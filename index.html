@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operation Barbarossa — Eastern Front 1941</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0d0f0c; --panel:#161a14; --panel2:#1d2218; --line:#3a4430;
+    --ink:#d8d4c0; --dim:#8d8a76; --amber:#e8b34b; --red:#c4453a; --redL:#e06a5f;
+    --grn:#7a9d54; --cyan:#69c5c9; --ger:#5a6470; --sov:#a93226;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; user-select:none;}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:"Segoe UI",Tahoma,Verdana,sans-serif;color:var(--ink);}
+  #map{position:absolute;inset:0;cursor:grab;}
+  #map.dragging{cursor:grabbing;}
+
+  /* ---------- top bar ---------- */
+  #topbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    gap:14px;padding:0 14px;background:linear-gradient(#181c13ee,#12150eee);
+    border-bottom:1px solid var(--line);z-index:20;font-size:14px;}
+  #topbar .t-title{font-weight:700;letter-spacing:2px;color:var(--amber);font-size:15px;white-space:nowrap;}
+  #topbar .t-chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+    padding:4px 10px;white-space:nowrap;}
+  #topbar .t-chip b{color:var(--amber);}
+  #wx-chip.mud b{color:#b07d4f;} #wx-chip.snow b{color:#cfe6ef;} #wx-chip.freeze b{color:#9fc7d8;}
+  #topbar .spacer{flex:1;}
+  button{font-family:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:6px 14px;font-size:14px;cursor:pointer;}
+  button:hover{border-color:var(--amber);color:var(--amber);}
+  button:disabled{opacity:.4;cursor:default;}
+  button.primary{background:#4a3b18;border-color:var(--amber);color:#ffd98a;font-weight:600;}
+  button.primary:hover{background:#5d4a1d;}
+  button.danger{border-color:var(--red);color:var(--redL);}
+
+  /* ---------- side panel ---------- */
+  #side{position:absolute;top:60px;right:8px;width:262px;z-index:20;display:flex;
+    flex-direction:column;gap:8px;max-height:calc(100% - 130px);}
+  .card{background:#14180fdd;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-size:13px;line-height:1.45;}
+  .card h3{font-size:11px;letter-spacing:2px;color:var(--dim);margin-bottom:6px;font-weight:600;}
+  .card .big{font-size:15px;font-weight:700;}
+  .ger .big{color:#aeb9c6;} .sov .big{color:#e88c80;}
+  .statrow{display:flex;justify-content:space-between;margin:1px 0;}
+  .statrow span:last-child{color:var(--amber);font-weight:600;}
+  .bad{color:var(--redL)!important;} .good{color:var(--grn)!important;}
+  #unit-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  #unit-actions button{padding:4px 10px;font-size:12px;}
+  #preview-card .vs{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
+  #log-card{overflow-y:auto;min-height:60px;}
+  #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
+  #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys{color:var(--amber);}
+
+  /* ---------- bottom hint ---------- */
+  #hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
+    background:#14180fcc;border:1px solid var(--line);border-radius:8px;padding:6px 16px;
+    font-size:13px;color:var(--dim);white-space:nowrap;}
+  #hint b{color:var(--ink);}
+
+  /* ---------- modals ---------- */
+  .modal-back{position:absolute;inset:0;background:#000a;z-index:40;display:flex;
+    align-items:center;justify-content:center;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:26px 30px;max-width:660px;width:92%;max-height:88%;overflow-y:auto;
+    box-shadow:0 12px 60px #000c;}
+  .modal h2{color:var(--amber);letter-spacing:3px;font-size:20px;margin-bottom:12px;}
+  .modal p,.modal li{font-size:14px;line-height:1.55;color:var(--ink);}
+  .modal ul{margin:8px 0 8px 20px;}
+  .modal .mrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .hidden{display:none!important;}
+
+  /* ---------- title screen ---------- */
+  #menu{background:radial-gradient(1200px 700px at 50% 30%, #1d2415 0%, #0a0c08 70%);}
+  #menu .modal{max-width:740px;background:#11150cf2;text-align:center;border-color:#4a5538;}
+  #menu h1{font-size:34px;letter-spacing:6px;color:var(--amber);text-shadow:0 0 22px #e8b34b44;}
+  #menu .sub{color:var(--dim);letter-spacing:3px;font-size:13px;margin:4px 0 18px;}
+  #menu .pick-row{display:flex;gap:14px;justify-content:center;margin:14px 0;}
+  .pick{flex:1;max-width:280px;border:1px solid var(--line);border-radius:10px;padding:14px;
+    cursor:pointer;background:var(--panel2);text-align:left;}
+  .pick:hover{border-color:var(--amber);}
+  .pick.sel{border-color:var(--amber);box-shadow:0 0 14px #e8b34b33;background:#242a1b;}
+  .pick h4{font-size:15px;margin-bottom:4px;} .pick p{font-size:12px;color:var(--dim);line-height:1.4;}
+  .pick.p-ger h4{color:#b9c4d2;} .pick.p-sov h4{color:#e88c80;}
+  #menu .opt-row{display:flex;gap:8px;justify-content:center;margin:8px 0 18px;flex-wrap:wrap;}
+  .opt{border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+    color:var(--dim);background:var(--panel2);}
+  .opt.sel{color:var(--amber);border-color:var(--amber);}
+  #menu .start-btn{font-size:17px;padding:12px 44px;letter-spacing:2px;}
+  #menu .foot{margin-top:14px;font-size:12px;color:var(--dim);}
+
+  /* ---------- end screen ---------- */
+  #end-modal h2.win{color:var(--grn);} #end-modal h2.lose{color:var(--redL);}
+  #end-stats{margin:10px 0;font-size:14px;}
+
+  /* AI banner */
+  #ai-banner{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:25;
+    background:#1b1410ee;border:1px solid var(--red);color:var(--redL);border-radius:8px;
+    padding:8px 22px;font-size:14px;letter-spacing:2px;}
+  #pass-banner{font-size:16px;}
+  .pulse{animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+
+<div id="topbar" class="hidden">
+  <span class="t-title">⚙ BARBAROSSA</span>
+  <span class="t-chip" id="date-chip"><b>Turn 1</b> · 22 Jun 1941</span>
+  <span class="t-chip" id="wx-chip">Weather: <b>Clear</b></span>
+  <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
+  <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
+  <span class="spacer"></span>
+  <button id="btn-objectives">Objectives</button>
+  <button id="btn-help2">Help</button>
+  <button id="btn-sound">🔊</button>
+  <button id="btn-menu">Menu</button>
+  <button id="btn-endturn" class="primary">End Turn ▶</button>
+</div>
+
+<div id="side" class="hidden">
+  <div class="card" id="unit-card"><h3>UNIT</h3><div id="unit-body">Select one of your units.</div>
+    <div id="unit-actions"></div></div>
+  <div class="card" id="air-card"><h3>✈ AIR FORCES</h3><div id="air-body">—</div></div>
+  <div class="card hidden" id="preview-card"><h3>BATTLE FORECAST</h3><div id="preview-body"></div></div>
+  <div class="card" id="terrain-card"><h3>TERRAIN</h3><div id="terrain-body">Hover the map.</div></div>
+  <div class="card" id="log-card"><h3>WAR DIARY</h3><div id="log"></div></div>
+</div>
+
+<div id="hint" class="hidden"></div>
+<div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
+
+<!-- ============ TITLE / MENU ============ -->
+<div id="menu" class="modal-back">
+  <div class="modal">
+    <h1>OPERATION BARBAROSSA</h1>
+    <div class="sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
+    <div class="pick-row">
+      <div class="pick p-ger sel" id="pick-ger">
+        <h4>⬛ Germany (Axis)</h4>
+        <p>Race the clock. Use your panzers to break through, encircle whole Soviet armies,
+           and take Moscow before the winter snows stop you cold.</p>
+      </div>
+      <div class="pick p-sov" id="pick-sov">
+        <h4>🟥 Soviet Union</h4>
+        <p>Trade space for time. Hold the rivers and cities, never let your armies get
+           surrounded, and bleed the invader until winter — then strike back.</p>
+      </div>
+    </div>
+    <div class="opt-row" id="diff-row">
+      <span style="color:var(--dim);padding:6px 0;">Difficulty:</span>
+      <span class="opt" data-d="easy">Recruit</span>
+      <span class="opt sel" data-d="normal">Field Marshal</span>
+      <span class="opt" data-d="hard">Iron Will</span>
+    </div>
+    <div class="opt-row">
+      <span class="opt sel" id="mode-ai">vs Computer</span>
+      <span class="opt" id="mode-hotseat">2-Player Hotseat</span>
+    </div>
+    <div class="mrow" style="justify-content:center;">
+      <button class="primary start-btn" id="btn-start">BEGIN CAMPAIGN</button>
+      <button id="btn-continue" class="hidden start-btn">CONTINUE SAVE</button>
+    </div>
+    <div class="mrow" style="justify-content:center;">
+      <button id="btn-help">How to Play</button>
+    </div>
+    <div class="foot">Runs 100% on your PC — no internet needed. Progress autosaves every turn.</div>
+  </div>
+</div>
+
+<!-- ============ HELP ============ -->
+<div id="help-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2>HOW TO PLAY</h2>
+    <p><b>Goal.</b> Germany must capture the Soviet objective cities (Moscow is worth the most)
+       before the campaign ends on <b>turn 28</b> (early January 1942). The Soviets win by holding them.
+       Each turn is one week of 1941.</p>
+    <ul>
+      <li><b>Select</b> one of your units, then click a highlighted hex to <b>move</b>, or click an
+          adjacent enemy (red ring) to <b>attack</b>. Every unit can move and attack once per turn.</li>
+      <li><b>Strength</b> (the number on the counter) is a unit's health <i>and</i> its punch.
+          Spend <b>⚙ Production</b> to reinforce a damaged unit or deploy new ones at your cities.</li>
+      <li><b>Terrain matters.</b> Forests, hills and cities boost defense. Rivers are deadly to attack
+          across. Units that hold still <b>dig in</b> (▮ pips = bonus defense).</li>
+      <li><b>SUPPLY is everything.</b> Supply reaches only <b>7 hexes</b> from your map edge (Germans
+          west, Soviets east) — and from every <b>city you control</b>, which acts as a forward depot.
+          Capture cities to push your supply network deeper. A unit cut off (by distance, or because
+          enemies stand between it and home) shows <b style="color:var(--redL)">⚠ OUT OF SUPPLY</b>:
+          it fights at half strength and bleeds men every turn. <b>Surround enemy armies to starve them
+          — and don't let it happen to your spearheads.</b></li>
+      <li><b>The clock.</b> October brings <b>mud</b> (slow, weak attacks). December brings <b>snow</b> —
+          German attacks falter while fresh <b>Siberian divisions</b> arrive for the Soviets. Germany:
+          win <i>before</i> winter. Soviets: survive <i>until</i> it.</li>
+      <li>A unit forced to retreat with nowhere to go is <b>destroyed</b> — pockets kill.</li>
+      <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
+          plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields), or fly
+          <b>Patrol</b> to intercept enemy strikes. Groups that stay grounded repair. Flak and dogfights
+          cause losses — and deep snow all but grounds the Luftwaffe.</li>
+    </ul>
+    <p style="color:var(--dim)"><b>Tips:</b> punch holes with panzers, pour through, and meet behind the
+       enemy line — that's an encirclement. As the Soviets, keep a straight front, garrison cities,
+       and always have an escape route east.</p>
+    <div class="mrow"><button class="primary" id="btn-help-close">Got it</button></div>
+  </div>
+</div>
+
+<!-- ============ OBJECTIVES ============ -->
+<div id="obj-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2>OBJECTIVE CITIES</h2>
+    <div id="obj-list" style="font-size:14px;line-height:1.9;"></div>
+    <p id="obj-summary" style="margin-top:10px;"></p>
+    <div class="mrow"><button class="primary" id="btn-obj-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ END GAME ============ -->
+<div id="end-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2 id="end-title">VICTORY</h2>
+    <p id="end-text"></p>
+    <div id="end-stats"></div>
+    <div class="mrow">
+      <button class="primary" id="btn-end-menu">Back to Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HOTSEAT PASS ============ -->
+<div id="pass-modal" class="modal-back hidden">
+  <div class="modal" style="text-align:center;">
+    <h2 id="pass-title">PASS THE KEYBOARD</h2>
+    <p id="pass-text"></p>
+    <div class="mrow" style="justify-content:center;"><button class="primary" id="btn-pass-go">Ready — Begin Turn</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   OPERATION BARBAROSSA — Eastern Front 1941
+   A single-file, fully offline, turn-based strategy game.
+   Built for the Claude-Jarvis project: no installs, no internet, no APIs.
+   Design pillars (from the classics):
+     - Supply & encirclement  (Unity of Command / Hearts of Iron)
+     - Terrain & entrenchment (Panzer General)
+     - Production & the weather clock (Hearts of Iron)
+   ===================================================================== */
+
+/* ============================ MAP DATA ============================ */
+/* 30 x 20 hexes, odd-r offset (pointy-top, odd rows shift right).
+   ~ water   . plains   f forest   h hills   s swamp   r river        */
+const COLS = 30, ROWS = 20;
+const MAP_ROWS = [
+/*           0    5    10   15   20   25     */
+/* 0*/ "~~~~~~~~~~~~~~.ffffff.ffff.fff",
+/* 1*/ "~~~~~~~~~~~~~..f.fff.f.ffff.ff",
+/* 2*/ "~~~~....f..f.fff.fffh.f.fff.ff",
+/* 3*/ "..f.....rr..f.ff.ff.hh.f.ff.ff",
+/* 4*/ ".f.......rr..ff.f.f.......f.ff",
+/* 5*/ "f.....f...r.f..f..f...f....f..",
+/* 6*/ ".....f..f..r.f.....f.....f..f.",
+/* 7*/ "......f.....f..r.f........f..f",
+/* 8*/ "....sssss.ss...r....f....f....",
+/* 9*/ "...sssssssss..r...........f...",
+/*10*/ "....sssssss...r...............",
+/*11*/ "..h..ss......r................",
+/*12*/ ".h...........r............h...",
+/*13*/ ".............r........h.......",
+/*14*/ "..............r...............",
+/*15*/ "..............r........rr.....",
+/*16*/ ".............r................",
+/*17*/ "..........~~~~~~~~~~~~~.......",
+/*18*/ "....~~~~~~~~~~~~~~~~~~~~~.....",
+/*19*/ "...~~~~~~~~~~~~~~~~~~~~~~~....",
+];
+
+const TERRAIN = {
+  '.': {name:'Plains',  move:1, def:1.00, dig:1, color:'#4a5234'},
+  'f': {name:'Forest',  move:2, def:1.30, dig:2, color:'#33422a'},
+  'h': {name:'Hills',   move:2, def:1.40, dig:2, color:'#56503a'},
+  's': {name:'Marshes', move:3, def:1.15, dig:1, color:'#3c4a42'},
+  'r': {name:'River',   move:3, def:0.85, dig:0, color:'#33505e'},
+  '~': {name:'Sea',     move:0, def:1.00, dig:0, color:'#1d2c38'},
+  'c': {name:'City',    move:1, def:1.70, dig:3, color:'#5a5648'}, // virtual: hex with a city
+};
+
+/* Cities: vp>0 are German objectives. owner 'G' | 'S'. */
+const CITIES_INIT = [
+  {x:1, y:3,  name:'Königsberg',     vp:0, owner:'G'},
+  {x:2, y:7,  name:'Warsaw',         vp:0, owner:'G'},
+  {x:1, y:15, name:'Bucharest',      vp:0, owner:'G'},
+  {x:7, y:2,  name:'Riga',           vp:1, owner:'S'},
+  {x:14,y:1,  name:'Leningrad',      vp:3, owner:'S'},
+  {x:12,y:2,  name:'Pskov',          vp:0, owner:'S'},
+  {x:3, y:8,  name:'Brest',          vp:0, owner:'S'},
+  {x:9, y:7,  name:'Minsk',          vp:1, owner:'S'},
+  {x:16,y:6,  name:'Smolensk',       vp:1, owner:'S'},
+  {x:19,y:5,  name:'Vyazma',         vp:0, owner:'S'},
+  {x:21,y:4,  name:'Kalinin',        vp:0, owner:'S'},
+  {x:24,y:4,  name:'Moscow',         vp:4, owner:'S'},
+  {x:24,y:7,  name:'Tula',           vp:0, owner:'S'},
+  {x:18,y:8,  name:'Bryansk',        vp:0, owner:'S'},
+  {x:21,y:9,  name:'Orel',           vp:0, owner:'S'},
+  {x:13,y:9,  name:'Gomel',          vp:0, owner:'S'},
+  {x:10,y:11, name:'Zhitomir',       vp:0, owner:'S'},
+  {x:12,y:12, name:'Kiev',           vp:2, owner:'S'},
+  {x:19,y:11, name:'Kharkov',        vp:1, owner:'S'},
+  {x:16,y:13, name:'Dnepropetrovsk', vp:0, owner:'S'},
+  {x:21,y:14, name:'Stalino',        vp:0, owner:'S'},
+  {x:9, y:17, name:'Odessa',         vp:1, owner:'S'},
+  {x:25,y:16, name:'Rostov',         vp:2, owner:'S'},
+  {x:27,y:8,  name:'Voronezh',       vp:0, owner:'S'},
+  {x:28,y:3,  name:'Yaroslavl',      vp:0, owner:'S'},
+];
+const TOTAL_VP = CITIES_INIT.reduce((a,c)=>a+c.vp,0);
+
+/* Soviet reinforcements appear at these (if friendly, supplied, empty), in order:
+   interior cities first — fresh armies form near the fighting, not just the far edge. */
+const SOV_SPAWNS = [[24,4],[18,8],[19,11],[27,8],[21,9],[25,16],[29,5],[29,9],[29,13],[28,3]];
+const GER_SPAWNS = [[1,2],[2,7],[1,15],[0,3],[0,5],[0,11]];
+
+/* ============================ UNIT TYPES ============================ */
+const KINDS = {
+  g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
+  g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+  g_ally: {side:'G', label:'Romanian Army',  atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
+  s_guard:{side:'S', label:'Siberian Guards',atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
+  s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf'},
+};
+
+/* Starting order of battle. [kind, name, x, y, str] */
+const START_UNITS = [
+  // — Army Group North —
+  ['g_inf','18. Armee',        4,2, 10], ['g_inf','16. Armee',  4,3, 10],
+  ['g_pz' ,'4. Panzergruppe',  5,3, 10],
+  // — Army Group Center —
+  ['g_inf','9. Armee',         4,5, 10], ['g_pz' ,'3. Panzergruppe', 5,5, 10],
+  ['g_inf','2. Armee',         3,6, 10], ['g_pz' ,'2. Panzergruppe', 4,6, 10],
+  ['g_inf','4. Armee',         4,7, 10],
+  // — Army Group South —
+  ['g_inf','6. Armee',         3,11,10], ['g_pz' ,'1. Panzergruppe', 3,12,10],
+  ['g_inf','17. Armee',        3,13,10], ['g_inf','11. Armee',       2,14, 9],
+  ['g_ally','Romanian 3rd',    2,15, 8], ['g_ally','Romanian 4th',   2,16, 8],
+  // — Soviet border armies (caught by surprise: under strength, low entrenchment) —
+  ['s_inf','8th Army',   6,2, 6], ['s_inf','11th Army', 6,4, 6],
+  ['s_inf','3rd Army',   5,6, 6], ['s_inf','10th Army', 5,7, 6],
+  ['s_inf','4th Army',   3,8, 6], ['s_inf','5th Army',  5,11,6],
+  ['s_inf','6th Army',   4,12,6], ['s_inf','26th Army', 4,14,6],
+  ['s_inf','9th Army',   4,16,6],
+  // — Second echelon —
+  ['s_inf','27th Army',  9,3, 7], ['s_inf','13th Army',  9,7, 7],
+  ['s_inf','20th Army', 16,6, 7], ['s_inf','37th Army', 12,12,7],
+  ['s_inf','18th Army',  8,15,6],
+  ['s_tank','1st Mech Corps', 7,5, 7], ['s_tank','4th Mech Corps', 7,11,7],
+  // — Reserve —
+  ['s_inf','16th Army', 19,5, 7], ['s_inf','24th Army', 24,4, 8],
+];
+
+/* Soviet mobilization: extra units per turn [turn, kind, name]. */
+const SOV_SCHEDULE = [
+  [2,'s_inf','22nd Army'], [3,'s_inf','21st Army'], [3,'s_inf','29th Army'],
+  [4,'s_inf','19th Army'],
+  [4,'s_tank','5th Mech Corps'], [5,'s_inf','28th Army'], [6,'s_inf','30th Army'],
+  [6,'s_mil','Kiev Militia'], [7,'s_inf','31st Army'], [7,'s_tank','7th Mech Corps'],
+  [8,'s_inf','32nd Army'], [9,'s_inf','35th Army'],
+  [9,'s_inf','33rd Army'], [10,'s_inf','34th Army'], [10,'s_tank','2nd Tank Corps'],
+  [11,'s_inf','38th Army'], [12,'s_inf','40th Army'], [13,'s_inf','43rd Army'],
+  [13,'s_mil','Moscow Militia'], [14,'s_inf','49th Army'], [15,'s_inf','50th Army'],
+  [15,'s_tank','4th Tank Corps'], [16,'s_inf','52nd Army'], [17,'s_mil','Workers Militia'],
+  [17,'s_inf','54th Army'], [18,'s_inf','55th Army'], [19,'s_inf','57th Army'],
+  [20,'s_guard','1st Siberian Gds'], [20,'s_inf','58th Army'],
+  [21,'s_guard','2nd Siberian Gds'], [22,'s_guard','3rd Siberian Gds'],
+  [22,'s_inf','59th Army'], [23,'s_guard','4th Siberian Gds'],
+  [24,'s_guard','5th Siberian Gds'], [25,'s_inf','60th Army'],
+  [26,'s_inf','61st Army'], [27,'s_inf','62nd Army'],
+];
+
+/* ============================ RULES CONSTANTS ============================ */
+const MAX_TURN = 28;                       // 28 weeks: 22 Jun 1941 → 4 Jan 1942
+const START_DATE = Date.UTC(1941,5,22);
+const ENTRENCH_DEF = 0.15;                 // +15% defense per dig-in pip
+const CONCENTRIC = 0.12;                   // +12% attack per extra adjacent friend
+const OOS_ATK = 0.5, OOS_DEF = 0.75;       // out-of-supply penalties
+const RIVER_ATK = 0.6;                     // attacking out of a river hex
+// weather: turns 1-15 clear · 16-19 mud · 20-21 freeze · 22+ snow
+function weatherFor(turn){ return turn>=22?'snow' : turn>=20?'freeze' : turn>=16?'mud' : 'clear'; }
+const WX_LABEL = {clear:'Clear', mud:'Mud — Rasputitsa', freeze:'Hard Frost', snow:'Deep Snow'};
+function ppFor(side, turn){
+  if (side==='G') return turn<=13 ? 6 : 4;             // overstretch after autumn
+  return turn<=6 ? 4 : turn<=14 ? 6 : 8;               // Soviet mobilization ramps up
+}
+// German victory tiers by objective points held at the end of turn 28
+const VICTORY_TIERS = [
+  [12,'DECISIVE AXIS VICTORY','The Soviet state collapses. Moscow has fallen and the Red Army is shattered — history takes a darker road.'],
+  [8,'AXIS OPERATIONAL VICTORY','The Wehrmacht winters deep inside Russia, better placed than history. But the giant is waking…'],
+  [5,'STALEMATE — HISTORY REPEATS','Like 1941 itself: vast gains, but the objectives held. Frozen soldiers stare at the spires of Moscow they will never reach.'],
+  [0,'SOVIET VICTORY','The invasion is broken on the Red Army’s back. The counteroffensive rolls west through the snow.'],
+];
+
+/* ============================ HEX MATH (odd-r offset, pointy-top) ============================ */
+function inMap(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
+function terrainAt(x,y){ return MAP_ROWS[y][x]; }
+function passable(x,y){ return inMap(x,y) && terrainAt(x,y) !== '~'; }
+function neighbors(x,y){
+  const odd = y & 1;
+  const d = odd ? [[1,0],[-1,0],[0,-1],[1,-1],[0,1],[1,1]]
+                : [[1,0],[-1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+  const out = [];
+  for (const [dx,dy] of d){ const nx=x+dx, ny=y+dy; if (inMap(nx,ny)) out.push([nx,ny]); }
+  return out;
+}
+function cubeOf(x,y){ const q = x - ((y - (y&1)) >> 1); return [q, y, -q - y]; }
+function hexDist(x1,y1,x2,y2){
+  const a=cubeOf(x1,y1), b=cubeOf(x2,y2);
+  return Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]), Math.abs(a[2]-b[2]));
+}
+const keyOf = (x,y) => x + ',' + y;
+
+/* ============================ GAME STATE ============================ */
+let G = null;          // the whole game state (serializable)
+let nextId = 1;
+
+function cityAt(x,y){ return G.cities.find(c => c.x===x && c.y===y); }
+function unitAt(x,y){ return G.units.find(u => u.x===x && u.y===y); }
+function unitsOf(side){ return G.units.filter(u => u.side===side); }
+function enemyOf(side){ return side==='G' ? 'S' : 'G'; }
+function effTerrain(x,y){
+  const c = cityAt(x,y);
+  if (!c) return TERRAIN[terrainAt(x,y)];
+  // Moscow & Leningrad are fortress cities: deep defense lines, ringed in concrete
+  return c.vp >= 3 ? {...TERRAIN['c'], name:'Fortress City', def:1.9} : TERRAIN['c'];
+}
+
+function makeUnit(kind, name, x, y, str){
+  const k = KINDS[kind];
+  return { id: nextId++, kind, name, side:k.side, x, y,
+           str: str ?? k.maxStr, entrench: 0, moved:false, attacked:false,
+           oos:false, oosTurns:0 };
+}
+
+function newGame(playerSide, difficulty, mode){
+  nextId = 1;
+  G = {
+    turn: 1, phase: 'G',                       // Germany always moves first
+    playerSide, difficulty: difficulty||'normal', mode: mode||'ai',
+    cities: CITIES_INIT.map(c => ({...c})),
+    units: START_UNITS.map(([k,n,x,y,s]) => makeUnit(k,n,x,y,s)),
+    air: AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s)),
+    pp: {G:0, S:0},
+    log: [],
+    over: false, result: null,
+    stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
+  };
+  // Soviet border armies start partly dug in along the frontier
+  for (const u of unitsOf('S')) if (u.x<=6) u.entrench = 1;
+  // Brest fortress: starts beyond supply range, dug in deep — holds out like 1941
+  const brest = G.units.find(u=>u.name==='4th Army');
+  if (brest) brest.entrench = 3;
+  G.pp.G = ppFor('G',1) + diffPP('G');
+  G.pp.S = ppFor('S',1) + diffPP('S');
+  refreshSupply();
+  logMsg('sys', '22 June 1941 — Operation Barbarossa begins. ' +
+    (playerSide==='G' ? 'Strike fast: winter is coming.' : 'Hold the line: winter is coming.'));
+  logMsg('sys', '✈ The Luftwaffe catches the Red Air Force on the ground — over 1,800 Soviet planes lost in a day.');
+  return G;
+}
+
+function diffPP(side){
+  if (G.mode==='hotseat') return 0;
+  const aiSide = enemyOf(G.playerSide);
+  if (G.difficulty==='easy')  return side===G.playerSide ? 1 : -1;
+  if (G.difficulty==='hard')  return side===aiSide ? 2 : -1;
+  return 0;
+}
+function diffCombat(side){           // attack multiplier tweak for AI difficulty
+  if (G.mode==='hotseat') return 1;
+  const aiSide = enemyOf(G.playerSide);
+  if (side!==aiSide) return 1;
+  return G.difficulty==='easy' ? 0.85 : G.difficulty==='hard' ? 1.15 : 1;
+}
+
+function logMsg(cls, text){
+  G.log.push([cls, text]);
+  if (G.log.length > 80) G.log.shift();
+  if (typeof onLog === 'function') onLog();
+}
+
+/* ============================ SUPPLY & ZOC ============================ */
+/* A hex is in a side's Zone of Control if adjacent to that side's unit. */
+function computeZOC(side){
+  const z = new Set();
+  for (const u of unitsOf(side))
+    for (const [nx,ny] of neighbors(u.x,u.y)) z.add(keyOf(nx,ny));
+  return z;
+}
+
+/* Supply spreads from the home map edge AND from friendly-owned cities, but
+   only SUPPLY_RANGE hexes at a time — each city you control is a depot that
+   pushes the network further (Unity-of-Command style). It cannot flow through
+   enemy units or enemy ZOC (unless a friendly unit holds the hex).
+   This is why the blitzkrieg must take cities — and why it runs out of steam. */
+const SUPPLY_RANGE = 7;
+function computeSupply(side){
+  const foe = enemyOf(side);
+  const foeZOC = computeZOC(foe);
+  const occ = {};                     // occupancy map for speed
+  for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
+  const cityKeys = new Set(G.cities.filter(c=>c.owner===side).map(c=>keyOf(c.x,c.y)));
+  const dist = new Map();             // hex -> hexes since last depot
+  const open = [];
+  const homeX = side==='G' ? 0 : COLS-1;
+  for (let y=0;y<ROWS;y++){
+    if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe){
+      dist.set(keyOf(homeX,y), 0); open.push([0,homeX,y]);
+    }
+  }
+  while (open.length){
+    open.sort((a,b)=>a[0]-b[0]);
+    const [c,x,y] = open.shift();
+    if (c > (dist.get(keyOf(x,y)) ?? 1e9)) continue;
+    for (const [nx,ny] of neighbors(x,y)){
+      const k = keyOf(nx,ny);
+      if (!passable(nx,ny)) continue;
+      if (occ[k] === foe) continue;
+      if (foeZOC.has(k) && occ[k] !== side) continue;
+      let nc = c + 1;
+      if (nc > SUPPLY_RANGE) continue;
+      if (cityKeys.has(k)) nc = 0;            // friendly city = forward depot
+      if (nc < (dist.get(k) ?? 1e9)){ dist.set(k, nc); open.push([nc,nx,ny]); }
+    }
+  }
+  return new Set(dist.keys());
+}
+
+function refreshSupply(){
+  for (const side of ['G','S']){
+    const net = computeSupply(side);
+    for (const u of unitsOf(side)) u.oos = !net.has(keyOf(u.x,u.y));
+  }
+}
+
+/* ============================ MOVEMENT ============================ */
+function moveCost(u, x, y){
+  let c = effTerrain(x,y).move;
+  const wx = weatherFor(G.turn);
+  if (wx === 'mud') c += 1;
+  if (wx === 'snow' && KINDS[u.kind].sym === 'arm') c += 1;
+  return c;
+}
+
+/* Dijkstra flood: returns Map key->cost of hexes the unit can END on.
+   Enemy ZOC stops movement; friendly units can be passed through but not
+   stopped on; enemy hexes are impassable. */
+function reachable(u){
+  const wx = weatherFor(G.turn);
+  let mp = KINDS[u.kind].mp;
+  if (wx==='snow' && u.side==='G') mp = Math.max(1, mp-1);
+  const foeZOC = computeZOC(enemyOf(u.side));
+  const occ = {};
+  for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
+  const best = new Map([[keyOf(u.x,u.y), 0]]);
+  const open = [[0,u.x,u.y]];
+  while (open.length){
+    open.sort((a,b)=>a[0]-b[0]);
+    const [c,x,y] = open.shift();
+    if (c > (best.get(keyOf(x,y)) ?? 1e9)) continue;
+    if (foeZOC.has(keyOf(x,y)) && !(x===u.x&&y===u.y)) continue;  // ZOC: stop here
+    for (const [nx,ny] of neighbors(x,y)){
+      if (!passable(nx,ny)) continue;
+      const k = keyOf(nx,ny);
+      if (occ[k] === enemyOf(u.side)) continue;
+      const nc = c + moveCost(u,nx,ny);
+      if (nc > mp) continue;
+      if (nc < (best.get(k) ?? 1e9)){ best.set(k, nc); open.push([nc,nx,ny]); }
+    }
+  }
+  best.delete(keyOf(u.x,u.y));
+  for (const [k] of [...best]) {                       // can't end on any unit
+    const [x,y] = k.split(',').map(Number);
+    if (unitAt(x,y)) best.delete(k);
+  }
+  return best;
+}
+
+function doMove(u, x, y){
+  u.x = x; u.y = y; u.moved = true; u.entrench = 0;
+  const c = cityAt(x,y);
+  if (c && c.owner !== u.side){
+    c.owner = u.side;
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} captured by ${u.name}!`);
+    if (typeof onCityTaken === 'function') onCityTaken(c);
+  }
+  refreshSupply();
+  checkSuddenDeath();
+}
+function flag(side){ return side==='G' ? '⬛' : '🟥'; }
+
+/* ============================ COMBAT ============================ */
+function combatMods(att, def){
+  const wx = weatherFor(G.turn);
+  const tDef = effTerrain(def.x, def.y).def;
+  let aMul = 1, dMul = tDef * (1 + ENTRENCH_DEF*def.entrench);
+  if (terrainAt(att.x,att.y)==='r') aMul *= RIVER_ATK;
+  if (att.oos) aMul *= OOS_ATK;
+  if (def.oos) dMul *= OOS_DEF;
+  // concentric attack: every other friendly unit adjacent to the defender
+  let ring = 0;
+  for (const [nx,ny] of neighbors(def.x,def.y)){
+    const t = unitAt(nx,ny);
+    if (t && t.side===att.side && t.id!==att.id) ring++;
+  }
+  aMul *= 1 + CONCENTRIC*Math.min(ring,3);
+  // weather
+  if (wx==='mud'){ aMul *= KINDS[att.kind].sym==='arm' ? 0.5 : 0.6; }
+  if (wx==='freeze'){ aMul *= 0.9; }
+  if (wx==='snow'){
+    if (att.side==='G') aMul *= 0.6;
+    if (def.side==='G') dMul *= 0.8;
+    if (KINDS[att.kind].winter) aMul *= 1.2;
+  }
+  aMul *= diffCombat(att.side);
+  return {aMul, dMul, ring, tDef};
+}
+
+function combatPower(att, def){
+  const m = combatMods(att, def);
+  const A = KINDS[att.kind].atk * (att.str/10) * m.aMul;
+  const D = KINDS[def.kind].def * (def.str/10) * m.dMul;
+  return {A: Math.max(A,0.1), D: Math.max(D,0.1), ...m};
+}
+
+/* Expected (dice-free) result — used for the on-screen forecast and the AI. */
+const RETREAT_RATIO = 1.35;
+function previewCombat(att, def){
+  const {A,D} = combatPower(att,def);
+  const r = A/D;
+  const defLoss = Math.min(def.str, Math.round(1.9*r));
+  const atkLoss = Math.min(att.str, Math.round(1.7/Math.max(r,0.35)));
+  return {ratio:r, defLoss, atkLoss, retreat: r>=RETREAT_RATIO && defLoss>=2};
+}
+
+function retreatHex(def, att){
+  // best adjacent hex: empty, passable, away from attacker, ideally out of enemy ZOC
+  const foeZOC = computeZOC(att.side);
+  let best=null, bestScore=-1e9;
+  for (const [nx,ny] of neighbors(def.x,def.y)){
+    if (!passable(nx,ny) || unitAt(nx,ny)) continue;
+    let s = hexDist(nx,ny,att.x,att.y)*3;
+    s += (def.side==='S' ? nx : -nx);                 // bias toward own rear
+    if (foeZOC.has(keyOf(nx,ny))) s -= 8;
+    if (s > bestScore){ bestScore=s; best=[nx,ny]; }
+  }
+  return best;
+}
+
+function resolveCombat(att, def){
+  const {A,D} = combatPower(att,def);
+  const rnd = () => 0.75 + Math.random()*0.5;
+  const r = (A*rnd())/(D*rnd());
+  let defLoss = Math.min(def.str, Math.max(r>0.8?1:0, Math.round(1.9*r*(0.8+Math.random()*0.4))));
+  let atkLoss = Math.min(att.str, Math.round(1.7/Math.max(r,0.35)*(0.8+Math.random()*0.4)));
+  att.attacked = true; att.moved = true; att.entrench = 0;
+  def.entrench = Math.max(0, def.entrench - 1);
+  def.str -= defLoss; att.str -= atkLoss;
+  G.stats[def.side].lost += defLoss; G.stats[att.side].lost += atkLoss;
+  G.stats[att.side].killed += defLoss; G.stats[def.side].killed += atkLoss;
+
+  const events = {defLoss, atkLoss, ratio:r, destroyed:false, retreated:false,
+                  attDied:false, advance:null, defFrom:[def.x,def.y]};
+  if (att.str <= 0){
+    events.attDied = true; killUnit(att);
+    logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${att.name} destroyed itself attacking ${def.name}!`);
+  }
+  const defCity = cityAt(def.x,def.y);
+  const fortress = defCity && defCity.vp >= 3 && defCity.owner === def.side;
+  if (def.str <= 0){
+    events.destroyed = true;
+  } else if (fortress && r >= RETREAT_RATIO && defLoss >= 2 && !events.attDied){
+    def.str -= 1; G.stats[def.side].lost += 1; G.stats[att.side].killed += 1;   // no retreat: fights in the ruins
+    if (def.str <= 0) events.destroyed = true;
+  } else if (r >= RETREAT_RATIO && defLoss >= 2 && !events.attDied){
+    const rh = retreatHex(def, att);
+    if (rh){
+      def.x = rh[0]; def.y = rh[1]; def.entrench = 0; events.retreated = true;
+      const c = cityAt(rh[0],rh[1]);
+      if (c && c.owner!==def.side) c.owner = def.side;
+    } else {
+      def.str -= 2; G.stats[def.side].lost += 2; G.stats[att.side].killed += 2;
+      if (def.str <= 0) events.destroyed = true;
+      else logMsg('sys', `${def.name} has nowhere to retreat — mauled in the pocket!`);
+    }
+  }
+  if (events.destroyed){
+    killUnit(def);
+    logMsg(att.side==='G'?'l-g':'l-s',
+      `${flag(att.side)} ${att.name} destroys ${def.name}${defNoEscape(events)?' — pocket closed!':'!'}`);
+  } else {
+    logMsg(att.side==='G'?'l-g':'l-s',
+      `${flag(att.side)} ${att.name} hits ${def.name}: ${defLoss} losses inflicted, ${atkLoss} taken.`);
+  }
+  // breakthrough: armor advances into a vacated hex
+  if ((events.destroyed || events.retreated) && !events.attDied &&
+      KINDS[att.kind].sym==='arm' && !unitAt(...events.defFrom)){
+    const [fx,fy] = events.defFrom;
+    att.x = fx; att.y = fy;
+    const c = cityAt(fx,fy);
+    if (c && c.owner!==att.side){
+      c.owner = att.side;
+      logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${att.name}!`);
+      if (typeof onCityTaken === 'function') onCityTaken(c);
+    }
+    events.advance = [fx,fy];
+  }
+  refreshSupply();
+  checkSuddenDeath();
+  return events;
+}
+function defNoEscape(ev){ return ev.destroyed && !ev.retreated; }
+function killUnit(u){ G.units = G.units.filter(t => t.id !== u.id); }
+
+/* ============================ PRODUCTION ============================ */
+function canReinforce(u){
+  if (u.str >= KINDS[u.kind].maxStr || u.oos || u.moved || u.attacked) return false;
+  const adjEnemy = neighbors(u.x,u.y).some(([x,y]) => { const t=unitAt(x,y); return t && t.side!==u.side; });
+  const cost = adjEnemy ? 2 : 1;            // pricier at the front line
+  return G.pp[u.side] >= cost ? {cost, steps: adjEnemy ? 1 : Math.min(KINDS[u.kind].maxStr - u.str, Math.floor(G.pp[u.side]/cost), 3)} : false;
+}
+function doReinforce(u){
+  const r = canReinforce(u);
+  if (!r) return false;
+  u.str += r.steps; G.pp[u.side] -= r.cost * r.steps;
+  u.moved = true;                            // reinforcing costs the unit its turn
+  logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} reinforced to strength ${u.str}.`);
+  return true;
+}
+function deploySpots(side){
+  const spawns = side==='G' ? GER_SPAWNS : SOV_SPAWNS;
+  const net = computeSupply(side);
+  return spawns.filter(([x,y]) => {
+    const c = cityAt(x,y);
+    if (c && c.owner!==side) return false;
+    return passable(x,y) && !unitAt(x,y) && net.has(keyOf(x,y));
+  });
+}
+function buyableKinds(side){
+  return Object.keys(KINDS).filter(k => KINDS[k].side===side && k!=='g_ally' && k!=='s_guard')
+    .filter(k => KINDS[k].cost <= G.pp[side]);
+}
+function doDeploy(side, kind, x, y){
+  const k = KINDS[kind];
+  if (!k || k.side!==side || G.pp[side] < k.cost) return false;
+  if (!deploySpots(side).some(([sx,sy]) => sx===x && sy===y)) return false;
+  G.pp[side] -= k.cost;
+  const names = {g_inf:'Ersatz Armee', g_pz:'Panzer Reserve', s_inf:'Reserve Army',
+                 s_tank:'Tank Reserve', s_mil:'People’s Militia'};
+  const u = makeUnit(kind, names[kind]||k.label, x, y, k.maxStr);
+  u.moved = true; u.attacked = true;        // arrives unready
+  G.units.push(u);
+  logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
+  refreshSupply();
+  return true;
+}
+
+/* ============================ AIR POWER ============================ */
+/* Off-map air groups. Each turn a group can STRIKE (bomb a ground unit:
+   damage + blasts away entrenchment), PATROL (intercept enemy strikes until
+   your next turn), or rest to repair. Strikes only reach AIR_RANGE hexes
+   from a city you control — airfields advance with the front. */
+const AIR_RANGE = 8;
+const AIR_INIT = [
+  ['G','Luftflotte 2', 9],
+  ['G','Luftflotte 4', 7],
+  ['S','VVS West Front', 4],     // caught on the ground, 22 June 1941
+];
+const SOV_AIR_SCHEDULE = [       // the Red Air Force rebuilds: [turn, name, str]
+  [4,  'VVS Reserve Group', 6],
+  [9,  '1st Air Army', 7],
+  [18, 'Winter Air Command', 9],
+];
+const AIR_MAXSTR = 10;
+function makeAir(side, name, str){ return {id:nextId++, side, name, str, mission:'ready'}; }
+function airOf(side){ return G.air.filter(a => a.side===side); }
+function airWxMul(side){
+  const wx = weatherFor(G.turn);
+  if (wx==='mud') return 0.7;
+  if (wx==='freeze') return 0.85;
+  if (wx==='snow') return side==='G' ? 0.45 : 0.9;   // the Luftwaffe freezes solid
+  return 1;
+}
+function airfieldCovered(side, x, y){
+  return G.cities.some(c => c.owner===side && hexDist(c.x,c.y,x,y) <= AIR_RANGE);
+}
+function strikeTargets(side){
+  return unitsOf(enemyOf(side)).filter(t => airfieldCovered(side, t.x, t.y));
+}
+function enemyPatrol(side){
+  return airOf(enemyOf(side)).filter(p => p.mission==='patrol' && p.str>0)
+                             .sort((a,b)=>b.str-a.str)[0] || null;
+}
+function previewStrike(au, t){
+  const eff = (au.str/10)*airWxMul(au.side);
+  const p = enemyPatrol(au.side);
+  return {dmg: Math.min(2, Math.max(0, Math.round(eff*(p?0.7:1.45)))), intercepted: !!p};
+}
+function killAir(au){ G.air = G.air.filter(a => a.id !== au.id); }
+function setPatrol(au){
+  if (au.mission!=='ready') return false;
+  au.mission = 'patrol';
+  logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} flies fighter patrols.`);
+  return true;
+}
+function airStrike(au, t){
+  if (au.mission!=='ready' || !t || t.side===au.side) return null;
+  if (!airfieldCovered(au.side, t.x, t.y)) return null;
+  au.mission = 'done';
+  let eff = (au.str/10)*airWxMul(au.side);
+  const res = {dmg:0, intercepted:false, flak:false, lostGroup:false, killed:false, target:t};
+  const patrol = enemyPatrol(au.side);
+  if (patrol){
+    res.intercepted = true;
+    au.str -= patrol.str > au.str ? 2 : 1;
+    patrol.str -= 1;
+    if (patrol.str <= 0) killAir(patrol);
+    eff *= 0.5;
+    logMsg('sys', `✈ Air battle over ${cityAt(t.x,t.y)?.name||'the front'} — ${patrol.name} intercepts ${au.name}!`);
+    if (au.str <= 0){
+      killAir(au); res.lostGroup = true;
+      logMsg('sys', `✈ ${au.name} is wiped out by enemy fighters.`);
+      return res;
+    }
+  }
+  if (Math.random() < 0.25){
+    au.str -= 1; res.flak = true;
+    if (au.str <= 0){ killAir(au); res.lostGroup = true; }
+  }
+  res.dmg = Math.min(2, t.str, Math.max(0, Math.round(eff*(1.1 + Math.random()*0.7))));
+  t.str -= res.dmg;
+  // field entrenchments are blasted open — but bombed cities just become rubble fortresses
+  if (t.entrench > 0 && !cityAt(t.x,t.y)) t.entrench--;
+  G.stats[t.side].lost += res.dmg; G.stats[au.side].killed += res.dmg;
+  if (t.str <= 0){
+    res.killed = true; killUnit(t);
+    logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} annihilates ${t.name} from the air!`);
+    refreshSupply(); checkSuddenDeath();
+  } else {
+    logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} bombs ${t.name}: ${res.dmg} losses${res.flak?' (flak damage taken)':''}.`);
+  }
+  if (typeof onAirStrike === 'function') onAirStrike(au, t, res);
+  return res;
+}
+
+/* ============================ TURN FLOW ============================ */
+function dateStr(turn){
+  const d = new Date(START_DATE + (turn-1)*7*864e5);
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getUTCDate()} ${m[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function startPhase(side){
+  G.phase = side;
+  for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; }
+  for (const a of airOf(side)) a.mission = 'ready';   // patrols land, bombers rearm
+  refreshSupply();
+  // attrition for cut-off units; entrench handled at end of phase
+  for (const u of [...unitsOf(side)]){
+    if (u.oos){
+      u.oosTurns++;
+      if (u.oosTurns >= 2){
+        u.str -= 1; G.stats[side].lost += 1; G.stats[enemyOf(side)].killed += 1;
+        if (u.str <= 0){
+          killUnit(u);
+          logMsg('sys', `${flag(side)} ${u.name} surrenders — starved out in the pocket.`);
+        }
+      }
+    } else u.oosTurns = 0;
+  }
+  G.pp[side] += ppFor(side, G.turn) + diffPP(side);
+  if (G.pp[side] > 40) G.pp[side] = 40;
+  checkSuddenDeath();
+}
+
+function endPhase(){
+  const side = G.phase;
+  for (const u of unitsOf(side)){
+    if (!u.moved && !u.attacked && !u.oos){
+      const cap = effTerrain(u.x,u.y).dig;
+      if (u.entrench < cap) u.entrench++;
+    }
+  }
+  for (const a of airOf(side))                       // groups that rested repair
+    if (a.mission==='ready' && a.str < AIR_MAXSTR) a.str++;
+  if (side === 'G'){
+    startPhase('S');
+  } else {
+    // Soviet reinforcements arrive at the top of the new turn
+    G.turn++;
+    if (G.turn > MAX_TURN){ endGame(); return; }
+    const wxNew = weatherFor(G.turn), wxOld = weatherFor(G.turn-1);
+    if (wxNew !== wxOld){
+      const msg = {mud:'The autumn rains begin — the rasputitsa swallows roads, men and machines.',
+                   freeze:'The ground freezes hard. Movement is possible again… and winter is close.',
+                   snow:'DEEP SNOW. German attacks falter in -30° cold. Siberian divisions are arriving.'}[wxNew];
+      if (msg) logMsg('sys', '❄ ' + msg);
+    }
+    for (const [t,kind,name] of SOV_SCHEDULE){
+      if (t === G.turn){
+        const spot = deploySpots('S')[0];
+        if (spot){
+          const u = makeUnit(kind, name, spot[0], spot[1]);
+          G.units.push(u);
+          logMsg('l-s', `🟥 ${name} (${KINDS[kind].label}) mobilized at ${cityAt(spot[0],spot[1])?.name||'the rear'}.`);
+        }
+      }
+    }
+    for (const [t,name,str] of SOV_AIR_SCHEDULE){
+      if (t === G.turn){
+        G.air.push(makeAir('S', name, str));
+        logMsg('l-s', `🟥 ✈ ${name} reaches the front — the Red Air Force is rebuilding.`);
+      }
+    }
+    refreshSupply();
+    startPhase('G');
+  }
+}
+
+/* ============================ VICTORY ============================ */
+function axisVP(){
+  return G.cities.filter(c => c.vp>0 && c.owner==='G').reduce((a,c)=>a+c.vp,0);
+}
+function checkSuddenDeath(){
+  if (G.over) return;
+  const moscow = G.cities.find(c=>c.name==='Moscow'), lenin = G.cities.find(c=>c.name==='Leningrad');
+  if (moscow.owner==='G' && lenin.owner==='G'){
+    endGame('axis-sudden'); return;
+  }
+  if (unitsOf('G').length < 5){
+    endGame('soviet-sudden'); return;
+  }
+}
+function endGame(sudden){
+  if (G.over) return;
+  G.over = true;
+  const vp = axisVP();
+  let title, text;
+  if (sudden==='axis-sudden'){
+    title = 'DECISIVE AXIS VICTORY';
+    text  = 'Moscow and Leningrad have both fallen — Soviet command collapses. The war in the East is decided.';
+  } else if (sudden==='soviet-sudden'){
+    title = 'DECISIVE SOVIET VICTORY';
+    text  = 'The invading army has been annihilated. The Red Army marches west — years ahead of schedule.';
+  } else {
+    for (const [min,t,x] of VICTORY_TIERS){ if (vp >= min){ title=t; text=x; break; } }
+  }
+  G.result = {title, text, vp};
+  logMsg('sys', `CAMPAIGN OVER — ${title}`);
+  if (typeof onGameOver === 'function') onGameOver();
+}
+
+/* ============================ AI ============================ */
+/* The AI plans ONE action at a time so the browser can animate each step.
+   aiPlanAction(side) -> {type:'move'|'attack'|'hold', ...} or null when done. */
+
+let dfCache = {};
+function clearAICache(){ dfCache = {}; }
+
+/* Dijkstra distance field TO (tx,ty) for `side`, over terrain move costs.
+   Enemy-held hexes are near-walls, enemy ZOC is sticky — paths route around. */
+function distField(side, tx, ty){
+  const ck = side + ':' + tx + ',' + ty;
+  if (dfCache[ck]) return dfCache[ck];
+  const foe = enemyOf(side);
+  const foeZOC = computeZOC(foe);
+  const occ = {};
+  for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
+  const f = new Map([[keyOf(tx,ty), 0]]);
+  const open = [[0,tx,ty]];
+  while (open.length){
+    open.sort((a,b)=>a[0]-b[0]);
+    const [c,x,y] = open.shift();
+    if (c > (f.get(keyOf(x,y)) ?? 1e9)) continue;
+    for (const [nx,ny] of neighbors(x,y)){
+      if (!passable(nx,ny)) continue;
+      const k = keyOf(nx,ny);
+      let step = TERRAIN[terrainAt(nx,ny)].move;
+      if (occ[k]===foe) step += 12;
+      else if (foeZOC.has(k)) step += 1.5;
+      const nc = c + step;
+      if (nc < (f.get(k) ?? 1e9)){ f.set(k,nc); open.push([nc,nx,ny]); }
+    }
+  }
+  dfCache[ck] = f;
+  return f;
+}
+
+function adjacentEnemies(u){
+  const out = [];
+  for (const [nx,ny] of neighbors(u.x,u.y)){
+    const t = unitAt(nx,ny);
+    if (t && t.side !== u.side) out.push(t);
+  }
+  return out;
+}
+function nearestEnemyDist(u){
+  let d = 99;
+  for (const t of unitsOf(enemyOf(u.side))) d = Math.min(d, hexDist(u.x,u.y,t.x,t.y));
+  return d;
+}
+
+/* ---- air missions at the start of an AI phase ---- */
+function aiAir(side){
+  for (const au of airOf(side)){
+    if (au.mission !== 'ready') continue;
+    const myTotal  = airOf(side).reduce((a,p)=>a+p.str,0);
+    const foeTotal = airOf(enemyOf(side)).reduce((a,p)=>a+p.str,0);
+    // badly outmatched in the air: keep one group on defensive patrol
+    if (foeTotal > myTotal*1.5 && foeTotal > 4 &&
+        !airOf(side).some(p=>p.mission==='patrol')){ setPatrol(au); continue; }
+    if (airWxMul(side) < 0.5) continue;               // grounded by winter: rest & repair
+    if (au.str <= 3) continue;                        // too mauled to fly: repair
+    let best=null, bestS=1;                           // only fly if it's worth it
+    for (const t of strikeTargets(side)){
+      let s = t.str*0.3 + t.entrench*1.2 + (t.oos?2:0);
+      const adjMine = neighbors(t.x,t.y).filter(([x,y])=>{const u=unitAt(x,y);return u&&u.side===side;}).length;
+      s += adjMine*2;                                 // soften what we're about to assault
+      if (adjMine===0) s -= 3;
+      const c = cityAt(t.x,t.y);
+      if (c && c.vp>0 && c.owner!==side) s += 1.5;
+      if (s > bestS){ bestS=s; best=t; }
+    }
+    if (best) airStrike(au, best);
+  }
+}
+
+/* ---- economy: spend PP at the start of an AI phase ---- */
+function aiSpend(side){
+  aiAir(side);
+  // 1. reinforce hurt units (cheap, in the rear first)
+  const mine = unitsOf(side).slice().sort((a,b)=>
+    (KINDS[b.kind].cost - KINDS[a.kind].cost) || (a.str - b.str));
+  for (const u of mine){
+    if (u.str <= KINDS[u.kind].maxStr - 3){
+      const r = canReinforce(u);
+      if (r && (nearestEnemyDist(u) > 1 || u.str <= 4)) doReinforce(u);
+    }
+  }
+  // 2. deploy fresh formations
+  let guard = 0;
+  while (guard++ < 6){
+    const spots = deploySpots(side);
+    if (!spots.length) break;
+    let kind = null;
+    if (side==='S'){
+      if (G.pp.S >= 12 && unitsOf('S').filter(u=>u.kind==='s_tank').length < 5 && G.turn>=8) kind='s_tank';
+      else if (G.pp.S >= 8) kind='s_inf';
+      else if (G.pp.S >= 4 && G.turn >= 4) kind='s_mil';
+    } else {
+      if (G.pp.G >= 22 && unitsOf('G').filter(u=>u.kind==='g_pz').length < 5) kind='g_pz';
+      else if (G.pp.G >= 16 && unitsOf('G').length < 15) kind='g_inf';
+    }
+    if (!kind) break;
+    if (!doDeploy(side, kind, spots[0][0], spots[0][1])) break;
+  }
+}
+
+/* ---- attack choice shared by both AIs ---- */
+function bestAttack(u, minRatio){
+  let best = null, bestU = -1e9;
+  for (const t of adjacentEnemies(u)){
+    const p = previewCombat(u, t);
+    const wouldDestroy = p.defLoss >= t.str;
+    const noRetreat = p.retreat && !retreatHex(t, u);
+    let ok = p.ratio >= minRatio
+          || (wouldDestroy && p.ratio >= minRatio-0.25)
+          || (t.oos && p.ratio >= minRatio-0.2)
+          || (noRetreat && p.ratio >= minRatio-0.2);
+    if (!ok) continue;
+    let util = p.defLoss*1.6 - p.atkLoss + (wouldDestroy?6:0) + (noRetreat?4:0)
+             + (t.oos?2:0) + (cityAt(t.x,t.y)?1:0) + p.ratio;
+    if (util > bestU){ bestU = util; best = t; }
+  }
+  return best;
+}
+
+/* ---- German planner ---- */
+function gerPickTarget(u){
+  let best=null, bestW=-1e9;
+  for (const c of G.cities){
+    if (c.owner==='G' || c.vp===0) continue;
+    const w = c.vp*3 - hexDist(u.x,u.y,c.x,c.y)*0.9;
+    if (w > bestW){ bestW=w; best=c; }
+  }
+  return best || G.cities.find(c=>c.name==='Moscow');
+}
+
+function gerScoreHex(u, x, y, df, isArm, myNet){
+  let s = -(df.get(keyOf(x,y)) ?? 60) * 2.2;
+  s += (effTerrain(x,y).def - 1) * 3;
+  const c = cityAt(x,y);
+  if (c && c.owner!=='G') s += 6 + c.vp*4;                     // capture!
+  // don't outrun the supply net (capturing a city extends it, so that's exempt)
+  if (myNet && !myNet.has(keyOf(x,y)) && !(c && c.owner!=='G')) s -= 7;
+  let friendsNear = 0;
+  for (const f of unitsOf('G')) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=2) friendsNear++;
+  if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
+  // closing with a weak enemy is good
+  for (const [nx,ny] of neighbors(x,y)){
+    const t = unitAt(nx,ny);
+    if (t && t.side==='S'){
+      const mock = {...u, x, y};
+      const p = previewCombat(mock, t);
+      if (p.ratio >= 1.1) s += 2 + Math.min(p.ratio,3);
+      else if (p.ratio < 0.7) s -= 2;
+    }
+  }
+  return s;
+}
+
+/* does parking a unit at (x,y) cut any Soviet unit out of supply? */
+function cutoffValue(u, x, y){
+  const ox=u.x, oy=u.y;
+  u.x=x; u.y=y;
+  const net = computeSupply('S');
+  let cut = 0;
+  for (const t of unitsOf('S')) if (!net.has(keyOf(t.x,t.y)) && !t.oos) cut++;
+  u.x=ox; u.y=oy;
+  return cut;
+}
+
+function aiPlanGerman(){
+  const order = unitsOf('G').slice().sort((a,b)=>
+    (KINDS[a.kind].sym==='arm'?0:1) - (KINDS[b.kind].sym==='arm'?0:1) || a.id-b.id);
+  for (const u of order){
+    if (u.attacked) continue;
+    // 1. attack if a good fight is adjacent
+    const wx = weatherFor(G.turn);
+    const minR = wx==='snow' ? 1.45 : wx==='mud' ? 1.3 : 1.05;
+    const tgt = bestAttack(u, minR);
+    if (tgt) return {type:'attack', a:u.id, d:tgt.id};
+    if (u.moved){ u.attacked = true; continue; }
+    // 2. otherwise move with purpose
+    const isArm = KINDS[u.kind].sym==='arm';
+    const city = gerPickTarget(u);
+    const df = distField('G', city.x, city.y);
+    const myNet = computeSupply('G');
+    const reach = reachable(u);
+    let best=[u.x,u.y], bestS = gerScoreHex(u,u.x,u.y,df,isArm,myNet) + (u.entrench>0?1:0) - 0.5;
+    const cand = [...reach.keys()].map(k=>k.split(',').map(Number));
+    for (const [x,y] of cand){
+      let s = gerScoreHex(u,x,y,df,isArm,myNet);
+      if (s > bestS-6 && isArm){
+        const cut = cutoffValue(u,x,y);
+        s += cut * 5;                                           // panzers love pockets
+      }
+      if (s > bestS){ bestS=s; best=[x,y]; }
+    }
+    if (best[0]!==u.x || best[1]!==u.y) return {type:'move', u:u.id, x:best[0], y:best[1]};
+    return {type:'hold', u:u.id};
+  }
+  return null;
+}
+
+/* ---- Soviet planner ---- */
+function sovThreat(c){
+  let t = 0;
+  for (const g of unitsOf('G')) t += (KINDS[g.kind].atk * g.str/10) / Math.pow(hexDist(c.x,c.y,g.x,g.y)+1, 2);
+  return t;
+}
+function sovPickCity(u){
+  let best=null, bestW=-1e9;
+  for (const c of G.cities){
+    if (c.owner!=='S' || c.vp===0) continue;
+    const w = sovThreat(c)*(c.vp+1)*3 - hexDist(u.x,u.y,c.x,c.y)*0.4;
+    if (w > bestW){ bestW=w; best=c; }
+  }
+  return best || G.cities.find(c=>c.name==='Moscow');
+}
+
+function sovScoreHex(u, x, y, df, myNet){
+  let s = -(df.get(keyOf(x,y)) ?? 60) * 1.8;
+  s += (effTerrain(x,y).def - 1) * 6;                           // dig into good ground
+  if (myNet && !myNet.has(keyOf(x,y))) s -= 7;                  // stay supplied
+  const c = cityAt(x,y);
+  if (c && c.owner==='S' && c.vp>0 && !unitAt(x,y)) s += 7;     // garrison objectives
+  if (c && c.owner==='G') s += 8 + c.vp*4;                      // retake!
+  let adjE = 0, weakest = null;
+  for (const [nx,ny] of neighbors(x,y)){
+    const t = unitAt(nx,ny);
+    if (t && t.side==='G'){ adjE++; if (!weakest || t.str<weakest.str) weakest=t; }
+  }
+  if (adjE >= 3) s -= 10;                                       // don't walk into a pocket
+  else if (adjE === 2) s -= 3;
+  const wx = weatherFor(G.turn);
+  if (wx==='snow' && weakest){
+    const mock = {...u, x, y};
+    if (previewCombat(mock, weakest).ratio >= 0.95) s += 4;     // winter counterattack
+  }
+  return s;
+}
+
+function aiPlanSoviet(){
+  const wx = weatherFor(G.turn);
+  for (const u of unitsOf('S')){
+    if (u.attacked) continue;
+    const adj = adjacentEnemies(u);
+    // 1. fight: cautious normally, bold in the snow
+    const minR = wx==='snow' ? 0.95 : 1.5;
+    const tgt = bestAttack(u, minR);
+    if (tgt) return {type:'attack', a:u.id, d:tgt.id};
+    if (u.moved){ u.attacked = true; continue; }
+    // 2. escape encirclement (or pull badly hurt units out of the line)
+    const danger = adj.length >= 3 || u.oos
+                || (u.str <= 3 && adj.length >= 1) || (u.str <= 4 && adj.length >= 2);
+    if (danger){
+      const reach = reachable(u);
+      const net = computeSupply('S');
+      let best=null, bestS=-1e9;
+      for (const k of reach.keys()){
+        const [x,y] = k.split(',').map(Number);
+        let s = (net.has(k)?10:0) + x*0.6;                       // east, toward supply
+        let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side==='G') e++; }
+        s -= e*3;
+        s += (effTerrain(x,y).def-1)*3;
+        if (s > bestS){ bestS=s; best=[x,y]; }
+      }
+      if (best && (adj.length>=3 ? true : !net.has(keyOf(u.x,u.y))))
+        return {type:'move', u:u.id, x:best[0], y:best[1]};
+    }
+    // 3. garrisons sit tight; frontline units in good ground dig in
+    const onCity = cityAt(u.x,u.y);
+    if (onCity && onCity.owner==='S' && onCity.vp>0){ return {type:'hold', u:u.id}; }
+    const near = nearestEnemyDist(u);
+    if (near <= 2 && (effTerrain(u.x,u.y).def >= 1.15 || u.entrench >= 1) && adj.length < 3){
+      return {type:'hold', u:u.id};
+    }
+    // 4. reserves flow to the most threatened objective
+    const city = sovPickCity(u);
+    const df = distField('S', city.x, city.y);
+    const myNet = computeSupply('S');
+    const reach = reachable(u);
+    let best=[u.x,u.y], bestS = sovScoreHex(u,u.x,u.y,df,myNet) + (u.entrench>0?2:0);
+    for (const k of reach.keys()){
+      const [x,y] = k.split(',').map(Number);
+      const s = sovScoreHex(u,x,y,df,myNet);
+      if (s > bestS){ bestS=s; best=[x,y]; }
+    }
+    if (best[0]!==u.x || best[1]!==u.y) return {type:'move', u:u.id, x:best[0], y:best[1]};
+    return {type:'hold', u:u.id};
+  }
+  return null;
+}
+
+function aiPlanAction(side){
+  return side==='G' ? aiPlanGerman() : aiPlanSoviet();
+}
+
+function applyAction(a){
+  if (!a) return null;
+  if (a.type==='hold'){
+    const u = G.units.find(t=>t.id===a.u);
+    if (u){ u.moved = true; u.attacked = true; }
+    return {type:'hold'};
+  }
+  if (a.type==='move'){
+    const u = G.units.find(t=>t.id===a.u);
+    if (u && !unitAt(a.x,a.y)){ doMove(u, a.x, a.y); return {type:'move', unit:u}; }
+    return {type:'hold'};
+  }
+  if (a.type==='attack'){
+    const att = G.units.find(t=>t.id===a.a), def = G.units.find(t=>t.id===a.d);
+    if (att && def){ const ev = resolveCombat(att,def); return {type:'attack', att, def, ev}; }
+    return {type:'hold'};
+  }
+  return null;
+}
+
+/* run a full AI phase instantly (used by hotseat-skip & the test harness) */
+function aiFullPhase(side){
+  clearAICache();
+  aiSpend(side);
+  let guard = 0, cap = (unitsOf(side).length+2) * 8;
+  while (guard++ < cap && !G.over){
+    const a = aiPlanAction(side);
+    if (!a) break;
+    applyAction(a);
+  }
+}
+
+/* ============================ SAVE / LOAD ============================ */
+const SAVE_KEY = 'barbarossa-save-v1';
+function serialize(){ return JSON.stringify({G, nextId}); }
+function deserialize(json){
+  const d = JSON.parse(json);
+  G = d.G; nextId = d.nextId;
+  if (!G.air) G.air = AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s));   // migrate pre-air saves
+  refreshSupply();
+}
+function saveGame(){
+  try { if (typeof localStorage!=='undefined') localStorage.setItem(SAVE_KEY, serialize()); } catch(e){}
+}
+function loadGame(){
+  try {
+    if (typeof localStorage==='undefined') return false;
+    const j = localStorage.getItem(SAVE_KEY);
+    if (!j) return false;
+    deserialize(j);
+    return true;
+  } catch(e){ return false; }
+}
+function clearSave(){
+  try { if (typeof localStorage!=='undefined') localStorage.removeItem(SAVE_KEY); } catch(e){}
+}
+
+/* ============================ HOOKS (used by the engine) ============================ */
+let onLog = null, onCityTaken = null, onGameOver = null, onAirStrike = null;
+
+/* ====================================================================
+   Everything below is browser-only: rendering, input, UI, sound.
+   The game engine above runs headless too (used by the test harness).
+   ==================================================================== */
+if (typeof document !== 'undefined') (function(){
+
+/* ---------------- canvas & camera ---------------- */
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const S = 34, HX = Math.sqrt(3)*S, VY = 1.5*S, M = 60;
+const MAPW = HX*(COLS+0.5)+M*2, MAPH = VY*(ROWS-1)+2*S+M*2;
+let cam = {x:0, y:0, z:1};
+let DPR = 1;
+
+function resize(){
+  DPR = window.devicePixelRatio || 1;
+  canvas.width = innerWidth*DPR; canvas.height = innerHeight*DPR;
+  canvas.style.width = innerWidth+'px'; canvas.style.height = innerHeight+'px';
+}
+window.addEventListener('resize', resize); resize();
+
+function fitCamera(){
+  const z = Math.min(innerWidth/MAPW, (innerHeight-60)/MAPH);
+  cam.z = Math.max(0.45, Math.min(1.4, z));
+  cam.x = (MAPW - innerWidth/cam.z)/2;
+  cam.y = (MAPH - (innerHeight)/cam.z)/2 - 20/cam.z;
+}
+function hexCenter(x,y){ return [M + HX*(x + 0.5*(y&1)) + HX/2, M + VY*y + S]; }
+function toScreen(px,py){ return [(px-cam.x)*cam.z, (py-cam.y)*cam.z]; }
+function toWorld(sx,sy){ return [sx/cam.z + cam.x, sy/cam.z + cam.y]; }
+function hexFromPixel(wx,wy){
+  let best=null, bd=1e9;
+  const gy = Math.round((wy - M - S)/VY);
+  for (let y=Math.max(0,gy-1); y<=Math.min(ROWS-1,gy+1); y++){
+    const gx = Math.round((wx - M - HX/2)/HX - 0.5*(y&1));
+    for (let x=Math.max(0,gx-1); x<=Math.min(COLS-1,gx+1); x++){
+      const [cx,cy] = hexCenter(x,y);
+      const d = (cx-wx)**2 + (cy-wy)**2;
+      if (d < bd){ bd=d; best=[x,y]; }
+    }
+  }
+  return bd <= (S*1.05)**2 ? best : null;
+}
+
+/* ---------------- ui state ---------------- */
+let sel = null;            // selected unit id
+let reach = null;          // Map of reachable keys for sel
+let hover = null;          // [x,y] under mouse
+let deployKind = null;     // kind being placed
+let airTarget = null;      // air group id picking a strike target
+let anims = [];            // floating texts / flashes
+let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
+let aiRunning = false;
+let muted = false;
+try { muted = localStorage.getItem('barb-muted')==='1'; } catch(e){}
+
+const $ = id => document.getElementById(id);
+const show = (id,on) => $(id).classList.toggle('hidden', !on);
+
+/* ---------------- sound (tiny WebAudio synth) ---------------- */
+let AC = null;
+function ac(){ if (!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function tone(f, dur, type='square', vol=0.06, slide=0){
+  if (muted) return; const a = ac(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = f;
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide), a.currentTime+dur);
+  g.gain.value = vol; g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+dur);
+  o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur);
+}
+function noise(dur, vol=0.12){
+  if (muted) return; const a = ac(); if (!a) return;
+  const n = a.sampleRate*dur, buf = a.createBuffer(1,n,a.sampleRate), d = buf.getChannelData(0);
+  for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1-i/n);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(g); g.connect(a.destination); src.start();
+}
+const sClick = ()=>tone(660,0.05,'square',0.04);
+const sMove  = ()=>tone(220,0.1,'triangle',0.05,-80);
+const sShot  = ()=>{ noise(0.18,0.1); tone(120,0.15,'sawtooth',0.05,-60); };
+const sBoom  = ()=>{ noise(0.4,0.18); tone(70,0.4,'sawtooth',0.08,-40); };
+const sCity  = ()=>{ tone(523,0.12,'square',0.05); setTimeout(()=>tone(659,0.12,'square',0.05),120); setTimeout(()=>tone(784,0.2,'square',0.05),240); };
+
+/* ---------------- engine hooks ---------------- */
+onLog = function(){
+  const el = $('log');
+  el.innerHTML = G.log.slice(-30).map(([c,t])=>`<div class="${c}">${t}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+};
+onCityTaken = function(c){ if (c.vp>0) sCity(); };
+onGameOver = function(){ setTimeout(showEnd, 600); };
+onAirStrike = function(au, t, res){
+  floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
+  if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
+};
+
+/* ---------------- drawing ---------------- */
+function hexPath(cx,cy,s){
+  ctx.beginPath();
+  for (let i=0;i<6;i++){
+    const a = Math.PI/180*(60*i-30);
+    const px = cx + s*Math.cos(a), py = cy + s*Math.sin(a);
+    i ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+  }
+  ctx.closePath();
+}
+
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle = '#0a0c08'; ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
+  if (!G) return;
+  const wx = weatherFor(G.turn);
+
+  // terrain
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = terrainAt(x,y), [cx,cy] = hexCenter(x,y);
+    hexPath(cx,cy,S-0.6);
+    let col = TERRAIN[t].color;
+    if (wx==='snow' && t!=='~') col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
+    else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.'?'#54482e':'#463f2e';
+    ctx.fillStyle = col; ctx.fill();
+    ctx.strokeStyle = '#00000033'; ctx.lineWidth = 1; ctx.stroke();
+    // decorations
+    ctx.save(); ctx.translate(cx,cy);
+    if (t==='f'){ ctx.fillStyle = wx==='snow' ? '#4e6052' : '#243520';
+      for (const [dx,dy] of [[-10,2],[2,-7],[10,6]]){
+        ctx.beginPath(); ctx.moveTo(dx,dy+6); ctx.lineTo(dx+5,dy-6); ctx.lineTo(dx+10,dy+6); ctx.closePath(); ctx.fill(); } }
+    if (t==='h'){ ctx.strokeStyle='#00000040'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-12,6); ctx.quadraticCurveTo(-6,-6,0,6); ctx.moveTo(2,2); ctx.quadraticCurveTo(8,-8,14,4); ctx.stroke(); }
+    if (t==='s'){ ctx.strokeStyle='#5d7a6a88'; ctx.lineWidth=1.5;
+      for (const [dx,dy] of [[-10,-4],[0,4],[9,-3]]){
+        ctx.beginPath(); ctx.moveTo(dx-4,dy); ctx.lineTo(dx+4,dy); ctx.moveTo(dx,dy); ctx.lineTo(dx,dy-5); ctx.stroke(); } }
+    if (t==='r'){ ctx.strokeStyle='#7db3c977'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(-S*0.7,-4); ctx.quadraticCurveTo(0,6,S*0.7,-2); ctx.stroke(); }
+    if (t==='~'){ ctx.strokeStyle='#3e586e66'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(-12,-3); ctx.quadraticCurveTo(-6,-7,0,-3); ctx.quadraticCurveTo(6,1,12,-3); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // cities
+  for (const c of G.cities){
+    const [cx,cy] = hexCenter(c.x,c.y);
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.fillStyle = c.owner==='G' ? '#3b414b' : '#6e2620';
+    ctx.strokeStyle = '#000a'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.rect(-9,-2,7,9); ctx.rect(-1,-8,8,15); ctx.rect(8,1,6,6); ctx.fill(); ctx.stroke();
+    if (c.vp>0){ ctx.fillStyle = '#ffd34d'; star(0,-14,5); }
+    ctx.font = '600 11px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#000c'; ctx.fillText(c.name, 1, 25);
+    ctx.fillStyle = c.vp>0 ? '#ffe9a8' : '#cfccba'; ctx.fillText(c.name, 0, 24);
+    ctx.restore();
+  }
+
+  // movement / deploy / attack overlays
+  if (deployKind){
+    for (const [x,y] of deploySpots(G.phase)){
+      const [cx,cy] = hexCenter(x,y);
+      hexPath(cx,cy,S-3); ctx.fillStyle = '#69c5c94d'; ctx.fill();
+      ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+  if (airTarget){
+    for (const t of strikeTargets(G.phase)){
+      const [cx,cy] = hexCenter(t.x,t.y);
+      hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 3; ctx.stroke();
+    }
+  }
+  const su = sel && G.units.find(u=>u.id===sel);
+  if (su && reach){
+    for (const k of reach.keys()){
+      const [x,y] = k.split(',').map(Number);
+      const [cx,cy] = hexCenter(x,y);
+      hexPath(cx,cy,S-3); ctx.fillStyle = '#e8b34b30'; ctx.fill();
+    }
+    if (!su.attacked) for (const t of adjacentEnemies(su)){
+      const [cx,cy] = hexCenter(t.x,t.y);
+      hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#e2493b'; ctx.lineWidth = 3; ctx.stroke();
+    }
+  }
+  if (hover){
+    const [cx,cy] = hexCenter(hover[0],hover[1]);
+    hexPath(cx,cy,S-1.5); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  // units
+  const now = performance.now();
+  for (const u of G.units){
+    let [cx,cy] = hexCenter(u.x,u.y);
+    if (moveAnim && moveAnim.unit.id===u.id){
+      const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
+      const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
+      cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
+      if (p>=1) moveAnim = null;
+    }
+    drawUnit(u, cx, cy);
+  }
+
+  // floating texts
+  anims = anims.filter(a => now - a.t0 < 1100);
+  for (const a of anims){
+    const p = (now-a.t0)/1100;
+    ctx.globalAlpha = 1-p;
+    ctx.font = '700 15px Segoe UI'; ctx.textAlign='center';
+    ctx.fillStyle = a.color;
+    ctx.fillText(a.text, a.x, a.y - p*26);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function star(x,y,r){
+  ctx.beginPath();
+  for (let i=0;i<10;i++){
+    const a = Math.PI/5*i - Math.PI/2, rr = i%2 ? r*0.45 : r;
+    const px = x+rr*Math.cos(a), py = y+rr*Math.sin(a);
+    i ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+function drawUnit(u, cx, cy){
+  const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
+  const ger = u.side==='G';
+  ctx.save(); ctx.translate(cx,cy);
+  // counter
+  ctx.fillStyle = ger ? '#454d58' : '#9c2e22';
+  if (u.kind==='g_ally') ctx.fillStyle = '#5c5536';
+  if (u.kind==='s_guard') ctx.fillStyle = '#b04a18';
+  if (u.kind==='s_mil') ctx.fillStyle = '#7a4a3a';
+  roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : '#000c';
+  ctx.lineWidth = (sel===u.id) ? 2.5 : 1.2; ctx.stroke();
+  if (u.side===G.phase && u.moved && (u.attacked || !adjacentEnemies(u).length)){
+    roundRect(-w/2,-h/2,w,h,5); ctx.fillStyle = '#00000055'; ctx.fill();
+  }
+  // NATO-style symbol box
+  const bw = w*0.52, bh = h*0.52;
+  ctx.strokeStyle = '#e9e5d2'; ctx.lineWidth = 1.6;
+  ctx.strokeRect(-bw/2-(w*0.13), -bh/2, bw, bh);
+  const bx = -(w*0.13);
+  if (k.sym==='inf'){
+    ctx.beginPath();
+    ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
+    ctx.moveTo(bx+bw/2,-bh/2); ctx.lineTo(bx-bw/2,bh/2); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.ellipse(bx,0,bw*0.32,bh*0.3,0,0,Math.PI*2); ctx.stroke();
+  }
+  // strength badge
+  ctx.fillStyle = '#101208'; roundRect(w/2-15,h/2-15,13,12,3); ctx.fill();
+  ctx.fillStyle = u.str<=3 ? '#ff8d80' : '#ffe9a8';
+  ctx.font = '700 10px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText(u.str, w/2-8.5, h/2-5.5);
+  // entrench pips
+  ctx.fillStyle = '#cfe6a8';
+  for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-6, 3.5, 3.5);
+  // out of supply
+  if (u.oos){
+    ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
+    ctx.fillText('⚠', w/2-8, -h/2+10);
+  }
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+
+function floatText(x,y,text,color){
+  const [cx,cy] = hexCenter(x,y);
+  anims.push({x:cx, y:cy-S*0.4, text, color, t0:performance.now()});
+}
+
+(function loop(){
+  try{ if (G) draw(); }
+  catch(e){ if (!window.__drawErr){ window.__drawErr = 1; console.error('draw error:', e); } }
+  requestAnimationFrame(loop);
+})();
+
+/* ---------------- input ---------------- */
+let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
+canvas.addEventListener('mousedown', e=>{ dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); });
+window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); });
+window.addEventListener('mousemove', e=>{
+  if (dragging){
+    const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
+    if (Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
+    cam.x -= dx/cam.z; cam.y -= dy/cam.z; lastMx=e.clientX; lastMy=e.clientY;
+  }
+  const [wx,wy] = toWorld(e.clientX, e.clientY);
+  hover = hexFromPixel(wx,wy);
+  updateTerrainCard(); updatePreview();
+});
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  cam.z = Math.max(0.35, Math.min(2.2, cam.z*f));
+  cam.x = wx - e.clientX/cam.z; cam.y = wy - e.clientY/cam.z;
+}, {passive:false});
+
+canvas.addEventListener('click', e=>{
+  if (dragMoved || !G || G.over || aiRunning) return;
+  const isHuman = G.mode==='hotseat' || G.phase===G.playerSide;
+  if (!isHuman) return;
+  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  const h = hexFromPixel(wx,wy);
+  if (!h) { deselect(); return; }
+  const [x,y] = h;
+  // air strike targeting mode
+  if (airTarget){
+    const au = G.air.find(a=>a.id===airTarget);
+    const t = unitAt(x,y);
+    airTarget = null;
+    if (au && t && t.side!==G.phase){
+      const res = airStrike(au, t);
+      if (res){ res.killed ? sBoom() : sShot(); }
+    }
+    $('hint').innerHTML = defaultHint();
+    updateAll(); return;
+  }
+  // deploy mode
+  if (deployKind){
+    if (doDeploy(G.phase, deployKind, x, y)){ sCity(); updateAll(); }
+    deployKind = null; updateUnitCard(); return;
+  }
+  const u = unitAt(x,y);
+  const su = sel && G.units.find(t=>t.id===sel);
+  if (u && u.side===G.phase){ selectUnit(u); sClick(); return; }
+  if (su && u && u.side!==G.phase && !su.attacked && hexDist(su.x,su.y,u.x,u.y)===1){
+    playerAttack(su,u); return;
+  }
+  if (su && !su.moved && reach && reach.has(keyOf(x,y))){
+    playerMove(su,x,y); return;
+  }
+  deselect();
+});
+window.addEventListener('keydown', e=>{
+  if (!G || G.over) return;
+  if (e.key==='Escape'){ deselect(); deployKind=null; airTarget=null; updateAll(); }
+  if (e.key==='n' || e.key==='N') selectNext();
+  if (e.key==='e' || e.key==='E') $('btn-endturn').click();
+});
+
+function selectUnit(u){
+  sel = u.id;
+  reach = (!u.moved) ? reachable(u) : new Map();
+  updateUnitCard();
+}
+function deselect(){ sel=null; reach=null; updateUnitCard(); }
+function selectNext(){
+  const mine = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked);
+  if (!mine.length) return;
+  const i = mine.findIndex(u=>u.id===sel);
+  const u = mine[(i+1) % mine.length];
+  selectUnit(u);
+  const [cx,cy] = hexCenter(u.x,u.y);
+  cam.x = cx - innerWidth/cam.z/2; cam.y = cy - innerHeight/cam.z/2;
+}
+
+function playerMove(u,x,y){
+  const [fx,fy] = hexCenter(u.x,u.y);
+  doMove(u,x,y);
+  moveAnim = {unit:u, fx, fy, t0:performance.now(), dur:240};
+  sMove();
+  reach = new Map();
+  updateAll(); updateUnitCard();
+}
+function playerAttack(att,def){
+  sShot();
+  const ev = resolveCombat(att,def);
+  if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
+  if (ev.atkLoss>0) floatText(att.x,att.y,'-'+ev.atkLoss,'#ffd98a');
+  if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
+  deselect(); updateAll();
+}
+
+/* ---------------- side panel ---------------- */
+function updateUnitCard(){
+  const body = $('unit-body'), act = $('unit-actions');
+  act.innerHTML = '';
+  const u = sel && G.units.find(t=>t.id===sel);
+  const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
+  if (!u){
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">N = next unit · E = end turn</span>';
+    body.innerHTML = html;
+    if (isHuman){
+      for (const k of buyableKinds(G.phase)){
+        const b = document.createElement('button');
+        b.textContent = `Deploy ${KINDS[k].label} (${KINDS[k].cost}⚙)`;
+        b.onclick = ()=>{ deployKind = (deployKind===k?null:k); sClick();
+          $('hint').innerHTML = deployKind ? 'Click a <b>highlighted city</b> to deploy — Esc cancels.' : defaultHint(); };
+        act.appendChild(b);
+      }
+    }
+    return;
+  }
+  const k = KINDS[u.kind];
+  const cls = u.side==='G'?'ger':'sov';
+  body.innerHTML = `
+    <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
+    <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
+    <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
+    <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
+    <div class="statrow"><span>Movement</span><span>${k.mp}</span></div>
+    <div class="statrow"><span>Dug in</span><span>${'▮'.repeat(u.entrench)||'—'}</span></div>
+    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
+    <div class="statrow"><span>This turn</span><span>${u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
+  if (isHuman && u.side===G.phase){
+    const r = canReinforce(u);
+    if (r){
+      const b = document.createElement('button');
+      b.textContent = `Reinforce +${r.steps} (${r.cost*r.steps}⚙)`;
+      b.onclick = ()=>{ doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
+      act.appendChild(b);
+    }
+  }
+}
+
+function updateAirCard(){
+  const body = $('air-body');
+  const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
+  const mine = airOf(side), foe = airOf(enemyOf(side));
+  const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
+  if (!mine.length && !foe.length){ body.innerHTML = '—'; return; }
+  body.innerHTML = '';
+  for (const au of mine){
+    const row = document.createElement('div');
+    const status = au.mission==='ready' ? '<span class="good">ready</span>'
+                 : au.mission==='patrol' ? '<span style="color:var(--cyan)">on patrol</span>'
+                 : '<span style="color:var(--dim)">flown</span>';
+    row.innerHTML = `<div class="statrow"><span>✈ ${au.name}</span><span>str ${au.str} · ${status}</span></div>`;
+    if (isHuman && au.mission==='ready'){
+      const act = document.createElement('div');
+      act.style.cssText = 'display:flex;gap:6px;margin:2px 0 6px;';
+      const bs = document.createElement('button');
+      bs.textContent = '💥 Strike'; bs.style.cssText = 'padding:2px 10px;font-size:12px;';
+      bs.onclick = ()=>{ sClick(); airTarget = (airTarget===au.id ? null : au.id);
+        $('hint').innerHTML = airTarget
+          ? 'Click a <b>ringed enemy</b> to bomb it (damage + digs them out) — Esc cancels.'
+          : defaultHint(); };
+      const bp = document.createElement('button');
+      bp.textContent = '🛡 Patrol'; bp.style.cssText = 'padding:2px 10px;font-size:12px;';
+      bp.onclick = ()=>{ sClick(); setPatrol(au); airTarget=null; updateAll(); };
+      act.appendChild(bs); act.appendChild(bp);
+      row.appendChild(act);
+    }
+    body.appendChild(row);
+  }
+  const foePat = foe.some(p=>p.mission==='patrol');
+  const note = document.createElement('div');
+  note.style.cssText = 'color:var(--dim);font-size:12px;margin-top:2px;';
+  note.innerHTML = foe.length
+    ? `Enemy air: ${foe.reduce((a,p)=>a+p.str,0)} str${foePat ? ' — <span class="bad">fighters on patrol!</span>' : ''}`
+    : 'Enemy air force destroyed.';
+  body.appendChild(note);
+  const wm = airWxMul(side);
+  if (wm < 1){
+    const w = document.createElement('div');
+    w.style.cssText = 'color:var(--dim);font-size:12px;';
+    w.textContent = wm < 0.5 ? '❄ Aircraft frozen on their fields — barely able to fly.'
+                             : 'Bad flying weather — strikes are weakened.';
+    body.appendChild(w);
+  }
+}
+
+function updateTerrainCard(){
+  if (!hover || !G){ return; }
+  const [x,y] = hover;
+  const t = effTerrain(x,y), c = cityAt(x,y);
+  let html = `<span class="big">${c ? c.name : t.name}</span>`;
+  if (c) html += ` <span style="color:var(--dim)">(${t.name}${c.vp?` · ★ objective ×${c.vp}`:''} · ${c.owner==='G'?'Axis':'Soviet'})</span>`;
+  html += `<div class="statrow"><span>Defense bonus</span><span>×${t.def.toFixed(2)}</span></div>
+           <div class="statrow"><span>Move cost</span><span>${t.move||'—'}</span></div>
+           <div class="statrow"><span>Max dig-in</span><span>${t.dig}</span></div>`;
+  const u = unitAt(x,y);
+  if (u){
+    html += `<div style="margin-top:4px;border-top:1px solid var(--line);padding-top:4px;">
+      ${flag(u.side)} <b>${u.name}</b> — str ${u.str}${u.oos?' <span class="bad">⚠ no supply</span>':''}</div>`;
+  }
+  $('terrain-body').innerHTML = html;
+}
+
+function updatePreview(){
+  const su = sel && G && G.units.find(t=>t.id===sel);
+  const t = hover && unitAt(hover[0],hover[1]);
+  const ok = su && t && t.side!==su.side && !su.attacked && hexDist(su.x,su.y,t.x,t.y)===1;
+  show('preview-card', !!ok);
+  if (!ok) return;
+  const p = previewCombat(su, t);
+  $('preview-body').innerHTML = `
+    <div class="vs"><span>${flag(su.side)} ${su.name}</span><span>str ${su.str}</span></div>
+    <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
+    <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
+    <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
+    <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
+    ${p.retreat ? '<div style="color:var(--amber)">Likely to force a retreat'+(retreatHex(t,su)?'':' — NO ESCAPE ROUTE!')+'</div>' : ''}
+    <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack.</div>`;
+}
+
+function defaultHint(){
+  const human = G.mode==='hotseat' || G.phase===G.playerSide;
+  if (!human) return 'Enemy is moving…';
+  const left = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
+  return `<b>${G.phase==='G'?'Axis':'Soviet'} turn</b> — ${left} unit${left===1?'':'s'} ready · drag to pan, scroll to zoom`;
+}
+
+function updateTop(){
+  $('date-chip').innerHTML = `<b>Turn ${G.turn}/${MAX_TURN}</b> · ${dateStr(G.turn)}`;
+  const wx = weatherFor(G.turn);
+  const chip = $('wx-chip');
+  chip.innerHTML = `Weather: <b>${WX_LABEL[wx]}</b>`;
+  chip.className = 't-chip ' + wx;
+  $('vp-chip').innerHTML = `Axis objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
+  const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
+  $('pp-chip').innerHTML = `${side==='G'?'Axis':'Soviet'} production: <b>${G.pp[side]}</b> ⚙`;
+}
+function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); $('hint').innerHTML = defaultHint(); }
+
+/* ---------------- objectives modal ---------------- */
+$('btn-objectives').onclick = ()=>{
+  const list = G.cities.filter(c=>c.vp>0).sort((a,b)=>b.vp-a.vp).map(c=>
+    `<div>${c.owner==='G'?'⬛':'🟥'} <b>${c.name}</b> — ${'★'.repeat(c.vp)} ${c.owner==='G'?'<span style="color:#9fb0c4">Axis-held</span>':'<span style="color:#e09a90">Soviet-held</span>'}</div>`).join('');
+  $('obj-list').innerHTML = list;
+  const vp = axisVP();
+  $('obj-summary').innerHTML =
+    `Axis hold <b>${vp}</b> of ${TOTAL_VP} objective points. At the end of turn ${MAX_TURN}:<br>
+     ★ 12+ decisive Axis victory · 8+ Axis victory · 5–7 stalemate · under 5 Soviet victory.<br>
+     Capturing <b>both Moscow and Leningrad</b> ends the war at once.`;
+  show('obj-modal', true);
+};
+$('btn-obj-close').onclick = ()=>show('obj-modal', false);
+
+/* ---------------- help ---------------- */
+$('btn-help').onclick = ()=>show('help-modal',true);
+$('btn-help2').onclick = ()=>show('help-modal',true);
+$('btn-help-close').onclick = ()=>show('help-modal',false);
+
+/* ---------------- sound / menu buttons ---------------- */
+$('btn-sound').onclick = ()=>{
+  muted = !muted;
+  try{ localStorage.setItem('barb-muted', muted?'1':'0'); }catch(e){}
+  $('btn-sound').textContent = muted ? '🔇' : '🔊';
+};
+$('btn-sound').textContent = muted ? '🔇' : '🔊';
+$('btn-menu').onclick = ()=>{
+  saveGame();
+  show('menu', true);
+  $('btn-continue').classList.remove('hidden');
+};
+
+/* ---------------- end turn & AI driver ---------------- */
+$('btn-endturn').onclick = ()=>{
+  if (!G || G.over || aiRunning) return;
+  const human = G.mode==='hotseat' || G.phase===G.playerSide;
+  if (!human) return;
+  sClick(); deselect(); deployKind = null;
+  endPhase();
+  saveGame();
+  if (G.over) return;
+  proceed();
+};
+
+function proceed(){
+  updateAll();
+  if (G.over) return;
+  const human = G.mode==='hotseat' || G.phase===G.playerSide;
+  if (G.mode==='hotseat'){
+    $('pass-title').textContent = 'PASS THE KEYBOARD';
+    $('pass-text').innerHTML = `It is now the <b>${G.phase==='G'?'⬛ Axis':'🟥 Soviet'}</b> player's turn ${G.turn} (${dateStr(G.turn)}).`;
+    show('pass-modal', true);
+    return;
+  }
+  if (!human) runAIPhase();
+}
+
+function runAIPhase(){
+  aiRunning = true;
+  show('ai-banner', true);
+  $('ai-banner').textContent = (G.phase==='G'?'⬛ AXIS':'🟥 SOVIET') + ' TURN…';
+  clearAICache();
+  aiSpend(G.phase);
+  updateAll();
+  let guard = 0;
+  const cap = (unitsOf(G.phase).length+2)*8;
+  function step(){
+    if (G.over){ finish(); return; }
+    if (guard++ > cap){ finish(); return; }
+    const a = aiPlanAction(G.phase);
+    if (!a){ finish(); return; }
+    // pace the show: snappier when the army is huge
+    const n = unitsOf(G.phase).length;
+    const mDelay = Math.max(40, 150 - n*2), aDelay = Math.max(120, 300 - n*3);
+    const res = applyAction(a);
+    if (res && res.type==='move'){
+      sMove();
+      setTimeout(step, mDelay);
+    } else if (res && res.type==='attack'){
+      sShot();
+      const ev = res.ev;
+      if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
+      if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
+      updateAll();
+      setTimeout(step, aDelay);
+    } else {
+      setTimeout(step, 0);
+    }
+  }
+  function finish(){
+    show('ai-banner', false);
+    aiRunning = false;
+    if (!G.over){
+      endPhase();
+      saveGame();
+      if (!G.over){
+        const human = G.phase===G.playerSide;
+        if (!human){ runAIPhase(); return; }
+      }
+    }
+    updateAll();
+  }
+  setTimeout(step, 350);
+}
+
+$('btn-pass-go').onclick = ()=>{ show('pass-modal', false); updateAll(); };
+
+/* ---------------- end screen ---------------- */
+function showEnd(){
+  const r = G.result; if (!r) return;
+  const youAxis = G.playerSide==='G' && G.mode!=='hotseat';
+  const axisWon = r.title.includes('AXIS');
+  const sovietWon = r.title.includes('SOVIET');
+  let cls = 'win';
+  if (G.mode!=='hotseat'){
+    cls = (youAxis && axisWon) || (!youAxis && sovietWon) ? 'win' : (r.title.includes('STALEMATE') ? '' : 'lose');
+  }
+  $('end-title').textContent = r.title;
+  $('end-title').className = cls;
+  $('end-text').textContent = r.text;
+  $('end-stats').innerHTML = `
+    <div class="statrow"><span>Axis objective points</span><span>${r.vp} / ${TOTAL_VP}</span></div>
+    <div class="statrow"><span>⬛ Axis losses</span><span>${G.stats.G.lost} strength</span></div>
+    <div class="statrow"><span>🟥 Soviet losses</span><span>${G.stats.S.lost} strength</span></div>
+    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} weeks</span></div>`;
+  show('end-modal', true);
+  if (cls==='win') sCity(); else sBoom();
+  clearSave();
+}
+$('btn-end-menu').onclick = ()=>{ show('end-modal',false); show('menu',true); $('btn-continue').classList.add('hidden'); };
+
+/* ---------------- menu ---------------- */
+let mSide='G', mDiff='normal', mMode='ai';
+$('pick-ger').onclick = ()=>{ mSide='G'; $('pick-ger').classList.add('sel'); $('pick-sov').classList.remove('sel'); };
+$('pick-sov').onclick = ()=>{ mSide='S'; $('pick-sov').classList.add('sel'); $('pick-ger').classList.remove('sel'); };
+for (const el of document.querySelectorAll('#diff-row .opt')){
+  el.onclick = ()=>{
+    mDiff = el.dataset.d;
+    document.querySelectorAll('#diff-row .opt').forEach(o=>o.classList.remove('sel'));
+    el.classList.add('sel');
+  };
+}
+$('mode-ai').onclick = ()=>{ mMode='ai'; $('mode-ai').classList.add('sel'); $('mode-hotseat').classList.remove('sel'); };
+$('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.add('sel'); $('mode-ai').classList.remove('sel'); };
+
+$('btn-start').onclick = ()=>{
+  newGame(mSide, mDiff, mMode);
+  startCampaign();
+};
+$('btn-continue').onclick = ()=>{
+  if (loadGame()) startCampaign(true);
+};
+function startCampaign(loaded){
+  show('menu', false);
+  show('topbar', true); show('side', true); show('hint', true);
+  fitCamera();
+  updateAll();
+  if (!loaded) saveGame();
+  // if the human plays the Soviets, the German AI opens the war
+  if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
+  if (!G.over && G.mode==='hotseat') updateAll();
+}
+try { if (localStorage.getItem(SAVE_KEY)) $('btn-continue').classList.remove('hidden'); } catch(e){}
+
+})();
+
+/* ============================ HEADLESS EXPORTS (for tests) ============================ */
+if (typeof module !== 'undefined' && module.exports){
+  module.exports = {
+    newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor,
+    computeSupply, computeZOC, reachable, previewCombat, resolveCombat,
+    doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
+    unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
+    airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
+    MAP_ROWS, CITIES_INIT, START_UNITS, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
+    getState: () => G,
+  };
+}
+</script>
+</body>
+</html>
