@@ -93,6 +93,27 @@ console.log('— rules sanity —');
   check('fully surrounded unit is cut off', !net.has(victim.x+','+victim.y));
 }
 
+/* encirclement bites: savage combat debuffs and fast attrition */
+{
+  E.newGame('G','normal','hotseat');
+  const att = E.unitsOf('G').find(u=>u.name==='9. Armee');
+  const def = E.unitsOf('S').find(u=>u.name==='3rd Army');
+  const base = E.previewCombat(att, def).ratio;
+  def.oos = true;
+  const cutD = E.previewCombat(att, def).ratio;
+  def.oos = false;
+  check('encircled defender fights at 65%', Math.abs(base/cutD - 0.65) < 1e-9, (base/cutD).toFixed(3));
+  att.oos = true;
+  const cutA = E.previewCombat(att, def).ratio;
+  att.oos = false;
+  check('encircled attacker fights at 40%', Math.abs(cutA/base - 0.4) < 1e-9, (cutA/base).toFixed(3));
+  // pockets starve from the very first week (Brest fortress starts cut off)
+  const brest = E.unitsOf('S').find(u=>u.name==='4th Army');
+  const s0 = brest.str;
+  E.startPhase('S');
+  check('pocket attrition from the first turn', brest.str === s0-1, brest.str+' vs '+s0);
+}
+
 /* air power */
 console.log('— air power —');
 {

@@ -180,7 +180,9 @@
        Each turn is one week of 1941.</p>
     <ul>
       <li><b>Select</b> one of your units, then click a highlighted hex to <b>move</b>, or click an
-          adjacent enemy (red ring) to <b>attack</b>. Every unit can move and attack once per turn.</li>
+          adjacent enemy (red ring) to <b>attack</b>. Every unit can move and attack once per turn.
+          You can drive deep into enemy ground — but any hex <b>next to an enemy unit</b> halts
+          movement for the turn (zone of control). Punch a hole in their line, then pour through it.</li>
       <li><b>Strength</b> (the number on the counter) is a unit's health <i>and</i> its punch.
           Spend <b>⚙ Production</b> to reinforce a damaged unit or deploy new ones at your cities.</li>
       <li><b>Terrain matters.</b> Forests, hills and cities boost defense. Rivers are deadly to attack
@@ -190,9 +192,10 @@
       <li><b>SUPPLY is everything.</b> Supply reaches only <b>7 hexes</b> from your map edge (Germans
           west, Soviets east) — and from every <b>city you control</b>, which acts as a forward depot.
           Capture cities to push your supply network deeper. A unit cut off (by distance, or because
-          enemies stand between it and home) shows <b style="color:var(--redL)">⚠ OUT OF SUPPLY</b>:
-          it fights at half strength and bleeds men every turn. <b>Surround enemy armies to starve them
-          — and don't let it happen to your spearheads.</b></li>
+          enemies stand between it and home) shows <b style="color:var(--redL)">⚠ OUT OF SUPPLY</b>
+          and a red ring: it attacks at <b>40%</b>, defends at <b>65%</b>, cannot dig in or
+          reinforce, and starves — losing strength every single turn. <b>Surround enemy armies
+          to destroy them — and don't let it happen to your spearheads.</b></li>
       <li><b>The clock.</b> October brings <b>mud</b> (slow, weak attacks). December brings <b>snow</b> —
           German attacks falter while fresh <b>Siberian divisions</b> arrive for the Soviets. Germany:
           win <i>before</i> winter. Soviets: survive <i>until</i> it.</li>
@@ -544,7 +547,7 @@ const MAX_TURN = 28;                       // 28 weeks: 22 Jun 1941 → 4 Jan 19
 const START_DATE = Date.UTC(1941,5,22);
 const ENTRENCH_DEF = 0.15;                 // +15% defense per dig-in pip
 const CONCENTRIC = 0.12;                   // +12% attack per extra adjacent friend
-const OOS_ATK = 0.5, OOS_DEF = 0.75;       // out-of-supply penalties
+const OOS_ATK = 0.4, OOS_DEF = 0.65;       // encircled: savage combat penalties
 const RIVER_ATK = 0.6;                     // attacking out of a river hex
 // weather: turns 1-15 clear · 16-19 mud · 20-21 freeze · 22+ snow
 function weatherFor(turn){ return turn>=22?'snow' : turn>=20?'freeze' : turn>=16?'mud' : 'clear'; }
@@ -1082,16 +1085,14 @@ function startPhase(side){
   for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; }
   for (const a of airOf(side)) a.mission = 'ready';   // patrols land, bombers rearm
   refreshSupply();
-  // attrition for cut-off units; entrench handled at end of phase
+  // attrition for cut-off units: pockets starve from the very first week
   for (const u of [...unitsOf(side)]){
     if (u.oos){
       u.oosTurns++;
-      if (u.oosTurns >= 2){
-        u.str -= 1; G.stats[side].lost += 1; G.stats[enemyOf(side)].killed += 1;
-        if (u.str <= 0){
-          killUnit(u);
-          logMsg('sys', `${flag(side)} ${u.name} surrenders — starved out in the pocket.`);
-        }
+      u.str -= 1; G.stats[side].lost += 1; G.stats[enemyOf(side)].killed += 1;
+      if (u.str <= 0){
+        killUnit(u);
+        logMsg('sys', `${flag(side)} ${u.name} surrenders — starved out in the pocket.`);
       }
     } else u.oosTurns = 0;
   }
@@ -1762,7 +1763,8 @@ function draw(){
     for (const k of reach.keys()){
       const [x,y] = k.split(',').map(Number);
       const [cx,cy] = hexCenter(x,y);
-      hexPath(cx,cy,S-3); ctx.fillStyle = '#e8b34b30'; ctx.fill();
+      hexPath(cx,cy,S-3); ctx.fillStyle = '#e8b34b55'; ctx.fill();
+      ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
     }
     if (!su.attacked) for (const t of adjacentEnemies(su)){
       const [cx,cy] = hexCenter(t.x,t.y);
@@ -1819,8 +1821,8 @@ function drawUnit(u, cx, cy){
   if (u.kind==='s_guard') ctx.fillStyle = '#b04a18';
   if (u.kind==='s_mil') ctx.fillStyle = '#7a4a3a';
   roundRect(-w/2,-h/2,w,h,5); ctx.fill();
-  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : '#000c';
-  ctx.lineWidth = (sel===u.id) ? 2.5 : 1.2; ctx.stroke();
+  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
+  ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
   if (u.side===G.phase && u.moved && (u.attacked || !adjacentEnemies(u).length)){
     roundRect(-w/2,-h/2,w,h,5); ctx.fillStyle = '#00000055'; ctx.fill();
   }
@@ -2094,6 +2096,8 @@ function updatePreview(){
     <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
     <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
     <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
+    ${su.oos ? '<div style="color:var(--redL)">⚠ We are cut off — attacking at 40% strength</div>' : ''}
+    ${t.oos ? '<div style="color:var(--grn)">⚠ Enemy is encircled — no supply, defense crumbling</div>' : ''}
     ${ag && ag.atk ? `<div style="color:var(--amber)">⭐ ${ag.name} leads the assault</div>` : ''}
     ${dg && dg.def ? `<div style="color:var(--amber)">⭐ ${dg.name} commands the defense</div>` : ''}
     ${zhukovDefends(t) ? '<div style="color:var(--amber)">⭐ Zhukov directs the Moscow defense</div>' : ''}

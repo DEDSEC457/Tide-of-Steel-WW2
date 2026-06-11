@@ -16,8 +16,9 @@ The whole game is one file (`index.html`) that runs in any browser:
 
 ## 🧠 What makes it a strategy game
 - **Supply & encirclement** — supply reaches only 7 hexes from your map edge or
-  from cities you control (forward depots). Surround enemy armies to starve them;
-  don't let your panzer spearheads outrun their own supply.
+  from cities you control (forward depots). Encircled units fight at a fraction
+  of their strength and starve every turn — surround enemy armies to destroy
+  them, and don't let your panzer spearheads outrun their own supply.
 - **Terrain & entrenchment** — forests, hills, rivers, fortress cities; units
   that hold still dig in. Battle forecast before every attack. The map is tinted
   with the front line — grey ground is Axis-held, red is Soviet.
