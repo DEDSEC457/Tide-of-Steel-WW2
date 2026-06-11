@@ -24,6 +24,11 @@ The whole game is one file (`index.html`) that runs in any browser:
   a friendly city) or Patrol (fighters intercept enemy strikes); idle groups
   repair, flak and dogfights bleed them.
 - **Production** — spend ⚙ points to reinforce damaged armies or deploy new ones.
+- **⭐ Named generals** — historical commanders lead their real formations:
+  Guderian's panzers hit harder, Rokossovsky's riflemen are hard to dislodge,
+  Katukov's T-34s ambush German armor. A general is lost with his unit. From
+  early October, **Zhukov** takes command of the Moscow defense — Soviet units
+  near the capital fight harder while it holds.
 - **The clock** — October mud bogs everything down; December snow cripples German
   attacks while Siberian divisions and fresh Soviet air arrive. Germany must win
   *before* winter; the Soviets must survive *until* it.
@@ -46,6 +51,14 @@ UI against a fake DOM. Run it after any change to `index.html` — it should end
 with `ALL CHECKS PASSED`.
 
 ## 🗺 Roadmap ideas
+- **Historical events** — weekly headlines that change the game: Hitler's "Kiev turn"
+  directive, the October Moscow panic, Sorge's spy report freeing the Siberians early,
+  Lend-Lease convoys reaching Archangelsk
+- **The winter-clothing gamble** — Germany chooses in August: spend production on
+  winter gear (softens the snow penalties) or on fresh divisions, like 1941's real bet
+- **Soviet rail redeployment** — shuttle one army per turn between friendly cities
+- **Factory evacuation** — dismantle industry in a threatened city: lose production
+  now, gain it back behind the Urals later
+- **Partisans** — from October, partisan bands cut German supply behind the lines
+- Scenario starts (Smolensk crisis, the December counteroffensive)
 - Pacific theater: USA vs Japan carrier war (campaign 2?)
-- Soviet rail redeployment, named generals with bonuses
-- Scenario starts (Smolensk crisis, winter counteroffensive)

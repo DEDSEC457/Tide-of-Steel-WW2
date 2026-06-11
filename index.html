@@ -195,6 +195,11 @@
           German attacks falter while fresh <b>Siberian divisions</b> arrive for the Soviets. Germany:
           win <i>before</i> winter. Soviets: survive <i>until</i> it.</li>
       <li>A unit forced to retreat with nowhere to go is <b>destroyed</b> — pockets kill.</li>
+      <li><b>⭐ Generals.</b> Historical commanders lead their formations — Guderian's panzers
+          hit harder and drive deeper, Rokossovsky's riflemen are hard to dislodge. Units with a
+          general show a gold star; the unit panel and battle forecast show the effect. A general
+          is <b>lost with his unit</b>. From early October, <b>Zhukov</b> takes over the Moscow
+          defense: Soviet units near the capital defend better while it holds.</li>
       <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
           plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields), or fly
           <b>Patrol</b> to intercept enemy strikes. Groups that stay grounded repair. Flak and dogfights
@@ -381,6 +386,58 @@ const SOV_SCHEDULE = [
   [26,'s_inf','61st Army'], [27,'s_inf','62nd Army'],
 ];
 
+/* ============================ GENERALS ============================ */
+/* Named commanders attached to their historical formations. Small edges:
+   atk/def are multipliers, mp is extra movement. The bonus is lost with the
+   unit — generals go down with their commands, so guard them well. */
+const GENERALS = [
+  // — German —
+  {side:'G', unit:'2. Panzergruppe', name:'Guderian',     atk:1.15,
+   bio:'"Schneller Heinz", father of the blitzkrieg — leads from a radio truck at the point of the spearhead.'},
+  {side:'G', unit:'3. Panzergruppe', name:'Hoth',         atk:1.10,
+   bio:'"Papa" Hoth — steady, relentless, driving up the Moscow highway.'},
+  {side:'G', unit:'4. Panzergruppe', name:'Hoepner',      atk:1.10,
+   bio:'The old cavalryman, commanding the armored thrust on Leningrad.'},
+  {side:'G', unit:'1. Panzergruppe', name:'von Kleist',   atk:1.10,
+   bio:'Aristocrat at the head of the southern panzer wedge, aimed at Kiev and the Donets.'},
+  {side:'G', unit:'11. Armee',       name:'von Manstein', atk:1.15,
+   bio:'The Wehrmacht’s sharpest operational mind, handed the southern flank in September.'},
+  {side:'G', unit:'4. Armee',        name:'von Kluge',    def:1.10,
+   bio:'"Clever Hans" — methodical and careful, very hard to catch off balance.'},
+  // — Soviet —
+  {side:'S', unit:'16th Army',       name:'Rokossovsky',  def:1.15,
+   bio:'Master of the flexible defense. His army stands across the road to Moscow.'},
+  {side:'S', unit:'19th Army',       name:'Konev',        def:1.10,
+   bio:'A hard, unsentimental driver of men — a front commander in the making.'},
+  {side:'S', unit:'13th Army',       name:'Yeryomenko',   atk:1.10,
+   bio:'Promised Stalin he would smash "the scoundrel Guderian". He keeps trying.'},
+  {side:'S', unit:'37th Army',       name:'Kirponos',     def:1.10,
+   bio:'Commands the Kiev fortified region — and will not abandon his city.'},
+  {side:'S', unit:'5th Army',        name:'Potapov',      def:1.10,
+   bio:'His counterattacks out of the Pripyat marshes haunt the German flanks for months.'},
+  {side:'S', unit:'4th Tank Corps',  name:'Katukov',      atk:1.15,
+   bio:'Ambushes German armor with hull-down T-34s — Guderian learns his name at Mtsensk.'},
+];
+const GEN_BY_UNIT = new Map(GENERALS.map(g => [g.side+'|'+g.unit, g]));
+function generalOf(u){ return GEN_BY_UNIT.get(u.side+'|'+u.name) || null; }
+function genBonusText(g){
+  const b = [];
+  if (g.atk) b.push('+'+Math.round((g.atk-1)*100)+'% attack');
+  if (g.def) b.push('+'+Math.round((g.def-1)*100)+'% defense');
+  if (g.mp)  b.push('+'+g.mp+' movement');
+  return b.join(' · ');
+}
+
+/* Zhukov sits above army command. Recalled to the capital in early October
+   (turn 16 = 5 Oct 1941 — he arrived on the 7th), he directs the Moscow
+   defense: Soviet units fighting near a Soviet-held Moscow defend harder. */
+const ZHUKOV_TURN = 16, ZHUKOV_RANGE = 5, ZHUKOV_DEF = 1.15;
+function zhukovDefends(def){
+  if (def.side !== 'S' || G.turn < ZHUKOV_TURN) return false;
+  const moscow = G.cities.find(c => c.name === 'Moscow');
+  return moscow.owner === 'S' && hexDist(def.x, def.y, moscow.x, moscow.y) <= ZHUKOV_RANGE;
+}
+
 /* ============================ RULES CONSTANTS ============================ */
 const MAX_TURN = 28;                       // 28 weeks: 22 Jun 1941 → 4 Jan 1942
 const START_DATE = Date.UTC(1941,5,22);
@@ -559,7 +616,7 @@ function moveCost(u, x, y){
    stopped on; enemy hexes are impassable. */
 function reachable(u){
   const wx = weatherFor(G.turn);
-  let mp = KINDS[u.kind].mp;
+  let mp = KINDS[u.kind].mp + (generalOf(u)?.mp || 0);
   if (wx==='snow' && u.side==='G') mp = Math.max(1, mp-1);
   const foeZOC = computeZOC(enemyOf(u.side));
   const occ = {};
@@ -606,6 +663,10 @@ function combatMods(att, def){
   const wx = weatherFor(G.turn);
   const tDef = effTerrain(def.x, def.y).def;
   let aMul = 1, dMul = tDef * (1 + ENTRENCH_DEF*def.entrench);
+  const ag = generalOf(att), dg = generalOf(def);
+  if (ag && ag.atk) aMul *= ag.atk;
+  if (dg && dg.def) dMul *= dg.def;
+  if (zhukovDefends(def)) dMul *= ZHUKOV_DEF;
   if (terrainAt(att.x,att.y)==='r') aMul *= RIVER_ATK;
   if (att.oos) aMul *= OOS_ATK;
   if (def.oos) dMul *= OOS_DEF;
@@ -722,7 +783,11 @@ function resolveCombat(att, def){
   return events;
 }
 function defNoEscape(ev){ return ev.destroyed && !ev.retreated; }
-function killUnit(u){ G.units = G.units.filter(t => t.id !== u.id); }
+function killUnit(u){
+  const g = generalOf(u);
+  if (g) logMsg('sys', `⭐ General ${g.name} is lost with his command — a grievous blow to ${u.side==='G'?'the Wehrmacht':'the Red Army'}.`);
+  G.units = G.units.filter(t => t.id !== u.id);
+}
 
 /* ============================ PRODUCTION ============================ */
 function canReinforce(u){
@@ -908,6 +973,8 @@ function endPhase(){
                    snow:'DEEP SNOW. German attacks falter in -30° cold. Siberian divisions are arriving.'}[wxNew];
       if (msg) logMsg('sys', '❄ ' + msg);
     }
+    if (G.turn === ZHUKOV_TURN && G.cities.find(c=>c.name==='Moscow').owner==='S')
+      logMsg('sys', '⭐ STAVKA recalls Army General Zhukov from Leningrad to command the Western Front — the defense of Moscow stiffens.');
     for (const [t,kind,name] of SOV_SCHEDULE){
       if (t === G.turn){
         const spot = deploySpots('S')[0];
@@ -1575,6 +1642,8 @@ function drawUnit(u, cx, cy){
   // entrench pips
   ctx.fillStyle = '#cfe6a8';
   for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-6, 3.5, 3.5);
+  // a general's command flies his star
+  if (generalOf(u)){ ctx.fillStyle = '#ffd34d'; star(-w/2+8, -h/2+5, 3.5); }
   // out of supply
   if (u.oos){
     ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
@@ -1718,10 +1787,13 @@ function updateUnitCard(){
     return;
   }
   const k = KINDS[u.kind];
+  const g = generalOf(u);
   const cls = u.side==='G'?'ger':'sov';
   body.innerHTML = `
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
+    ${g ? `<div style="color:var(--amber);margin-bottom:2px;">⭐ Gen. ${g.name} · ${genBonusText(g)}</div>
+           <div style="color:var(--dim);font-size:12px;font-style:italic;margin-bottom:4px;">${g.bio}</div>` : ''}
     <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
     <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
     <div class="statrow"><span>Movement</span><span>${k.mp}</span></div>
@@ -1797,8 +1869,9 @@ function updateTerrainCard(){
            <div class="statrow"><span>Max dig-in</span><span>${t.dig}</span></div>`;
   const u = unitAt(x,y);
   if (u){
+    const ug = generalOf(u);
     html += `<div style="margin-top:4px;border-top:1px solid var(--line);padding-top:4px;">
-      ${flag(u.side)} <b>${u.name}</b> — str ${u.str}${u.oos?' <span class="bad">⚠ no supply</span>':''}</div>`;
+      ${flag(u.side)} <b>${u.name}</b>${ug?' · ⭐ '+ug.name:''} — str ${u.str}${u.oos?' <span class="bad">⚠ no supply</span>':''}</div>`;
   }
   $('terrain-body').innerHTML = html;
 }
@@ -1810,12 +1883,16 @@ function updatePreview(){
   show('preview-card', !!ok);
   if (!ok) return;
   const p = previewCombat(su, t);
+  const ag = generalOf(su), dg = generalOf(t);
   $('preview-body').innerHTML = `
     <div class="vs"><span>${flag(su.side)} ${su.name}</span><span>str ${su.str}</span></div>
     <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
     <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
     <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
     <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
+    ${ag && ag.atk ? `<div style="color:var(--amber)">⭐ ${ag.name} leads the assault</div>` : ''}
+    ${dg && dg.def ? `<div style="color:var(--amber)">⭐ ${dg.name} commands the defense</div>` : ''}
+    ${zhukovDefends(t) ? '<div style="color:var(--amber)">⭐ Zhukov directs the Moscow defense</div>' : ''}
     ${p.retreat ? '<div style="color:var(--amber)">Likely to force a retreat'+(retreatHex(t,su)?'':' — NO ESCAPE ROUTE!')+'</div>' : ''}
     <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack.</div>`;
 }
@@ -2013,7 +2090,8 @@ if (typeof module !== 'undefined' && module.exports){
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
-    MAP_ROWS, CITIES_INIT, START_UNITS, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
+    GENERALS, generalOf, zhukovDefends,
+    MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };
 }

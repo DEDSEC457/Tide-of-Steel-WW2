@@ -130,6 +130,58 @@ console.log('— air power —');
   check('pre-air saves migrate', E.airOf('G').length===2 && E.airOf('S').length===1);
 }
 
+/* generals */
+console.log('— generals —');
+{
+  E.newGame('G','normal','hotseat');
+  const G = E.getState();
+  // every general commands a formation that actually exists
+  const names = new Set([...E.START_UNITS.map(u=>u[1]), ...E.SOV_SCHEDULE.map(s=>s[2])]);
+  check('all generals command real formations', E.GENERALS.every(g=>names.has(g.unit)),
+    E.GENERALS.filter(g=>!names.has(g.unit)).map(g=>g.name).join(','));
+  check('no formation has two generals',
+    new Set(E.GENERALS.map(g=>g.side+'|'+g.unit)).size === E.GENERALS.length);
+  const gud = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  check('Guderian leads 2. Panzergruppe', !!E.generalOf(gud) && E.generalOf(gud).name==='Guderian');
+  // attack bonus shows up in the forecast (and therefore in the AI's eyes)
+  const tgt = E.unitsOf('S').find(u=>u.name==='3rd Army');
+  const withGen = E.previewCombat(gud, tgt).ratio;
+  gud.name = 'Nobody';
+  const without = E.previewCombat(gud, tgt).ratio;
+  check('Guderian boosts attack odds ×1.15', Math.abs(withGen/without - 1.15) < 1e-9,
+    (withGen/without).toFixed(3));
+  // the engine supports +movement generals (none shipped — it unbalanced the AI sims)
+  gud.name = '2. Panzergruppe';
+  check('no general grants movement', E.GENERALS.every(g=>!g.mp),
+    E.GENERALS.filter(g=>g.mp).map(g=>g.name).join(','));
+  const reachPlain = E.reachable(gud).size;
+  E.generalOf(gud).mp = 1;
+  const reachFast = E.reachable(gud).size;
+  delete E.generalOf(gud).mp;
+  check('general mp bonus extends reach', reachFast > reachPlain, reachFast+' vs '+reachPlain);
+  // defense bonus
+  const rok = E.unitsOf('S').find(u=>u.name==='16th Army');
+  const att = E.unitsOf('G').find(u=>u.name==='9. Armee');
+  const defGen = E.previewCombat(att, rok).ratio;
+  rok.name = 'Nobody';
+  const defPlain = E.previewCombat(att, rok).ratio;
+  rok.name = '16th Army';
+  check('Rokossovsky stiffens the defense', defGen < defPlain,
+    defGen.toFixed(3)+' vs '+defPlain.toFixed(3));
+  // Zhukov: from turn 16, Soviet units near a Soviet-held Moscow defend better
+  const mosDef = E.unitsOf('S').find(u=>u.name==='24th Army');   // garrisons Moscow
+  check('no Zhukov before October', !E.zhukovDefends(mosDef));
+  G.turn = 16;
+  check('Zhukov active from turn 16 near Moscow', E.zhukovDefends(mosDef));
+  const zhk = E.previewCombat(att, mosDef).ratio;
+  const moscow = G.cities.find(c=>c.name==='Moscow');
+  moscow.owner = 'G';
+  check('Zhukov bonus gone if Moscow falls', !E.zhukovDefends(mosDef));
+  const noZhk = E.previewCombat(att, mosDef).ratio;
+  moscow.owner = 'S';
+  check('Zhukov bonus shows in the forecast', zhk < noZhk, zhk.toFixed(3)+' vs '+noZhk.toFixed(3));
+}
+
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
 console.log(`— ${RUNS} AI-vs-AI campaigns —`);
