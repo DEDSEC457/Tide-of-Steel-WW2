@@ -19,7 +19,8 @@ The whole game is one file (`index.html`) that runs in any browser:
   from cities you control (forward depots). Surround enemy armies to starve them;
   don't let your panzer spearheads outrun their own supply.
 - **Terrain & entrenchment** — forests, hills, rivers, fortress cities; units
-  that hold still dig in. Battle forecast before every attack.
+  that hold still dig in. Battle forecast before every attack. The map is tinted
+  with the front line — grey ground is Axis-held, red is Soviet.
 - **✈ The air war** — air groups fly Strike (close air support within 8 hexes of
   a friendly city) or Patrol (fighters intercept enemy strikes); idle groups
   repair, flak and dogfights bleed them.
@@ -32,6 +33,13 @@ The whole game is one file (`index.html`) that runs in any browser:
 - **The clock** — October mud bogs everything down; December snow cripples German
   attacks while Siberian divisions and fresh Soviet air arrive. Germany must win
   *before* winter; the Soviets must survive *until* it.
+- **📰 History unfolds** — real dated dispatches from 1941 pop up as the weeks
+  pass (Stalin's "brothers and sisters" speech, the Kiev pocket, the Red Square
+  parade, Pearl Harbor…), a few with small production effects. And in mid-August
+  the German side faces **the winter question**: divert 10 ⚙ to winter equipment,
+  or gamble — as the OKH did — that the war ends before the snow. Gear mostly
+  saves the December *defense* and keeps the infantry marching; no greatcoat
+  unfreezes a panzer engine.
 
 **Controls:** click a unit → move/attack · `N` next unit · `E` end turn · `Esc` deselect ·
 drag to pan · scroll to zoom.
@@ -50,12 +58,11 @@ AI-vs-AI campaigns checking for crashes and rule violations, and smoke-tests the
 UI against a fake DOM. Run it after any change to `index.html` — it should end
 with `ALL CHECKS PASSED`.
 
+`node balance-ab.js [runs] [--no-pp] [--no-gear] [--no-generals]` — balance
+A/B tool: plays AI-vs-AI campaigns with individual bonus systems switched off,
+so you can see which feature moves the victory distribution.
+
 ## 🗺 Roadmap ideas
-- **Historical events** — weekly headlines that change the game: Hitler's "Kiev turn"
-  directive, the October Moscow panic, Sorge's spy report freeing the Siberians early,
-  Lend-Lease convoys reaching Archangelsk
-- **The winter-clothing gamble** — Germany chooses in August: spend production on
-  winter gear (softens the snow penalties) or on fresh divisions, like 1941's real bet
 - **Soviet rail redeployment** — shuttle one army per turn between friendly cities
 - **Factory evacuation** — dismantle industry in a threatened city: lose production
   now, gain it back behind the Urals later

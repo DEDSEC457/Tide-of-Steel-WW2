@@ -182,6 +182,83 @@ console.log('— generals —');
   check('Zhukov bonus shows in the forecast', zhk < noZhk, zhk.toFixed(3)+' vs '+noZhk.toFixed(3));
 }
 
+/* territory control */
+console.log('— territory —');
+{
+  E.newGame('G','normal','hotseat');
+  check('Moscow soil starts Soviet', E.terrOwner(24,4)==='S', E.terrOwner(24,4));
+  check('Warsaw soil starts German', E.terrOwner(2,7)==='G', E.terrOwner(2,7));
+  check('sea is no one’s ground', E.terrOwner(0,0)===null);
+  // an advancing unit turns the ground its own color
+  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  const before = E.terrOwner(8,9);
+  E.doMove(pz, 8, 9);                       // deep move (engine-level, for the test)
+  check('advance claims ground', before==='S' && E.terrOwner(8,9)==='G',
+    before+' -> '+E.terrOwner(8,9));
+  // pre-territory saves rebuild the map
+  const snap = JSON.parse(E.serialize());
+  delete snap.G.terr;
+  E.deserialize(JSON.stringify(snap));
+  check('pre-territory saves migrate', E.terrOwner(2,7)==='G' && E.terrOwner(8,9)==='G');
+}
+
+/* historical events & the winter question */
+console.log('— events & winter gear —');
+{
+  E.newGame('G','normal','hotseat');
+  const G = E.getState();
+  check('events all land inside the campaign', E.EVENTS.every(e=>e.turn>=1 && e.turn<=E.MAX_TURN));
+  check('events have date, title and text', E.EVENTS.every(e=>e.date && e.title && e.text));
+  check('Barbarossa headline fires on turn 1', G.log.some(([c,t])=>t.includes('OPERATION BARBAROSSA')));
+  // pp events pay out
+  const ppS = G.pp.S;
+  G.turn = 2; E.fireEvents();
+  check('Stalin speech adds Soviet production', G.pp.S === ppS+2, G.pp.S+' vs '+ppS);
+  // the winter question is asked in mid-August
+  G.turn = 9; E.startPhase('G');
+  check('winter question offered turn 9', G.winterGear === 'pending', String(G.winterGear));
+  const poor = G.pp.G; G.pp.G = 3;
+  check('cannot buy gear without production', E.decideWinterGear(true)===false && G.winterGear==='pending');
+  G.pp.G = Math.max(poor, 14);
+  const before = G.pp.G;
+  check('buying gear costs 10 production',
+    E.decideWinterGear(true)===true && E.hasWinterGear() && G.pp.G === before-10);
+  // gear softens snow attacks a little (0.65 vs 0.6) and German defense a lot (0.9 vs 0.8)
+  G.turn = 22;
+  const att = E.unitsOf('G').find(u=>u.name==='9. Armee');
+  const tgt = E.unitsOf('S').find(u=>u.name==='3rd Army');
+  const withGear = E.previewCombat(att, tgt).ratio;
+  G.winterGear = false;
+  const without = E.previewCombat(att, tgt).ratio;
+  check('winter gear slightly helps snow attacks', Math.abs(withGear/without - 0.65/0.6) < 1e-9,
+    (withGear/without).toFixed(3));
+  const sovAtt = E.unitsOf('S').find(u=>u.name==='10th Army');
+  const defNoGear = E.previewCombat(sovAtt, att).ratio;
+  G.winterGear = true;
+  const defGear = E.previewCombat(sovAtt, att).ratio;
+  check('winter gear shields the German defense', Math.abs(defNoGear/defGear - 0.9/0.8) < 1e-9,
+    (defNoGear/defGear).toFixed(3));
+  // felt boots: infantry keeps marching, panzers freeze either way
+  const pz = E.unitsOf('G').find(u=>u.name==='4. Panzergruppe');
+  const rInfGear = E.reachable(att).size, rPzGear = E.reachable(pz).size;
+  G.winterGear = false;
+  const rInfNo = E.reachable(att).size, rPzNo = E.reachable(pz).size;
+  check('winter gear keeps the infantry moving', rInfGear > rInfNo, rInfGear+' vs '+rInfNo);
+  check('panzers freeze with or without gear', rPzGear === rPzNo, rPzGear+' vs '+rPzNo);
+  // AI Germany answers the question itself
+  E.newGame('G','normal','hotseat');
+  const G2 = E.getState();
+  G2.turn = 9; E.startPhase('G');
+  E.aiFullPhase('G');
+  check('AI resolves the winter question', G2.winterGear !== 'pending', String(G2.winterGear));
+  // unanswered, the offer expires after a few weeks
+  E.newGame('G','normal','hotseat');
+  const G3 = E.getState();
+  G3.turn = 9; E.startPhase('G');
+  G3.turn = 13; E.startPhase('G');
+  check('unanswered offer expires', G3.winterGear === false, String(G3.winterGear));
+}
+
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
 console.log(`— ${RUNS} AI-vs-AI campaigns —`);
@@ -292,6 +369,9 @@ function uiSmoke(side){
   const UI = sb.module.exports;
   let guard = 0;
   while (!UI.getState().over && guard++ < 40){
+    // dismiss event popups and answer the winter question like a player would
+    for (let i=0;i<3;i++) if ($('btn-event-close').onclick) $('btn-event-close').onclick();
+    if (UI.getState().winterGear === 'pending' && $('btn-gear-buy').onclick) $('btn-gear-buy').onclick();
     $('btn-endturn').onclick();              // human passes; AI plays via queued steps
     drain();
   }
