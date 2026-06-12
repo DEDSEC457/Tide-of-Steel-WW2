@@ -50,16 +50,17 @@ check('weather schedule', E.weatherFor(1)==='clear' && E.weatherFor(16)==='mud'
 console.log('— scenario registry —');
 for (const id of Object.keys(E.SCENARIOS)){
   const s = E.SCENARIOS[id];
+  const K = s.kinds || E.KINDS;
   const land = (x,y) => s.map[y] && s.map[y][x] && s.map[y][x] !== '~';
   check(`[${id}] map is ${s.cols}x${s.rows}, legal terrain`,
-    s.map.length===s.rows && s.map.every(r=>r.length===s.cols && /^[.fhsr~]+$/.test(r)));
+    s.map.length===s.rows && s.map.every(r=>r.length===s.cols && /^[.fhsro~]+$/.test(r)));
   check(`[${id}] cities on land, unique hexes`,
     s.cities.every(c=>land(c.x,c.y)) &&
     new Set(s.cities.map(c=>c.x+','+c.y)).size===s.cities.length);
   check(`[${id}] start units on land, unique hexes, known kinds`,
-    s.startUnits.every(([k,n,x,y])=>land(x,y) && E.KINDS[k]) &&
+    s.startUnits.every(([k,n,x,y])=>land(x,y) && K[k]) &&
     new Set(s.startUnits.map(u=>u[2]+','+u[3])).size===s.startUnits.length);
-  check(`[${id}] schedules use known kinds`, s.sovSchedule.every(r=>E.KINDS[r[1]]));
+  check(`[${id}] schedules use known kinds`, s.sovSchedule.every(r=>K[r[1]]));
   const names = new Set([...s.startUnits.map(u=>u[1]), ...s.sovSchedule.map(r=>r[2])]);
   check(`[${id}] generals command real formations`, s.generals.every(g=>names.has(g.unit)));
   check(`[${id}] events land inside the campaign`,

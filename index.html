@@ -150,6 +150,8 @@
       <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
+      <span class="opt" data-s="midway">⚓ Midway 1942</span>
+      <span class="opt" data-s="dday">🟦 D-Day 1944</span>
     </div>
     <div class="pick-row">
       <div class="pick p-ger sel" id="pick-ger">
@@ -910,11 +912,350 @@ SCENARIOS.stalingrad = {
   ]; },
 };
 
+/* ---------- Scenario 4: D-Day — Normandy, June–August 1944 ----------
+   The Western Front. Side G = the Allies (they move first and their
+   captured objectives drive the victory tiers); side S = the Germans.
+   The Allies have NO map-edge supply: everything flows from the four
+   invasion beaches (supply seeds) and the city-depots they capture —
+   the logistics race IS the campaign. */
+SCENARIOS.dday = {
+  id: 'dday',
+  title: 'D-DAY — NORMANDY', short: 'NORMANDY',
+  sub: 'THE WESTERN FRONT · JUNE — AUGUST 1944 · TURN-BASED STRATEGY',
+  sides: {
+    G: {name:'Allied', flag:'🟦', color:'#3f5d40', tint:'rgba(80,130,90,0.28)'},
+    S: {name:'German', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+  },
+  kinds: {
+    g_inf:  {side:'G', label:'US Infantry Corps',   atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
+    g_pz:   {side:'G', label:'US Armored Corps',    atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+    g_ally: {side:'G', label:'British & CW Corps',  atk:4, def:5, mp:3, maxStr:10, cost:10, sym:'inf', color:'#4a5a35'},
+    s_inf:  {side:'S', label:'Infanterie-Korps',    atk:4, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    s_tank: {side:'S', label:'Panzer-Korps',        atk:7, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
+    s_guard:{side:'S', label:'Waffen-SS Korps',     atk:6, def:6, mp:4, maxStr:10, cost:16, sym:'inf', color:'#3a3a3a'},
+    s_mil:  {side:'S', label:'Static Division',     atk:2, def:4, mp:1, maxStr:6,  cost:4,  sym:'inf', color:'#5a5244'},
+  },
+  deployNames: {g_inf:'US Follow-up Corps', g_pz:'US Armored (follow-up)',
+                s_inf:'Ersatz-Korps', s_tank:'Panzer Reserve', s_mil:'Alarm Units'},
+  menu: {
+    ger: {h:'🟦 The Allies (US & British)', p:'You are ashore — now win the buildup race. Take Cherbourg for a port, break out of the bocage, and be across the Seine before autumn.'},
+    sov: {h:'⬛ Germany (Westheer)', p:'The Atlantic Wall is breached but the panzers are coming. Pin them in the hedgerows, hold the ports, and throw the invasion back into the sea.'},
+  },
+  cols: 30, rows: 20,
+  /* Channel north · Cotentin peninsula · bocage (forest/marsh) ·
+     hills at Falaise · the Seine running northwest to Le Havre */
+  map: [
+  /*           0    5    10   15   20   25     */
+  /* 0*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 1*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 2*/ "~~~~..~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 3*/ "~~~~....~~~~~~~~~~~...........",
+  /* 4*/ "~~~...............r...........",
+  /* 5*/ "....fsf.sf.........r..........",
+  /* 6*/ "...fsff..sf.........r.........",
+  /* 7*/ "..f.sf..f....hh......r........",
+  /* 8*/ "..........f..hh.......r.......",
+  /* 9*/ ".f...f.................r......",
+  /*10*/ "..f...........................",
+  /*11*/ ".ff...........................",
+  /*12*/ "..f.f.........................",
+  /*13*/ "....f.........................",
+  /*14*/ "..............f...............",
+  /*15*/ ".....................f........",
+  /*16*/ "..............................",
+  /*17*/ "...........f..................",
+  /*18*/ "..............................",
+  /*19*/ "..............................",
+  ],
+  /* vp>0 are Allied objectives. All of France starts German-held. */
+  cities: [
+    {x:4, y:2,  name:'Cherbourg',  vp:2, owner:'S'},
+    {x:7, y:5,  name:'Carentan',   vp:1, owner:'S'},
+    {x:10,y:5,  name:'Bayeux',     vp:0, owner:'S'},
+    {x:14,y:5,  name:'Caen',       vp:2, owner:'S'},
+    {x:17,y:5,  name:'Lisieux',    vp:0, owner:'S'},
+    {x:9, y:7,  name:'Saint-Lô',   vp:1, owner:'S'},
+    {x:6, y:9,  name:'Avranches',  vp:1, owner:'S'},
+    {x:15,y:7,  name:'Falaise',    vp:1, owner:'S'},
+    {x:16,y:9,  name:'Argentan',   vp:0, owner:'S'},
+    {x:19,y:3,  name:'Le Havre',   vp:1, owner:'S'},
+    {x:20,y:5,  name:'Rouen',      vp:1, owner:'S'},
+    {x:3, y:10, name:'Saint-Malo', vp:0, owner:'S'},
+    {x:5, y:12, name:'Rennes',     vp:1, owner:'S'},
+    {x:14,y:11, name:'Alençon',    vp:0, owner:'S'},
+    {x:13,y:13, name:'Le Mans',    vp:0, owner:'S'},
+    {x:21,y:8,  name:'Evreux',     vp:0, owner:'S'},
+    {x:22,y:10, name:'Dreux',      vp:0, owner:'S'},
+    {x:21,y:12, name:'Chartres',   vp:0, owner:'S'},
+    {x:24,y:9,  name:'Paris',      vp:4, owner:'S'},
+  ],
+  /* Allied reinforcements land over the beaches; German reserves
+     arrive from the Reich and the rear */
+  gerSpawns: [[9,4],[11,4],[6,4],[13,4],[7,5]],
+  sovSpawns: [[24,9],[20,5],[22,10],[29,6],[29,12],[21,12]],
+  /* the Mulberries: beach hexes are Allied supply sources; no edge supply */
+  supplySeeds: {G: [[6,4],[9,4],[11,4],[13,4]]},
+  edgeSupply: {G:false, S:true},
+  startUnits: [
+    // — the Allied lodgement, morning of 6 June —
+    ['g_inf','VII Corps (Utah)',    6,4, 8], ['g_inf','101st Airborne',  7,4, 7],
+    ['g_inf','82nd Airborne',       5,5, 7], ['g_inf','V Corps (Omaha)', 9,4, 8],
+    ['g_ally','XXX Corps (Gold)',  11,4, 9], ['g_ally','II Cdn Corps (Juno)', 12,5, 8],
+    ['g_ally','I Corps (Sword)',   13,4, 9], ['g_ally','6th Airborne',   14,4, 7],
+    // — the Westheer —
+    ['s_mil','709. Static',         5,3, 5], ['s_inf','243. Infanterie',  4,4, 6],
+    ['s_inf','91. Luftlande',       6,5, 6], ['s_inf','352. Infanterie', 10,4, 7],
+    ['s_mil','716. Static',        12,4, 5], ['s_mil','711. Static',     16,4, 5],
+    ['s_inf','LXXXIV Korps',        8,6, 7], ['s_inf','77. Infanterie',   5,7, 6],
+    ['s_tank','21. Panzer',        14,6, 8], ['s_guard','12. SS Hitlerjugend', 15,6, 9],
+    ['s_tank','Panzer Lehr',       12,7, 9], ['s_inf','3. Fallschirmjäger', 10,7, 8],
+    ['s_guard','17. SS PzGren',     9,8, 8], ['s_inf','326. Infanterie', 17,6, 6],
+    ['s_inf','15. Armee Detachment', 21,4, 7], ['s_mil','Paris Garrison', 24,9, 5],
+  ],
+  /* mixed schedule: German reserves race the Allied follow-up waves */
+  sovSchedule: [
+    [2,'s_guard','1. SS Leibstandarte'], [2,'s_tank','2. SS Das Reich'],
+    [3,'s_tank','116. Panzer'],          [4,'s_inf','353. Infanterie'],
+    [5,'s_guard','9. SS Hohenstaufen'],  [5,'s_guard','10. SS Frundsberg'],
+    [6,'s_inf','276. Infanterie'],       [8,'g_pz','Third Army (Patton)'],
+    [9,'g_ally','First Canadian Army'],  [10,'s_inf','331. Infanterie'],
+  ],
+  generals: [
+    // — Allied —
+    {side:'G', unit:'VII Corps (Utah)', name:'Collins',   atk:1.15,
+     bio:'"Lightning Joe" — takes Cherbourg in three weeks, then leads the breakout.'},
+    {side:'G', unit:'XXX Corps (Gold)', name:'Montgomery', def:1.10,
+     bio:'Master of the set-piece battle, commanding all Allied ground forces — methodical, and the panzers\' magnet at Caen.'},
+    {side:'G', unit:'82nd Airborne',    name:'Ridgway',   def:1.10,
+     bio:'Jumped into the dark over the Merderet with his division.'},
+    {side:'G', unit:'Third Army (Patton)', name:'Patton', atk:1.20,
+     bio:'"We shall attack and attack until we are exhausted, and then we shall attack again."'},
+    // — German —
+    {side:'S', unit:'Panzer Lehr',      name:'Bayerlein', atk:1.10,
+     bio:'Rommel\'s old Afrika chief of staff, leading the strongest panzer division in the West.'},
+    {side:'S', unit:'12. SS Hitlerjugend', name:'Meyer',  atk:1.10,
+     bio:'"Panzermeyer" — his teenage division fights with fanatic ferocity around Caen.'},
+    {side:'S', unit:'3. Fallschirmjäger', name:'Meindl',  def:1.15,
+     bio:'His paratroopers make every hedgerow at Saint-Lô cost a day and a company.'},
+    {side:'S', unit:'9. SS Hohenstaufen', name:'Hausser', atk:1.10,
+     bio:'Veteran SS commander rushed back from the Eastern Front to plug the line.'},
+  ],
+  events: [
+    {turn:1,  date:'6 June 1944',   title:'THE LONGEST DAY',
+     text:'156,000 men, 5,000 ships, 11,000 aircraft — the largest amphibious invasion in history goes in across five beaches. By midnight the Atlantic Wall, four years in the building, has been breached in a single morning. "The eyes of the world are upon you."'},
+    {turn:2,  date:'13 June 1944',  title:'VENGEANCE WEAPONS',
+     text:'The first V-1 flying bombs fall on London — Hitler\'s answer to the invasion. At Villers-Bocage a single Tiger commanded by Michael Wittmann shoots up an entire British armoured column. The hedgerow war has begun.'},
+    {turn:3,  date:'19 June 1944',  title:'THE GREAT STORM',
+     text:'The worst June gale in forty years wrecks the American Mulberry harbour and strands 800 craft. For four days almost nothing lands over the beaches. The Germans get the breathing space the Luftwaffe could never have bought them.'},
+    {turn:4,  date:'27 June 1944',  title:'CHERBOURG',
+     text:'Collins takes Cherbourg — the first great port. The Germans have wrecked it so thoroughly that nothing will move through it for weeks: the supply crisis continues, and everything still comes over the sand.'},
+    {turn:6,  date:'11 July 1944',  title:'THE BOCAGE',
+     text:'A thousand years of Norman hedgerows have turned every field into a fortress. Rifle companies are burning out in days; tank crews weld steel teeth to their hulls to chew through the banks. Nobody trained for this.'},
+    {turn:8,  date:'25 July 1944',  title:'OPERATION COBRA', pp:{G:2},
+     text:'Three thousand aircraft carpet-bomb a six-kilometre box west of Saint-Lô, and Panzer Lehr simply ceases to exist. The hole is real: American armour pours through into open country for the first time.'},
+    {turn:10, date:'8 August 1944', title:'MORTAIN',
+     text:'Hitler orders the panzers to attack west toward Avranches and cut the breakout. They drive instead into a sack: Allied fighter-bombers work the columns over all day. The further west they attack, the deeper the trap becomes.'},
+    {turn:11, date:'15 August 1944', title:'OPERATION DRAGOON',
+     text:'A second invasion — the Riviera. Army Group G begins a 700-kilometre retreat up the Rhône valley. Every German soldier in France is now thinking about the distance to the Reich.'},
+    {turn:12, date:'21 August 1944', title:'THE FALAISE POCKET', pp:{G:2},
+     text:'The pincers meet at Chambois: 50,000 prisoners, the roads west choked for miles with burned-out vehicles. In Paris the Resistance rises and the police seize the Préfecture. The Battle of Normandy is ending in catastrophe for the Westheer.'},
+  ],
+  maxTurn: 12,                              // 12 weeks: 6 Jun → late Aug 1944
+  startDate: Date.UTC(1944,5,6),
+  // one week of weather matters: the great Channel storm of 19-22 June
+  weather(turn){ return turn===3 ? 'mud' : 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=2 ? 10 : turn===3 ? 5 : turn<=8 ? 13 : 15;  // buildup; Red Ball Express after Cobra
+    return 5;                                                  // the Westheer, strained everywhere
+  },
+  // Allied objective points held at the end (15 total; history ≈ 14)
+  victoryTiers: [
+    [14,'TOTAL VICTORY — TO THE GERMAN BORDER','France free, the Westheer destroyed, the spearheads racing for the Rhine — even faster than history.'],
+    [11,'HISTORY REPEATS — PARIS LIBERATED','The bells of Notre-Dame ring out — Normandy was bought in blood, but France is free by summer\'s end.'],
+    [7,'THE SLOW GRIND','A deep lodgement and hard-won ground, but the breakout never quite came — the war in the West will be longer.'],
+    [3,'STALEMATE IN THE BOCAGE','The invasion holds a strip of Normandy bought at terrible cost. The Allies will need another plan — and another year.'],
+    [0,'THROWN INTO THE SEA','The greatest amphibious gamble in history has failed. There will not be another for years.'],
+  ],
+  sudden: {
+    axisCities: ['Paris','Rouen'], minAxisUnits: 4,
+    axisTitle: 'FRANCE LIBERATED',
+    axisText:  'Paris is free and the Seine is crossed in force — the German front in the West has collapsed.',
+    sovTitle:  'THE INVASION DEFEATED',
+    sovText:   'The lodgement is annihilated on the beaches where it landed. The liberation of Europe is postponed indefinitely.',
+  },
+  airInit: [
+    ['G','Allied Expeditionary AF', 10],
+    ['G','RAF 2nd Tactical AF', 9],
+    ['S','Luftflotte 3', 4],                // outnumbered twenty to one
+  ],
+  sovAirSchedule: [],
+  setup(st){
+    // the Atlantic Wall: coastal and fortress garrisons are dug in
+    for (const name of ['709. Static','716. Static','711. Static','352. Infanterie','15. Armee Detachment','Paris Garrison']){
+      const u = st.units.find(t=>t.name===name);
+      if (u) u.entrench = 2;
+    }
+  },
+  opening(playerSide){ return [
+    '6 June 1944 — D-DAY. Before dawn three airborne divisions drop into the dark; at 06:30 the ramps go down on five beaches.',
+    playerSide==='G'
+      ? 'You are ashore. Now win the buildup race — and remember: your supply comes from the beaches until you take a port.'
+      : 'The invasion has come — and not at Calais. Contain the beachhead while the panzers arrive, and drive it into the sea.',
+  ]; },
+};
+
+/* ---------- Scenario 5: The Battle of Midway, June 1942 ----------
+   The Pacific. One turn = ONE DAY. Almost the whole map is navigable
+   ocean; units are naval task forces. Carriers are floating airfields:
+   the air war ranges from them (and from Midway itself), and they are
+   devastating but fragile. Japan (side G) must take the atoll; the
+   ambushing US carriers must make them pay. */
+SCENARIOS.midway = {
+  id: 'midway',
+  title: 'THE BATTLE OF MIDWAY', short: 'MIDWAY',
+  sub: 'THE PACIFIC · 4 — 10 JUNE 1942 · ONE TURN = ONE DAY',
+  sides: {
+    G: {name:'Japanese', flag:'🟥', color:'#7e2f23', tint:'rgba(190,60,45,0.18)'},
+    S: {name:'US',       flag:'🟦', color:'#2e4d6b', tint:'rgba(70,110,170,0.20)'},
+  },
+  kinds: {
+    g_pz:   {side:'G', label:'Carrier Division',   atk:8, def:4, mp:5, maxStr:8,  cost:30, sym:'arm', carrier:true},
+    g_inf:  {side:'G', label:'Battleship Division',atk:6, def:7, mp:4, maxStr:10, cost:24, sym:'inf'},
+    g_ally: {side:'G', label:'Invasion Convoy',    atk:2, def:3, mp:3, maxStr:8,  cost:20, sym:'inf', color:'#6b5a36'},
+    s_tank: {side:'S', label:'Carrier Task Force', atk:7, def:4, mp:5, maxStr:8,  cost:30, sym:'arm', carrier:true},
+    s_inf:  {side:'S', label:'Cruiser Task Force', atk:4, def:5, mp:4, maxStr:8,  cost:20, sym:'inf'},
+    s_guard:{side:'S', label:'Fast Battleships',   atk:6, def:7, mp:4, maxStr:10, cost:30, sym:'inf'},
+    s_mil:  {side:'S', label:'Island Garrison',    atk:2, def:5, mp:1, maxStr:8,  cost:10, sym:'inf', color:'#4a5a44'},
+  },
+  menu: {
+    ger: {h:'🟥 Imperial Japan', p:'Four fleet carriers, the finest naval aviators alive, and one objective: take Midway and finish what Pearl Harbor started — before the American carriers interfere.'},
+    sov: {h:'🟦 United States Navy', p:'The codebreakers have given you the ambush of the century. Three carriers wait northeast of Midway. Hold the atoll — and sink the Kidō Butai.'},
+  },
+  cols: 30, rows: 20,
+  /* open ocean; Kure atoll (18,8) and Midway (20,9) are the only land */
+  map: [
+  /* 0*/ "oooooooooooooooooooooooooooooo",
+  /* 1*/ "oooooooooooooooooooooooooooooo",
+  /* 2*/ "oooooooooooooooooooooooooooooo",
+  /* 3*/ "oooooooooooooooooooooooooooooo",
+  /* 4*/ "oooooooooooooooooooooooooooooo",
+  /* 5*/ "oooooooooooooooooooooooooooooo",
+  /* 6*/ "oooooooooooooooooooooooooooooo",
+  /* 7*/ "oooooooooooooooooooooooooooooo",
+  /* 8*/ "oooooooooooooooooo.ooooooooooo",
+  /* 9*/ "oooooooooooooooooooo.ooooooooo",
+  /*10*/ "oooooooooooooooooooooooooooooo",
+  /*11*/ "oooooooooooooooooooooooooooooo",
+  /*12*/ "oooooooooooooooooooooooooooooo",
+  /*13*/ "oooooooooooooooooooooooooooooo",
+  /*14*/ "oooooooooooooooooooooooooooooo",
+  /*15*/ "oooooooooooooooooooooooooooooo",
+  /*16*/ "oooooooooooooooooooooooooooooo",
+  /*17*/ "oooooooooooooooooooooooooooooo",
+  /*18*/ "oooooooooooooooooooooooooooooo",
+  /*19*/ "oooooooooooooooooooooooooooooo",
+  ],
+  cities: [
+    {x:20, y:9, name:'Midway', vp:2, owner:'S'},
+  ],
+  gerSpawns: [], sovSpawns: [],
+  supplyRange: 40,                          // fleet trains: nobody starves in a week at sea
+  startUnits: [
+    // — Kidō Butai and the invasion force, closing from the northwest —
+    ['g_pz' ,'1st Carrier Div (Akagi·Kaga)',   9,7,  8],
+    ['g_pz' ,'2nd Carrier Div (Hiryū·Sōryū)', 10,9,  8],
+    ['g_inf','Battleship Force (Yamato)',      7,9,  10],
+    ['g_inf','Cruiser Div 7 (Mogami)',         9,11, 8],
+    ['g_ally','Midway Invasion Convoy',        7,13, 8],
+    // — the American ambush, waiting at Point Luck —
+    ['s_tank','TF-16 (Enterprise·Hornet)',    25,5,  8],
+    ['s_tank','TF-17 (Yorktown)',             26,7,  7],
+    ['s_inf','TF-8 Cruisers',                 24,8,  7],
+    ['s_mil','Midway Garrison',               20,9,  7],
+  ],
+  sovSchedule: [],
+  generals: [
+    {side:'G', unit:'1st Carrier Div (Akagi·Kaga)', name:'Nagumo', def:1.10,
+     bio:'Victor of Pearl Harbor — cautious, unlucky, and about to face the most debated decision of the Pacific war.'},
+    {side:'G', unit:'2nd Carrier Div (Hiryū·Sōryū)', name:'Yamaguchi', atk:1.15,
+     bio:'The boldest carrier admiral in the fleet. He will go down with Hiryū rather than leave her.'},
+    {side:'G', unit:'Battleship Force (Yamato)', name:'Yamamoto', atk:1.10,
+     bio:'Architect of the whole operation — watching from Yamato\'s bridge, three hundred miles too far behind.'},
+    {side:'S', unit:'TF-16 (Enterprise·Hornet)', name:'Spruance', atk:1.15,
+     bio:'The cool-headed cruiser admiral handed Halsey\'s carriers — and about to make every decision right.'},
+    {side:'S', unit:'TF-17 (Yorktown)', name:'Fletcher', def:1.10,
+     bio:'Veteran of Coral Sea, flying his flag from a carrier patched back together in 72 hours.'},
+  ],
+  /* Midway itself: the unsinkable carrier — garrison, guns and land-based air */
+  capitalDefense: {turn:1, range:1, def:1.2, city:'Midway',
+    announce:'⭐ Midway\'s garrison stands to — the island is an unsinkable carrier.'},
+  events: [
+    {turn:1, date:'4 June 1942', title:'AF IS SHORT OF WATER',
+     text:'Weeks ago, Station HYPO\'s codebreakers tricked Japan into revealing its target. Nimitz knows the date, the bearing, and the order of battle. Three American carriers wait at "Point Luck" — northeast of Midway, exactly where Japan believes there is only empty ocean.'},
+    {turn:2, date:'5 June 1942', title:'THE FATEFUL FIVE MINUTES',
+     text:'History\'s verdict on 4 June: with Japanese decks crowded with rearming aircraft, the dive bombers of Enterprise and Yorktown arrived overhead unseen. In five minutes Akagi, Kaga and Sōryū were burning wrecks. Battles this size are rarely decided so fast — unless someone is caught with their planes on deck.'},
+    {turn:3, date:'6 June 1942', title:'HIRYŪ\'S REVENGE',
+     text:'Alone, Yamaguchi\'s Hiryū struck back twice and crippled Yorktown before the Americans found her at dusk. The lesson of carrier war: whoever strikes first, wins — and there is no second prize.'},
+    {turn:4, date:'7 June 1942', title:'YAMAMOTO TURNS BACK',
+     text:'With his carriers gone, Yamamoto\'s battleships — the most powerful surface fleet on Earth — can do nothing but withdraw, unable even to force a night action. The age of the battleship ended this week, in waters it never fired a shot over.'},
+  ],
+  maxTurn: 7, turnDays: 1,                  // one week of battle, a day at a time
+  startDate: Date.UTC(1942,5,4),
+  weather(){ return 'clear'; },
+  pp(){ return 2; },                        // repairs only — no new fleets in a week
+  // Japanese objective points at the end: Midway taken or held
+  victoryTiers: [
+    [2,'JAPANESE VICTORY — MIDWAY FALLS','The Rising Sun flies over Midway. Hawaii is in range, and the Pacific Fleet must now come out and fight on Japan\'s terms.'],
+    [0,'AMERICAN VICTORY — THE AMBUSH HOLDS','Midway holds, and the Kidō Butai has paid in irreplaceable carriers and aviators. The tide of the Pacific war has turned.'],
+  ],
+  sudden: {
+    axisCities: ['Midway'], minAxisUnits: 2,
+    axisTitle: 'JAPANESE VICTORY — MIDWAY FALLS',
+    axisText:  'The invasion force is ashore and the atoll is taken. The Pacific Fleet has lost its forward sentinel — and perhaps the war\'s initiative.',
+    sovTitle:  'DECISIVE AMERICAN VICTORY',
+    sovText:   'The Kidō Butai — the finest carrier force on Earth — has been annihilated. Japan will never again take the strategic offensive.',
+  },
+  airInit: [
+    ['G','1st Carrier Div Air', 9],
+    ['G','2nd Carrier Div Air', 9],
+    ['S','Enterprise Air Group', 7],
+    ['S','Yorktown Air Group', 6],
+    ['S','Midway Air Wing', 5],
+  ],
+  sovAirSchedule: [],
+  setup(st){
+    const g = st.units.find(t=>t.name==='Midway Garrison');
+    if (g) g.entrench = 2;                  // dug into the coral for months
+  },
+  opening(playerSide){ return [
+    '4 June 1942, 04:30 — the Kidō Butai turns into the wind and launches 108 aircraft at Midway.',
+    playerSide==='S'
+      ? 'HYPO has broken their code: you know they are coming. Spring the ambush — and strike first.'
+      : 'Somewhere out there, the American carriers may be waiting. Find them before they find you.',
+  ]; },
+};
+
+/* ---- side identities & unit types: scenarios may override ---- */
+const DEFAULT_SIDES = {
+  G: {name:'Axis',   flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+  S: {name:'Soviet', flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
+};
+const DEFAULT_KINDS = {
+  g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
+  g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+  g_ally: {side:'G', label:'Allied Army',    atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf', color:'#5c5536'},
+  s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
+  s_guard:{side:'S', label:'Guards Army',    atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true, color:'#b04a18'},
+  s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#7a4a3a'},
+};
+
 /* ---- current scenario: mutable mirrors the engine reads ---- */
 let SCN = null;
 let COLS, ROWS, MAP_ROWS, CITIES_INIT, TOTAL_VP, SOV_SPAWNS, GER_SPAWNS,
     START_UNITS, SOV_SCHEDULE, GENERALS, GEN_BY_UNIT, EVENTS,
-    AIR_INIT, SOV_AIR_SCHEDULE, MAX_TURN, START_DATE, VICTORY_TIERS;
+    AIR_INIT, SOV_AIR_SCHEDULE, MAX_TURN, START_DATE, VICTORY_TIERS,
+    KINDS, SIDES;
 function loadScenario(id){
   SCN = SCENARIOS[id] || SCENARIOS.barbarossa;
   COLS = SCN.cols; ROWS = SCN.rows; MAP_ROWS = SCN.map;
@@ -926,6 +1267,8 @@ function loadScenario(id){
   AIR_INIT = SCN.airInit; SOV_AIR_SCHEDULE = SCN.sovAirSchedule;
   MAX_TURN = SCN.maxTurn; START_DATE = SCN.startDate;
   VICTORY_TIERS = SCN.victoryTiers;
+  KINDS = SCN.kinds || DEFAULT_KINDS;
+  SIDES = SCN.sides || DEFAULT_SIDES;
   return SCN;
 }
 loadScenario('barbarossa');
@@ -973,7 +1316,7 @@ function fireEvents(){
   return evs;
 }
 
-/* ============================ TERRAIN & UNIT TYPES ============================ */
+/* ============================ TERRAIN ============================ */
 const TERRAIN = {
   '.': {name:'Plains',  move:1, def:1.00, dig:1, color:'#4a5234'},
   'f': {name:'Forest',  move:2, def:1.30, dig:2, color:'#33422a'},
@@ -981,16 +1324,8 @@ const TERRAIN = {
   's': {name:'Marshes', move:3, def:1.15, dig:1, color:'#3c4a42'},
   'r': {name:'River',   move:3, def:0.85, dig:0, color:'#33505e'},
   '~': {name:'Sea',     move:0, def:1.00, dig:0, color:'#1d2c38'},
+  'o': {name:'Open Ocean', move:1, def:1.00, dig:0, color:'#16314a'}, // navigable, for naval theaters
   'c': {name:'City',    move:1, def:1.70, dig:3, color:'#5a5648'}, // virtual: hex with a city
-};
-const KINDS = {
-  g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
-  g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
-  g_ally: {side:'G', label:'Allied Army',    atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
-  s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
-  s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
-  s_guard:{side:'S', label:'Guards Army',    atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
-  s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf'},
 };
 
 /* ============================ RULES CONSTANTS ============================ */
@@ -1110,10 +1445,14 @@ function computeSupply(side){
   const cityKeys = new Set(G.cities.filter(c=>c.owner===side).map(c=>keyOf(c.x,c.y)));
   const dist = new Map();             // hex -> hexes since last depot
   const open = [];
-  const homeX = side==='G' ? 0 : COLS-1;
-  for (let y=0;y<ROWS;y++){
-    if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe){
-      dist.set(keyOf(homeX,y), 0); open.push([0,homeX,y]);
+  const range = SCN.supplyRange ?? SUPPLY_RANGE;
+  // home map edge (scenarios can turn this off — e.g. an invader supplied only by sea)
+  if ((SCN.edgeSupply && SCN.edgeSupply[side]) ?? true){
+    const homeX = side==='G' ? 0 : COLS-1;
+    for (let y=0;y<ROWS;y++){
+      if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe){
+        dist.set(keyOf(homeX,y), 0); open.push([0,homeX,y]);
+      }
     }
   }
   // scenario lifelines (e.g. Leningrad's "Road of Life" over the Ladoga ice):
@@ -1135,7 +1474,7 @@ function computeSupply(side){
       if (occ[k] === foe) continue;
       if (foeZOC.has(k) && occ[k] !== side) continue;
       let nc = c + 1;
-      if (nc > SUPPLY_RANGE) continue;
+      if (nc > range) continue;
       if (cityKeys.has(k)) nc = 0;            // friendly city = forward depot
       if (nc < (dist.get(k) ?? 1e9)){ dist.set(k, nc); open.push([nc,nx,ny]); }
     }
@@ -1250,7 +1589,8 @@ function doMove(u, x, y){
   refreshSupply();
   checkSuddenDeath();
 }
-function flag(side){ return side==='G' ? '⬛' : '🟥'; }
+function flag(side){ return SIDES[side].flag; }
+function sideName(side){ return SIDES[side].name; }
 
 /* ============================ COMBAT ============================ */
 function combatMods(att, def){
@@ -1417,7 +1757,7 @@ function doDeploy(side, kind, x, y){
   if (!k || k.side!==side || G.pp[side] < k.cost) return false;
   if (!deploySpots(side).some(([sx,sy]) => sx===x && sy===y)) return false;
   G.pp[side] -= k.cost;
-  const names = {g_inf:'Ersatz Armee', g_pz:'Panzer Reserve', s_inf:'Reserve Army',
+  const names = SCN.deployNames || {g_inf:'Ersatz Armee', g_pz:'Panzer Reserve', s_inf:'Reserve Army',
                  s_tank:'Tank Reserve', s_mil:'People’s Militia'};
   const u = makeUnit(kind, names[kind]||k.label, x, y, k.maxStr);
   u.moved = true; u.attacked = true;        // arrives unready
@@ -1444,7 +1784,9 @@ function airWxMul(side){
   return 1;
 }
 function airfieldCovered(side, x, y){
-  return G.cities.some(c => c.owner===side && hexDist(c.x,c.y,x,y) <= AIR_RANGE);
+  if (G.cities.some(c => c.owner===side && hexDist(c.x,c.y,x,y) <= AIR_RANGE)) return true;
+  // naval theaters: aircraft carriers are floating airfields
+  return unitsOf(side).some(u => KINDS[u.kind].carrier && hexDist(u.x,u.y,x,y) <= AIR_RANGE);
 }
 function strikeTargets(side){
   return unitsOf(enemyOf(side)).filter(t => airfieldCovered(side, t.x, t.y));
@@ -1507,7 +1849,7 @@ function airStrike(au, t){
 
 /* ============================ TURN FLOW ============================ */
 function dateStr(turn){
-  const d = new Date(START_DATE + (turn-1)*7*864e5);
+  const d = new Date(START_DATE + (turn-1)*(SCN.turnDays||7)*864e5);
   const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${d.getUTCDate()} ${m[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
@@ -1581,18 +1923,20 @@ function endPhase(){
       logMsg('sys', cd.announce);
     for (const [t,kind,name] of SOV_SCHEDULE){
       if (t === G.turn){
-        const spot = deploySpots('S')[0];
+        const sd = KINDS[kind].side;                   // schedules can reinforce either side
+        const spot = deploySpots(sd)[0];
         if (spot){
           const u = makeUnit(kind, name, spot[0], spot[1]);
           G.units.push(u);
-          logMsg('l-s', `🟥 ${name} (${KINDS[kind].label}) mobilized at ${cityAt(spot[0],spot[1])?.name||'the rear'}.`);
+          logMsg(sd==='G'?'l-g':'l-s', `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
         }
       }
     }
-    for (const [t,name,str] of SOV_AIR_SCHEDULE){
+    for (const [t,name,str,sd] of SOV_AIR_SCHEDULE){
       if (t === G.turn){
-        G.air.push(makeAir('S', name, str));
-        logMsg('l-s', `🟥 ✈ ${name} reaches the front — the Red Air Force is rebuilding.`);
+        const side2 = sd || 'S';
+        G.air.push(makeAir(side2, name, str));
+        logMsg(side2==='G'?'l-g':'l-s', `${flag(side2)} ✈ ${name} reaches the front.`);
       }
     }
     refreshSupply();
@@ -1698,6 +2042,7 @@ function aiAir(side){
       const adjMine = neighbors(t.x,t.y).filter(([x,y])=>{const u=unitAt(x,y);return u&&u.side===side;}).length;
       s += adjMine*2;                                 // soften what we're about to assault
       if (adjMine===0) s -= 3;
+      if (KINDS[t.kind].carrier) s += 6;              // enemy flattops are always worth a strike
       const c = cityAt(t.x,t.y);
       if (c && c.vp>0 && c.owner!==side) s += 1.5;
       if (s > bestS){ bestS=s; best=t; }
@@ -1743,6 +2088,7 @@ function aiSpend(side){
 /* ---- attack choice shared by both AIs ---- */
 function bestAttack(u, minRatio){
   let best = null, bestU = -1e9;
+  if (KINDS[u.kind].carrier) minRatio += 0.6;   // carriers don't brawl unless it's a massacre
   for (const t of adjacentEnemies(u)){
     const p = previewCombat(u, t);
     const wouldDestroy = p.defLoss >= t.str;
@@ -1780,10 +2126,11 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   let friendsNear = 0;
   for (const f of unitsOf('G')) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=2) friendsNear++;
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
-  // closing with a weak enemy is good
+  // closing with a weak enemy is good — unless you're a carrier (stand off!)
   for (const [nx,ny] of neighbors(x,y)){
     const t = unitAt(nx,ny);
     if (t && t.side==='S'){
+      if (KINDS[u.kind].carrier){ s -= 9; continue; }
       const mock = {...u, x, y};
       const p = previewCombat(mock, t);
       if (p.ratio >= 1.1) s += 2 + Math.min(p.ratio,3);
@@ -1867,6 +2214,7 @@ function sovScoreHex(u, x, y, df, myNet){
   }
   if (adjE >= 3) s -= 10;                                       // don't walk into a pocket
   else if (adjE === 2) s -= 3;
+  if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
   const wx = weatherFor(G.turn);
   if (wx==='snow' && weakest){
     const mock = {...u, x, y};
@@ -2108,8 +2456,8 @@ function showNextEvent(){
   $('event-text').innerHTML = e.text;
   const fx = [];
   if (e.pp){
-    if (e.pp.G) fx.push(`⬛ Axis production +${e.pp.G} ⚙`);
-    if (e.pp.S) fx.push(`🟥 Soviet production +${e.pp.S} ⚙`);
+    if (e.pp.G) fx.push(`${flag('G')} ${sideName('G')} production +${e.pp.G} ⚙`);
+    if (e.pp.S) fx.push(`${flag('S')} ${sideName('S')} production +${e.pp.S} ⚙`);
   }
   $('event-effect').innerHTML = fx.join(' · ');
   show('event-modal', true);
@@ -2184,8 +2532,8 @@ function buildClock(){
     : G.winterGear===false ? '✗ No winter equipment — December will be brutal for the Wehrmacht.'
     : G.winterGear==='pending' ? '⚠ The winter question awaits an answer at German headquarters.'
     : `The winter question reaches German headquarters in mid-August (turn ${SCN.winterQuestion.turn}).`;
-  html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is one week.
-    The campaign ends after turn ${MAX_TURN} (week of ${dateStr(MAX_TURN)}).${gearNote?'<br>'+gearNote:''}</div>`;
+  html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is one ${(SCN.turnDays||7)===7?'week':'day'}.
+    The campaign ends after turn ${MAX_TURN} (${dateStr(MAX_TURN)}).${gearNote?'<br>'+gearNote:''}</div>`;
   $('clock-body').innerHTML = html;
 }
 
@@ -2215,11 +2563,11 @@ function draw(){
     if (wx==='snow' && t!=='~') col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
     else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.'?'#54482e':'#463f2e';
     ctx.fillStyle = col; ctx.fill();
-    // translucent territory tint: grey behind the German lines, red behind Soviet ground
+    // translucent territory tint in each side's color
     const to = t!=='~' && terrOwner(x,y);
     if (to){
       hexPath(cx,cy,S-0.6);
-      ctx.fillStyle = to==='G' ? 'rgba(108,118,132,0.30)' : 'rgba(186,52,40,0.24)';
+      ctx.fillStyle = SIDES[to].tint;
       ctx.fill();
     }
     ctx.strokeStyle = '#00000033'; ctx.lineWidth = 1; ctx.stroke();
@@ -2240,6 +2588,8 @@ function draw(){
       ctx.beginPath(); ctx.moveTo(-S*0.7,-4); ctx.quadraticCurveTo(0,6,S*0.7,-2); ctx.stroke(); }
     if (t==='~'){ ctx.strokeStyle='#3e586e66'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(-12,-3); ctx.quadraticCurveTo(-6,-7,0,-3); ctx.quadraticCurveTo(6,1,12,-3); ctx.stroke(); }
+    if (t==='o'){ ctx.strokeStyle='#48719455'; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(-10,2); ctx.quadraticCurveTo(-5,-2,0,2); ctx.quadraticCurveTo(5,6,10,2); ctx.stroke(); }
     // seasonal ground dressing: snowdrifts in winter, puddles in the rasputitsa
     const hs = (x*73856093 ^ y*19349663) >>> 0;
     if (wx==='snow' && t!=='~' && t!=='r'){
@@ -2373,13 +2723,9 @@ function star(x,y,r){
 
 function drawUnit(u, cx, cy){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
-  const ger = u.side==='G';
   ctx.save(); ctx.translate(cx,cy);
   // counter
-  ctx.fillStyle = ger ? '#454d58' : '#9c2e22';
-  if (u.kind==='g_ally') ctx.fillStyle = '#5c5536';
-  if (u.kind==='s_guard') ctx.fillStyle = '#b04a18';
-  if (u.kind==='s_mil') ctx.fillStyle = '#7a4a3a';
+  ctx.fillStyle = k.color || SIDES[u.side].color;
   roundRect(-w/2,-h/2,w,h,5); ctx.fill();
   ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
   ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
@@ -2631,12 +2977,12 @@ function updateTerrainCard(){
   const [x,y] = hover;
   const t = effTerrain(x,y), c = cityAt(x,y);
   let html = `<span class="big">${c ? c.name : t.name}</span>`;
-  if (c) html += ` <span style="color:var(--dim)">(${t.name}${c.vp?` · ★ objective ×${c.vp}`:''} · ${c.owner==='G'?'Axis':'Soviet'})</span>`;
+  if (c) html += ` <span style="color:var(--dim)">(${t.name}${c.vp?` · ★ objective ×${c.vp}`:''} · ${sideName(c.owner)})</span>`;
   html += `<div class="statrow"><span>Defense bonus</span><span>×${t.def.toFixed(2)}</span></div>
            <div class="statrow"><span>Move cost</span><span>${t.move||'—'}</span></div>
            <div class="statrow"><span>Max dig-in</span><span>${t.dig}</span></div>`;
   const to = terrOwner(x,y);
-  if (to) html += `<div class="statrow"><span>Ground held by</span><span>${to==='G'?'⬛ Axis':'🟥 Soviets'}</span></div>`;
+  if (to) html += `<div class="statrow"><span>Ground held by</span><span>${flag(to)} ${sideName(to)}</span></div>`;
   const u = unitAt(x,y);
   if (u){
     const ug = generalOf(u);
@@ -2673,7 +3019,7 @@ function defaultHint(){
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!human) return 'Enemy is moving…';
   const left = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
-  return `<b>${G.phase==='G'?'Axis':'Soviet'} turn</b> — ${left} unit${left===1?'':'s'} ready · drag to pan, scroll to zoom`;
+  return `<b>${sideName(G.phase)} turn</b> — ${left} unit${left===1?'':'s'} ready · drag to pan, scroll to zoom`;
 }
 
 function updateTop(){
@@ -2682,23 +3028,23 @@ function updateTop(){
   const chip = $('wx-chip');
   chip.innerHTML = `Weather: <b>${WX_LABEL[wx]}</b>`;
   chip.className = 't-chip ' + wx;
-  $('vp-chip').innerHTML = `Axis objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
+  $('vp-chip').innerHTML = `${sideName('G')} objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
-  $('pp-chip').innerHTML = `${side==='G'?'Axis':'Soviet'} production: <b>${G.pp[side]}</b> ⚙`;
+  $('pp-chip').innerHTML = `${sideName(side)} production: <b>${G.pp[side]}</b> ⚙`;
 }
 function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); }
 
 /* ---------------- objectives modal ---------------- */
 $('btn-objectives').onclick = ()=>{
   const list = G.cities.filter(c=>c.vp>0).sort((a,b)=>b.vp-a.vp).map(c=>
-    `<div>${c.owner==='G'?'⬛':'🟥'} <b>${c.name}</b> — ${'★'.repeat(c.vp)} ${c.owner==='G'?'<span style="color:#9fb0c4">Axis-held</span>':'<span style="color:#e09a90">Soviet-held</span>'}</div>`).join('');
+    `<div>${flag(c.owner)} <b>${c.name}</b> — ${'★'.repeat(c.vp)} ${c.owner==='G'?`<span style="color:#9fb0c4">${sideName('G')}-held</span>`:`<span style="color:#e09a90">${sideName('S')}-held</span>`}</div>`).join('');
   $('obj-list').innerHTML = list;
   const vp = axisVP();
   const tierLine = VICTORY_TIERS.slice(0,-1).map(([min,t])=>`★ ${min}+ ${t.toLowerCase()}`).join(' · ');
   const lastTier = VICTORY_TIERS[VICTORY_TIERS.length-1][1].toLowerCase();
   const sdc = SCN.sudden.axisCities;
   $('obj-summary').innerHTML =
-    `Axis hold <b>${vp}</b> of ${TOTAL_VP} objective points. At the end of turn ${MAX_TURN}:<br>
+    `${sideName('G')} hold <b>${vp}</b> of ${TOTAL_VP} objective points. At the end of turn ${MAX_TURN}:<br>
      ${tierLine} · otherwise ${lastTier}.` +
     (sdc && sdc.length ? `<br>Capturing <b>${sdc.join(' and ')}</b> ends the war at once.` : '');
   show('obj-modal', true);
@@ -2752,7 +3098,7 @@ function proceed(){
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
   if (G.mode==='hotseat'){
     $('pass-title').textContent = 'PASS THE KEYBOARD';
-    $('pass-text').innerHTML = `It is now the <b>${G.phase==='G'?'⬛ Axis':'🟥 Soviet'}</b> player's turn ${G.turn} (${dateStr(G.turn)}).`;
+    $('pass-text').innerHTML = `It is now the <b>${flag(G.phase)} ${sideName(G.phase)}</b> player's turn ${G.turn} (${dateStr(G.turn)}).`;
     // turn report: what happened while this player looked away
     const snap = G.turnSnap && G.turnSnap[G.phase];
     let rep = '';
@@ -2776,7 +3122,7 @@ function runAIPhase(){
   aiRunning = true;
   clearUndo();
   show('ai-banner', true);
-  $('ai-banner').textContent = (G.phase==='G'?'⬛ AXIS':'🟥 SOVIET') + ' TURN…';
+  $('ai-banner').textContent = flag(G.phase) + ' ' + sideName(G.phase).toUpperCase() + ' TURN…';
   clearAICache();
   aiSpend(G.phase);
   updateAll();
@@ -2838,10 +3184,10 @@ function showEnd(){
   $('end-title').className = cls;
   $('end-text').textContent = r.text;
   $('end-stats').innerHTML = `
-    <div class="statrow"><span>Axis objective points</span><span>${r.vp} / ${TOTAL_VP}</span></div>
-    <div class="statrow"><span>⬛ Axis losses</span><span>${G.stats.G.lost} strength</span></div>
-    <div class="statrow"><span>🟥 Soviet losses</span><span>${G.stats.S.lost} strength</span></div>
-    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} weeks</span></div>`;
+    <div class="statrow"><span>${sideName('G')} objective points</span><span>${r.vp} / ${TOTAL_VP}</span></div>
+    <div class="statrow"><span>${flag('G')} ${sideName('G')} losses</span><span>${G.stats.G.lost} strength</span></div>
+    <div class="statrow"><span>${flag('S')} ${sideName('S')} losses</span><span>${G.stats.S.lost} strength</span></div>
+    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${(SCN.turnDays||7)===7?'weeks':'days'}</span></div>`;
   show('end-modal', true);
   if (cls==='win') sCity(); else sBoom();
   clearSave();
