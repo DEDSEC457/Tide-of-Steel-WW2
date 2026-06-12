@@ -968,6 +968,7 @@ SCENARIOS.dday = {
     g_inf:  {side:'G', label:'US Infantry Corps',   atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
     g_pz:   {side:'G', label:'US Armored Corps',    atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
     g_ally: {side:'G', label:'British & CW Corps',  atk:4, def:5, mp:3, maxStr:10, cost:10, sym:'inf', color:'#4a5a35'},
+    g_para: {side:'G', label:'Airborne Division',   atk:4, def:5, mp:3, maxStr:8,  cost:14, sym:'para', noBuy:true},
     s_inf:  {side:'S', label:'Infanterie-Korps',    atk:4, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
     s_tank: {side:'S', label:'Panzer-Korps',        atk:7, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
     s_guard:{side:'S', label:'Waffen-SS Korps',     atk:6, def:6, mp:4, maxStr:10, cost:16, sym:'inf', color:'#3a3a3a'},
@@ -979,84 +980,98 @@ SCENARIOS.dday = {
     ger: {h:'🟦 The Allies (US & British)', p:'You are ashore — now win the buildup race. Take Cherbourg for a port, break out of the bocage, and be across the Seine before autumn.'},
     sov: {h:'⬛ Germany (Westheer)', p:'The Atlantic Wall is breached but the panzers are coming. Pin them in the hedgerows, hold the ports, and throw the invasion back into the sea.'},
   },
-  cols: 30, rows: 20,
-  /* Channel north · Cotentin peninsula · bocage (forest/marsh) ·
-     hills at Falaise · the Seine running northwest to Le Havre */
+  cols: 36, rows: 22,
+  /* England across the Channel · the Cotentin · the five beaches ·
+     bocage country · Falaise hills · Brittany and Brest · the Seine
+     to Paris · the Loire across the south · Biscay in the corner */
   map: [
-  /*           0    5    10   15   20   25     */
-  /* 0*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-  /* 1*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-  /* 2*/ "~~~~..~~~~~~~~~~~~~~~~~~~~~~~~",
-  /* 3*/ "~~~~....~~~~~~~~~~~...........",
-  /* 4*/ "~~~...............r...........",
-  /* 5*/ "....fsf.sf.........r..........",
-  /* 6*/ "...fsff..sf.........r.........",
-  /* 7*/ "..f.sf..f....hh......r........",
-  /* 8*/ "..........f..hh.......r.......",
-  /* 9*/ ".f...f.................r......",
-  /*10*/ "..f...........................",
-  /*11*/ ".ff...........................",
-  /*12*/ "..f.f.........................",
-  /*13*/ "....f.........................",
-  /*14*/ "..............f...............",
-  /*15*/ ".....................f........",
-  /*16*/ "..............................",
-  /*17*/ "...........f..................",
-  /*18*/ "..............................",
-  /*19*/ "..............................",
+  /*           0    5    10   15   20   25   30   35  */
+  /* 0*/ "..f...........~~~~~~~~~~~~~~~~~~~~~~",
+  /* 1*/ ".....f........~~~~~~~~~~~~~~~~~~~~~~",
+  /* 2*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 3*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 4*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 5*/ "~~~~~~...~~~~~~~~~~~~~~.........~~~~",
+  /* 6*/ "~~~~~......~~~~~~~~~~~r.............",
+  /* 7*/ "~~~~~..................r............",
+  /* 8*/ "~~~~..f.s.ff............r..f........",
+  /* 9*/ "~~~..f.ss..f..f..........r..........",
+  /*10*/ "~~....f..s..f....hhh......r.........",
+  /*11*/ "~.f...f...s....f..hh.......r..f.....",
+  /*12*/ "....f.....s............f....r.......",
+  /*13*/ "...f........f................r......",
+  /*14*/ "~..................f................",
+  /*15*/ "~~...f..............................",
+  /*16*/ "~~~.................f...............",
+  /*17*/ "~~~~................................",
+  /*18*/ "~~~~~~..............................",
+  /*19*/ "~~~~~~~~..rrrrrrrrrrrrrrrrrr........",
+  /*20*/ "~~~~~~~~~...........................",
+  /*21*/ "~~~~~~~~~~~.........................",
   ],
   /* vp>0 are Allied objectives. All of France starts German-held. */
   cities: [
-    {x:4, y:2,  name:'Cherbourg',  vp:2, owner:'S'},
-    {x:7, y:5,  name:'Carentan',   vp:1, owner:'S'},
-    {x:10,y:5,  name:'Bayeux',     vp:0, owner:'S'},
-    {x:14,y:5,  name:'Caen',       vp:2, owner:'S'},
-    {x:17,y:5,  name:'Lisieux',    vp:0, owner:'S'},
-    {x:9, y:7,  name:'Saint-Lô',   vp:1, owner:'S'},
-    {x:6, y:9,  name:'Avranches',  vp:1, owner:'S'},
-    {x:15,y:7,  name:'Falaise',    vp:1, owner:'S'},
-    {x:16,y:9,  name:'Argentan',   vp:0, owner:'S'},
-    {x:19,y:3,  name:'Le Havre',   vp:1, owner:'S'},
-    {x:20,y:5,  name:'Rouen',      vp:1, owner:'S'},
-    {x:3, y:10, name:'Saint-Malo', vp:0, owner:'S'},
-    {x:5, y:12, name:'Rennes',     vp:1, owner:'S'},
-    {x:14,y:11, name:'Alençon',    vp:0, owner:'S'},
-    {x:13,y:13, name:'Le Mans',    vp:0, owner:'S'},
-    {x:21,y:8,  name:'Evreux',     vp:0, owner:'S'},
-    {x:22,y:10, name:'Dreux',      vp:0, owner:'S'},
-    {x:21,y:12, name:'Chartres',   vp:0, owner:'S'},
-    {x:24,y:9,  name:'Paris',      vp:4, owner:'S'},
+    {x:6, y:0,  name:'Portsmouth', vp:0, owner:'G'},
+    {x:12,y:1,  name:'Dover',      vp:0, owner:'G'},
+    {x:6, y:5,  name:'Cherbourg',  vp:2, owner:'S'},
+    {x:23,y:5,  name:'Le Havre',   vp:1, owner:'S'},
+    {x:9, y:7,  name:'Carentan',   vp:1, owner:'S'},
+    {x:25,y:7,  name:'Rouen',      vp:1, owner:'S'},
+    {x:13,y:8,  name:'Bayeux',     vp:0, owner:'S'},
+    {x:17,y:8,  name:'Caen',       vp:2, owner:'S'},
+    {x:20,y:8,  name:'Lisieux',    vp:0, owner:'S'},
+    {x:12,y:9,  name:'Saint-Lô',   vp:1, owner:'S'},
+    {x:26,y:9,  name:'Evreux',     vp:0, owner:'S'},
+    {x:5, y:10, name:'Saint-Malo', vp:0, owner:'S'},
+    {x:18,y:10, name:'Falaise',    vp:1, owner:'S'},
+    {x:8, y:11, name:'Avranches',  vp:1, owner:'S'},
+    {x:26,y:11, name:'Dreux',      vp:0, owner:'S'},
+    {x:28,y:11, name:'Paris',      vp:4, owner:'S'},
+    {x:1, y:12, name:'Brest',      vp:1, owner:'S'},
+    {x:17,y:12, name:'Alençon',    vp:0, owner:'S'},
+    {x:19,y:12, name:'Argentan',   vp:0, owner:'S'},
+    {x:7, y:13, name:'Rennes',     vp:1, owner:'S'},
+    {x:25,y:13, name:'Chartres',   vp:1, owner:'S'},
+    {x:15,y:14, name:'Le Mans',    vp:1, owner:'S'},
+    {x:4, y:15, name:'Lorient',    vp:0, owner:'S'},
+    {x:27,y:16, name:'Orléans',    vp:1, owner:'S'},
+    {x:9, y:18, name:'Nantes',     vp:0, owner:'S'},
+    {x:19,y:18, name:'Tours',      vp:0, owner:'S'},
   ],
   /* Allied reinforcements land over the beaches; German reserves
      arrive from the Reich and the rear */
-  gerSpawns: [[9,4],[11,4],[6,4],[13,4],[7,5]],
-  sovSpawns: [[24,9],[20,5],[22,10],[29,6],[29,12],[21,12]],
-  /* the Mulberries: beach hexes are Allied supply sources; no edge supply */
-  supplySeeds: {G: [[6,4],[9,4],[11,4],[13,4]]},
+  gerSpawns: [[12,7],[14,7],[8,7],[16,7],[15,7]],
+  sovSpawns: [[28,11],[25,7],[27,16],[35,8],[35,12],[35,16],[25,13]],
+  /* the Mulberries: the five beaches are Allied supply sources; no edge supply */
+  supplySeeds: {G: [[8,7],[12,7],[14,7],[15,7],[16,7]]},
   edgeSupply: {G:false, S:true},
   startUnits: [
     // — the Allied lodgement, morning of 6 June —
-    ['g_inf','VII Corps (Utah)',    6,4, 8], ['g_inf','101st Airborne',  7,4, 7],
-    ['g_inf','82nd Airborne',       5,5, 7], ['g_inf','V Corps (Omaha)', 9,4, 8],
-    ['g_ally','XXX Corps (Gold)',  11,4, 9], ['g_ally','II Cdn Corps (Juno)', 12,5, 8],
-    ['g_ally','I Corps (Sword)',   13,4, 9], ['g_ally','6th Airborne',   14,4, 7],
-    // — the Westheer —
-    ['s_mil','709. Static',         5,3, 5], ['s_inf','243. Infanterie',  4,4, 6],
-    ['s_inf','91. Luftlande',       6,5, 6], ['s_inf','352. Infanterie', 10,4, 7],
-    ['s_mil','716. Static',        12,4, 5], ['s_mil','711. Static',     16,4, 5],
-    ['s_inf','LXXXIV Korps',        8,6, 7], ['s_inf','77. Infanterie',   5,7, 6],
-    ['s_tank','21. Panzer',        14,6, 8], ['s_guard','12. SS Hitlerjugend', 15,6, 9],
-    ['s_tank','Panzer Lehr',       12,7, 9], ['s_inf','3. Fallschirmjäger', 10,7, 8],
-    ['s_guard','17. SS PzGren',     9,8, 8], ['s_inf','326. Infanterie', 17,6, 6],
-    ['s_inf','15. Armee Detachment', 21,4, 7], ['s_mil','Paris Garrison', 24,9, 5],
+    ['g_inf','VII Corps (Utah)',    8,7, 8], ['g_para','101st Airborne',  9,8, 7],
+    ['g_para','82nd Airborne',      7,8, 7], ['g_inf','V Corps (Omaha)', 12,7, 8],
+    ['g_ally','XXX Corps (Gold)',  14,7, 9], ['g_ally','II Cdn Corps (Juno)', 15,7, 8],
+    ['g_ally','I Corps (Sword)',   16,7, 9], ['g_para','6th Airborne',   17,7, 7],
+    // — the Westheer, from the Atlantic Wall to Paris —
+    ['s_inf','243. Infanterie',     6,6, 6], ['s_mil','709. Static',      7,6, 5],
+    ['s_inf','91. Luftlande',       8,8, 6], ['s_inf','352. Infanterie', 11,7, 7],
+    ['s_mil','716. Static',        13,7, 5], ['s_mil','711. Static',     18,7, 5],
+    ['s_inf','LXXXIV Korps',       10,8, 7], ['s_inf','77. Infanterie',   7,9, 6],
+    ['s_tank','21. Panzer',        18,8, 8], ['s_guard','12. SS Hitlerjugend', 17,9, 9],
+    ['s_tank','Panzer Lehr',       15,9, 9], ['s_inf','3. Fallschirmjäger', 12,10, 8],
+    ['s_guard','17. SS PzGren',    11,9, 8], ['s_tank','2. Panzer',      20,10, 8],
+    ['s_inf','331. Infanterie',    25,8, 6], ['s_inf','15. Armee Detachment', 26,6, 7],
+    ['s_inf','266. Infanterie',     4,11, 6], ['s_inf','275. Infanterie',  9,11, 6],
+    ['s_inf','2. Fallschirmjäger',  2,13, 6], ['s_mil','Paris Garrison',  28,11, 5],
   ],
   /* mixed schedule: German reserves race the Allied follow-up waves */
   sovSchedule: [
     [2,'s_guard','1. SS Leibstandarte'], [2,'s_tank','2. SS Das Reich'],
-    [3,'s_tank','116. Panzer'],          [4,'s_inf','353. Infanterie'],
-    [5,'s_guard','9. SS Hohenstaufen'],  [5,'s_guard','10. SS Frundsberg'],
-    [6,'s_inf','276. Infanterie'],       [8,'g_pz','Third Army (Patton)'],
-    [9,'g_ally','First Canadian Army'],  [10,'s_inf','331. Infanterie'],
+    [3,'s_tank','116. Panzer'],          [3,'g_inf','XIX Corps (US)'],
+    [4,'s_inf','353. Infanterie'],       [5,'s_guard','9. SS Hohenstaufen'],
+    [5,'s_guard','10. SS Frundsberg'],   [5,'g_ally','XII Corps (UK)'],
+    [6,'s_inf','276. Infanterie'],       [6,'g_inf','VIII Corps (US)'],
+    [7,'s_inf','363. Infanterie'],       [8,'g_pz','Third Army (Patton)'],
+    [9,'g_ally','First Canadian Army'],  [10,'g_pz','XV Corps Armored'],
   ],
   generals: [
     // — Allied —
@@ -1077,6 +1092,8 @@ SCENARIOS.dday = {
      bio:'His paratroopers make every hedgerow at Saint-Lô cost a day and a company.'},
     {side:'S', unit:'9. SS Hohenstaufen', name:'Hausser', atk:1.10,
      bio:'Veteran SS commander rushed back from the Eastern Front to plug the line.'},
+    {side:'S', unit:'2. Fallschirmjäger', name:'Ramcke', def:1.15,
+     bio:'Fortress commander of Brest — he will hold the ruins to the last wall.'},
   ],
   events: [
     {turn:1,  date:'6 June 1944',   title:'THE LONGEST DAY',
@@ -1089,6 +1106,8 @@ SCENARIOS.dday = {
      text:'Collins takes Cherbourg — the first great port. The Germans have wrecked it so thoroughly that nothing will move through it for weeks: the supply crisis continues, and everything still comes over the sand.'},
     {turn:6,  date:'11 July 1944',  title:'THE BOCAGE',
      text:'A thousand years of Norman hedgerows have turned every field into a fortress. Rifle companies are burning out in days; tank crews weld steel teeth to their hulls to chew through the banks. Nobody trained for this.'},
+    {turn:7,  date:'18 July 1944',  title:'OPERATION GOODWOOD',
+     text:'Three British armoured divisions attack east of Caen behind the heaviest aerial bombardment yet seen — and lose 400 tanks in three days. But every panzer division drawn to the Caen sector is one that will not be facing the Americans next week.'},
     {turn:8,  date:'25 July 1944',  title:'OPERATION COBRA', pp:{G:2},
      text:'Three thousand aircraft carpet-bomb a six-kilometre box west of Saint-Lô, and Panzer Lehr simply ceases to exist. The hole is real: American armour pours through into open country for the first time.'},
     {turn:10, date:'8 August 1944', title:'MORTAIN',
@@ -1106,16 +1125,16 @@ SCENARIOS.dday = {
     if (side==='G') return turn<=2 ? 10 : turn===3 ? 5 : turn<=8 ? 13 : 15;  // buildup; Red Ball Express after Cobra
     return 5;                                                  // the Westheer, strained everywhere
   },
-  // Allied objective points held at the end (15 total; history ≈ 14)
+  // Allied objective points held at the end (19 total; history ≈ 17)
   victoryTiers: [
-    [14,'TOTAL VICTORY — TO THE GERMAN BORDER','France free, the Westheer destroyed, the spearheads racing for the Rhine — even faster than history.'],
-    [11,'HISTORY REPEATS — PARIS LIBERATED','The bells of Notre-Dame ring out — Normandy was bought in blood, but France is free by summer\'s end.'],
-    [7,'THE SLOW GRIND','A deep lodgement and hard-won ground, but the breakout never quite came — the war in the West will be longer.'],
-    [3,'STALEMATE IN THE BOCAGE','The invasion holds a strip of Normandy bought at terrible cost. The Allies will need another plan — and another year.'],
+    [16,'TOTAL VICTORY — TO THE GERMAN BORDER','France free, the Westheer destroyed, the spearheads racing for the Rhine — even faster than history.'],
+    [12,'HISTORY REPEATS — PARIS LIBERATED','The bells of Notre-Dame ring out — Normandy was bought in blood, but France is free by summer\'s end.'],
+    [8,'THE SLOW GRIND','A deep lodgement and hard-won ground, but the breakout never quite came — the war in the West will be longer.'],
+    [4,'STALEMATE IN THE BOCAGE','The invasion holds a strip of Normandy bought at terrible cost. The Allies will need another plan — and another year.'],
     [0,'THROWN INTO THE SEA','The greatest amphibious gamble in history has failed. There will not be another for years.'],
   ],
   sudden: {
-    axisCities: ['Paris','Rouen'], minAxisUnits: 4,
+    axisCities: ['Paris','Rouen'], minAxisUnits: 5,
     axisTitle: 'FRANCE LIBERATED',
     axisText:  'Paris is free and the Seine is crossed in force — the German front in the West has collapsed.',
     sovTitle:  'THE INVASION DEFEATED',
@@ -1156,13 +1175,18 @@ SCENARIOS.midway = {
     G: {name:'Japanese', flag:'🟥', color:'#7e2f23', tint:'rgba(190,60,45,0.18)'},
     S: {name:'US',       flag:'🟦', color:'#2e4d6b', tint:'rgba(70,110,170,0.20)'},
   },
+  /* naval kinds: carriers are floating airfields (their air groups die with
+     them), battleships shoot 2 hexes, submarines can't be bombed, and only
+     the troop convoy or a garrison can actually take an island */
   kinds: {
-    g_pz:   {side:'G', label:'Carrier Division',   atk:8, def:4, mp:5, maxStr:8,  cost:30, sym:'arm', carrier:true},
-    g_inf:  {side:'G', label:'Battleship Division',atk:6, def:7, mp:4, maxStr:10, cost:24, sym:'inf'},
-    g_ally: {side:'G', label:'Invasion Convoy',    atk:2, def:3, mp:3, maxStr:8,  cost:20, sym:'inf', color:'#6b5a36'},
-    s_tank: {side:'S', label:'Carrier Task Force', atk:7, def:4, mp:5, maxStr:8,  cost:30, sym:'arm', carrier:true},
-    s_inf:  {side:'S', label:'Cruiser Task Force', atk:4, def:5, mp:4, maxStr:8,  cost:20, sym:'inf'},
-    s_guard:{side:'S', label:'Fast Battleships',   atk:6, def:7, mp:4, maxStr:10, cost:30, sym:'inf'},
+    g_pz:   {side:'G', label:'Carrier Division',   atk:8, def:4, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true},
+    g_inf:  {side:'G', label:'Battleship Division',atk:6, def:7, mp:4, maxStr:10, cost:24, sym:'bb', range:2, noCapture:true},
+    g_ca:   {side:'G', label:'Cruiser Division',   atk:4, def:5, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true},
+    g_ally: {side:'G', label:'Invasion Convoy',    atk:2, def:3, mp:3, maxStr:8,  cost:20, sym:'tr', color:'#6b5a36'},
+    s_tank: {side:'S', label:'Carrier Task Force', atk:7, def:4, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true},
+    s_inf:  {side:'S', label:'Cruiser Task Force', atk:4, def:5, mp:5, maxStr:8,  cost:20, sym:'ca', fast:true, noCapture:true},
+    s_sub:  {side:'S', label:'Submarine Patrol',   atk:5, def:2, mp:3, maxStr:4,  cost:15, sym:'ss', lowProfile:true, noCapture:true, noBuy:true},
+    s_guard:{side:'S', label:'Fast Battleships',   atk:6, def:7, mp:4, maxStr:10, cost:30, sym:'bb', range:2, noCapture:true},
     s_mil:  {side:'S', label:'Island Garrison',    atk:2, def:5, mp:1, maxStr:8,  cost:10, sym:'inf', color:'#4a5a44'},
   },
   menu: {
@@ -1202,13 +1226,16 @@ SCENARIOS.midway = {
     // — Kidō Butai and the invasion force, closing from the northwest —
     ['g_pz' ,'1st Carrier Div (Akagi·Kaga)',   9,7,  8],
     ['g_pz' ,'2nd Carrier Div (Hiryū·Sōryū)', 10,9,  8],
+    ['g_ca' ,'Cruiser Div 8 (Tone·Chikuma)',  11,8,  7],
     ['g_inf','Battleship Force (Yamato)',      7,9,  10],
-    ['g_inf','Cruiser Div 7 (Mogami)',         9,11, 8],
+    ['g_ca' ,'Destroyer Screen',               8,11, 6],
+    ['g_inf','Cruiser Div 7 (Mogami)',         9,12, 8],
     ['g_ally','Midway Invasion Convoy',        7,13, 8],
     // — the American ambush, waiting at Point Luck —
     ['s_tank','TF-16 (Enterprise·Hornet)',    25,5,  8],
     ['s_tank','TF-17 (Yorktown)',             26,7,  7],
     ['s_inf','TF-8 Cruisers',                 24,8,  7],
+    ['s_sub','Submarine Picket Line',         16,11, 4],
     ['s_mil','Midway Garrison',               20,9,  7],
   ],
   sovSchedule: [],
@@ -1253,12 +1280,14 @@ SCENARIOS.midway = {
     sovTitle:  'DECISIVE AMERICAN VICTORY',
     sovText:   'The Kidō Butai — the finest carrier force on Earth — has been annihilated. Japan will never again take the strategic offensive.',
   },
+  /* every carrier air group is tied to its ship — sink the carrier and the
+     planes die with her. Midway's own air wing flies from the island. */
   airInit: [
-    ['G','1st Carrier Div Air', 9],
-    ['G','2nd Carrier Div Air', 9],
-    ['S','Enterprise Air Group', 7],
-    ['S','Yorktown Air Group', 6],
-    ['S','Midway Air Wing', 5],
+    ['G','Akagi·Kaga Air Group',  9, '1st Carrier Div (Akagi·Kaga)'],
+    ['G','Hiryū·Sōryū Air Group', 9, '2nd Carrier Div (Hiryū·Sōryū)'],
+    ['S','Enterprise·Hornet Air', 8, 'TF-16 (Enterprise·Hornet)'],
+    ['S','Yorktown Air Group',    6, 'TF-17 (Yorktown)'],
+    ['S','Midway Air Wing',       5],
   ],
   sovAirSchedule: [],
   setup(st){
@@ -1423,7 +1452,7 @@ function newGame(playerSide, difficulty, mode, scenario){
     playerSide, difficulty: difficulty||'normal', mode: mode||'ai',
     cities: CITIES_INIT.map(c => ({...c})),
     units: START_UNITS.map(([k,n,x,y,s]) => makeUnit(k,n,x,y,s)),
-    air: AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s)),
+    air: AIR_INIT.map(([sd,n,s,hm]) => makeAir(sd,n,s,hm)),
     pp: {G:0, S:0},
     winterGear: null,                          // null = not yet asked · 'pending' · true/false
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
@@ -1619,7 +1648,7 @@ function reachable(u){
 function doMove(u, x, y){
   u.x = x; u.y = y; u.moved = true; u.entrench = 0;
   const c = cityAt(x,y);
-  if (c && c.owner !== u.side){
+  if (c && c.owner !== u.side && !KINDS[u.kind].noCapture){
     c.owner = u.side;
     logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} captured by ${u.name}!`);
     if (typeof onCityTaken === 'function') onCityTaken(c);
@@ -1694,6 +1723,7 @@ function retreatHex(def, att){
 }
 
 function resolveCombat(att, def){
+  const adjacentKill = hexDist(att.x,att.y,def.x,def.y) === 1;   // ranged kills can't be exploited
   const {A,D} = combatPower(att,def);
   const rnd = () => 0.75 + Math.random()*0.5;
   const r = (A*rnd())/(D*rnd());
@@ -1738,13 +1768,13 @@ function resolveCombat(att, def){
     logMsg(att.side==='G'?'l-g':'l-s',
       `${flag(att.side)} ${att.name} hits ${def.name}: ${defLoss} losses inflicted, ${atkLoss} taken.`);
   }
-  // breakthrough: armor advances into a vacated hex
-  if ((events.destroyed || events.retreated) && !events.attDied &&
-      KINDS[att.kind].sym==='arm' && !unitAt(...events.defFrom)){
+  // breakthrough: armor (and fast fleets) advance into a vacated adjacent hex
+  if ((events.destroyed || events.retreated) && !events.attDied && adjacentKill &&
+      (KINDS[att.kind].sym==='arm' || KINDS[att.kind].fast) && !unitAt(...events.defFrom)){
     const [fx,fy] = events.defFrom;
     att.x = fx; att.y = fy;
     const c = cityAt(fx,fy);
-    if (c && c.owner!==att.side){
+    if (c && c.owner!==att.side && !KINDS[att.kind].noCapture){
       c.owner = att.side;
       logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${att.name}!`);
       if (typeof onCityTaken === 'function') onCityTaken(c);
@@ -1758,7 +1788,12 @@ function resolveCombat(att, def){
 function defNoEscape(ev){ return ev.destroyed && !ev.retreated; }
 function killUnit(u){
   const g = generalOf(u);
-  if (g) logMsg('sys', `⭐ General ${g.name} is lost with his command — a grievous blow to ${u.side==='G'?'the Wehrmacht':'the Red Army'}.`);
+  if (g) logMsg('sys', `⭐ ${g.name} is lost with this command — a grievous blow.`);
+  // carrier air groups go down with their ship
+  for (const a of G.air.filter(a => a.home === u.name)){
+    killAir(a);
+    logMsg('sys', `✈ ${a.name} is lost with ${u.name} — pilots and planes together.`);
+  }
   G.units = G.units.filter(t => t.id !== u.id);
 }
 
@@ -1787,7 +1822,7 @@ function deploySpots(side){
   });
 }
 function buyableKinds(side){
-  return Object.keys(KINDS).filter(k => KINDS[k].side===side && k!=='g_ally' && k!=='s_guard')
+  return Object.keys(KINDS).filter(k => KINDS[k].side===side && k!=='g_ally' && k!=='s_guard' && !KINDS[k].noBuy)
     .filter(k => KINDS[k].cost <= G.pp[side]);
 }
 function doDeploy(side, kind, x, y){
@@ -1812,7 +1847,7 @@ function doDeploy(side, kind, x, y){
    from a city you control — airfields advance with the front. */
 const AIR_RANGE = 8;
 const AIR_MAXSTR = 10;
-function makeAir(side, name, str){ return {id:nextId++, side, name, str, mission:'ready'}; }
+function makeAir(side, name, str, home){ return {id:nextId++, side, name, str, mission:'ready', home: home||null}; }
 function airOf(side){ return G.air.filter(a => a.side===side); }
 function airWxMul(side){
   const wx = weatherFor(G.turn);
@@ -1827,7 +1862,7 @@ function airfieldCovered(side, x, y){
   return unitsOf(side).some(u => KINDS[u.kind].carrier && hexDist(u.x,u.y,x,y) <= AIR_RANGE);
 }
 function strikeTargets(side){
-  return unitsOf(enemyOf(side)).filter(t => airfieldCovered(side, t.x, t.y));
+  return unitsOf(enemyOf(side)).filter(t => !KINDS[t.kind].lowProfile && airfieldCovered(side, t.x, t.y));
 }
 function enemyPatrol(side){
   return airOf(enemyOf(side)).filter(p => p.mission==='patrol' && p.str>0)
@@ -2057,6 +2092,13 @@ function adjacentEnemies(u){
   }
   return out;
 }
+/* naval gunnery: units with a range stat (battleships) attack at distance */
+function attackRange(u){ return KINDS[u.kind].range || 1; }
+function enemiesInRange(u){
+  const r = attackRange(u);
+  if (r <= 1) return adjacentEnemies(u);
+  return unitsOf(enemyOf(u.side)).filter(t => hexDist(u.x,u.y,t.x,t.y) <= r);
+}
 function nearestEnemyDist(u){
   let d = 99;
   for (const t of unitsOf(enemyOf(u.side))) d = Math.min(d, hexDist(u.x,u.y,t.x,t.y));
@@ -2081,6 +2123,7 @@ function aiAir(side){
       s += adjMine*2;                                 // soften what we're about to assault
       if (adjMine===0) s -= 3;
       if (KINDS[t.kind].carrier) s += 6;              // enemy flattops are always worth a strike
+      if (KINDS[t.kind].sym==='tr') s += 3;           // so are loaded transports
       const c = cityAt(t.x,t.y);
       if (c && c.vp>0 && c.owner!==side) s += 1.5;
       if (s > bestS){ bestS=s; best=t; }
@@ -2127,7 +2170,7 @@ function aiSpend(side){
 function bestAttack(u, minRatio){
   let best = null, bestU = -1e9;
   if (KINDS[u.kind].carrier) minRatio += 0.6;   // carriers don't brawl unless it's a massacre
-  for (const t of adjacentEnemies(u)){
+  for (const t of enemiesInRange(u)){
     const p = previewCombat(u, t);
     const wouldDestroy = p.defLoss >= t.str;
     const noRetreat = p.retreat && !retreatHex(t, u);
@@ -2158,7 +2201,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   let s = -(df.get(keyOf(x,y)) ?? 60) * 2.2;
   s += (effTerrain(x,y).def - 1) * 3;
   const c = cityAt(x,y);
-  if (c && c.owner!=='G') s += 6 + c.vp*4;                     // capture!
+  if (c && c.owner!=='G' && !KINDS[u.kind].noCapture) s += 6 + c.vp*4;   // capture!
   // don't outrun the supply net (capturing a city extends it, so that's exempt)
   if (myNet && !myNet.has(keyOf(x,y)) && !(c && c.owner!=='G')) s -= 7;
   let friendsNear = 0;
@@ -2190,8 +2233,8 @@ function cutoffValue(u, x, y){
 }
 
 function aiPlanGerman(){
-  const order = unitsOf('G').slice().sort((a,b)=>
-    (KINDS[a.kind].sym==='arm'?0:1) - (KINDS[b.kind].sym==='arm'?0:1) || a.id-b.id);
+  const fastK = k => (KINDS[k].sym==='arm' || KINDS[k].fast) ? 0 : 1;
+  const order = unitsOf('G').slice().sort((a,b)=> fastK(a.kind) - fastK(b.kind) || a.id-b.id);
   for (const u of order){
     if (u.attacked) continue;
     // 1. attack if a good fight is adjacent
@@ -2201,7 +2244,7 @@ function aiPlanGerman(){
     if (tgt) return {type:'attack', a:u.id, d:tgt.id};
     if (u.moved){ u.attacked = true; continue; }
     // 2. otherwise move with purpose
-    const isArm = KINDS[u.kind].sym==='arm';
+    const isArm = KINDS[u.kind].sym==='arm' || KINDS[u.kind].fast;
     const city = gerPickTarget(u);
     const df = distField('G', city.x, city.y);
     const myNet = computeSupply('G');
@@ -2244,7 +2287,7 @@ function sovScoreHex(u, x, y, df, myNet){
   if (myNet && !myNet.has(keyOf(x,y))) s -= 7;                  // stay supplied
   const c = cityAt(x,y);
   if (c && c.owner==='S' && c.vp>0 && !unitAt(x,y)) s += 7;     // garrison objectives
-  if (c && c.owner==='G') s += 8 + c.vp*4;                      // retake!
+  if (c && c.owner==='G' && !KINDS[u.kind].noCapture) s += 8 + c.vp*4;   // retake!
   let adjE = 0, weakest = null;
   for (const [nx,ny] of neighbors(x,y)){
     const t = unitAt(nx,ny);
@@ -2572,7 +2615,11 @@ onLog = function(){
   el.innerHTML = G.log.slice(-30).map(([c,t])=>`<div class="${c}">${t}</div>`).join('');
   el.scrollTop = el.scrollHeight;
 };
-onCityTaken = function(c){ if (c.vp>0) sCity(); };
+onCityTaken = function(c){
+  if (c.vp>0) sCity();
+  boomAt(c.x, c.y, true);
+  floatText(c.x, c.y, '★ '+c.name+' taken', '#ffd34d');
+};
 onGameOver = function(){ setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
   boomAt(t.x, t.y, res.killed);
@@ -2829,10 +2876,16 @@ function draw(){
       hexPath(cx,cy,S-3); ctx.fillStyle = '#e8b34b55'; ctx.fill();
       ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
     }
-    if (!su.attacked) for (const t of adjacentEnemies(su)){
+    if (!su.attacked) for (const t of enemiesInRange(su)){
       const [cx,cy] = hexCenter(t.x,t.y);
       hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#e2493b'; ctx.lineWidth = 3; ctx.stroke();
     }
+    // pulsing ring under the selected unit
+    const [scx,scy] = hexCenter(su.x,su.y);
+    hexPath(scx,scy, S-2 + Math.sin(now*0.006)*1.6);
+    ctx.globalAlpha = 0.55 + 0.3*Math.sin(now*0.006);
+    ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.globalAlpha = 1;
   }
   if (hover){
     const [cx,cy] = hexCenter(hover[0],hover[1]);
@@ -2855,6 +2908,22 @@ function draw(){
   anims = anims.filter(a => now - a.t0 < 1100);
   for (const a of anims){
     const p = (now-a.t0)/1100;
+    if (a.type === 'arrow'){
+      const pr = Math.min(1, p*2.4);
+      const gx = a.x1 + (a.x2-a.x1)*pr, gy = a.y1 + (a.y2-a.y1)*pr;
+      ctx.globalAlpha = (1-p)*0.9;
+      ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(a.x1,a.y1); ctx.lineTo(gx,gy); ctx.stroke();
+      const ang = Math.atan2(a.y2-a.y1, a.x2-a.x1);
+      ctx.fillStyle = '#ffd98a';
+      ctx.beginPath();
+      ctx.moveTo(gx,gy);
+      ctx.lineTo(gx-9*Math.cos(ang-0.5), gy-9*Math.sin(ang-0.5));
+      ctx.lineTo(gx-9*Math.cos(ang+0.5), gy-9*Math.sin(ang+0.5));
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
     if (a.type === 'boom'){
       const pr = Math.min(1, p*1.7);
       const r = (a.big?26:15)*pr + 4;
@@ -2943,26 +3012,61 @@ function drawUnit(u, cx, cy){
   if (u.side===G.phase && u.moved && (u.attacked || !adjacentEnemies(u).length)){
     roundRect(-w/2,-h/2,w,h,5); ctx.fillStyle = '#00000055'; ctx.fill();
   }
-  // NATO-style symbol box
+  // NATO-style symbol box (land) and ship silhouettes (naval)
   const bw = w*0.52, bh = h*0.52;
-  ctx.strokeStyle = '#e9e5d2'; ctx.lineWidth = 1.6;
-  ctx.strokeRect(-bw/2-(w*0.13), -bh/2, bw, bh);
-  const bx = -(w*0.13);
+  const bx = -(w*0.13), pale = '#e9e5d2';
+  ctx.strokeStyle = pale; ctx.lineWidth = 1.6;
+  ctx.strokeRect(bx-bw/2, -bh/2, bw, bh);
+  ctx.fillStyle = pale;
   if (k.sym==='inf'){
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
     ctx.moveTo(bx+bw/2,-bh/2); ctx.lineTo(bx-bw/2,bh/2); ctx.stroke();
-  } else {
+  } else if (k.sym==='arm'){
     ctx.beginPath(); ctx.ellipse(bx,0,bw*0.32,bh*0.3,0,0,Math.PI*2); ctx.stroke();
+  } else if (k.sym==='para'){
+    ctx.beginPath();                                      // airborne: X under a canopy
+    ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/6);
+    ctx.moveTo(bx+bw/2,bh/2); ctx.lineTo(bx-bw/2,-bh/6); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, -bh/6, bw*0.36, Math.PI, 0); ctx.stroke();
+  } else if (k.sym==='cv'){
+    ctx.fillRect(bx-bw*0.42, -2.6, bw*0.84, 2.6);         // flight deck
+    ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 3);              // hull
+    ctx.fillRect(bx+bw*0.10, -5.6, 3.6, 3);               // island
+  } else if (k.sym==='bb'){
+    ctx.beginPath();                                      // hull with raked bow
+    ctx.moveTo(bx-bw*0.42, 0); ctx.lineTo(bx+bw*0.34, 0);
+    ctx.lineTo(bx+bw*0.46, -2.4); ctx.lineTo(bx-bw*0.42, -2.4);
+    ctx.closePath(); ctx.fill();
+    ctx.fillRect(bx-bw*0.42, 0, bw*0.84, 2.6);
+    ctx.fillRect(bx-bw*0.24, -5.2, 4, 3);                 // fore turret
+    ctx.fillRect(bx+bw*0.05, -5.2, 4, 3);                 // aft turret
+    ctx.fillRect(bx-bw*0.04, -7, 1.6, 4.5);               // mast
+  } else if (k.sym==='ca'){
+    ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 2.4);            // hull
+    ctx.fillRect(bx-bw*0.12, -4.4, 3.4, 2.6);             // turret
+    ctx.fillRect(bx+bw*0.08, -5.2, 1.6, 3.4);             // funnel
+  } else if (k.sym==='tr'){
+    ctx.fillRect(bx-bw*0.36, 0, bw*0.72, 2.6);            // hull
+    ctx.fillRect(bx-3.8, -4.6, 7.6, 4);                   // deck cargo
+  } else if (k.sym==='ss'){
+    ctx.beginPath(); ctx.ellipse(bx, 0, bw*0.38, 2.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(bx-1.6, -4.6, 3.2, 3.2);                 // sail
+    ctx.fillRect(bx+0.2, -6.4, 1, 2.4);                   // periscope
   }
   // strength badge
   ctx.fillStyle = '#101208'; roundRect(w/2-15,h/2-15,13,12,3); ctx.fill();
   ctx.fillStyle = u.str<=3 ? '#ff8d80' : '#ffe9a8';
   ctx.font = '700 10px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(u.str, w/2-8.5, h/2-5.5);
+  // strength bar along the bottom edge
+  const frac = Math.max(0, Math.min(1, u.str / k.maxStr));
+  ctx.fillStyle = '#000a'; ctx.fillRect(-w/2+3, h/2-2.6, w-6, 2);
+  ctx.fillStyle = frac > 0.55 ? '#7a9d54' : frac > 0.3 ? '#e8b34b' : '#e2493b';
+  ctx.fillRect(-w/2+3, h/2-2.6, (w-6)*frac, 2);
   // entrench pips
   ctx.fillStyle = '#cfe6a8';
-  for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-6, 3.5, 3.5);
+  for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-7, 3.5, 3.5);
   // a general's command flies his star
   if (generalOf(u)){ ctx.fillStyle = '#ffd34d'; star(-w/2+8, -h/2+5, 3.5); }
   // out of supply
@@ -2985,6 +3089,10 @@ function floatText(x,y,text,color){
 function boomAt(x,y,big){
   const [cx,cy] = hexCenter(x,y);
   anims.push({type:'boom', x:cx, y:cy, big:!!big, seed:(x*31+y*47)%360, t0:performance.now()});
+}
+function attackArrow(att, def){
+  const [x1,y1] = hexCenter(att.x,att.y), [x2,y2] = hexCenter(def.x,def.y);
+  anims.push({type:'arrow', x1, y1, x2, y2, t0:performance.now()});
 }
 
 (function loop(){
@@ -3043,7 +3151,7 @@ canvas.addEventListener('click', e=>{
   const u = unitAt(x,y);
   const su = sel && G.units.find(t=>t.id===sel);
   if (u && u.side===G.phase){ selectUnit(u); sClick(); return; }
-  if (su && u && u.side!==G.phase && !su.attacked && hexDist(su.x,su.y,u.x,u.y)===1){
+  if (su && u && u.side!==G.phase && !su.attacked && hexDist(su.x,su.y,u.x,u.y) <= attackRange(su)){
     playerAttack(su,u); return;
   }
   if (su && !su.moved && reach && reach.has(keyOf(x,y))){
@@ -3088,6 +3196,7 @@ function playerMove(u,x,y){
 function playerAttack(att,def){
   clearUndo();
   sShot();
+  attackArrow(att, def);
   const ev = resolveCombat(att,def);
   if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
@@ -3127,6 +3236,8 @@ function updateUnitCard(){
     <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
     <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
     <div class="statrow"><span>Movement</span><span>${k.mp}</span></div>
+    ${(k.range||1)>1 ? `<div class="statrow"><span>Gunnery range</span><span>${k.range} hexes</span></div>` : ''}
+    ${k.carrier ? `<div class="statrow"><span>Air operations</span><span>✈ floating airfield</span></div>` : ''}
     <div class="statrow"><span>Dug in</span><span>${'▮'.repeat(u.entrench)||'—'}</span></div>
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
     <div class="statrow"><span>This turn</span><span>${u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
@@ -3211,7 +3322,7 @@ function updateTerrainCard(){
 function updatePreview(){
   const su = sel && G && G.units.find(t=>t.id===sel);
   const t = hover && unitAt(hover[0],hover[1]);
-  const ok = su && t && t.side!==su.side && !su.attacked && hexDist(su.x,su.y,t.x,t.y)===1;
+  const ok = su && t && t.side!==su.side && !su.attacked && hexDist(su.x,su.y,t.x,t.y) <= attackRange(su);
   show('preview-card', !!ok);
   if (!ok) return;
   const p = previewCombat(su, t);
@@ -3381,6 +3492,7 @@ function runAIPhase(){
       setTimeout(step, mDelay*mult);
     } else if (res && res.type==='attack'){
       sShot();
+      attackArrow(res.att, res.def);
       const ev = res.ev;
       if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
       if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
