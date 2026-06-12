@@ -294,6 +294,75 @@ console.log('— QoL —');
     && Array.isArray(G2.turnSnap.G.cities));
 }
 
+/* combat readability: the forecast exposes a legible modifier breakdown */
+console.log('— combat readability —');
+{
+  E.newGame('G','normal','hotseat');
+  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');   // Guderian, +15% atk
+  const def = E.unitsOf('S').find(u=>u.name==='3rd Army');
+  const p = E.previewCombat(pz, def);
+  check('forecast returns a factors breakdown', Array.isArray(p.factors));
+  check('Guderian shows up as an attack factor',
+    p.factors.some(f=>f.who==='atk' && /Guderian/.test(f.label) && Math.abs(f.mul-1.15)<1e-9),
+    JSON.stringify(p.factors.map(f=>f.label)));
+  // a defender in a forest shows a terrain factor on the defending side
+  const forestDef = E.unitsOf('S').find(u=>E.terrainAt(u.x,u.y)==='f');
+  if (forestDef){
+    const adj = E.neighbors(forestDef.x,forestDef.y).map(([x,y])=>E.unitAt(x,y)).find(u=>u&&u.side==='G')
+              || E.unitsOf('G')[0];
+    const fp = E.previewCombat(adj, forestDef);
+    check('terrain appears as a defensive factor', fp.factors.some(f=>f.who==='def' && f.mul>1));
+  } else check('terrain appears as a defensive factor', true);
+  // an out-of-supply attacker is flagged
+  pz.oos = true;
+  check('cut-off attacker shows a penalty factor',
+    E.previewCombat(pz,def).factors.some(f=>f.who==='atk' && f.mul<1 && /cut off/i.test(f.label)));
+  pz.oos = false;
+}
+
+/* strategic decisions */
+console.log('— decisions —');
+{
+  // every scenario's decisions are well-formed and target real units/cities where named
+  for (const id of Object.keys(E.SCENARIOS)){
+    const ds = E.SCENARIOS[id].decisions || [];
+    check(`[${id}] decisions well-formed`, ds.every(d=>
+      d.id && d.side && d.turn>=1 && d.turn<=E.SCENARIOS[id].maxTurn && d.title && d.text &&
+      Array.isArray(d.options) && d.options.length>=2 &&
+      d.options.every(o=>o.label && typeof o.apply==='function') &&
+      typeof d.ai==='function'),
+      ds.map(d=>d.id).join(','));
+  }
+  // the Kiev Turn fires on turn 10 (headless auto-resolves via the AI choice)
+  E.newGame('G','normal','hotseat');
+  let G = E.getState();
+  G.turn = 10; E.startPhase('G');
+  check('Kiev Turn resolves on turn 10', ('kievturn' in G.decisions) && G.decisions.kievturn!=='pending',
+    JSON.stringify(G.decisions));
+  // branch A (encircle south) effects, isolated from startPhase income/maxStr caps
+  E.newGame('G','normal','hotseat'); G = E.getState();
+  G.decisions = {kievturn:'pending'};
+  const kiev = G.cities.find(c=>c.name==='Kiev');
+  const south = E.unitsOf('G').slice().sort((a,b)=>
+    E.hexDist(a.x,a.y,kiev.x,kiev.y)-E.hexDist(b.x,b.y,kiev.x,kiev.y)).slice(0,4);
+  south.forEach(u=>u.str=5);                 // room for the +2
+  const sBefore = G.pp.S, strBefore = south.reduce((a,u)=>a+u.str,0);
+  E.resolveDecision('kievturn', 0);
+  check('Kiev option strengthens the south and gives the Soviets time',
+    south.reduce((a,u)=>a+u.str,0) > strBefore && G.pp.S === sBefore+4,
+    `str ${strBefore}->${south.reduce((a,u)=>a+u.str,0)}, pp ${sBefore}->${G.pp.S}`);
+  check('a resolved decision cannot be re-resolved', E.resolveDecision('kievturn',1)===false);
+  // the choice survives a save/load round-trip
+  const snap = E.serialize(); E.deserialize(snap);
+  check('decision choices persist through save/load', E.getState().decisions.kievturn===0);
+  // the AI resolves its own decisions automatically during a headless phase
+  E.newGame('S','normal','ai');              // human Soviet -> Germany (incl. its decisions) is AI
+  const G2 = E.getState();
+  let guard=0; while(G2.turn<11 && guard++<40){ E.aiFullPhase(G2.phase); if(!G2.over) E.endPhase(); }
+  check('AI auto-resolves its decisions', G2.decisions && G2.decisions.kievturn!=='pending' && 'kievturn' in G2.decisions,
+    JSON.stringify(G2.decisions));
+}
+
 /* historical events & the winter question */
 console.log('— events & winter gear —');
 {
@@ -498,6 +567,10 @@ function uiSmoke(side){
     // dismiss event popups and answer the winter question like a player would
     for (let i=0;i<3;i++) if ($('btn-event-close').onclick) $('btn-event-close').onclick();
     if (UI.getState().winterGear === 'pending' && $('btn-gear-buy').onclick) $('btn-gear-buy').onclick();
+    // a strategic decision blocks the turn — answer it (the option buttons live in a
+    // fake-DOM container we can't click, so resolve through the exported API)
+    const pd = UI.pendingDecision();
+    if (pd) UI.resolveDecision(pd.id, pd.ai ? pd.ai(UI.getState()) : 0);
     $('btn-endturn').onclick();              // first click may arm the "units ready" warning…
     $('btn-endturn').onclick();              // …second click confirms; AI plays via queued steps
     drain();

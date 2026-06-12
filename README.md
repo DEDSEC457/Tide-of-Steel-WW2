@@ -44,13 +44,19 @@ The whole game is one file (`index.html`) that runs in any browser:
 - **The clock** — October mud bogs everything down; December snow cripples German
   attacks while Siberian divisions and fresh Soviet air arrive. Germany must win
   *before* winter; the Soviets must survive *until* it.
-- **📰 History unfolds** — real dated dispatches from 1941 pop up as the weeks
-  pass (Stalin's "brothers and sisters" speech, the Kiev pocket, the Red Square
-  parade, Pearl Harbor…), a few with small production effects. And in mid-August
-  the German side faces **the winter question**: divert 10 ⚙ to winter equipment,
-  or gamble — as the OKH did — that the war ends before the snow. Gear mostly
-  saves the December *defense* and keeps the infantry marching; no greatcoat
-  unfreezes a panzer engine.
+- **📰 History unfolds** — real dated dispatches pop up as the weeks pass
+  (Stalin's "brothers and sisters" speech, the Kiev pocket, the Red Square
+  parade, Pearl Harbor…), a few with small production effects.
+- **⚑ Decisions** — the great crossroads are real forks with lasting effects:
+  the mid-August **winter question** (divert ⚙ to winter gear or gamble on an
+  early victory), **the Kiev Turn** (wheel south for the pocket or drive on
+  Moscow), **Nagumo's dilemma** at Midway (re-arm for the island or hold for the
+  fleet), and **Mortain** at Normandy (the Führer's counterattack or save the army).
+- **🔍 Battle Forecast** — before every attack, see the odds, the expected
+  losses, and a full **WHY** breakdown of every modifier deciding the fight.
+- **🧠 Smarter AI** — the attacker masses on weak points, pours fast units
+  through breakthroughs to exploit a broken front, and reads its posture: it
+  drives hard when it has the initiative and digs in when winter turns against it.
 
 **Controls:** click a unit → move/attack · `N` next unit · `E` end turn · `U` undo last move ·
 `S` supply view · `Esc` deselect · drag to pan · scroll to zoom · click the weather chip for

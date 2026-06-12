@@ -219,6 +219,12 @@
           movement for the turn (zone of control). Punch a hole in their line, then pour through it.</li>
       <li><b>Strength</b> (the number on the counter) is a unit's health <i>and</i> its punch.
           Spend <b>⚙ Production</b> to reinforce a damaged unit or deploy new ones at your cities.</li>
+      <li><b>Read the forecast.</b> Hover an enemy you can hit and the <b>Battle Forecast</b> shows
+          the odds, expected losses, and a <b>WHY</b> breakdown of every modifier — terrain, rivers,
+          dig-in, generals, supply, and ganging up — so you always know what's deciding the fight.</li>
+      <li><b>⚑ Decisions.</b> At the great historical crossroads you'll be handed a real choice —
+          the Kiev Turn, Nagumo's rearming gamble at Midway, the Mortain counterattack at Normandy —
+          each with lasting consequences. There's no taking it back.</li>
       <li><b>Terrain matters.</b> Forests, hills and cities boost defense. Rivers are deadly to attack
           across. Units that hold still <b>dig in</b> (▮ pips = bonus defense). The map is tinted
           with the front line: <b>grey</b> ground is Axis-held, <b>red</b> is Soviet — watch it
@@ -343,6 +349,17 @@
       <button class="primary" id="btn-gear-buy">Divert the trains — winter equipment (10 ⚙)</button>
       <button id="btn-gear-front">"Home before the snow" — everything to the front</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ STRATEGIC DECISION ============ -->
+<div id="decision-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:600px;">
+    <h2 style="font-size:14px;letter-spacing:4px;">⚑ A DECISION IS DEMANDED</h2>
+    <div id="decision-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
+    <h3 id="decision-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
+    <p id="decision-text"></p>
+    <div id="decision-options" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 </div>
 
@@ -526,6 +543,37 @@ SCENARIOS.barbarossa = {
      one man in five. Divert supply trains to winter equipment — or gamble,
      as the OKH did, that the war ends before the snow falls? */
   winterQuestion: {turn:9, cost:10},
+  /* Strategic crossroads. apply(G) runs in engine scope (unitsOf, hexDist,
+     KINDS, axisVP, G.pp all available); only the chosen index is serialized. */
+  decisions: [
+    {
+      id:'kievturn', turn:10, side:'G',
+      date:'21 August 1941', title:'THE KIEV TURN',
+      text:'Against the protests of nearly every general, Hitler wants the panzers to wheel <b>south</b> toward Kiev — “My generals understand nothing of the economic aspects of war.” Guderian and Halder beg to keep driving on <b>Moscow</b> while the autumn roads still hold. The most argued-over order of the war. Here, the choice is yours.',
+      options:[
+        {label:'Wheel south — close the Kiev pocket',
+         blurb:'Reinforce Army Group South for the largest encirclement in history. The Red Army loses a fortune in the south — but Moscow gains weeks to dig in.',
+         log:'⬛ The panzers turn south. The Kiev pocket begins to close — Moscow will have to wait.',
+         apply(G){
+           const k = G.cities.find(c=>c.name==='Kiev') || {x:12,y:12};
+           unitsOf('G').slice().sort((a,b)=>hexDist(a.x,a.y,k.x,k.y)-hexDist(b.x,b.y,k.x,k.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+           G.pp.G = Math.min(40, G.pp.G+3);
+           G.pp.S = Math.min(40, G.pp.S+4);     // the delay lets the Soviets prepare the capital
+         }},
+        {label:'Drive on Moscow — defy the directive',
+         blurb:'Throw the spearheads straight at the capital while the weather holds. The flanks stay exposed and the south is left hanging — but the prize is the prize.',
+         log:'⬛ “The objective is Moscow.” The central panzers roll east — flanks be damned.',
+         apply(G){
+           const mo = G.cities.find(c=>c.name==='Moscow') || {x:24,y:4};
+           unitsOf('G').slice().sort((a,b)=>hexDist(a.x,a.y,mo.x,mo.y)-hexDist(b.x,b.y,mo.x,mo.y))
+             .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+           G.pp.G = Math.min(40, G.pp.G+5);
+         }},
+      ],
+      ai(G){ return axisVP() >= 6 ? 1 : 0; },   // ahead of schedule? gun for Moscow; else bag Kiev
+    },
+  ],
   /* "This week in 1941" — real dispatches from the historical war, shown as
      the matching game week begins. pp:{side:n} grants a small production
      bonus. Pure static data keyed by turn — saves stay compatible. */
@@ -540,8 +588,6 @@ SCENARIOS.barbarossa = {
    text:'By night, 195 Luftwaffe bombers raid Moscow. The flak over the Kremlin is so thick that Muscovites joke it is “the second front.” Damage is light. Moscow will not be bombed out of the war.'},
   {turn:8,  date:'14 August 1941',    title:'THE ATLANTIC CHARTER',
    text:'Roosevelt and Churchill, meeting secretly aboard warships off Newfoundland, pledge a world “freed from want and fear” — and aid for the Soviet Union. The first Arctic convoy sails for Archangelsk within the month.'},
-  {turn:10, date:'21 August 1941',    title:'THE KIEV TURN',
-   text:'Against the protests of nearly every general, Hitler turns the panzers south toward Kiev instead of Moscow: “My generals understand nothing of the economic aspects of war.” Historians will argue over this order forever. Here, the choice is yours.'},
   {turn:11, date:'6 September 1941',  title:'YELNYA: FIRST VICTORY',
    text:'At Yelnya, east of Smolensk, Zhukov’s armies throw the Wehrmacht off captured ground — the Red Army’s first true victory of the war. The divisions that won it receive a new title: the first of the Guards.'},
   {turn:13, date:'19 September 1941', title:'THE KIEV POCKET',
@@ -707,6 +753,7 @@ SCENARIOS.winter41 = {
   /* the Road of Life: trucks cross the Ladoga ice — besieged Leningrad
      stays supplied as long as the city itself holds */
   supplySeeds: {S: [[14,1]]},
+  gerAI: 'defend',                  // the Westheer is on the back foot all winter — dig in
   /* no winterQuestion: it is December, and the gamble has already been lost */
   events: [
     {turn:1,  date:'5 December 1941',  title:'THE SLEDGEHAMMER FALLS', pp:{S:2},
@@ -1095,6 +1142,35 @@ SCENARIOS.dday = {
     {side:'S', unit:'2. Fallschirmjäger', name:'Ramcke', def:1.15,
      bio:'Fortress commander of Brest — he will hold the ruins to the last wall.'},
   ],
+  decisions: [
+    {
+      id:'luttich', turn:9, side:'S',
+      date:'6 August 1944', title:'OPERATION LÜTTICH',
+      text:'With the Americans pouring through Avranches, Hitler orders the panzers to attack <b>west</b> and cut the breakout at the coast. Kluge warns it will only push the army deeper into a sack the Allies are closing around Falaise. Drive for the sea — or save the army?',
+      options:[
+        {label:'Attack west to Avranches — the Führer\'s order',
+         blurb:'Mass the panzers for a thrust to the coast. They hit hard now — but driving west, under total Allied air power, only deepens the trap forming behind them.',
+         log:'⬛ The panzers wheel west toward Avranches. Above them, the fighter-bombers are already circling.',
+         apply(G){
+           const av = G.cities.find(c=>c.name==='Avranches') || {x:8,y:11};
+           unitsOf('S').filter(u=>KINDS[u.kind].sym==='arm')
+             .sort((a,b)=>hexDist(a.x,a.y,av.x,av.y)-hexDist(b.x,b.y,av.x,av.y))
+             .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+           G.pp.G = Math.min(40, G.pp.G+4);   // the Allies feast on the exposed columns
+         }},
+        {label:'Pull back toward the Seine — save the army',
+         blurb:'Defy the order and begin the withdrawal. You give up ground, but the army lives to fight on the next river line instead of dying in the Falaise pocket.',
+         log:'⬛ “The army must not be destroyed for nothing.” The panzers disengage and fall back east.',
+         apply(G){
+           const pa = G.cities.find(c=>c.name==='Paris') || {x:28,y:11};
+           unitsOf('S').sort((a,b)=>hexDist(a.x,a.y,pa.x,pa.y)-hexDist(b.x,b.y,pa.x,pa.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+1); });
+           G.pp.S = Math.min(40, G.pp.S+5);
+         }},
+      ],
+      ai(G){ return 1; },   // the strategically sound choice: don't deepen the trap
+    },
+  ],
   events: [
     {turn:1,  date:'6 June 1944',   title:'THE LONGEST DAY',
      text:'156,000 men, 5,000 ships, 11,000 aircraft — the largest amphibious invasion in history goes in across five beaches. By midnight the Atlantic Wall, four years in the building, has been breached in a single morning. "The eyes of the world are upon you."'},
@@ -1254,6 +1330,31 @@ SCENARIOS.midway = {
   /* Midway itself: the unsinkable carrier — garrison, guns and land-based air */
   capitalDefense: {turn:1, range:1, def:1.2, city:'Midway',
     announce:'⭐ Midway\'s garrison stands to — the island is an unsinkable carrier.'},
+  decisions: [
+    {
+      id:'nagumo', turn:1, side:'G',
+      date:'4 June 1942 · 07:45', title:'NAGUMO\'S DILEMMA',
+      text:'The first wave reports Midway needs a <b>second strike</b> — and your reserve aircraft sit armed with anti-ship torpedoes for a fleet that scouts say isn\'t there. Re-arm them with land bombs for the island? Or keep them ready in case the Americans <i>are</i> out there? This is the decision the whole battle turned on.',
+      options:[
+        {label:'Re-arm for a second strike on Midway',
+         blurb:'Commit the reserve to crushing the atoll. The island\'s defenses crumble — but your flight decks fill with fuel and bombs, and a carrier caught mid-rearm is a tinderbox.',
+         log:'🟥 The order goes out: re-arm with land bombs. Hangar crews race to swap ordnance — decks crowded, hoses everywhere.',
+         apply(G){
+           const gar = G.units.find(u=>u.name==='Midway Garrison'); if (gar) gar.str = Math.max(1, gar.str-2);
+           airOf('G').forEach(a=>{ a.str = Math.min(AIR_MAXSTR, a.str+1); });
+           unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str = Math.max(1, c.str-1); }); // caught rearming
+         }},
+        {label:'Hold the reserve armed against the fleet',
+         blurb:'Trust the warning and keep the torpedo planes ready. If the enemy carriers appear, you strike first — the only thing that matters in carrier war. Midway stays dangerous.',
+         log:'🟥 “Hold them armed for ships.” The reserve stays ready on the hangar deck — and the scouts are sent out again.',
+         apply(G){
+           airOf('G').forEach(a=>{ a.str = Math.min(AIR_MAXSTR, a.str+1); });
+           unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str = Math.min(KINDS[c.kind].maxStr, c.str+1); });
+         }},
+      ],
+      ai(G){ return 1; },   // the smart, historical-counterfactual choice: keep the decks clear
+    },
+  ],
   events: [
     {turn:1, date:'4 June 1942', title:'AF IS SHORT OF WATER',
      text:'Weeks ago, Station HYPO\'s codebreakers tricked Japan into revealing its target. Nimitz knows the date, the bearing, and the order of battle. Three American carriers wait at "Point Luck" — northeast of Midway, exactly where Japan believes there is only empty ocean.'},
@@ -1455,6 +1556,7 @@ function newGame(playerSide, difficulty, mode, scenario){
     air: AIR_INIT.map(([sd,n,s,hm]) => makeAir(sd,n,s,hm)),
     pp: {G:0, S:0},
     winterGear: null,                          // null = not yet asked · 'pending' · true/false
+    decisions: {},                             // decision id -> chosen option index (or 'pending')
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
     log: [],
     over: false, result: null,
@@ -1663,32 +1765,40 @@ function sideName(side){ return SIDES[side].name; }
 function combatMods(att, def){
   const wx = weatherFor(G.turn);
   const tDef = effTerrain(def.x, def.y).def;
-  let aMul = 1, dMul = tDef * (1 + ENTRENCH_DEF*def.entrench);
+  let aMul = 1, dMul = 1;
+  // `factors` is a legible breakdown for the forecast: {who:'atk'|'def', label, mul}
+  const F = [];
+  const af = (label, mul) => { aMul *= mul; if (Math.abs(mul-1) > 1e-9) F.push({who:'atk', label, mul}); };
+  const df = (label, mul) => { dMul *= mul; if (Math.abs(mul-1) > 1e-9) F.push({who:'def', label, mul}); };
+  // terrain & entrenchment (rolled into the defender's base multiplier)
+  df(effTerrain(def.x,def.y).name, tDef);
+  if (def.entrench > 0) df('Dug in '+'▮'.repeat(def.entrench), 1 + ENTRENCH_DEF*def.entrench);
   const ag = generalOf(att), dg = generalOf(def);
-  if (ag && ag.atk) aMul *= ag.atk;
-  if (dg && dg.def) dMul *= dg.def;
-  if (zhukovDefends(def)) dMul *= SCN.capitalDefense.def;
-  if (terrainAt(att.x,att.y)==='r') aMul *= RIVER_ATK;
-  if (att.oos) aMul *= OOS_ATK;
-  if (def.oos) dMul *= OOS_DEF;
+  if (ag && ag.atk) af('⭐ '+ag.name, ag.atk);
+  if (dg && dg.def) df('⭐ '+dg.name, dg.def);
+  if (zhukovDefends(def)) df('⭐ '+ (SCN.capitalDefense.city) +' defense', SCN.capitalDefense.def);
+  if (terrainAt(att.x,att.y)==='r') af('Attacking across river', RIVER_ATK);
+  if (att.oos) af('Attacker cut off', OOS_ATK);
+  if (def.oos) df('Defender cut off', OOS_DEF);
   // concentric attack: every other friendly unit adjacent to the defender
   let ring = 0;
   for (const [nx,ny] of neighbors(def.x,def.y)){
     const t = unitAt(nx,ny);
     if (t && t.side===att.side && t.id!==att.id) ring++;
   }
-  aMul *= 1 + CONCENTRIC*Math.min(ring,3);
+  if (ring > 0) af((Math.min(ring,3)+1)+'-sided attack', 1 + CONCENTRIC*Math.min(ring,3));
   // weather
-  if (wx==='mud'){ aMul *= KINDS[att.kind].sym==='arm' ? 0.5 : 0.6; }
-  if (wx==='freeze'){ aMul *= 0.9; }
+  if (wx==='mud'){ af('Rasputitsa mud', KINDS[att.kind].sym==='arm' ? 0.5 : 0.6); }
+  if (wx==='freeze'){ af('Hard frost', 0.9); }
   if (wx==='snow'){
     // winter gear saves the defense, not the offensive — no December blitz
-    if (att.side==='G') aMul *= hasWinterGear() ? 0.65 : 0.6;
-    if (def.side==='G') dMul *= hasWinterGear() ? 0.9 : 0.8;
-    if (KINDS[att.kind].winter) aMul *= 1.2;
+    if (att.side==='G') af(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.65 : 0.6);
+    if (def.side==='G') df(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.9 : 0.8);
+    if (KINDS[att.kind].winter) af('Winter-hardened', 1.2);
   }
-  aMul *= diffCombat(att.side);
-  return {aMul, dMul, ring, tDef};
+  const dc = diffCombat(att.side);
+  if (dc !== 1) af('Difficulty', dc);
+  return {aMul, dMul, ring, tDef, factors:F};
 }
 
 function combatPower(att, def){
@@ -1701,11 +1811,12 @@ function combatPower(att, def){
 /* Expected (dice-free) result — used for the on-screen forecast and the AI. */
 const RETREAT_RATIO = 1.35;
 function previewCombat(att, def){
-  const {A,D} = combatPower(att,def);
+  const cp = combatPower(att,def);
+  const {A,D} = cp;
   const r = A/D;
   const defLoss = Math.min(def.str, Math.round(1.9*r));
   const atkLoss = Math.min(att.str, Math.round(1.7/Math.max(r,0.35)));
-  return {ratio:r, defLoss, atkLoss, retreat: r>=RETREAT_RATIO && defLoss>=2};
+  return {ratio:r, defLoss, atkLoss, retreat: r>=RETREAT_RATIO && defLoss>=2, factors:cp.factors};
 }
 
 function retreatHex(def, att){
@@ -1955,7 +2066,46 @@ function startPhase(side){
     G.winterGear = false;
     logMsg('sys', '⬛ The railways are saturated — winter equipment stays in Warsaw depots. The army gambles on an early victory.');
   }
+  fireDecisions(side);
   checkSuddenDeath();
+}
+
+/* ============================ STRATEGIC DECISIONS ============================ */
+/* Historical crossroads turned into real forks. Each decision belongs to one
+   side and fires on its turn; the human gets a modal, the AI resolves itself.
+   G.decisions[id] holds the chosen option index (or 'pending'). Effects live
+   in the scenario (functions, never serialized), so saves stay portable. */
+function decisionsFor(side){
+  return (SCN.decisions || []).filter(d => d.side === side);
+}
+function decisionById(id){ return (SCN.decisions || []).find(d => d.id === id); }
+function fireDecisions(side){
+  if (!G.decisions) G.decisions = {};
+  for (const d of decisionsFor(side)){
+    if (G.turn !== d.turn || d.id in G.decisions) continue;
+    G.decisions[d.id] = 'pending';
+    logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ⚑ A decision is demanded: ${d.title}.`);
+    const human = G.mode==='hotseat' || side===G.playerSide;
+    if (human && typeof onDecision === 'function') onDecision(d);
+    else resolveDecision(d.id, d.ai ? d.ai(G) : 0);
+  }
+}
+function pendingDecision(){
+  for (const id in (G.decisions||{}))
+    if (G.decisions[id]==='pending'){ const d = decisionById(id); if (d) return d; }
+  return null;
+}
+function resolveDecision(id, choice){
+  const d = decisionById(id);
+  if (!d || G.decisions[id] !== 'pending') return false;
+  G.decisions[id] = choice;
+  const opt = d.options[choice];
+  if (opt){
+    if (opt.log) logMsg(d.side==='G'?'l-g':'l-s', opt.log);
+    if (opt.apply) opt.apply(G);
+  }
+  refreshSupply();
+  return true;
 }
 
 function endPhase(){
@@ -2187,26 +2337,88 @@ function bestAttack(u, minRatio){
 }
 
 /* ---- German planner ---- */
+/* POSTURE: an army pushes deep only when it has the strength to. >1 means we
+   outweigh the enemy (exploit, accept supply risk); <1 means consolidate and
+   defend. Computed once per phase — this is what stops the AI from charging
+   into encirclement when it should be digging in (e.g. winter '41). */
+let aiPostureG = 1;
+function computePosture(side){
+  if (side !== 'G') return 1.2;
+  // scenarios where Germany is the one being invaded say so outright
+  if (SCN.gerAI === 'defend') return 0.6;
+  // an attacking army digs in only in deep snow — unless it still dominates.
+  // (matches 1941–42: summer drives, winter halts, without turning timid just
+  //  because the enemy out-numbers it.)
+  if (weatherFor(G.turn) === 'snow'){
+    const mine = unitsOf('G').reduce((a,u)=>a+u.str,0);
+    const foe  = unitsOf('S').reduce((a,u)=>a+u.str,0);
+    return mine > foe*1.3 ? 1.0 : 0.6;
+  }
+  return 1.2;
+}
+/* threat to a city from whoever it doesn't belong to */
+function threatToCity(c){
+  const foe = enemyOf(c.owner);
+  let t = 0;
+  for (const g of unitsOf(foe)) t += (KINDS[g.kind].atk*g.str/10) / Math.pow(hexDist(c.x,c.y,g.x,g.y)+1, 2);
+  return t;
+}
+/* how strongly the enemy holds a hex: its garrison + adjacent defenders */
+function enemyStrengthAt(side, x, y){
+  const foe = enemyOf(side);
+  let s = 0; const on = unitAt(x,y);
+  if (on && on.side===foe) s += on.str + KINDS[on.kind].def;
+  for (const [nx,ny] of neighbors(x,y)){
+    const t = unitAt(nx,ny);
+    if (t && t.side===foe) s += t.str*0.6;
+  }
+  return s;
+}
 function gerPickTarget(u){
+  // on the back foot: rally to the most threatened friendly objective and defend
+  if (aiPostureG < 0.9){
+    let best=null, bestW=-1e9;
+    for (const c of G.cities){
+      if (c.owner!=='G' || c.vp===0) continue;
+      const w = threatToCity(c)*(c.vp+1)*3 - hexDist(u.x,u.y,c.x,c.y)*0.4;
+      if (w > bestW){ bestW=w; best=c; }
+    }
+    if (best) return best;
+  }
+  // on the offensive: mass on the SOFT objectives — value up, distance down,
+  // defenders down — so the army converges on the weakest valuable point.
   let best=null, bestW=-1e9;
   for (const c of G.cities){
     if (c.owner==='G' || c.vp===0) continue;
-    const w = c.vp*3 - hexDist(u.x,u.y,c.x,c.y)*0.9;
+    const w = c.vp*3 - hexDist(u.x,u.y,c.x,c.y)*0.9 - enemyStrengthAt('G',c.x,c.y)*0.4;
     if (w > bestW){ bestW=w; best=c; }
   }
   return best || G.cities.slice().sort((a,b)=>b.vp-a.vp)[0];
 }
 
 function gerScoreHex(u, x, y, df, isArm, myNet){
+  const offensive = aiPostureG >= 1.0;
   let s = -(df.get(keyOf(x,y)) ?? 60) * 2.2;
-  s += (effTerrain(x,y).def - 1) * 3;
+  s += (effTerrain(x,y).def - 1) * (offensive ? 3 : 6);        // dig into good ground when defending
   const c = cityAt(x,y);
   if (c && c.owner!=='G' && !KINDS[u.kind].noCapture) s += 6 + c.vp*4;   // capture!
-  // don't outrun the supply net (capturing a city extends it, so that's exempt)
-  if (myNet && !myNet.has(keyOf(x,y)) && !(c && c.owner!=='G')) s -= 7;
-  let friendsNear = 0;
+  if (c && c.owner==='G' && c.vp>0 && !offensive && !unitAt(x,y)) s += 6;  // garrison our own
+  // don't outrun the supply net — fast units on the attack accept a little risk
+  // (capturing a city restores supply, so the capture hex is exempt)
+  const oosPen = (isArm && offensive) ? 6 : 7;
+  if (myNet && !myNet.has(keyOf(x,y)) && !(c && c.owner!=='G')) s -= oosPen;
+  let friendsNear = 0, adjEnemy = 0;
   for (const f of unitsOf('G')) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=2) friendsNear++;
+  for (const [nx,ny] of neighbors(x,y)){ const t = unitAt(nx,ny); if (t && t.side==='S') adjEnemy++; }
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
+  if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
+  // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
+  // (no adjacent enemy) that gets meaningfully closer to its objective pours
+  // through the gap. Suppressed on the defensive so we don't over-extend.
+  if (isArm && offensive && adjEnemy===0){
+    const here = df.get(keyOf(u.x,u.y)) ?? 60, there = df.get(keyOf(x,y)) ?? 60;
+    if (there < here - 1) s += 2 + Math.min(3, (here-there)*0.3);   // open road forward
+  }
   // closing with a weak enemy is good — unless you're a carrier (stand off!)
   for (const [nx,ny] of neighbors(x,y)){
     const t = unitAt(nx,ny);
@@ -2233,6 +2445,7 @@ function cutoffValue(u, x, y){
 }
 
 function aiPlanGerman(){
+  aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
   const fastK = k => (KINDS[k].sym==='arm' || KINDS[k].fast) ? 0 : 1;
   const order = unitsOf('G').slice().sort((a,b)=> fastK(a.kind) - fastK(b.kind) || a.id-b.id);
   for (const u of order){
@@ -2421,7 +2634,7 @@ function clearSave(){
 
 /* ============================ HOOKS (used by the engine) ============================ */
 let onLog = null, onCityTaken = null, onGameOver = null, onAirStrike = null,
-    onEvents = null, onWinterDecision = null;
+    onEvents = null, onWinterDecision = null, onDecision = null;
 
 /* ====================================================================
    Everything below is browser-only: rendering, input, UI, sound.
@@ -2627,12 +2840,15 @@ onAirStrike = function(au, t, res){
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
 };
 
-/* ---------------- historical events & the winter question ---------------- */
+/* ---------------- historical events, decisions & the winter question ---------------- */
 let eventQueue = [];
 onEvents = function(evs){ eventQueue.push(...evs); showNextEvent(); };
-onWinterDecision = function(){ if (!eventQueue.length) maybeShowGear(); };
+onWinterDecision = function(){ if (!eventQueue.length && !maybeShowDecision()) maybeShowGear(); };
+// in hotseat the seated player may differ from the phase that just started —
+// defer to the pass screen; vs the AI, control is returning to us now, so show it
+onDecision = function(){ if (G.mode!=='hotseat' && !eventQueue.length) maybeShowDecision(); };
 function showNextEvent(){
-  if (!eventQueue.length){ show('event-modal', false); maybeShowGear(); return; }
+  if (!eventQueue.length){ show('event-modal', false); if (!maybeShowDecision()) maybeShowGear(); return; }
   const e = eventQueue[0];
   $('event-date').textContent = e.date;
   $('event-title').textContent = e.title;
@@ -2646,6 +2862,33 @@ function showNextEvent(){
   show('event-modal', true);
 }
 $('btn-event-close').onclick = ()=>{ sClick(); eventQueue.shift(); showNextEvent(); };
+
+/* ---- strategic decisions ---- */
+function maybeShowDecision(){
+  if (!G || G.over) return false;
+  const d = pendingDecision();
+  if (!d || d.side !== G.phase) return false;
+  if (G.mode !== 'hotseat' && d.side !== G.playerSide) return false;   // AI decides itself
+  $('decision-date').textContent = d.date || '';
+  $('decision-title').textContent = d.title;
+  $('decision-text').innerHTML = d.text;
+  const box = $('decision-options'); box.innerHTML = '';
+  d.options.forEach((opt, i)=>{
+    const b = document.createElement('button');
+    b.className = 'primary';
+    b.style.cssText = 'text-align:left;padding:10px 14px;';
+    b.innerHTML = `<b>${opt.label}</b>${opt.blurb?`<br><span style="font-weight:400;color:#ffe9b8;font-size:12px;">${opt.blurb}</span>`:''}`;
+    b.onclick = ()=>{
+      resolveDecision(d.id, i); clearUndo(); sCity();
+      show('decision-modal', false);
+      updateAll();
+      if (!maybeShowDecision()) maybeShowGear();    // chain any further pending decisions
+    };
+    box.appendChild(b);
+  });
+  show('decision-modal', true);
+  return true;
+}
 
 function maybeShowGear(){
   if (!G || G.winterGear !== 'pending' || G.phase !== 'G') return;
@@ -3326,19 +3569,22 @@ function updatePreview(){
   show('preview-card', !!ok);
   if (!ok) return;
   const p = previewCombat(su, t);
-  const ag = generalOf(su), dg = generalOf(t);
+  // legible modifier breakdown — green helps the attacker, red helps the defender
+  const fmt = m => (m>=1?'+':'−') + Math.round(Math.abs(m-1)*100) + '%';
+  const rows = p.factors.map(f=>{
+    const helpsAtk = (f.who==='atk') === (f.mul>=1);   // atk×>1 or def×<1 both favor us
+    const cls = helpsAtk ? 'good' : 'bad';
+    const tag = f.who==='atk' ? 'atk' : 'def';
+    return `<div class="statrow" style="font-size:12px"><span style="color:var(--dim)">${f.label} <i>(${tag})</i></span><span class="${cls}">${fmt(f.mul)}</span></div>`;
+  }).join('');
   $('preview-body').innerHTML = `
     <div class="vs"><span>${flag(su.side)} ${su.name}</span><span>str ${su.str}</span></div>
     <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
     <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
     <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
     <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
-    ${su.oos ? '<div style="color:var(--redL)">⚠ We are cut off — attacking at 40% strength</div>' : ''}
-    ${t.oos ? '<div style="color:var(--grn)">⚠ Enemy is encircled — no supply, defense crumbling</div>' : ''}
-    ${ag && ag.atk ? `<div style="color:var(--amber)">⭐ ${ag.name} leads the assault</div>` : ''}
-    ${dg && dg.def ? `<div style="color:var(--amber)">⭐ ${dg.name} commands the defense</div>` : ''}
-    ${zhukovDefends(t) ? '<div style="color:var(--amber)">⭐ Zhukov directs the Moscow defense</div>' : ''}
-    ${p.retreat ? '<div style="color:var(--amber)">Likely to force a retreat'+(retreatHex(t,su)?'':' — NO ESCAPE ROUTE!')+'</div>' : ''}
+    ${rows ? `<div style="border-top:1px solid var(--line);margin:5px 0 2px;padding-top:3px;color:var(--dim);font-size:11px;letter-spacing:1px;">WHY</div>${rows}` : '<div style="color:var(--dim);font-size:12px;">Even ground, no modifiers.</div>'}
+    ${p.retreat ? '<div style="color:var(--amber);margin-top:3px;">Likely to force a retreat'+(retreatHex(t,su)?'':' — NO ESCAPE ROUTE!')+'</div>' : ''}
     <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack.</div>`;
 }
 
@@ -3424,6 +3670,8 @@ $('btn-endturn').onclick = ()=>{
   if (!G || G.over || aiRunning) return;
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!human) return;
+  // a strategic decision must be answered before the turn can end
+  if (maybeShowDecision()) return;
   // safeguard: units still ready? ask for a second click
   const ready = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
   if (ready > 0 && performance.now() > endPendingUntil){
@@ -3519,7 +3767,8 @@ function runAIPhase(){
   setTimeout(step, aiSpeed===2 ? 0 : 350);
 }
 
-$('btn-pass-go').onclick = ()=>{ show('pass-modal', false); updateAll(); };
+$('btn-pass-go').onclick = ()=>{ show('pass-modal', false); updateAll();
+  if (!maybeShowDecision()) maybeShowGear(); };   // the new player faces any pending choice
 
 /* ---------------- end screen ---------------- */
 function showEnd(){
@@ -3602,7 +3851,7 @@ function startCampaign(loaded){
   show('topbar', true); show('side', true); show('hint', true);
   fitCamera();
   updateAll();
-  if (G.winterGear === 'pending' && !eventQueue.length) maybeShowGear();   // saved mid-decision
+  if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
   if (!loaded) saveGame();
   // if the human plays the Soviets, the German AI opens the war
   if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
@@ -3622,6 +3871,7 @@ if (typeof module !== 'undefined' && module.exports){
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
     GENERALS, generalOf, zhukovDefends,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner,
+    fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     SCENARIOS, loadScenario,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
