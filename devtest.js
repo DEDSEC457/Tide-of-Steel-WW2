@@ -89,6 +89,14 @@ for (const id of Object.keys(E.SCENARIOS)){
   delete snap.G.scenario;
   E.deserialize(JSON.stringify(snap));
   check('pre-scenario saves default to Barbarossa', E.getState().scenario === 'barbarossa');
+  // a save from one theater loads correctly after another was active
+  E.newGame('G','normal','hotseat','midway');
+  const navalSnap = E.serialize();
+  E.newGame('G','normal','hotseat','barbarossa');
+  E.deserialize(navalSnap);
+  check('cross-scenario save/load restores the right theater',
+    E.getState().scenario === 'midway' && !!E.unitAt(20,9) && E.terrainAt(0,0) === 'o');
+  E.loadScenario('barbarossa'); E.newGame('G','normal','hotseat','barbarossa');
 }
 
 /* coastal sanity: Riga, Odessa near sea; Moscow not */
