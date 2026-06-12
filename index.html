@@ -292,6 +292,7 @@
       <button id="btn-continue" class="hidden start-btn">CONTINUE SAVE</button>
     </div>
     <div class="mrow" style="justify-content:center;">
+      <button id="btn-back-arcade">← Back</button>
       <button id="btn-help">How to Play</button>
       <button id="btn-settings-menu">Settings</button>
     </div>
@@ -4213,6 +4214,7 @@ function showModeSelect(){ show('mode-select', true); show('menu', false); show(
 $('mc-arcade').onclick = ()=>{ show('mode-select', false); show('menu', true); sClick(); };
 $('mc-realistic').onclick = ()=>{ show('mode-select', false); show('realistic-menu', true); sClick(); };
 $('btn-back-realistic').onclick = ()=>{ show('realistic-menu', false); show('mode-select', true); };
+$('btn-back-arcade').onclick = ()=>{ show('menu', false); show('mode-select', true); };
 
 $('btn-menu').onclick = ()=>{
   saveGame();
