@@ -1,0 +1,174 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Railhead — visual mockup</title>
+<style>
+:root{--bg:#0d0f0c;--ink:#d8d4c0;--dim:#8d8a76;--amber:#e8b34b;}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;font-family:"Segoe UI",Tahoma,sans-serif;}
+html,body{background:var(--bg);color:var(--ink);overflow:hidden;height:100%;}
+#bar{position:fixed;top:0;left:0;right:0;height:88px;z-index:5;padding:8px 14px;
+  background:linear-gradient(#161a12f0,#0e110bf0);border-bottom:1px solid #3a4430;}
+#bar h1{color:var(--amber);font-size:16px;letter-spacing:3px;}
+#bar p{color:var(--dim);font-size:12px;margin-top:3px;max-width:900px;line-height:1.4;}
+.btns{margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+button{background:linear-gradient(#262c1d,#181d12);color:var(--ink);border:1px solid #3a4430;
+  border-radius:6px;padding:6px 13px;font-size:13px;cursor:pointer;}
+button.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 10px #e8b34b33;}
+button:hover{border-color:var(--amber);}
+.leg{color:var(--dim);font-size:12px;margin-left:6px;}
+.leg b{color:var(--ink);}
+canvas{position:fixed;inset:0;top:88px;}
+#cap{position:fixed;left:14px;bottom:10px;z-index:5;background:#11150cdd;border:1px solid #3a4430;
+  border-radius:8px;padding:8px 14px;font-size:12px;color:var(--dim);max-width:560px;line-height:1.5;}
+#cap b{color:var(--amber);}
+</style></head><body>
+<div id="bar">
+  <h1>⚙ RAILHEAD — VISUAL MOCKUP</h1>
+  <p>How the forward-depot system could look as <b style="color:#d8d4c0">background art</b>, not another counter.
+     Same map and palette as the game. Click to compare three styles — pick the one with the clutter level you like.</p>
+  <div class="btns">
+    <button id="b0" class="on">A · Rail line + sleepers</button>
+    <button id="b1">B · Supply glow</button>
+    <button id="b2">C · Minimal depots</button>
+    <span class="leg">⛽ <b>red ring</b> = spearhead beyond the railhead (cut off) · <b>gold ◆</b> = live depot · <b>hollow ◇</b> = captured, not yet railed</span>
+  </div>
+</div>
+<canvas id="c"></canvas>
+<div id="cap"></div>
+<script>
+const MAP=["~~~~~~~~~~ffff~~~~~~~~fff....fffffffffffffffffffffffffffffff","~~~~~~~~~~~~~~~~~~~~~~...~~~~fffffffffffffffffffffffffffffff","~~~~~~~~~~~~~~~~~~~~~~..~~~~~fffff.....fffffffffffffffffffff","~~~~~~~~~~~ffff..........~~~~.................ffffffffffffff","~~~~~~~~~~fffff..fff.sss...........................fffffffff","~~~~~~~~~~~.fff~~fffssss.......r...............fffffffffffff","~~~~~~~~~~..frf~~fff..ffff.hhhh.r.......ffff...fffffffffffff","~~~~~~~~~.....r..ffff.ffffhhhhhh.rrfff..ffffffffffffffffffff","...............rfffff.ffffffffff...ffff.fffffffffff.....ffff","............ffffrrfff.fffffffffffff.f...fff.fff.............","............ffffffrrr........ffffff.....fff..fff............","............fffffff.fffr............ffff..ffffff............","................fff..ffr...........ffff...ffffff............","......................r.....ffffff........fff...............","......................r....fffffff...................r......","............sssssss..r......ffff.....................r......","..........sssssssssssr..f...........................r.......",".........sssssssssssrs...f..........................r.......",".........sssssssssssrs...................r...........r......","..........ssssssssssr...................r............r......","............sssssssr...f...............r..............r.....","..................r....................r..............r.....","..h...............r...............r.....r............r......","hhhh...............r...............r.....r...........r......","hhhhhhr.............r.............hhr.....r.........r.......","hhhhhhhr..............r.r............r.....r........r.......","hhhhhh..r................r............r...r........r........","hhhhhh...r..............r..............rr.r.........r.......","hhhh.r....rr...........r.....~~~~~~~.................r...~~~",".....r....~~r~~.......r~.~~~~~~~~~~~~.................r..~~~","......r.~~~~~~~~~~~~~~......~~~~~~~~~~~................r.~~~",".......r~~~~~~~~~~~~~~......~~~~~~~~~~~................~~~~~","......~~~~~~~~~~~~~~~~~....~~~~~~~~~~~~.....hhhhhhhhh..~~~~~","......~~~~~~~~~~~~~~~~~....~~~~~~~~~~~~.hhhhhhhhhhhhhhh~~~~~","......~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.hhhhhhhhhhhhhhh~~~~~","......~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.hhhhhhhhhhhhhhh~~~~~"];
+const CITIES=[{"x":4,"y":8,"name":"Königsberg","vp":0,"owner":"G"},{"x":3,"y":15,"name":"Warsaw","vp":0,"owner":"G"},{"x":9,"y":28,"name":"Jassy","vp":0,"owner":"G"},{"x":8,"y":17,"name":"Brest","vp":0,"owner":"S"},{"x":7,"y":22,"name":"Lvov","vp":1,"owner":"S"},{"x":12,"y":6,"name":"Riga","vp":1,"owner":"S"},{"x":13,"y":10,"name":"Vilnius","vp":0,"owner":"S"},{"x":17,"y":13,"name":"Minsk","vp":1,"owner":"S"},{"x":16,"y":7,"name":"Pskov","vp":0,"owner":"S"},{"x":21,"y":6,"name":"Novgorod","vp":1,"owner":"S"},{"x":23,"y":3,"name":"Leningrad","vp":3,"owner":"S"},{"x":21,"y":10,"name":"Vitebsk","vp":1,"owner":"S"},{"x":22,"y":15,"name":"Mogilev","vp":0,"owner":"S"},{"x":26,"y":11,"name":"Smolensk","vp":2,"owner":"S"},{"x":33,"y":8,"name":"Kalinin","vp":1,"owner":"S"},{"x":37,"y":10,"name":"Moscow","vp":5,"owner":"S"},{"x":37,"y":13,"name":"Tula","vp":1,"owner":"S"},{"x":33,"y":15,"name":"Orel","vp":1,"owner":"S"},{"x":30,"y":16,"name":"Bryansk","vp":0,"owner":"S"},{"x":35,"y":18,"name":"Kursk","vp":1,"owner":"S"},{"x":41,"y":17,"name":"Voronezh","vp":1,"owner":"S"},{"x":19,"y":21,"name":"Kiev","vp":3,"owner":"S"},{"x":33,"y":21,"name":"Kharkov","vp":2,"owner":"S"},{"x":27,"y":25,"name":"Dnepropetrovsk","vp":1,"owner":"S"},{"x":33,"y":25,"name":"Stalino","vp":1,"owner":"S"},{"x":16,"y":29,"name":"Odessa","vp":1,"owner":"S"},{"x":24,"y":33,"name":"Sevastopol","vp":1,"owner":"S"},{"x":43,"y":28,"name":"Rostov","vp":2,"owner":"S"},{"x":52,"y":26,"name":"Stalingrad","vp":3,"owner":"S"},{"x":45,"y":6,"name":"Gorky","vp":1,"owner":"S"},{"x":50,"y":12,"name":"Penza","vp":0,"owner":"S"},{"x":48,"y":21,"name":"Saratov","vp":1,"owner":"S"}];
+const COLS=MAP[0].length, ROWS=MAP.length;
+const TC={'.':'#4a5234','f':'#33422a','h':'#56503a','s':'#3c4a42','r':'#33505e','~':'#1d2c38'};
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+let S,HX,VY,M=26,OFX,OFY;
+function fit(){
+  cv.width=innerWidth; cv.height=innerHeight-88;
+  S=Math.min((cv.width-2*M)/(Math.sqrt(3)*(COLS+0.6)), (cv.height-2*M)/(1.5*(ROWS-1)+2));
+  HX=Math.sqrt(3)*S; VY=1.5*S;
+  const w=HX*(COLS+0.5), h=VY*(ROWS-1)+2*S;
+  OFX=(cv.width-w)/2; OFY=(cv.height-h)/2+S;
+}
+function ctr(x,y){ return [OFX+HX*(x+0.5*(y&1)), OFY+VY*y]; }
+function hexPath(cx,cy){
+  ctx.beginPath();
+  for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-90);const px=cx+S*Math.cos(a),py=cy+S*Math.sin(a);i?ctx.lineTo(px,py):ctx.moveTo(px,py);}
+  ctx.closePath();
+}
+const at=(x,y)=>MAP[y][x];
+const cityAt=(x,y)=>CITIES.find(c=>c.x===x&&c.y===y);
+
+/* --- illustrative mid-campaign state (turn ~6) --- */
+// railhead frontier: how far west->east rail has reached, per row band (in hex x)
+function frontX(y){ if(y<=8)return 13; if(y<=18)return 18; if(y<=24)return 15; return 12; }
+function railedHex(x,y){ return at(x,y)!=='~' && x<=frontX(y); }   // behind the railhead
+function controlledHex(x,y){ return at(x,y)!=='~' && x<=frontX(y)+8; } // German-held (ahead of rail)
+const railedCityNames=['Königsberg','Warsaw','Brest','Lvov','Riga','Vilnius','Minsk','Pskov'];
+function isRailedCity(c){ return railedCityNames.includes(c.name); }
+function isTakenCity(c){ return controlledHex(c.x,c.y) && (c.owner==='S'||true) && c.x<=frontX(c.y)+7 && ['Königsberg','Warsaw','Brest','Lvov','Riga','Vilnius','Minsk','Pskov','Vitebsk','Mogilev','Smolensk','Novgorod'].includes(c.name); }
+// units: supplied (behind rail) + a spearhead beyond it
+const UNITS=[
+  {x:16,y:13,side:'G',sym:'inf'}, {x:12,y:6,side:'G',sym:'inf'},
+  {x:11,y:16,side:'G',sym:'inf'}, {x:17,y:12,side:'G',sym:'arm'},
+  {x:24,y:11,side:'G',sym:'arm',oos:true}, {x:26,y:13,side:'G',sym:'arm',oos:true},
+  {x:30,y:10,side:'S',sym:'inf'}, {x:33,y:21,side:'S',sym:'inf'}, {x:23,y:3,side:'S',sym:'inf'},
+];
+// the rail trunk + branch, as hex paths
+const TRUNK=[[0,15],[2,15],[3,15],[5,16],[8,17],[11,16],[14,14],[16,13],[17,13],[18,12]];
+const BRANCH=[[3,15],[5,13],[8,11],[10,9],[12,7],[12,6]];
+const BUILDING=[[18,12],[20,11],[22,11],[24,11]]; // under-construction dashed segment to the spearhead
+
+let STYLE=0;
+const CAPS=[
+  '<b>Style A — Rail line + sleepers.</b> A railroad line (ties drawn on) runs from your home edge through the captured cities to the railhead terminus ◆. Behind it, a faint warm wash marks the supplied zone. The dashed segment is track still being laid. The panzers beyond it glow red — out of supply until the rail catches up. Most thematic, a little more ink.',
+  '<b>Style B — Supply glow.</b> No line at all — instead a soft warm glow pools around live depots and fades to nothing at the railhead. Captured-but-unrailed cities sit dim. Cleanest \'feel\', reads as \'warmth = supply\', but the railhead edge is softer / less exact.',
+  '<b>Style C — Minimal depots.</b> Almost nothing added: just a small gold ◆ on each live depot and a single terminus marker at the railhead. No line, no tint. Lowest clutter — but the supplied zone is implied, not shown.',
+];
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // terrain
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const[cx,cy]=ctr(x,y); hexPath(cx,cy);
+    ctx.fillStyle=TC[at(x,y)]||'#4a5234'; ctx.fill();
+    ctx.strokeStyle='#0d0f0c55'; ctx.lineWidth=0.5; ctx.stroke();
+  }
+  // ===== supplied-zone wash (A & B) =====
+  if(STYLE===0){
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      if(!railedHex(x,y))continue;
+      const[cx,cy]=ctr(x,y); hexPath(cx,cy);
+      const edge=(frontX(y)-x); const a=Math.max(0.05,Math.min(0.22,0.06+edge*0.02));
+      ctx.fillStyle='rgba(232,179,75,'+a+')'; ctx.fill();
+    }
+  }
+  if(STYLE===1){
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    for(const c of CITIES){ if(!isRailedCity(c))continue;
+      const[cx,cy]=ctr(c.x,c.y);
+      const g=ctx.createRadialGradient(cx,cy,2,cx,cy,HX*4.2);
+      g.addColorStop(0,'rgba(232,179,75,0.30)'); g.addColorStop(1,'rgba(232,179,75,0)');
+      ctx.fillStyle=g; ctx.fillRect(cx-HX*4.2,cy-HX*4.2,HX*8.4,HX*8.4);
+    }
+    ctx.restore();
+  }
+  // ===== rail line + sleepers (A) =====
+  function railLine(pts,dashed){
+    if(pts.length<2)return;
+    ctx.lineWidth=2.4; ctx.strokeStyle=dashed?'#6b5a3a':'#b9a06a';
+    if(dashed)ctx.setLineDash([4,4]); else ctx.setLineDash([]);
+    ctx.beginPath();
+    pts.forEach((p,i)=>{const[cx,cy]=ctr(p[0],p[1]);i?ctx.lineTo(cx,cy):ctx.moveTo(cx,cy);});
+    ctx.stroke(); ctx.setLineDash([]);
+    if(dashed)return;
+    // sleepers: short perpendicular ticks
+    for(let i=0;i<pts.length-1;i++){
+      const[ax,ay]=ctr(pts[i][0],pts[i][1]), [bx,by]=ctr(pts[i+1][0],pts[i+1][1]);
+      const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy),nx=-dy/len,ny=dx/len,n=Math.max(2,len/7);
+      for(let s=0;s<=n;s++){const t=s/n,px=ax+dx*t,py=ay+dy*t;
+        ctx.beginPath();ctx.moveTo(px-nx*4,py-ny*4);ctx.lineTo(px+nx*4,py+ny*4);
+        ctx.strokeStyle='#cdb784';ctx.lineWidth=1.4;ctx.stroke();}
+    }
+  }
+  if(STYLE===0){ railLine(TRUNK,false); railLine(BRANCH,false); railLine(BUILDING,true);
+    // terminus marker
+    const[tx,ty]=ctr(18,12); ctx.fillStyle='#ffd98a';
+    ctx.save();ctx.translate(tx,ty);ctx.rotate(Math.PI/4);ctx.fillRect(-4,-4,8,8);ctx.restore();
+  }
+  // ===== cities =====
+  for(const c of CITIES){
+    const[cx,cy]=ctr(c.x,c.y);
+    const taken=isTakenCity(c), railed=railedCityNames.includes(c.name);
+    // city dot
+    ctx.beginPath();ctx.arc(cx,cy,c.vp>=3?4.5:c.vp>=1?3.4:2.6,0,7);
+    ctx.fillStyle=c.vp>=3?'#e0c060':'#bfb89a';ctx.fill();
+    ctx.lineWidth=1;ctx.strokeStyle='#000a';ctx.stroke();
+    // depot glyph
+    if(STYLE===2){
+      if(railed){ctx.fillStyle='#ffd98a';ctx.save();ctx.translate(cx+7,cy-7);ctx.rotate(Math.PI/4);ctx.fillRect(-3,-3,6,6);ctx.restore();}
+      else if(taken){ctx.strokeStyle='#8d8a76';ctx.lineWidth=1.2;ctx.save();ctx.translate(cx+7,cy-7);ctx.rotate(Math.PI/4);ctx.strokeRect(-3,-3,6,6);ctx.restore();}
+    } else {
+      if(railed){ctx.fillStyle='#ffd98a';ctx.save();ctx.translate(cx,cy-9);ctx.rotate(Math.PI/4);ctx.fillRect(-2.6,-2.6,5.2,5.2);ctx.restore();}
+      else if(taken){ctx.strokeStyle='#cdbf90';ctx.lineWidth=1.1;ctx.save();ctx.translate(cx,cy-9);ctx.rotate(Math.PI/4);ctx.strokeRect(-2.6,-2.6,5.2,5.2);ctx.restore();}
+    }
+    if(c.vp>=2){ctx.fillStyle='#cfcab0';ctx.font='9px Segoe UI';ctx.textAlign='center';ctx.fillText(c.name,cx,cy+14);}
+  }
+  // ===== units =====
+  for(const u of UNITS){
+    const[cx,cy]=ctr(u.x,u.y); const w=HX*0.78,h=VY*0.62;
+    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(cx-w/2+1.5,cy-h/2+2,w,h);
+    ctx.fillStyle=u.side==='G'?'#454d58':'#9c2e22';ctx.fillRect(cx-w/2,cy-h/2,w,h);
+    ctx.strokeStyle=u.oos?'#ff5340':'#000b';ctx.lineWidth=u.oos?2.2:1;ctx.strokeRect(cx-w/2,cy-h/2,w,h);
+    ctx.strokeStyle='#e9e5d2';ctx.lineWidth=1.1;
+    const bw=w*0.5,bh=h*0.52;ctx.strokeRect(cx-bw/2,cy-bh/2,bw,bh);
+    if(u.sym==='inf'){ctx.beginPath();ctx.moveTo(cx-bw/2,cy-bh/2);ctx.lineTo(cx+bw/2,cy+bh/2);ctx.moveTo(cx+bw/2,cy-bh/2);ctx.lineTo(cx-bw/2,cy+bh/2);ctx.stroke();}
+    else{ctx.beginPath();ctx.ellipse(cx,cy,bw*0.34,bh*0.3,0,0,7);ctx.stroke();}
+    if(u.oos){ctx.fillStyle='#ff5340';ctx.font='700 11px Segoe UI';ctx.textAlign='center';ctx.fillText('⚠',cx+w/2-3,cy-h/2+9);}
+  }
+  document.getElementById('cap').innerHTML=CAPS[STYLE];
+}
+function setStyle(s){STYLE=s;for(let i=0;i<3;i++)document.getElementById('b'+i).classList.toggle('on',i===s);draw();}
+document.getElementById('b0').onclick=()=>setStyle(0);
+document.getElementById('b1').onclick=()=>setStyle(1);
+document.getElementById('b2').onclick=()=>setStyle(2);
+addEventListener('resize',()=>{fit();draw();});
+fit();draw();
+</script></body></html>
