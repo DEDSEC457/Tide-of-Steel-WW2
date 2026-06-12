@@ -621,6 +621,7 @@ function uiSmoke(side){
   const $ = id => sb.document.getElementById(id);
   const drain = ()=>{ let g=0; while (q.length && g++<2e5){ q.shift()(); } };
   drain();                                   // render loop frames
+  if ($('mc-arcade').onclick) $('mc-arcade').onclick();   // mode select → arcade
   if (side==='S') $('pick-sov').onclick();
   $('btn-start').onclick(); drain();         // begin campaign (AI opens if player is S)
   const UI = sb.module.exports;
@@ -650,7 +651,20 @@ function uiSmoke(side){
   if ($('btn-mute').onclick){ $('btn-mute').onclick(); $('btn-mute').onclick(); }
   if ($('btn-settings-close').onclick) $('btn-settings-close').onclick();
   drain();
-  return {over: UI.getState().over, result: UI.getState().result, uiErrors};
+  const arcadeOver = UI.getState().over, arcadeResult = UI.getState().result;
+  // realistic-mode routing: mode select → preview screen → launch → one enemy phase
+  let realisticOk = true;
+  if ($('mc-realistic').onclick && $('btn-play-realistic').onclick){
+    $('mc-realistic').onclick();
+    if ($('rm-pick-sov').onclick) $('rm-pick-sov').onclick();
+    if ($('rm-pick-ger').onclick) $('rm-pick-ger').onclick();
+    if ($('btn-back-realistic').onclick) $('btn-back-realistic').onclick();
+    $('mc-realistic').onclick();
+    $('btn-play-realistic').onclick(); drain();
+    realisticOk = UI.getState().scenario === 'realistic';
+    $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
+  }
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors};
 }
 for (const side of ['G','S']){
   try {
@@ -658,6 +672,7 @@ for (const side of ['G','S']){
     check(`UI campaign as ${side==='G'?'Germany':'Soviets'} reaches an ending`,
       r.over && r.uiErrors===0,
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
+    check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
   } catch(err){
     failures++;
     console.log(`  FAIL UI smoke (${side}) — ${err.message}`);
