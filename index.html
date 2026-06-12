@@ -769,6 +769,7 @@ SCENARIOS.winter41 = {
      stays supplied as long as the city itself holds */
   supplySeeds: {S: [[14,1]]},
   gerAI: 'defend',                  // the Westheer is on the back foot all winter — dig in
+  sovAI: 'attack',                  // Zhukov's counteroffensive — Soviets push forward
   /* no winterQuestion: it is December, and the gamble has already been lost */
   events: [
     {turn:1,  date:'5 December 1941',  title:'THE SLEDGEHAMMER FALLS', pp:{S:2},
@@ -2529,7 +2530,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   // through the gap. Suppressed on the defensive so we don't over-extend.
   if (isArm && offensive && adjEnemy===0){
     const here = df.get(keyOf(u.x,u.y)) ?? 60, there = df.get(keyOf(x,y)) ?? 60;
-    if (there < here - 1) s += 2 + Math.min(3, (here-there)*0.3);   // open road forward
+    if (there < here - 1) s += 3 + Math.min(5, (here-there)*0.5);   // pour through the gap
   }
   // closing with a weak enemy is good — unless you're a carrier (stand off!)
   for (const [nx,ny] of neighbors(x,y)){
@@ -2556,8 +2557,39 @@ function cutoffValue(u, x, y){
   return cut;
 }
 
+/* ---- combined assault planner (shared by both sides) ----
+   When 2+ friendly units are already in range of the same enemy, coordinate a
+   pile-on. Returns the best {type:'combined', ...} action or null. */
+function aiBestCombinedAssault(side){
+  const foe = enemyOf(side);
+  const wx  = weatherFor(G.turn);
+  let bestAction=null, bestScore=-1e9;
+  for (const def of unitsOf(foe)){
+    const ready = unitsOf(side).filter(u =>
+      !u.attacked && !KINDS[u.kind].hq &&
+      hexDist(u.x, u.y, def.x, def.y) <= attackRange(u));
+    if (ready.length < 2) continue;
+    ready.sort((a,b) => combatPower(b,def).A - combatPower(a,def).A);
+    const lead    = ready[0];
+    const helpers = ready.slice(1, 4);
+    const pGroup  = previewGroup([lead, ...helpers], def);
+    const pSingle = previewCombat(lead, def);
+    const minR = wx==='snow' ? 1.1 : wx==='mud' ? 1.0 : 0.85;
+    if (pGroup.ratio < minR) continue;
+    // Only bother if combined is noticeably better than going alone
+    if (pGroup.ratio < pSingle.ratio * 1.06 && helpers.length < 2) continue;
+    const wouldKill = pGroup.defLoss >= def.str;
+    const score = pGroup.ratio*2 + (wouldKill?5:0) + (pGroup.combinedArms?2:0) + helpers.length;
+    if (score > bestScore){ bestScore=score; bestAction={type:'combined', lead:lead.id, helpers:helpers.map(h=>h.id), d:def.id}; }
+  }
+  return bestAction;
+}
+
 function aiPlanGerman(){
   aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
+  // mass on a single target when multiple German units are already in range
+  const combo = aiBestCombinedAssault('G');
+  if (combo) return combo;
   const fastK = k => (KINDS[k].sym==='arm' || KINDS[k].fast) ? 0 : 1;
   const order = unitsOf('G').slice().sort((a,b)=> fastK(a.kind) - fastK(b.kind) || a.id-b.id);
   for (const u of order){
@@ -2646,14 +2678,29 @@ function sovScoreHex(u, x, y, df, myNet){
   return s;
 }
 
+/* Soviet offensive target picker (used in winter41 and any sovAI:'attack' scenario) */
+function sovPickOffensiveTarget(u){
+  let best=null, bestW=-1e9;
+  for (const c of G.cities){
+    if (c.owner!=='G' || c.vp===0) continue;
+    const w = c.vp*4 - hexDist(u.x,u.y,c.x,c.y)*0.8 - enemyStrengthAt('S',c.x,c.y)*0.3;
+    if (w > bestW){ bestW=w; best=c; }
+  }
+  return best || sovPickCity(u);
+}
+
 function aiPlanSoviet(){
+  // mass on a single target when multiple Soviet units are already in range
+  const combo = aiBestCombinedAssault('S');
+  if (combo) return combo;
   const wx = weatherFor(G.turn);
+  const sovOffensive = SCN.sovAI === 'attack';
   for (const u of unitsOf('S')){
     if (u.attacked) continue;
     if (KINDS[u.kind].hq) return aiPlanHQ(u);
     const adj = adjacentEnemies(u);
-    // 1. fight: cautious normally, bold in the snow
-    const minR = wx==='snow' ? 0.95 : 1.5;
+    // 1. fight: cautious normally, bold in snow or when on the offensive
+    const minR = wx==='snow' ? 0.9 : (sovOffensive ? 1.15 : 1.5);
     const tgt = bestAttack(u, minR);
     if (tgt) return {type:'attack', a:u.id, d:tgt.id};
     if (u.moved){ u.attacked = true; continue; }
@@ -2682,15 +2729,20 @@ function aiPlanSoviet(){
     if (near <= 2 && (effTerrain(u.x,u.y).def >= 1.15 || u.entrench >= 1) && adj.length < 3){
       return {type:'hold', u:u.id};
     }
-    // 4. reserves flow to the most threatened objective
-    const city = sovPickCity(u);
+    // 4. reserves flow to most threatened objective (or attack target on offensive)
+    const city = sovOffensive ? sovPickOffensiveTarget(u) : sovPickCity(u);
     const df = distField('S', city.x, city.y);
     const myNet = computeSupply('S');
-    const reach = reachable(u);
-    let best=[u.x,u.y], bestS = sovScoreHex(u,u.x,u.y,df,myNet) + (u.entrench>0?2:0);
-    for (const k of reach.keys()){
+    const reach2 = reachable(u);
+    let best=[u.x,u.y], bestS = sovScoreHex(u,u.x,u.y,df,myNet) + (u.entrench>0?2:0) + (sovOffensive?0:-0.5);
+    for (const k of reach2.keys()){
       const [x,y] = k.split(',').map(Number);
-      const s = sovScoreHex(u,x,y,df,myNet);
+      let s = sovScoreHex(u,x,y,df,myNet);
+      // offensive: closing with a weak enemy is extra valuable (mirrors German exploitation)
+      if (sovOffensive) for (const [nx,ny] of neighbors(x,y)){
+        const t = unitAt(nx,ny);
+        if (t && t.side==='G' && t.str <= 5) s += 1.5;
+      }
       if (s > bestS){ bestS=s; best=[x,y]; }
     }
     if (best[0]!==u.x || best[1]!==u.y) return {type:'move', u:u.id, x:best[0], y:best[1]};
@@ -2717,7 +2769,13 @@ function applyAction(a){
   }
   if (a.type==='attack'){
     const att = G.units.find(t=>t.id===a.a), def = G.units.find(t=>t.id===a.d);
-    if (att && def){ const ev = resolveCombat(att,def); return {type:'attack', att, def, ev}; }
+    if (att && def){ const ev = resolveCombat(att,def); clearAICache(); return {type:'attack', att, def, ev}; }
+    return {type:'hold'};
+  }
+  if (a.type==='combined'){
+    const lead = G.units.find(t=>t.id===a.lead), def = G.units.find(t=>t.id===a.d);
+    const helpers = (a.helpers||[]).map(id=>G.units.find(t=>t.id===id)).filter(Boolean);
+    if (lead && def){ const ev = resolveCombat(lead, def, helpers); clearAICache(); return {type:'attack', att:lead, def, ev}; }
     return {type:'hold'};
   }
   return null;
