@@ -397,6 +397,39 @@ for (let run=0; run<RUNS; run++){
 }
 function MAXPHASES(){ return 28*2 + 10; }
 
+/* ---------------- every other scenario must play to completion too ---------------- */
+console.log('— scenario campaigns —');
+for (const id of Object.keys(E.SCENARIOS)){
+  if (id === 'barbarossa') continue;                  // covered by the main sims above
+  const res = {};
+  let bad = 0;
+  for (let i=0;i<3;i++){
+    try {
+      E.newGame('G','normal','hotseat', id);
+      const G = E.getState();
+      const cap = E.SCENARIOS[id].maxTurn*2 + 10;
+      let phases = 0;
+      while (!G.over && phases++ < cap){
+        E.aiFullPhase(G.phase);
+        const pos = new Set();
+        for (const u of G.units){
+          if (!E.passable(u.x,u.y)) throw new Error(`${u.name} on impassable hex ${u.x},${u.y}`);
+          const k = u.x+','+u.y;
+          if (pos.has(k)) throw new Error(`stacked units at ${k}`);
+          pos.add(k);
+          if (u.str < 1) throw new Error(`${u.name} has str ${u.str}`);
+        }
+        if (!G.over) E.endPhase();
+      }
+      const r = G.result ? G.result.title : 'TIMEOUT';
+      res[r] = (res[r]||0)+1;
+    } catch(err){ bad++; res['CRASH: '+err.message] = (res['CRASH: '+err.message]||0)+1; }
+  }
+  console.log(`  [${id}] ${JSON.stringify(res)} — axis VP ${E.axisVP()}`);
+  check(`[${id}] campaigns complete without crashes`, bad===0);
+}
+E.loadScenario('barbarossa');                          // restore the default
+
 /* ---------------- UI smoke test (fake DOM) ---------------- */
 console.log('— UI smoke test —');
 function uiSmoke(side){
