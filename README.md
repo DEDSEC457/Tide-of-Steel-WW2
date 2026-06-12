@@ -58,9 +58,14 @@ The whole game is one file (`index.html`) that runs in any browser:
   through breakthroughs to exploit a broken front, and reads its posture: it
   drives hard when it has the initiative and digs in when winter turns against it.
 
-**Controls:** click a unit → move/attack · `N` next unit · `E` end turn · `U` undo last move ·
-`S` supply view · `Esc` deselect · drag to pan · scroll to zoom · click the weather chip for
-the campaign clock.
+**Controls:** click a unit → move/attack · **shift-click** several units → combined assault ·
+`N` next unit · `E` end turn · `U` undo last move · `S` supply view · `Esc` deselect ·
+drag to pan · scroll to zoom · click the weather chip for the campaign clock.
+
+**Command depth:** units gain **experience** (Veteran → Hardened → Elite, +5/+10/+15%) as they
+fight; **combined-arms** assaults (shift-click) hit far harder than piecemeal attacks, especially
+tanks + infantry together, and you pick who exploits the breakthrough; **HQs** project a command
+aura (+5% combat, +1 movement) to nearby units.
 
 **Quality of life:** one-step undo, supply-network overlay, campaign weather clock,
 AI turn-speed toggle (normal/fast/instant), "units still ready" end-turn warning,

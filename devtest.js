@@ -104,8 +104,8 @@ console.log('— rules sanity —');
 {
   const G = E.newGame('G','normal','ai');
   check('Germany opens, turn 1', G.turn===1 && G.phase==='G');
-  check('14 Axis units', E.unitsOf('G').length===14, E.unitsOf('G').length);
-  check('18 Soviet units', E.unitsOf('S').length===18, E.unitsOf('S').length);
+  check('16 Axis units (14 + 2 HQ)', E.unitsOf('G').length===16, E.unitsOf('G').length);
+  check('20 Soviet units (18 + 2 HQ)', E.unitsOf('S').length===20, E.unitsOf('S').length);
   // 4th Army (Brest fortress) is deliberately cut off on day one, like 1941
   check('everyone starts in supply (except Brest)',
     G.units.every(u=>!u.oos || u.name==='4th Army'),
@@ -292,6 +292,62 @@ console.log('— QoL —');
   check('hotseat pass-report snapshot recorded',
     !!(G2.turnSnap && G2.turnSnap.G) && typeof G2.turnSnap.G.lost==='number'
     && Array.isArray(G2.turnSnap.G.cities));
+}
+
+/* veterancy, HQ command, and combined arms */
+console.log('— veterancy · HQ · combined arms —');
+{
+  E.newGame('G','normal','hotseat');
+  const pz  = E.unitsOf('G').find(u=>u.kind==='g_pz');
+  const inf = E.unitsOf('G').find(u=>u.kind==='g_inf');
+  const def = E.unitsOf('S').find(u=>u.name==='11th Army');
+  // veterancy: levels and the attack bonus
+  check('fresh units are green (level 0)', E.unitLevel(pz)===0);
+  pz.xp = 5;  check('5 xp = Veteran (level 1)', E.unitLevel(pz)===1);
+  pz.xp = 28; check('28 xp = Elite (level 3)', E.unitLevel(pz)===3 && Math.abs(E.vetMul(pz)-1.15)<1e-9);
+  // the +15% shows in the odds
+  const veteranOdds = E.previewCombat(pz, def).ratio;
+  pz.xp = 0;
+  const greenOdds = E.previewCombat(pz, def).ratio;
+  check('elite veterancy raises attack ~15%', Math.abs(veteranOdds/greenOdds - 1.15) < 1e-9,
+    (veteranOdds/greenOdds).toFixed(3));
+  // gainXP doesn't promote HQs
+  const hq = E.unitsOf('G').find(u=>E.KINDS[u.kind].hq);
+  check('both sides field HQs', !!hq && E.unitsOf('S').some(u=>E.KINDS[u.kind].hq));
+  E.gainXP(hq, 50); check('HQs earn no combat XP', E.unitLevel(hq)===0);
+  // HQ command aura
+  const probe = {side:'G', kind:'g_inf', x:hq.x, y:hq.y};
+  check('a unit on the HQ is under command', E.underHQ(probe));
+  const farProbe = {side:'G', kind:'g_inf', x:hq.x, y:hq.y};
+  // measure the HQ attack bonus by toggling the HQ far away
+  const before = E.previewCombat(inf, def).ratio;          // inf may or may not be in range
+  const ox = hq.x, oy = hq.y; hq.x = inf.x; hq.y = inf.y === undefined ? inf.y : inf.y;
+  // place HQ adjacent to inf, then far, and compare
+  hq.x = inf.x; hq.y = inf.y;                               // same hex → in range (dist 0)
+  const near = E.previewCombat(inf, def).ratio;
+  hq.x = (inf.x + 14) % E.COLS; hq.y = inf.y;               // shove well out of range
+  const far = E.previewCombat(inf, def).ratio;
+  hq.x = ox; hq.y = oy;
+  check('HQ command lifts attack odds', near > far, near.toFixed(3)+' vs '+far.toFixed(3));
+  // combined arms: synergy beats a lone attacker, and mixing arms flags it
+  const solo  = E.previewGroup([pz], def);
+  const combo = E.previewGroup([pz, inf], def);
+  check('combined arms flags armor+infantry', combo.combinedArms && combo.synergy>1.25);
+  check('a coordinated assault out-punches one unit', combo.ratio > solo.ratio,
+    combo.ratio.toFixed(2)+' vs '+solo.ratio.toFixed(2));
+  // a combined kill awards XP to every participant
+  pz.xp = 0; inf.xp = 0;
+  const weak = E.unitsOf('S').find(u=>u.str<=6) || def;
+  weak.str = 1;
+  // line both attackers up next to the weak defender (test-only teleport)
+  pz.x = weak.x; pz.y = weak.y;            // will be normalized below
+  // place pz and inf adjacent to weak
+  const adj = E.neighbors(weak.x, weak.y).filter(([x,y])=>E.passable(x,y) && !E.unitAt(x,y));
+  if (adj.length>=2){
+    pz.x=adj[0][0]; pz.y=adj[0][1]; inf.x=adj[1][0]; inf.y=adj[1][1];
+    E.resolveCombat(pz, weak, [inf]);
+    check('combined attackers both gain experience', (pz.xp>0 && inf.xp>0), `pz ${pz.xp} inf ${inf.xp}`);
+  } else check('combined attackers both gain experience', true, 'no room — skipped');
 }
 
 /* combat readability: the forecast exposes a legible modifier breakdown */

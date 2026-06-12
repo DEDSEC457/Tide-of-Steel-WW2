@@ -245,6 +245,16 @@
           general show a gold star; the unit panel and battle forecast show the effect. A general
           is <b>lost with his unit</b>. From early October, <b>Zhukov</b> takes over the Moscow
           defense: Soviet units near the capital defend better while it holds.</li>
+      <li><b>✚ Experience.</b> Units harden as they fight — <b>Veteran</b>, <b>Hardened</b>, <b>Elite</b>
+          (gold chevrons on the counter) for +5/+10/+15% to attack and defense. Veterancy survives
+          reinforcement, so keep your best formations alive.</li>
+      <li><b>⚔ Combined arms.</b> <b>Shift-click</b> several of your units, then click one adjacent
+          enemy to assault it together — far more punch than attacking one at a time, and a tank +
+          infantry mix lands a bonus on top. If the enemy breaks, <b>you choose which unit advances</b>
+          into the empty hex.</li>
+      <li><b>⌂ Headquarters.</b> Each side fields HQs (a command pennant). Friendly units within
+          <b>5 hexes</b> of an HQ get +5% attack/defense and <b>+1 movement</b>. HQs can't take ground
+          and are weak in a fight — keep them just behind the line, where their command reaches the front.</li>
       <li><b>📰 History unfolds.</b> Real dispatches from 1941 appear as the weeks pass — a few
           carry production bonuses. In mid-August the German side faces the <b>winter question</b>:
           divert 10 ⚙ to winter equipment, or gamble that the war ends first. Gear mostly saves
@@ -484,6 +494,9 @@ SCENARIOS.barbarossa = {
   ['s_tank','1st Mech Corps', 7,5, 7], ['s_tank','4th Mech Corps', 7,11,7],
   // — Reserve —
   ['s_inf','16th Army', 19,5, 7], ['s_inf','24th Army', 24,4, 8],
+  // — headquarters (command auras; keep them safe) —
+  ['g_hq','OKH Mitte', 1,5, 6], ['g_hq','OKH Süd', 1,12, 6],
+  ['s_hq','STAVKA', 27,4, 6], ['s_hq','Southwest Front HQ', 26,11, 6],
   ],
   /* Soviet mobilization: extra units per turn [turn, kind, name]. */
   sovSchedule: [
@@ -718,6 +731,8 @@ SCENARIOS.winter41 = {
     ['s_inf','13th Army',  24,11,6], ['s_inf','40th Army',  26,10,6],
     ['s_inf','21st Army',  24,13,6], ['s_inf','37th Army',  24,14,6],
     ['s_inf','9th Army',   22,15,6], ['s_inf','56th Army',  25,16,7],
+    ['g_hq','Heeresgruppe Mitte HQ', 14,3, 6], ['g_hq','Heeresgruppe Süd HQ', 19,13, 6],
+    ['s_hq','Western Front HQ', 26,4, 6], ['s_hq','Southern Front HQ', 26,15, 6],
   ],
   sovSchedule: [
     [2,'s_inf','39th Army'], [3,'s_guard','2nd Siberian Gds'],
@@ -896,6 +911,8 @@ SCENARIOS.stalingrad = {
     ['s_tank','1st Tank Army', 13,7, 7], ['s_tank','4th Tank Army', 16,8, 7],
     ['s_inf','62nd Army', 19,9, 7],  ['s_inf','64th Army',  17,10, 7],
     ['s_inf','51st Army', 14,13, 6],
+    ['g_hq','Heeresgruppe B HQ', 1,2, 6], ['g_hq','Heeresgruppe A HQ', 1,12, 6],
+    ['s_hq','Stalingrad Front HQ', 29,8, 6], ['s_hq','Don Front HQ', 28,2, 6],
   ],
   sovSchedule: [
     [3,'s_inf','63rd Army'], [4,'s_inf','60th Army'],
@@ -1020,6 +1037,8 @@ SCENARIOS.dday = {
     s_tank: {side:'S', label:'Panzer-Korps',        atk:7, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
     s_guard:{side:'S', label:'Waffen-SS Korps',     atk:6, def:6, mp:4, maxStr:10, cost:16, sym:'inf', color:'#3a3a3a'},
     s_mil:  {side:'S', label:'Static Division',     atk:2, def:4, mp:1, maxStr:6,  cost:4,  sym:'inf', color:'#5a5244'},
+    g_hq:   {side:'G', label:'Army Group HQ',       atk:1, def:4, mp:4, maxStr:6,  cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#3f5d40'},
+    s_hq:   {side:'S', label:'OB West HQ',          atk:1, def:4, mp:4, maxStr:6,  cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
   },
   deployNames: {g_inf:'US Follow-up Corps', g_pz:'US Armored (follow-up)',
                 s_inf:'Ersatz-Korps', s_tank:'Panzer Reserve', s_mil:'Alarm Units'},
@@ -1109,6 +1128,8 @@ SCENARIOS.dday = {
     ['s_inf','331. Infanterie',    25,8, 6], ['s_inf','15. Armee Detachment', 26,6, 7],
     ['s_inf','266. Infanterie',     4,11, 6], ['s_inf','275. Infanterie',  9,11, 6],
     ['s_inf','2. Fallschirmjäger',  2,13, 6], ['s_mil','Paris Garrison',  28,11, 5],
+    ['g_hq','21st Army Group HQ', 13,8, 6], ['g_hq','First US Army HQ', 10,7, 6],
+    ['s_hq','OB West HQ', 27,12, 6], ['s_hq','Panzergruppe West HQ', 22,11, 6],
   ],
   /* mixed schedule: German reserves race the Allied follow-up waves */
   sovSchedule: [
@@ -1416,6 +1437,8 @@ const DEFAULT_KINDS = {
   s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
   s_guard:{side:'S', label:'Guards Army',    atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true, color:'#b04a18'},
   s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#7a4a3a'},
+  g_hq:   {side:'G', label:'Army Group HQ',  atk:1, def:4, mp:4, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+  s_hq:   {side:'S', label:'Front HQ',       atk:1, def:4, mp:4, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6e2620'},
 };
 
 /* ---- current scenario: mutable mirrors the engine reads ---- */
@@ -1541,7 +1564,55 @@ function makeUnit(kind, name, x, y, str){
   const k = KINDS[kind];
   return { id: nextId++, kind, name, side:k.side, x, y,
            str: str ?? k.maxStr, entrench: 0, moved:false, attacked:false,
-           oos:false, oosTurns:0 };
+           oos:false, oosTurns:0, xp:0 };
+}
+
+/* ============================ VETERANCY & HQ ============================ */
+/* Units harden as they fight. Three ranks, +5%/+10%/+15% to attack AND
+   defense. Newly raised formations are green. */
+const XP_LEVELS = [5, 14, 28];                // xp for Veteran · Hardened · Elite — a long-game reward
+const RANK_NAME = ['Green','Veteran','Hardened','Elite'];
+function unitLevel(u){ const xp = u.xp||0; let l = 0; for (const t of XP_LEVELS) if (xp>=t) l++; return l; }
+function vetMul(u){ return 1 + 0.05*unitLevel(u); }
+function gainXP(u, n){
+  if (!u || KINDS[u.kind].hq) return;         // HQs direct, they don't brawl for XP
+  const before = unitLevel(u);
+  u.xp = (u.xp||0) + n;
+  const after = unitLevel(u);
+  if (after > before){
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is now ${RANK_NAME[after]} (rank ${after}).`);
+    if (typeof onLevelUp === 'function') onLevelUp(u);
+  }
+}
+
+/* Headquarters project a command aura: friendly units within HQ_RANGE get a
+   small attack/defense edge and +1 movement. HQs are fragile and can't take
+   ground — keep them safe behind the line. */
+const HQ_RANGE = 5, HQ_MUL = 1.05;
+function underHQ(u){
+  if (KINDS[u.kind].hq) return false;
+  return unitsOf(u.side).some(h => KINDS[h.kind].hq && hexDist(u.x,u.y,h.x,h.y) <= HQ_RANGE);
+}
+
+/* combined-arms forecast — shared by the UI and the engine. Each attacker
+   brings its own power; coordinating several adds synergy, and mixing armor
+   with infantry adds more (the real combined-arms punch). */
+function previewGroup(attackers, def){
+  const D = combatPower(attackers[0], def).D;
+  let A = 0, hasArm = false, hasInf = false;
+  for (const u of attackers){
+    A += combatPower(u, def).A;
+    const s = KINDS[u.kind].sym;
+    if (s==='arm') hasArm = true;
+    if (s==='inf' || s==='para') hasInf = true;
+  }
+  let synergy = 1;
+  if (attackers.length > 1){ synergy *= 1.10; if (hasArm && hasInf) synergy *= 1.15; }
+  A *= synergy;
+  const r = A/Math.max(D,0.1);
+  return { ratio:r, defLoss:Math.min(def.str, Math.round(1.9*r)),
+           atkLoss:Math.min(attackers.reduce((s,u)=>s+u.str,0), Math.round(1.7/Math.max(r,0.35))),
+           synergy, combinedArms:hasArm&&hasInf, count:attackers.length };
 }
 
 function newGame(playerSide, difficulty, mode, scenario){
@@ -1720,6 +1791,7 @@ function reachable(u){
   // felt boots keep the infantry marching; frozen engines stop the panzers regardless
   if (wx==='snow' && u.side==='G' && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
     mp = Math.max(1, mp-1);
+  if (underHQ(u)) mp += 1;                      // forward HQ keeps the formation moving
   const foeZOC = computeZOC(enemyOf(u.side));
   const occ = {};
   for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
@@ -1777,6 +1849,11 @@ function combatMods(att, def){
   if (ag && ag.atk) af('⭐ '+ag.name, ag.atk);
   if (dg && dg.def) df('⭐ '+dg.name, dg.def);
   if (zhukovDefends(def)) df('⭐ '+ (SCN.capitalDefense.city) +' defense', SCN.capitalDefense.def);
+  const al = unitLevel(att), dl = unitLevel(def);
+  if (al > 0) af('✚ '+RANK_NAME[al], 1+0.05*al);
+  if (dl > 0) df('✚ '+RANK_NAME[dl], 1+0.05*dl);
+  if (underHQ(att)) af('⌂ HQ command', HQ_MUL);
+  if (underHQ(def)) df('⌂ HQ command', HQ_MUL);
   if (terrainAt(att.x,att.y)==='r') af('Attacking across river', RIVER_ATK);
   if (att.oos) af('Attacker cut off', OOS_ATK);
   if (def.oos) df('Defender cut off', OOS_DEF);
@@ -1833,34 +1910,73 @@ function retreatHex(def, att){
   return best;
 }
 
-function resolveCombat(att, def){
-  const adjacentKill = hexDist(att.x,att.y,def.x,def.y) === 1;   // ranged kills can't be exploited
-  const {A,D} = combatPower(att,def);
+function advanceInto(u, fx, fy, events){
+  u.x = fx; u.y = fy;
+  const c = cityAt(fx,fy);
+  if (c && c.owner!==u.side && !KINDS[u.kind].noCapture){
+    c.owner = u.side;
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${u.name}!`);
+    if (typeof onCityTaken === 'function') onCityTaken(c);
+  }
+  events.advance = [fx,fy];
+}
+function resolveCombat(att, def, supports){
+  supports = (supports||[]).filter(s => s && s.id!==att.id && s.side===att.side);
+  const group = [att, ...supports];
+  const combined = supports.length > 0;
+  const adjacentKill = group.some(p => hexDist(p.x,p.y,def.x,def.y) === 1);  // ranged kills can't be exploited
+  // combined attack power: each attacker's own power, plus combined-arms synergy
+  const D = combatPower(att, def).D;
+  let A = 0, hasArm = false, hasInf = false;
+  for (const u of group){
+    A += combatPower(u, def).A;
+    const s = KINDS[u.kind].sym;
+    if (s==='arm') hasArm = true;
+    if (s==='inf' || s==='para') hasInf = true;
+  }
+  if (combined){ A *= 1.10; if (hasArm && hasInf) A *= 1.15; }
   const rnd = () => 0.75 + Math.random()*0.5;
   const r = (A*rnd())/(D*rnd());
   let defLoss = Math.min(def.str, Math.max(r>0.8?1:0, Math.round(1.9*r*(0.8+Math.random()*0.4))));
-  let atkLoss = Math.min(att.str, Math.round(1.7/Math.max(r,0.35)*(0.8+Math.random()*0.4)));
-  att.attacked = true; att.moved = true; att.entrench = 0;
+  let atkLossTotal = Math.round(1.7/Math.max(r,0.35)*(0.8+Math.random()*0.4));
+  for (const u of group){ u.attacked = true; u.moved = true; u.entrench = 0; }
   def.entrench = Math.max(0, def.entrench - 1);
-  def.str -= defLoss; att.str -= atkLoss;
-  G.stats[def.side].lost += defLoss; G.stats[att.side].lost += atkLoss;
-  G.stats[att.side].killed += defLoss; G.stats[def.side].killed += atkLoss;
+  def.str -= defLoss;
+  G.stats[def.side].lost += defLoss; G.stats[att.side].killed += defLoss;
+  // spread attacker losses across the group — the strongest absorb first
+  let atkLoss = 0, guard = 0;
+  while (atkLossTotal > 0 && guard++ < 80){
+    const alive = group.filter(u => u.str > 0).sort((a,b)=>b.str-a.str);
+    if (!alive.length) break;
+    alive[0].str -= 1; atkLoss++; atkLossTotal--;
+    G.stats[att.side].lost += 1; G.stats[def.side].killed += 1;
+  }
+  // experience: everyone who fought hardens — attacker and defender alike,
+  // so a stubborn defense seasons troops as fast as a winning advance
+  const defDead = def.str <= 0;
+  for (const u of group) if (u.str > 0) gainXP(u, defDead ? 3 : 2);
+  if (!defDead) gainXP(def, 2);
 
   const events = {defLoss, atkLoss, ratio:r, destroyed:false, retreated:false,
-                  attDied:false, advance:null, defFrom:[def.x,def.y]};
-  if (att.str <= 0){
-    events.attDied = true; killUnit(att);
-    logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${att.name} destroyed itself attacking ${def.name}!`);
+                  attDied:false, advance:null, choose:null, combined, defFrom:[def.x,def.y]};
+  for (const u of group){
+    if (u.str <= 0){
+      if (u.id===att.id) events.attDied = true;
+      killUnit(u);
+      logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${u.name} destroyed itself attacking ${def.name}!`);
+    }
   }
+  const lead = group.find(u => u.str > 0) || null;
+  const tag = combined ? att.name+' & co.' : att.name;
   const defCity = cityAt(def.x,def.y);
   const fortress = defCity && defCity.vp >= 3 && defCity.owner === def.side;
   if (def.str <= 0){
     events.destroyed = true;
-  } else if (fortress && r >= RETREAT_RATIO && defLoss >= 2 && !events.attDied){
+  } else if (fortress && r >= RETREAT_RATIO && defLoss >= 2 && lead){
     def.str -= 1; G.stats[def.side].lost += 1; G.stats[att.side].killed += 1;   // no retreat: fights in the ruins
     if (def.str <= 0) events.destroyed = true;
-  } else if (r >= RETREAT_RATIO && defLoss >= 2 && !events.attDied){
-    const rh = retreatHex(def, att);
+  } else if (r >= RETREAT_RATIO && defLoss >= 2 && lead){
+    const rh = retreatHex(def, lead);
     if (rh){
       def.x = rh[0]; def.y = rh[1]; def.entrench = 0; events.retreated = true;
       const c = cityAt(rh[0],rh[1]);
@@ -1873,24 +1989,20 @@ function resolveCombat(att, def){
   }
   if (events.destroyed){
     killUnit(def);
-    logMsg(att.side==='G'?'l-g':'l-s',
-      `${flag(att.side)} ${att.name} destroys ${def.name}${defNoEscape(events)?' — pocket closed!':'!'}`);
+    logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${tag} destroys ${def.name}${defNoEscape(events)?' — pocket closed!':'!'}`);
   } else {
-    logMsg(att.side==='G'?'l-g':'l-s',
-      `${flag(att.side)} ${att.name} hits ${def.name}: ${defLoss} losses inflicted, ${atkLoss} taken.`);
+    logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${tag} hits ${def.name}: ${defLoss} losses inflicted, ${atkLoss} taken.`);
   }
-  // breakthrough: armor (and fast fleets) advance into a vacated adjacent hex
-  if ((events.destroyed || events.retreated) && !events.attDied && adjacentKill &&
-      (KINDS[att.kind].sym==='arm' || KINDS[att.kind].fast) && !unitAt(...events.defFrom)){
+  // advance into a vacated adjacent hex
+  if ((events.destroyed || events.retreated) && lead && adjacentKill && !unitAt(...events.defFrom)){
     const [fx,fy] = events.defFrom;
-    att.x = fx; att.y = fy;
-    const c = cityAt(fx,fy);
-    if (c && c.owner!==att.side && !KINDS[att.kind].noCapture){
-      c.owner = att.side;
-      logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${att.name}!`);
-      if (typeof onCityTaken === 'function') onCityTaken(c);
+    const eligible = group.filter(u => u.str>0 && hexDist(u.x,u.y,fx,fy)===1 &&
+      !(KINDS[u.kind].noCapture && cityAt(fx,fy) && cityAt(fx,fy).owner!==u.side));
+    if (combined && eligible.length){
+      events.choose = eligible.map(u => u.id);                  // the player picks who advances
+    } else if (!combined && (KINDS[lead.kind].sym==='arm' || KINDS[lead.kind].fast) && eligible.includes(lead)){
+      advanceInto(lead, fx, fy, events);                        // lone armor exploits automatically
     }
-    events.advance = [fx,fy];
   }
   refreshSupply();
   checkSuddenDeath();
@@ -2450,6 +2562,7 @@ function aiPlanGerman(){
   const order = unitsOf('G').slice().sort((a,b)=> fastK(a.kind) - fastK(b.kind) || a.id-b.id);
   for (const u of order){
     if (u.attacked) continue;
+    if (KINDS[u.kind].hq) return aiPlanHQ(u);
     // 1. attack if a good fight is adjacent
     const wx = weatherFor(G.turn);
     const minR = wx==='snow' ? 1.45 : wx==='mud' ? 1.3 : 1.05;
@@ -2476,6 +2589,22 @@ function aiPlanGerman(){
     return {type:'hold', u:u.id};
   }
   return null;
+}
+
+/* HQs never lead an assault — they shadow the army and flee the front */
+function aiPlanHQ(u){
+  if (u.moved) return {type:'hold', u:u.id};
+  if (nearestEnemyDist(u) >= 4) return {type:'hold', u:u.id};
+  const reach = reachable(u);
+  let best = [u.x,u.y], bestS = -1e9;
+  for (const k of reach.keys()){
+    const [x,y] = k.split(',').map(Number);
+    let ed = 99; for (const t of unitsOf(enemyOf(u.side))) ed = Math.min(ed, hexDist(x,y,t.x,t.y));
+    let fr = 0; for (const f of unitsOf(u.side)) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=3) fr++;
+    const s = ed*2 + fr*1.5 + (u.side==='G' ? -x : x)*0.3;     // toward safety & friends & home edge
+    if (s > bestS){ bestS = s; best = [x,y]; }
+  }
+  return (best[0]!==u.x || best[1]!==u.y) ? {type:'move', u:u.id, x:best[0], y:best[1]} : {type:'hold', u:u.id};
 }
 
 /* ---- Soviet planner ---- */
@@ -2521,6 +2650,7 @@ function aiPlanSoviet(){
   const wx = weatherFor(G.turn);
   for (const u of unitsOf('S')){
     if (u.attacked) continue;
+    if (KINDS[u.kind].hq) return aiPlanHQ(u);
     const adj = adjacentEnemies(u);
     // 1. fight: cautious normally, bold in the snow
     const minR = wx==='snow' ? 0.95 : 1.5;
@@ -2634,7 +2764,7 @@ function clearSave(){
 
 /* ============================ HOOKS (used by the engine) ============================ */
 let onLog = null, onCityTaken = null, onGameOver = null, onAirStrike = null,
-    onEvents = null, onWinterDecision = null, onDecision = null;
+    onEvents = null, onWinterDecision = null, onDecision = null, onLevelUp = null;
 
 /* ====================================================================
    Everything below is browser-only: rendering, input, UI, sound.
@@ -2684,6 +2814,8 @@ function hexFromPixel(wx,wy){
 /* ---------------- ui state ---------------- */
 let sel = null;            // selected unit id
 let reach = null;          // Map of reachable keys for sel
+let selSet = [];           // ids in a combined-arms assault group
+let advanceChoice = null;  // {x,y,ids} — pick who advances after a combined kill
 let hover = null;          // [x,y] under mouse
 let deployKind = null;     // kind being placed
 let airTarget = null;      // air group id picking a strike target
@@ -2838,6 +2970,9 @@ onAirStrike = function(au, t, res){
   boomAt(t.x, t.y, res.killed);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
+};
+onLevelUp = function(u){
+  if (G && !G.over && u.side===G.phase) floatText(u.x, u.y, '✚ '+RANK_NAME[unitLevel(u)], '#ffe27a');
 };
 
 /* ---------------- historical events, decisions & the winter question ---------------- */
@@ -3130,6 +3265,33 @@ function draw(){
     ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.2; ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  // combined-arms assault group
+  if (selSet.length){
+    for (const id of selSet){
+      const gu = G.units.find(t=>t.id===id); if (!gu) continue;
+      const [cx,cy] = hexCenter(gu.x,gu.y);
+      hexPath(cx,cy,S-4); ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 2.6; ctx.stroke();
+    }
+  }
+  // HQ command aura when an HQ is selected
+  if (su && KINDS[su.kind].hq){
+    for (let yy=0;yy<ROWS;yy++) for (let xx=0;xx<COLS;xx++){
+      if (!passable(xx,yy) || hexDist(xx,yy,su.x,su.y) > HQ_RANGE) continue;
+      const [cx,cy] = hexCenter(xx,yy);
+      hexPath(cx,cy,S-3); ctx.fillStyle = '#7a9d5418'; ctx.fill();
+    }
+  }
+  // advance-choice: pick who exploits the captured hex
+  if (advanceChoice){
+    const [tx,ty] = hexCenter(advanceChoice.x, advanceChoice.y);
+    hexPath(tx,ty,S-3); ctx.fillStyle = '#69c5c955'; ctx.fill();
+    ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 3; ctx.stroke();
+    for (const id of advanceChoice.ids){
+      const gu = G.units.find(t=>t.id===id); if (!gu) continue;
+      const [ux,uy] = hexCenter(gu.x,gu.y);
+      hexPath(ux,uy,S-3); ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
   if (hover){
     const [cx,cy] = hexCenter(hover[0],hover[1]);
     hexPath(cx,cy,S-1.5); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1.5; ctx.stroke();
@@ -3296,6 +3458,13 @@ function drawUnit(u, cx, cy){
     ctx.beginPath(); ctx.ellipse(bx, 0, bw*0.38, 2.6, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillRect(bx-1.6, -4.6, 3.2, 3.2);                 // sail
     ctx.fillRect(bx+0.2, -6.4, 1, 2.4);                   // periscope
+  } else if (k.sym==='hq'){
+    ctx.fillRect(bx-bw*0.34, -bh*0.42, 1.6, bh*0.84);     // flagpole
+    ctx.beginPath();                                      // command pennant
+    ctx.moveTo(bx-bw*0.34+1.6, -bh*0.42);
+    ctx.lineTo(bx+bw*0.4, -bh*0.42+3);
+    ctx.lineTo(bx-bw*0.34+1.6, -bh*0.42+6);
+    ctx.closePath(); ctx.fill();
   }
   // strength badge
   ctx.fillStyle = '#101208'; roundRect(w/2-15,h/2-15,13,12,3); ctx.fill();
@@ -3312,6 +3481,15 @@ function drawUnit(u, cx, cy){
   for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-7, 3.5, 3.5);
   // a general's command flies his star
   if (generalOf(u)){ ctx.fillStyle = '#ffd34d'; star(-w/2+8, -h/2+5, 3.5); }
+  // veterancy chevrons (top-right): ✚ rank pips
+  const lvl = unitLevel(u);
+  if (lvl > 0){
+    ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 1.5;
+    for (let i=0;i<lvl;i++){
+      const yy = -h/2 + 4 + i*3.4, cxp = w/2 - 8;
+      ctx.beginPath(); ctx.moveTo(cxp-4, yy+2.6); ctx.lineTo(cxp, yy); ctx.lineTo(cxp+4, yy+2.6); ctx.stroke();
+    }
+  }
   // out of supply
   if (u.oos){
     ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
@@ -3392,19 +3570,65 @@ canvas.addEventListener('click', e=>{
     deployKind = null; updateUnitCard(); return;
   }
   const u = unitAt(x,y);
+  // advance-choice mode after a combined kill: click a candidate to move it in
+  if (advanceChoice){
+    if (u && advanceChoice.ids.includes(u.id)) finishAdvance(u);
+    else cancelAdvance();
+    return;
+  }
   const su = sel && G.units.find(t=>t.id===sel);
-  if (u && u.side===G.phase){ selectUnit(u); sClick(); return; }
-  if (su && u && u.side!==G.phase && !su.attacked && hexDist(su.x,su.y,u.x,u.y) <= attackRange(su)){
-    playerAttack(su,u); return;
+  if (u && u.side===G.phase){
+    if (e.shiftKey){ toggleGroup(u); return; }
+    selectUnit(u); selSet = []; sClick(); return;
+  }
+  if (u && u.side!==G.phase){
+    const attackers = combinedAttackers(u);
+    if (attackers.length >= 2){ playerGroupAttack(attackers, u); return; }
+    if (attackers.length === 1){ playerAttack(attackers[0], u); return; }
   }
   if (su && !su.moved && reach && reach.has(keyOf(x,y))){
     playerMove(su,x,y); return;
   }
   deselect();
 });
+
+/* which currently-selected units can actually reach this enemy */
+function combinedAttackers(target){
+  const ids = selSet.length ? selSet : (sel ? [sel] : []);
+  const out = [];
+  for (const id of ids){
+    const u = G.units.find(t=>t.id===id);
+    if (u && u.side===G.phase && !u.attacked && hexDist(u.x,u.y,target.x,target.y) <= attackRange(u)) out.push(u);
+  }
+  return out;
+}
+function toggleGroup(u){
+  if (u.attacked) return;                       // a committed unit can't join an assault
+  if (sel && sel!==u.id && !selSet.includes(sel)){
+    const s0 = G.units.find(t=>t.id===sel);
+    if (s0 && !s0.attacked) selSet.push(sel);   // fold the current selection into the group
+  }
+  if (selSet.includes(u.id)) selSet = selSet.filter(id=>id!==u.id);
+  else selSet.push(u.id);
+  sel = u.id; reach = (!u.moved) ? reachable(u) : new Map();
+  sClick(); updateUnitCard();
+  $('hint').innerHTML = selSet.length >= 2
+    ? `<b>⚔ Combined assault</b> — ${selSet.length} units · click an adjacent enemy to attack together · Esc clears`
+    : 'Shift-click more of your units to add them to a combined assault.';
+}
+function finishAdvance(u){
+  const {x,y} = advanceChoice;
+  if (!unitAt(x,y) && hexDist(u.x,u.y,x,y)===1){
+    const [fx,fy] = hexCenter(u.x,u.y);
+    doMove(u,x,y);
+    moveAnim = {unit:u, fx, fy, t0:performance.now(), dur:240}; sMove();
+  }
+  advanceChoice = null; deselect(); updateAll();
+}
+function cancelAdvance(){ advanceChoice = null; deselect(); updateAll(); }
 window.addEventListener('keydown', e=>{
   if (!G || G.over) return;
-  if (e.key==='Escape'){ deselect(); deployKind=null; airTarget=null; updateAll(); }
+  if (e.key==='Escape'){ deselect(); deployKind=null; airTarget=null; selSet=[]; advanceChoice=null; updateAll(); }
   if (e.key==='n' || e.key==='N') selectNext();
   if (e.key==='e' || e.key==='E') $('btn-endturn').click();
   if (e.key==='u' || e.key==='U') $('btn-undo').onclick();
@@ -3416,7 +3640,7 @@ function selectUnit(u){
   reach = (!u.moved) ? reachable(u) : new Map();
   updateUnitCard();
 }
-function deselect(){ sel=null; reach=null; updateUnitCard(); }
+function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); }
 function selectNext(){
   const mine = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked);
   if (!mine.length) return;
@@ -3447,6 +3671,25 @@ function playerAttack(att,def){
   if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
   deselect(); updateAll();
 }
+function playerGroupAttack(attackers, def){
+  clearUndo();
+  sShot();
+  const lead = attackers[0];
+  for (const a of attackers) attackArrow(a, def);
+  const ev = resolveCombat(lead, def, attackers.slice(1));
+  if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], true);
+  if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
+  if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
+  selSet = [];
+  if (ev.choose && ev.choose.length){
+    advanceChoice = {x:ev.defFrom[0], y:ev.defFrom[1], ids:ev.choose};
+    sel = null; reach = null;
+    updateAll();
+    $('hint').innerHTML = '<b>Choose who advances</b> into the captured hex — click a ringed unit, or click away to hold.';
+    return;
+  }
+  deselect(); updateAll();
+}
 
 /* ---------------- side panel ---------------- */
 function updateUnitCard(){
@@ -3455,7 +3698,7 @@ function updateUnitCard(){
   const u = sel && G.units.find(t=>t.id===sel);
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
   if (!u){
-    let html = 'Select one of your units.<br><span style="color:var(--dim)">N next · E end turn · U undo · S supply view</span>';
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · E end turn · U undo · S supply</span>';
     body.innerHTML = html;
     if (isHuman){
       for (const k of buyableKinds(G.phase)){
@@ -3482,6 +3725,9 @@ function updateUnitCard(){
     ${(k.range||1)>1 ? `<div class="statrow"><span>Gunnery range</span><span>${k.range} hexes</span></div>` : ''}
     ${k.carrier ? `<div class="statrow"><span>Air operations</span><span>✈ floating airfield</span></div>` : ''}
     <div class="statrow"><span>Dug in</span><span>${'▮'.repeat(u.entrench)||'—'}</span></div>
+    ${!k.hq ? `<div class="statrow"><span>Experience</span><span>${unitLevel(u)>0?'✚'.repeat(unitLevel(u))+' ':''}${RANK_NAME[unitLevel(u)]}${unitLevel(u)<3?` <span style="color:var(--dim)">(${u.xp||0}/${XP_LEVELS[unitLevel(u)]} xp)</span>`:''}</span></div>` : ''}
+    ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
+    ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
     <div class="statrow"><span>This turn</span><span>${u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
   if (isHuman && u.side===G.phase){
@@ -3563,11 +3809,26 @@ function updateTerrainCard(){
 }
 
 function updatePreview(){
-  const su = sel && G && G.units.find(t=>t.id===sel);
   const t = hover && unitAt(hover[0],hover[1]);
-  const ok = su && t && t.side!==su.side && !su.attacked && hexDist(su.x,su.y,t.x,t.y) <= attackRange(su);
-  show('preview-card', !!ok);
-  if (!ok) return;
+  if (!G || aiRunning || !t || t.side===G.phase){ show('preview-card', false); return; }
+  const attackers = combinedAttackers(t);
+  if (!attackers.length){ show('preview-card', false); return; }
+  show('preview-card', true);
+  // combined-arms assault forecast
+  if (attackers.length >= 2){
+    const g = previewGroup(attackers, t);
+    const list = attackers.map(a=>`${flag(a.side)} ${a.name}`).join('<br>');
+    $('preview-body').innerHTML = `
+      <div style="color:var(--cyan);font-weight:600;margin-bottom:3px;">⚔ COMBINED ASSAULT ×${attackers.length}</div>
+      <div style="font-size:12px;margin-bottom:3px;">${list}</div>
+      <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
+      <div class="statrow"><span>Combined odds</span><span class="${g.ratio>=1.2?'good':g.ratio<0.8?'bad':''}">${g.ratio.toFixed(2)} : 1</span></div>
+      <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${g.defLoss}</span></div>
+      <div class="statrow"><span>Coordination bonus</span><span class="good">+${Math.round((g.synergy-1)*100)}%${g.combinedArms?' · combined arms!':''}</span></div>
+      <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack together. If it falls, you choose who advances.</div>`;
+    return;
+  }
+  const su = attackers[0];
   const p = previewCombat(su, t);
   // legible modifier breakdown — green helps the attacker, red helps the defender
   const fmt = m => (m>=1?'+':'−') + Math.round(Math.abs(m-1)*100) + '%';
@@ -3872,6 +4133,7 @@ if (typeof module !== 'undefined' && module.exports){
     GENERALS, generalOf, zhukovDefends,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner,
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
+    unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
