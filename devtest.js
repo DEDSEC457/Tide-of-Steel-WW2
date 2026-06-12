@@ -223,6 +223,24 @@ console.log('— territory —');
   check('pre-territory saves migrate', E.terrOwner(2,7)==='G' && E.terrOwner(8,9)==='G');
 }
 
+/* QoL: undo snapshot pattern & hotseat pass report */
+console.log('— QoL —');
+{
+  E.newGame('G','normal','hotseat');
+  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  const [ox, oy] = [pz.x, pz.y];
+  const snap = E.serialize();
+  E.doMove(pz, 8, 9);
+  E.deserialize(snap);
+  const pz2 = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  check('undo restores the moved unit', pz2.x===ox && pz2.y===oy && !pz2.moved, pz2.x+','+pz2.y);
+  E.aiFullPhase('G'); E.endPhase();
+  const G2 = E.getState();
+  check('hotseat pass-report snapshot recorded',
+    !!(G2.turnSnap && G2.turnSnap.G) && typeof G2.turnSnap.G.lost==='number'
+    && Array.isArray(G2.turnSnap.G.cities));
+}
+
 /* historical events & the winter question */
 console.log('— events & winter gear —');
 {
@@ -394,12 +412,17 @@ function uiSmoke(side){
     // dismiss event popups and answer the winter question like a player would
     for (let i=0;i<3;i++) if ($('btn-event-close').onclick) $('btn-event-close').onclick();
     if (UI.getState().winterGear === 'pending' && $('btn-gear-buy').onclick) $('btn-gear-buy').onclick();
-    $('btn-endturn').onclick();              // human passes; AI plays via queued steps
+    $('btn-endturn').onclick();              // first click may arm the "units ready" warning…
+    $('btn-endturn').onclick();              // …second click confirms; AI plays via queued steps
     drain();
   }
-  // exercise the modals too
+  // exercise the modals & QoL controls too
   $('btn-objectives').onclick(); $('btn-obj-close').onclick();
   $('btn-help2').onclick(); $('btn-help-close').onclick();
+  if ($('wx-chip').onclick){ $('wx-chip').onclick(); $('btn-clock-close').onclick(); }
+  if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();
+  if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
+  if ($('btn-undo').onclick) $('btn-undo').onclick();
   $('btn-sound').onclick(); drain();
   return {over: UI.getState().over, result: UI.getState().result, uiErrors};
 }

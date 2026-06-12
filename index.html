@@ -25,6 +25,10 @@
     padding:4px 10px;white-space:nowrap;}
   #topbar .t-chip b{color:var(--amber);}
   #wx-chip.mud b{color:#b07d4f;} #wx-chip.snow b{color:#cfe6ef;} #wx-chip.freeze b{color:#9fc7d8;}
+  #wx-chip{cursor:pointer;} #wx-chip:hover{border-color:var(--amber);}
+  .clk{display:flex;gap:12px;padding:7px 9px;border-radius:6px;margin:3px 0;font-size:13px;line-height:1.45;}
+  .clk .c-turns{color:var(--dim);min-width:150px;flex-shrink:0;}
+  .clk.now{background:#262d1a;border:1px solid var(--amber);}
   #topbar .spacer{flex:1;}
   button{font-family:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
     border-radius:6px;padding:6px 14px;font-size:14px;cursor:pointer;}
@@ -114,10 +118,13 @@
   <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
   <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
   <span class="spacer"></span>
+  <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚 Supply</button>
+  <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
   <button id="btn-objectives">Objectives</button>
   <button id="btn-help2">Help</button>
   <button id="btn-sound">🔊</button>
   <button id="btn-menu">Menu</button>
+  <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩ Undo</button>
   <button id="btn-endturn" class="primary">End Turn ▶</button>
 </div>
 
@@ -210,6 +217,12 @@
           divert 10 ⚙ to winter equipment, or gamble that the war ends first. Gear mostly saves
           the <b>defense</b> in deep snow and keeps the infantry marching — panzers freeze and
           attacks stay hard either way.</li>
+      <li><b>Quality of life.</b> <b>U</b> / the ↩ Undo button takes back your last move
+          (until anything else happens). <b>S</b> / the 🚚 Supply button shades every hex
+          outside your supply network — see where your spearheads go dry <i>before</i> they do.
+          Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
+          speed (normal / fast / instant). Ending your turn with units still ready asks for a
+          second click, and so does overwriting a saved campaign.</li>
       <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
           plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields), or fly
           <b>Patrol</b> to intercept enemy strikes. Groups that stay grounded repair. Flak and dogfights
@@ -241,6 +254,15 @@
     <div class="mrow">
       <button class="primary" id="btn-end-menu">Back to Menu</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ CAMPAIGN CLOCK ============ -->
+<div id="clock-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:580px;">
+    <h2>THE CAMPAIGN CLOCK</h2>
+    <div id="clock-body"></div>
+    <div class="mrow"><button class="primary" id="btn-clock-close">Close</button></div>
   </div>
 </div>
 
@@ -283,6 +305,7 @@
   <div class="modal" style="text-align:center;">
     <h2 id="pass-title">PASS THE KEYBOARD</h2>
     <p id="pass-text"></p>
+    <div id="pass-report"></div>
     <div class="mrow" style="justify-content:center;"><button class="primary" id="btn-pass-go">Ready — Begin Turn</button></div>
   </div>
 </div>
@@ -620,6 +643,7 @@ function newGame(playerSide, difficulty, mode){
     air: AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s)),
     pp: {G:0, S:0},
     winterGear: null,                          // null = not yet asked · 'pending' · true/false
+    turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
     log: [],
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
@@ -1117,6 +1141,13 @@ function startPhase(side){
 
 function endPhase(){
   const side = G.phase;
+  // hotseat: remember how things stood when this player handed over, so the
+  // pass screen can report what happened while they looked away
+  if (G.mode==='hotseat'){
+    if (!G.turnSnap) G.turnSnap = {G:null, S:null};
+    G.turnSnap[side] = { lost: G.stats[side].lost, killed: G.stats[side].killed,
+                         cities: G.cities.filter(c=>c.owner===side).map(c=>c.name) };
+  }
   for (const u of unitsOf(side)){
     if (!u.moved && !u.attacked && !u.oos){
       const cap = effTerrain(u.x,u.y).dig;
@@ -1613,6 +1644,10 @@ let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
 let aiRunning = false;
 let muted = false;
 try { muted = localStorage.getItem('barb-muted')==='1'; } catch(e){}
+let undoSnap = null;       // serialized state before the player's last move
+let showSupply = false, supplyView = null;
+let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
+try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 
 const $ = id => document.getElementById(id);
 const show = (id,on) => $(id).classList.toggle('hidden', !on);
@@ -1680,8 +1715,68 @@ function maybeShowGear(){
   if (G.mode !== 'hotseat' && G.playerSide !== 'G') return;   // AI Germany decides itself
   show('gear-modal', true);
 }
-$('btn-gear-buy').onclick  = ()=>{ if (decideWinterGear(true)){  sCity();  show('gear-modal', false); updateAll(); } };
-$('btn-gear-front').onclick = ()=>{ if (decideWinterGear(false)){ sClick(); show('gear-modal', false); updateAll(); } };
+$('btn-gear-buy').onclick  = ()=>{ if (decideWinterGear(true)){  clearUndo(); sCity();  show('gear-modal', false); updateAll(); } };
+$('btn-gear-front').onclick = ()=>{ if (decideWinterGear(false)){ clearUndo(); sClick(); show('gear-modal', false); updateAll(); } };
+
+/* ---------------- undo · supply view · campaign clock · AI speed ---------------- */
+function clearUndo(){ undoSnap = null; updateUndoBtn(); }
+function updateUndoBtn(){ $('btn-undo').classList.toggle('hidden', !undoSnap); }
+$('btn-undo').onclick = ()=>{
+  if (!undoSnap || !G || G.over || aiRunning) return;
+  deserialize(undoSnap);
+  undoSnap = null; moveAnim = null;
+  sel = null; reach = null; deployKind = null; airTarget = null;
+  sMove(); updateAll(); saveGame();
+};
+
+function refreshSupplyView(){
+  supplyView = (showSupply && G && !G.over)
+    ? computeSupply(G.mode==='hotseat' ? G.phase : G.playerSide) : null;
+}
+$('btn-supply').onclick = ()=>{
+  showSupply = !showSupply; sClick();
+  $('btn-supply').style.borderColor = showSupply ? 'var(--cyan)' : '';
+  $('btn-supply').style.color = showSupply ? 'var(--cyan)' : '';
+  refreshSupplyView();
+};
+
+const AI_SPEED_LABEL = ['AI: ▶', 'AI: ▶▶', 'AI: ⚡'];
+function aiSpeedLabel(){ $('btn-aispeed').textContent = AI_SPEED_LABEL[aiSpeed]; }
+$('btn-aispeed').onclick = ()=>{
+  aiSpeed = (aiSpeed+1)%3;
+  try { localStorage.setItem('barb-aispeed', aiSpeed); } catch(e){}
+  aiSpeedLabel(); sClick();
+};
+aiSpeedLabel();
+
+$('wx-chip').onclick = ()=>{ if (!G) return; buildClock(); show('clock-modal', true); };
+$('btn-clock-close').onclick = ()=>show('clock-modal', false);
+function buildClock(){
+  const phases = [
+    [1, 15, 'Clear skies',
+     'Full marching speed. The blitzkrieg window — Germany must make its gains now.'],
+    [16, 19, 'Mud — Rasputitsa',
+     'Both sides: +1 movement cost everywhere, attacks ×0.5–0.6, air weakened.'],
+    [20, 21, 'Hard frost',
+     'The ground hardens — movement is normal again, attacks ×0.9. Germany’s last window.'],
+    [22, MAX_TURN, 'Deep snow',
+     'German attacks ×0.6 and defense ×0.8 (winter gear softens both), −1 German movement, the Luftwaffe nearly grounded. Siberian Guards attack ×1.2.'],
+  ];
+  let html = '';
+  for (const [a, b, name, fx] of phases){
+    const now = G.turn >= a && G.turn <= b;
+    html += `<div class="clk${now?' now':''}">
+      <span class="c-turns">Turns ${a}–${b} · from ${dateStr(a)}</span>
+      <div><b>${name}${now?` — NOW (turn ${G.turn})`:''}</b><br><span style="color:var(--dim)">${fx}</span></div></div>`;
+  }
+  const gearNote = G.winterGear===true ? '✓ Winter equipment ordered — December will bite less.'
+    : G.winterGear===false ? '✗ No winter equipment — December will be brutal for the Wehrmacht.'
+    : G.winterGear==='pending' ? '⚠ The winter question awaits an answer at German headquarters.'
+    : 'The winter question reaches German headquarters in mid-August (turn 9).';
+  html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is one week.
+    The campaign ends after turn ${MAX_TURN} (week of ${dateStr(MAX_TURN)}).<br>${gearNote}</div>`;
+  $('clock-body').innerHTML = html;
+}
 
 /* ---------------- drawing ---------------- */
 function hexPath(cx,cy,s){
@@ -1721,7 +1816,10 @@ function draw(){
     ctx.save(); ctx.translate(cx,cy);
     if (t==='f'){ ctx.fillStyle = wx==='snow' ? '#4e6052' : '#243520';
       for (const [dx,dy] of [[-10,2],[2,-7],[10,6]]){
-        ctx.beginPath(); ctx.moveTo(dx,dy+6); ctx.lineTo(dx+5,dy-6); ctx.lineTo(dx+10,dy+6); ctx.closePath(); ctx.fill(); } }
+        ctx.beginPath(); ctx.moveTo(dx,dy+6); ctx.lineTo(dx+5,dy-6); ctx.lineTo(dx+10,dy+6); ctx.closePath(); ctx.fill(); }
+      if (wx==='snow'){ ctx.fillStyle = 'rgba(255,255,255,0.55)';   // snow-capped trees
+        for (const [dx,dy] of [[-10,2],[2,-7],[10,6]]){
+          ctx.beginPath(); ctx.moveTo(dx+1.6,dy-2); ctx.lineTo(dx+5,dy-6); ctx.lineTo(dx+8.4,dy-2); ctx.closePath(); ctx.fill(); } } }
     if (t==='h'){ ctx.strokeStyle='#00000040'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(-12,6); ctx.quadraticCurveTo(-6,-6,0,6); ctx.moveTo(2,2); ctx.quadraticCurveTo(8,-8,14,4); ctx.stroke(); }
     if (t==='s'){ ctx.strokeStyle='#5d7a6a88'; ctx.lineWidth=1.5;
@@ -1731,7 +1829,31 @@ function draw(){
       ctx.beginPath(); ctx.moveTo(-S*0.7,-4); ctx.quadraticCurveTo(0,6,S*0.7,-2); ctx.stroke(); }
     if (t==='~'){ ctx.strokeStyle='#3e586e66'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(-12,-3); ctx.quadraticCurveTo(-6,-7,0,-3); ctx.quadraticCurveTo(6,1,12,-3); ctx.stroke(); }
+    // seasonal ground dressing: snowdrifts in winter, puddles in the rasputitsa
+    const hs = (x*73856093 ^ y*19349663) >>> 0;
+    if (wx==='snow' && t!=='~' && t!=='r'){
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      if (hs%3===0){ ctx.beginPath(); ctx.ellipse(-5+(hs%9), 6-(hs%4)*2, 9, 3.2, 0, 0, Math.PI*2); ctx.fill(); }
+      if (hs%4===1){ ctx.beginPath(); ctx.ellipse(7-(hs%6), -4+(hs%5), 6, 2.4, 0, 0, Math.PI*2); ctx.fill(); }
+    }
+    if (wx==='mud' && (t==='.'||t==='s')){
+      if (hs%3!==2){
+        ctx.fillStyle = 'rgba(26,21,10,0.42)';                       // mud pools
+        ctx.beginPath(); ctx.ellipse(-4+(hs%8), 4-(hs%5), 7+(hs%4), 3, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(140,165,185,0.13)';                    // wet sheen
+        ctx.beginPath(); ctx.ellipse(-4+(hs%8), 3-(hs%5), 4, 1.3, 0, 0, Math.PI*2); ctx.fill();
+      }
+    }
     ctx.restore();
+  }
+
+  // supply view: darken everything outside your network
+  if (supplyView){
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (!passable(x,y) || supplyView.has(keyOf(x,y))) continue;
+      const [cx,cy] = hexCenter(x,y);
+      hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fill();
+    }
   }
 
   // cities
@@ -1802,6 +1924,29 @@ function draw(){
     ctx.fillStyle = a.color;
     ctx.fillText(a.text, a.x, a.y - p*26);
     ctx.globalAlpha = 1;
+  }
+
+  // falling weather: autumn rain in the mud, snowfall in winter (screen space)
+  if (wx !== 'clear'){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    if (wx==='mud'){
+      ctx.strokeStyle = 'rgba(150,170,195,0.28)'; ctx.lineWidth = 1;
+      for (let i=0;i<70;i++){
+        const px = ((i*131 + now*0.18*(1+(i%5)*0.12)) % (innerWidth+60)) - 30;
+        const py = ((i*97  + now*(0.30+(i%7)*0.05)) % (innerHeight+40)) - 20;
+        ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px-3,py+11); ctx.stroke();
+      }
+    } else {
+      const flakes = wx==='snow' ? 90 : 25;              // a few flurries in the frost
+      ctx.fillStyle = '#fff';
+      for (let i=0;i<flakes;i++){
+        const px = ((i*149 + Math.sin(now*0.0007 + i)*16 + now*0.02*((i%3)+1)) % (innerWidth+40)) - 20;
+        const py = ((i*83  + now*(0.05+(i%6)*0.013)) % (innerHeight+30)) - 15;
+        ctx.globalAlpha = 0.3 + (i%4)*0.12;
+        ctx.beginPath(); ctx.arc(px, py, 1 + (i%3)*0.7, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
   }
 }
 
@@ -1913,14 +2058,14 @@ canvas.addEventListener('click', e=>{
     airTarget = null;
     if (au && t && t.side!==G.phase){
       const res = airStrike(au, t);
-      if (res){ res.killed ? sBoom() : sShot(); }
+      if (res){ clearUndo(); res.killed ? sBoom() : sShot(); }
     }
     $('hint').innerHTML = defaultHint();
     updateAll(); return;
   }
   // deploy mode
   if (deployKind){
-    if (doDeploy(G.phase, deployKind, x, y)){ sCity(); updateAll(); }
+    if (doDeploy(G.phase, deployKind, x, y)){ clearUndo(); sCity(); updateAll(); }
     deployKind = null; updateUnitCard(); return;
   }
   const u = unitAt(x,y);
@@ -1939,6 +2084,8 @@ window.addEventListener('keydown', e=>{
   if (e.key==='Escape'){ deselect(); deployKind=null; airTarget=null; updateAll(); }
   if (e.key==='n' || e.key==='N') selectNext();
   if (e.key==='e' || e.key==='E') $('btn-endturn').click();
+  if (e.key==='u' || e.key==='U') $('btn-undo').onclick();
+  if (e.key==='s' || e.key==='S') $('btn-supply').onclick();
 });
 
 function selectUnit(u){
@@ -1958,6 +2105,7 @@ function selectNext(){
 }
 
 function playerMove(u,x,y){
+  undoSnap = serialize();                    // one-step undo, until anything else happens
   const [fx,fy] = hexCenter(u.x,u.y);
   doMove(u,x,y);
   moveAnim = {unit:u, fx, fy, t0:performance.now(), dur:240};
@@ -1966,6 +2114,7 @@ function playerMove(u,x,y){
   updateAll(); updateUnitCard();
 }
 function playerAttack(att,def){
+  clearUndo();
   sShot();
   const ev = resolveCombat(att,def);
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
@@ -1981,7 +2130,7 @@ function updateUnitCard(){
   const u = sel && G.units.find(t=>t.id===sel);
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
   if (!u){
-    let html = 'Select one of your units.<br><span style="color:var(--dim)">N = next unit · E = end turn</span>';
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">N next · E end turn · U undo · S supply view</span>';
     body.innerHTML = html;
     if (isHuman){
       for (const k of buyableKinds(G.phase)){
@@ -2013,7 +2162,7 @@ function updateUnitCard(){
     if (r){
       const b = document.createElement('button');
       b.textContent = `Reinforce +${r.steps} (${r.cost*r.steps}⚙)`;
-      b.onclick = ()=>{ doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
+      b.onclick = ()=>{ clearUndo(); doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
       act.appendChild(b);
     }
   }
@@ -2043,7 +2192,7 @@ function updateAirCard(){
           : defaultHint(); };
       const bp = document.createElement('button');
       bp.textContent = '🛡 Patrol'; bp.style.cssText = 'padding:2px 10px;font-size:12px;';
-      bp.onclick = ()=>{ sClick(); setPatrol(au); airTarget=null; updateAll(); };
+      bp.onclick = ()=>{ clearUndo(); sClick(); setPatrol(au); airTarget=null; updateAll(); };
       act.appendChild(bs); act.appendChild(bp);
       row.appendChild(act);
     }
@@ -2126,7 +2275,7 @@ function updateTop(){
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
   $('pp-chip').innerHTML = `${side==='G'?'Axis':'Soviet'} production: <b>${G.pp[side]}</b> ⚙`;
 }
-function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); $('hint').innerHTML = defaultHint(); }
+function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); }
 
 /* ---------------- objectives modal ---------------- */
 $('btn-objectives').onclick = ()=>{
@@ -2161,11 +2310,22 @@ $('btn-menu').onclick = ()=>{
 };
 
 /* ---------------- end turn & AI driver ---------------- */
+let endPendingUntil = 0;
 $('btn-endturn').onclick = ()=>{
   if (!G || G.over || aiRunning) return;
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!human) return;
-  sClick(); deselect(); deployKind = null;
+  // safeguard: units still ready? ask for a second click
+  const ready = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
+  if (ready > 0 && performance.now() > endPendingUntil){
+    endPendingUntil = performance.now() + 2500;
+    $('btn-endturn').textContent = `⚠ ${ready} ready — end anyway?`;
+    setTimeout(()=>{ if (performance.now() >= endPendingUntil) $('btn-endturn').textContent = 'End Turn ▶'; }, 2600);
+    return;
+  }
+  endPendingUntil = 0;
+  $('btn-endturn').textContent = 'End Turn ▶';
+  sClick(); deselect(); deployKind = null; clearUndo();
   endPhase();
   saveGame();
   if (G.over) return;
@@ -2179,6 +2339,19 @@ function proceed(){
   if (G.mode==='hotseat'){
     $('pass-title').textContent = 'PASS THE KEYBOARD';
     $('pass-text').innerHTML = `It is now the <b>${G.phase==='G'?'⬛ Axis':'🟥 Soviet'}</b> player's turn ${G.turn} (${dateStr(G.turn)}).`;
+    // turn report: what happened while this player looked away
+    const snap = G.turnSnap && G.turnSnap[G.phase];
+    let rep = '';
+    if (snap){
+      const lost = G.stats[G.phase].lost - snap.lost;
+      const killed = G.stats[G.phase].killed - snap.killed;
+      const held = new Set(G.cities.filter(c=>c.owner===G.phase).map(c=>c.name));
+      const lostC = snap.cities.filter(n=>!held.has(n));
+      rep = `<div style="margin-top:8px;font-size:13px;color:var(--dim);">While you were away — ` +
+            `strength lost: <b style="color:var(--redL)">${lost}</b> · inflicted: <b style="color:var(--grn)">${killed}</b>` +
+            (lostC.length ? `<br>Cities lost: <b style="color:var(--redL)">${lostC.join(', ')}</b>` : '') + `</div>`;
+    }
+    $('pass-report').innerHTML = rep;
     show('pass-modal', true);
     return;
   }
@@ -2187,6 +2360,7 @@ function proceed(){
 
 function runAIPhase(){
   aiRunning = true;
+  clearUndo();
   show('ai-banner', true);
   $('ai-banner').textContent = (G.phase==='G'?'⬛ AXIS':'🟥 SOVIET') + ' TURN…';
   clearAICache();
@@ -2199,20 +2373,21 @@ function runAIPhase(){
     if (guard++ > cap){ finish(); return; }
     const a = aiPlanAction(G.phase);
     if (!a){ finish(); return; }
-    // pace the show: snappier when the army is huge
+    // pace the show: snappier when the army is huge, scaled by the AI speed toggle
+    const mult = aiSpeed===2 ? 0 : aiSpeed===1 ? 0.35 : 1;
     const n = unitsOf(G.phase).length;
     const mDelay = Math.max(40, 150 - n*2), aDelay = Math.max(120, 300 - n*3);
     const res = applyAction(a);
     if (res && res.type==='move'){
-      sMove();
-      setTimeout(step, mDelay);
+      if (mult) sMove();
+      setTimeout(step, mDelay*mult);
     } else if (res && res.type==='attack'){
       sShot();
       const ev = res.ev;
       if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
       if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
       updateAll();
-      setTimeout(step, aDelay);
+      setTimeout(step, aDelay*mult);
     } else {
       setTimeout(step, 0);
     }
@@ -2230,7 +2405,7 @@ function runAIPhase(){
     }
     updateAll();
   }
-  setTimeout(step, 350);
+  setTimeout(step, aiSpeed===2 ? 0 : 350);
 }
 
 $('btn-pass-go').onclick = ()=>{ show('pass-modal', false); updateAll(); };
@@ -2273,7 +2448,19 @@ for (const el of document.querySelectorAll('#diff-row .opt')){
 $('mode-ai').onclick = ()=>{ mMode='ai'; $('mode-ai').classList.add('sel'); $('mode-hotseat').classList.remove('sel'); };
 $('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.add('sel'); $('mode-ai').classList.remove('sel'); };
 
+let startPendingUntil = 0;
 $('btn-start').onclick = ()=>{
+  // safeguard: an unfinished campaign is saved — ask before wiping it
+  let hasSave = false;
+  try { hasSave = !!localStorage.getItem(SAVE_KEY); } catch(e){}
+  if (hasSave && performance.now() > startPendingUntil){
+    startPendingUntil = performance.now() + 3000;
+    $('btn-start').textContent = '⚠ OVERWRITES YOUR SAVE — SURE?';
+    setTimeout(()=>{ if (performance.now() >= startPendingUntil) $('btn-start').textContent = 'BEGIN CAMPAIGN'; }, 3100);
+    return;
+  }
+  startPendingUntil = 0;
+  $('btn-start').textContent = 'BEGIN CAMPAIGN';
   eventQueue.length = 0;                       // drop popups from a previous campaign
   newGame(mSide, mDiff, mMode);                // fires the turn-1 event
   startCampaign();
@@ -2283,6 +2470,7 @@ $('btn-continue').onclick = ()=>{
   if (loadGame()) startCampaign(true);
 };
 function startCampaign(loaded){
+  undoSnap = null;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true);
   fitCamera();

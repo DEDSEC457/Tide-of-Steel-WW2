@@ -42,8 +42,14 @@ The whole game is one file (`index.html`) that runs in any browser:
   saves the December *defense* and keeps the infantry marching; no greatcoat
   unfreezes a panzer engine.
 
-**Controls:** click a unit → move/attack · `N` next unit · `E` end turn · `Esc` deselect ·
-drag to pan · scroll to zoom.
+**Controls:** click a unit → move/attack · `N` next unit · `E` end turn · `U` undo last move ·
+`S` supply view · `Esc` deselect · drag to pan · scroll to zoom · click the weather chip for
+the campaign clock.
+
+**Quality of life:** one-step undo, supply-network overlay, campaign weather clock,
+AI turn-speed toggle (normal/fast/instant), "units still ready" end-turn warning,
+save-overwrite warning, hotseat turn reports — plus visible rain in the rasputitsa
+and falling snow, drifts and snow-capped forests in winter.
 
 ## 🌐 Play from anywhere (optional)
 If you make this repo **public**, you can turn on GitHub Pages
