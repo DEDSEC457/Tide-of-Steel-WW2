@@ -245,7 +245,7 @@
       <span style="color:var(--grn)">✔</span> &nbsp;⛽ Fuel logistics — panzers outrun supply and culminate<br>
       <span style="color:var(--grn)">✔</span> &nbsp;Motorized, SS Panzer &amp; cavalry formations<br>
       <span style="color:var(--grn)">✔</span> &nbsp;Lethal encirclement — cut-off pockets fight weak and starve<br>
-      ◆ &nbsp;Railhead &amp; forward depot logistics — <i>coming</i>
+      <span style="color:var(--grn)">✔</span> &nbsp;⛉ Railheads — captured cities supply only once the rail reaches them
     </div>
     <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:18px 0 0;">
       <div class="pick p-ger sel" id="rm-pick-ger" style="max-width:240px;">
@@ -1682,6 +1682,10 @@ SCENARIOS.realistic = {
   },
   fuel: true,                                   // mechanized formations burn & refuel fuel
   harshOOS: true,                               // pockets fight at a fraction and starve fast
+  railhead: {G: true},                          // German forward depots lag behind the railhead
+  supplyRange: 12,                              // hexes are ~half-scale here, so supply reaches further
+                                                //   (keeps the depot chain intact on the 60-wide map;
+                                                //    encirclement still cuts via ZOC, not distance)
   /* operational scale: ~40 km per hex, one week per turn. Movement is slower
      than arcade mode — a panzer group covers ~160 km a week in open country,
      infantry half that. The tempo of the real campaign, not the arcade dash.
@@ -1835,18 +1839,14 @@ SCENARIOS.realistic = {
      them — but the early waves are raw and the Germans get a couple of allied
      armies of their own. Tuned so the historical stalemate is the median result. */
   sovSchedule: [
-    [3, 's_inf','28th Army'],     [4, 's_mil','Moscow Militia'],
-    [5, 's_inf','29th Army'],     [6, 's_inf','30th Army'],
-    [8, 's_inf','31st Army'],     [9, 's_inf','33rd Army'],
-    [10,'s_guard','1st Guards Army'], [11,'s_inf','40th Army'],
-    [13,'s_inf','49th Army'],     [14,'g_inf','2nd Army'],
-    [15,'s_tank','2nd Tank Corps'], [16,'s_inf','52nd Army'],
-    [18,'s_guard','1st Shock Army'], [19,'s_inf','57th Army'],
+    [4, 's_mil','Moscow Militia'], [6, 's_inf','29th Army'],
+    [9, 's_inf','30th Army'],      [11,'s_inf','33rd Army'],
+    [13,'s_inf','49th Army'],      [14,'g_inf','2nd Army'],
+    [16,'s_tank','2nd Tank Corps'],[18,'s_guard','1st Shock Army'],
     [20,'s_guard','1st Siberian Gds'], [20,'g_ally','8th Italian Army'],
-    [21,'s_guard','2nd Siberian Gds'], [21,'s_cav','2nd Cavalry Corps'],
-    [23,'s_guard','3rd Siberian Gds'], [24,'s_cav','5th Cavalry Corps'],
-    [25,'s_guard','4th Siberian Gds'], [26,'s_inf','60th Army'],
-    [28,'s_tank','3rd Tank Corps'],    [30,'s_guard','2nd Shock Army'],
+    [22,'s_guard','2nd Siberian Gds'], [22,'s_cav','2nd Cavalry Corps'],
+    [24,'s_guard','3rd Siberian Gds'], [26,'s_inf','60th Army'],
+    [28,'s_tank','3rd Tank Corps'],     [30,'s_guard','4th Siberian Gds'],
   ],
   generals: [
   {side:'G', unit:'2nd Panzer Group', name:'Guderian', atk:1.15,
@@ -1913,14 +1913,18 @@ SCENARIOS.realistic = {
     return 'clear';
   },
   pp(side, turn){
-    if (side==='G') return turn<=13 ? 9 : 6;            // overstretch after autumn
-    return turn<=6 ? 5 : turn<=14 ? 8 : 11;             // Soviet mobilization ramps up
+    if (side==='G') return turn<=13 ? 9 : 6;            // the summer hammer, then overstretch
+    return turn<=6 ? 5 : turn<=14 ? 7 : 11;             // Soviet mobilization ramps up
   },
+  /* Tuned to correct-supply reality: with the logistics modelled honestly, the
+     Wehrmacht takes the western objectives and culminates short of the deep
+     ones — exactly as it did. Holding the gains IS the historical stalemate;
+     reaching Moscow/Leningrad/Stalingrad is doing better than history. */
   victoryTiers: [
-    [27,'DECISIVE AXIS VICTORY','The Soviet state collapses west of the Volga. History takes its darkest road.'],
-    [21,'AXIS OPERATIONAL VICTORY','The Wehrmacht winters far deeper than history — Moscow threatened from three sides when the ground dries.'],
-    [13,'STALEMATE — HISTORY REPEATS','Vast conquests, but the objectives held. The front freezes where the real one did — and the long war begins.'],
-    [0, 'SOVIET VICTORY','The invasion is broken. The Red Army counterattacks across the whole front, a year ahead of schedule.'],
+    [18,'DECISIVE AXIS VICTORY','The Soviet state collapses west of the Volga. History takes its darkest road.'],
+    [12,'AXIS OPERATIONAL VICTORY','The Wehrmacht winters far deeper than history — a deep objective has fallen and the line bulges east when the ground dries.'],
+    [5, 'STALEMATE — HISTORY REPEATS','Vast conquests, but the great objectives held. The front freezes where the real one did — and the long war begins.'],
+    [0, 'SOVIET VICTORY','The invasion is broken short of its gains. The Red Army counterattacks across the whole front, a year ahead of schedule.'],
   ],
   sudden: {
     axisCities: ['Moscow','Leningrad'], minAxisUnits: 6,
@@ -1946,11 +1950,11 @@ SCENARIOS.realistic = {
   setup(st){
     // border armies start partly dug in along the frontier line
     for (const u of st.units) if (u.side==='S' && u.x<=13) u.entrench = 1;
-    const lm = st.units.find(u=>u.name==='Leningrad Militia');
-    if (lm) lm.entrench = 2;
-    // city garrisons start fortified — the blitz must be fought through them
+    // city garrisons start lightly fortified — the blitz fights through them
     for (const u of st.units)
       if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = 1;
+    const lm = st.units.find(u=>u.name==='Leningrad Militia');
+    if (lm) lm.entrench = 2;
   },
   opening(playerSide){ return [
     '22 June 1941 — Operation Barbarossa begins on a front two thousand kilometres wide. ' +
@@ -2175,6 +2179,7 @@ function newGame(playerSide, difficulty, mode, scenario){
     air: AIR_INIT.map(([sd,n,s,hm]) => makeAir(sd,n,s,hm)),
     pp: {G:0, S:0},
     winterGear: null,                          // null = not yet asked · 'pending' · true/false
+    railDepth: {G: RAIL_START, S: RAIL_START},  // railhead reach from each home edge (realistic mode)
     decisions: {},                             // decision id -> chosen option index (or 'pending')
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
     log: [],
@@ -2225,36 +2230,103 @@ function computeZOC(side){
    enemy units or enemy ZOC (unless a friendly unit holds the hex).
    This is why the blitzkrieg must take cities — and why it runs out of steam. */
 const SUPPLY_RANGE = 7;
+/* Binary min-heap for the Dijkstra floods (supply, reachable, distField). On
+   the big realistic map these run per-unit, hundreds of times a turn — a sorted
+   array was O(n^2); the heap makes them near-linear without changing results. */
+function makeHeap(){
+  const a = [];               // entries: [cost, x, y]
+  return {
+    size(){ return a.length; },
+    push(c,x,y){ a.push([c,x,y]); let i=a.length-1;
+      while(i>0){ const p=(i-1)>>1; if(a[p][0]<=a[i][0])break; const t=a[p];a[p]=a[i];a[i]=t; i=p; } },
+    pop(){ const top=a[0], last=a.pop();
+      if(a.length){ a[0]=last; let i=0; const n=a.length;
+        for(;;){ let l=2*i+1, r=l+1, s=i;
+          if(l<n && a[l][0]<a[s][0]) s=l;
+          if(r<n && a[r][0]<a[s][0]) s=r;
+          if(s===i) break; const t=a[s];a[s]=a[i];a[i]=t; i=s; } }
+      return top; },
+  };
+}
+/* ---- railheads (realistic mode) ----
+   An advancing army's rail repair lags behind its spearheads — Soviet broad
+   gauge had to be re-laid before trains could follow. Until rail reaches a
+   captured city it is NOT a forward depot, so a fast advance outruns its own
+   supply and the panzers culminate. The railhead grows RAIL_RATE hexes a turn
+   through secured territory. Gated per side by SCN.railhead (only the attacker
+   is limited; the defender falls back along intact rail). */
+const RAIL_START = 15, RAIL_RATE = 2;
+function railSide(side){ return !!(SCN.railhead && SCN.railhead[side]); }
+function railDepthOf(side){ return (G.railDepth && G.railDepth[side]) ?? RAIL_START; }
+/* BFS from the home edge through secured (friendly, un-contested) territory,
+   capped at the current railhead depth. Returns the railed hex set, the parent
+   pointers (for drawing the line) and the distance map (for the supply wash). */
+function railNetwork(side){
+  const foe = enemyOf(side);
+  const foeZOC = computeZOC(foe);
+  const occ = {};
+  for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
+  const depth = railDepthOf(side);
+  const homeX = side==='G' ? 0 : COLS-1;
+  const dist = new Map(), parent = new Map();
+  // every step costs 1, so a plain FIFO breadth-first sweep gives shortest
+  // distances — no priority queue (this runs inside computeSupply, which the
+  // AI hits hundreds of times a turn, so it has to be O(n))
+  let frontier = [];
+  for (let y=0;y<ROWS;y++){
+    const k = keyOf(homeX,y);
+    if (passable(homeX,y) && occ[k] !== foe){ dist.set(k,0); frontier.push([homeX,y]); }
+  }
+  for (let c=0; c<depth && frontier.length; c++){
+    const next = [];
+    for (const [x,y] of frontier){
+      for (const [nx,ny] of neighbors(x,y)){
+        const k = keyOf(nx,ny);
+        if (dist.has(k) || !passable(nx,ny) || occ[k] === foe) continue;
+        if (foeZOC.has(k) && occ[k] !== side) continue;
+        dist.set(k, c+1); parent.set(k, keyOf(x,y)); next.push([nx,ny]);
+      }
+    }
+    frontier = next;
+  }
+  return { railed: new Set(dist.keys()), parent, dist };
+}
+
 function computeSupply(side){
   const foe = enemyOf(side);
   const foeZOC = computeZOC(foe);
   const occ = {};                     // occupancy map for speed
   for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
-  const cityKeys = new Set(G.cities.filter(c=>c.owner===side).map(c=>keyOf(c.x,c.y)));
+  let myCities = G.cities.filter(c=>c.owner===side);
+  // railheads: only cities the rail has reached project supply (the attacker's
+  // forward depots lag behind the front; the defender's whole rear stays railed)
+  if (railSide(side)){
+    const rn = railNetwork(side);
+    myCities = myCities.filter(c => rn.railed.has(keyOf(c.x,c.y)));
+  }
+  const cityKeys = new Set(myCities.map(c=>keyOf(c.x,c.y)));
   const dist = new Map();             // hex -> hexes since last depot
-  const open = [];
   const range = SCN.supplyRange ?? SUPPLY_RANGE;
+  // Dijkstra over a binary heap (stepping costs 1; arriving at a friendly depot
+  // city costs 0 and re-sources the network). The heap keeps this near-linear —
+  // vital because the AI computes supply hundreds of times a turn, and on the
+  // 60-wide map the old sorted-array queue was O(n^2).
+  const heap = makeHeap();
+  const seed = (x,y) => { const k=keyOf(x,y); if(!dist.has(k)){ dist.set(k,0); heap.push(0,x,y); } };
   // home map edge (scenarios can turn this off — e.g. an invader supplied only by sea)
   if ((SCN.edgeSupply && SCN.edgeSupply[side]) ?? true){
     const homeX = side==='G' ? 0 : COLS-1;
-    for (let y=0;y<ROWS;y++){
-      if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe){
-        dist.set(keyOf(homeX,y), 0); open.push([0,homeX,y]);
-      }
-    }
+    for (let y=0;y<ROWS;y++)
+      if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe) seed(homeX,y);
   }
   // scenario lifelines (e.g. Leningrad's "Road of Life" over the Ladoga ice):
-  // hexes that count as supply sources while friendly-held
   for (const [sx,sy] of (SCN.supplySeeds && SCN.supplySeeds[side]) || []){
     const c = cityAt(sx,sy);
     if (c && c.owner !== side) continue;
-    if (passable(sx,sy) && occ[keyOf(sx,sy)] !== foe){
-      dist.set(keyOf(sx,sy), 0); open.push([0,sx,sy]);
-    }
+    if (passable(sx,sy) && occ[keyOf(sx,sy)] !== foe) seed(sx,sy);
   }
-  while (open.length){
-    open.sort((a,b)=>a[0]-b[0]);
-    const [c,x,y] = open.shift();
+  while (heap.size()){
+    const [c,x,y] = heap.pop();
     if (c > (dist.get(keyOf(x,y)) ?? 1e9)) continue;
     for (const [nx,ny] of neighbors(x,y)){
       const k = keyOf(nx,ny);
@@ -2262,9 +2334,9 @@ function computeSupply(side){
       if (occ[k] === foe) continue;
       if (foeZOC.has(k) && occ[k] !== side) continue;
       let nc = c + 1;
-      if (nc > range) continue;
-      if (cityKeys.has(k)) nc = 0;            // friendly city = forward depot
-      if (nc < (dist.get(k) ?? 1e9)){ dist.set(k, nc); open.push([nc,nx,ny]); }
+      if (nc > range) continue;                 // too far to reach — a city out here is no depot
+      if (cityKeys.has(k)) nc = 0;              // a city WITHIN reach is a forward depot
+      if (nc < (dist.get(k) ?? 1e9)){ dist.set(k, nc); heap.push(nc,nx,ny); }
     }
   }
   return new Set(dist.keys());
@@ -2345,10 +2417,9 @@ function reachable(u){
   const occ = {};
   for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
   const best = new Map([[keyOf(u.x,u.y), 0]]);
-  const open = [[0,u.x,u.y]];
-  while (open.length){
-    open.sort((a,b)=>a[0]-b[0]);
-    const [c,x,y] = open.shift();
+  const heap = makeHeap(); heap.push(0,u.x,u.y);
+  while (heap.size()){
+    const [c,x,y] = heap.pop();
     if (c > (best.get(keyOf(x,y)) ?? 1e9)) continue;
     if (foeZOC.has(keyOf(x,y)) && !(x===u.x&&y===u.y)) continue;  // ZOC: stop here
     for (const [nx,ny] of neighbors(x,y)){
@@ -2357,7 +2428,7 @@ function reachable(u){
       if (occ[k] === enemyOf(u.side)) continue;
       const nc = c + moveCost(u,nx,ny);
       if (nc > mp) continue;
-      if (nc < (best.get(k) ?? 1e9)){ best.set(k, nc); open.push([nc,nx,ny]); }
+      if (nc < (best.get(k) ?? 1e9)){ best.set(k, nc); heap.push(nc,nx,ny); }
     }
   }
   best.delete(keyOf(u.x,u.y));
@@ -2705,6 +2776,9 @@ function dateStr(turn){
 
 function startPhase(side){
   G.phase = side;
+  // the railhead creeps forward: engineers re-lay track behind the advance
+  if (railSide(side) && G.railDepth)
+    G.railDepth[side] = Math.min(COLS + 8, railDepthOf(side) + RAIL_RATE);
   for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; }
   for (const a of airOf(side)) a.mission = 'ready';   // patrols land, bombers rearm
   refreshSupply();
@@ -2898,10 +2972,9 @@ function distField(side, tx, ty){
   const occ = {};
   for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
   const f = new Map([[keyOf(tx,ty), 0]]);
-  const open = [[0,tx,ty]];
-  while (open.length){
-    open.sort((a,b)=>a[0]-b[0]);
-    const [c,x,y] = open.shift();
+  const heap = makeHeap(); heap.push(0,tx,ty);
+  while (heap.size()){
+    const [c,x,y] = heap.pop();
     if (c > (f.get(keyOf(x,y)) ?? 1e9)) continue;
     for (const [nx,ny] of neighbors(x,y)){
       if (!passable(nx,ny)) continue;
@@ -2910,7 +2983,7 @@ function distField(side, tx, ty){
       if (occ[k]===foe) step += 12;
       else if (foeZOC.has(k)) step += 1.5;
       const nc = c + step;
-      if (nc < (f.get(k) ?? 1e9)){ f.set(k,nc); open.push([nc,nx,ny]); }
+      if (nc < (f.get(k) ?? 1e9)){ f.set(k,nc); heap.push(nc,nx,ny); }
     }
   }
   dfCache[ck] = f;
@@ -3116,8 +3189,13 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   return s;
 }
 
-/* does parking a unit at (x,y) cut any Soviet unit out of supply? */
+/* does parking a unit at (x,y) cut any Soviet unit out of supply?
+   Recomputing enemy supply is expensive, so skip it unless this hex actually
+   sits on the enemy's doorstep — you can't pocket anyone from empty ground. */
 function cutoffValue(u, x, y){
+  let nearFoe = false;
+  for (const t of unitsOf('S')) if (hexDist(x,y,t.x,t.y) <= 2){ nearFoe = true; break; }
+  if (!nearFoe) return 0;
   const ox=u.x, oy=u.y;
   u.x=x; u.y=y;
   const net = computeSupply('S');
@@ -3374,6 +3452,7 @@ function deserialize(json){
   if (!G.air) G.air = AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s));   // migrate pre-air saves
   if (SCN.fuel) for (const u of G.units)                            // migrate pre-fuel saves
     if (KINDS[u.kind].fuel && u.fuel == null) u.fuel = FUEL_MAX;
+  if (SCN.railhead && !G.railDepth) G.railDepth = {G: RAIL_START, S: RAIL_START}; // pre-rail saves
   refreshSupply();
 }
 function saveGame(){
@@ -3739,6 +3818,60 @@ function hexPath(cx,cy,s){
   ctx.closePath();
 }
 
+/* Style A railhead overlay: a warm wash over the railed corridor, a rail line
+   with sleepers tracing from the home edge out to each forward depot, gold
+   diamonds on railed depot cities and hollow ones on captured-but-not-yet-railed
+   cities. Background art — nothing here is a counter. */
+function drawRailhead(){
+  const rn = railNetwork('G');
+  // 1. supplied-corridor wash, fading with distance from the edge
+  for (const k of rn.railed){
+    const [x,y] = k.split(',').map(Number);
+    if (terrainAt(x,y)==='~') continue;
+    const [cx,cy] = hexCenter(x,y);
+    const a = Math.max(0.04, 0.15 - (rn.dist.get(k)||0)*0.006);
+    hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(232,179,75,'+a.toFixed(3)+')'; ctx.fill();
+  }
+  // 2. rail line: trace every railed German city back to the edge via parents
+  const segs = new Set();
+  for (const c of G.cities){
+    if (c.owner!=='G' || !rn.railed.has(keyOf(c.x,c.y))) continue;
+    let k = keyOf(c.x,c.y);
+    while (rn.parent.has(k)){ const p = rn.parent.get(k); segs.add(k+'>'+p); k = p; }
+  }
+  ctx.lineCap = 'round';
+  for (const s of segs){                                  // the rail bed
+    const [k1,k2] = s.split('>');
+    const [x1,y1] = k1.split(',').map(Number), [x2,y2] = k2.split(',').map(Number);
+    const [ax,ay] = hexCenter(x1,y1), [bx,by] = hexCenter(x2,y2);
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
+    ctx.strokeStyle = '#1a140c'; ctx.lineWidth = 3.4; ctx.stroke();
+    ctx.strokeStyle = '#b9a06a'; ctx.lineWidth = 1.8; ctx.stroke();
+  }
+  for (const s of segs){                                  // the sleepers (ties)
+    const [k1,k2] = s.split('>');
+    const [x1,y1] = k1.split(',').map(Number), [x2,y2] = k2.split(',').map(Number);
+    const [ax,ay] = hexCenter(x1,y1), [bx,by] = hexCenter(x2,y2);
+    let dx=bx-ax, dy=by-ay; const len=Math.hypot(dx,dy)||1, nx=-dy/len, ny=dx/len;
+    const n = Math.max(2, Math.round(len/8));
+    ctx.strokeStyle = '#d8c48e'; ctx.lineWidth = 1.3;
+    for (let i=0;i<=n;i++){ const t=i/n, px=ax+dx*t, py=ay+dy*t;
+      ctx.beginPath(); ctx.moveTo(px-nx*3.6, py-ny*3.6); ctx.lineTo(px+nx*3.6, py+ny*3.6); ctx.stroke(); }
+  }
+  ctx.lineCap = 'butt';
+  // 3. forward-depot diamonds: gold = railed & supplying · hollow = captured, rail not here yet
+  for (const c of G.cities){
+    if (c.owner!=='G') continue;
+    const railed = rn.railed.has(keyOf(c.x,c.y));
+    const [cx,cy] = hexCenter(c.x,c.y);
+    ctx.save(); ctx.translate(cx, cy - S*0.52); ctx.rotate(Math.PI/4);
+    if (railed){ ctx.fillStyle = '#ffd98a'; ctx.fillRect(-3.2,-3.2,6.4,6.4);
+      ctx.strokeStyle='#7a5a16'; ctx.lineWidth=1; ctx.strokeRect(-3.2,-3.2,6.4,6.4); }
+    else { ctx.strokeStyle = '#b6b09a'; ctx.lineWidth = 1.4; ctx.strokeRect(-3,-3,6,6); }
+    ctx.restore();
+  }
+}
+
 function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = '#0a0c08'; ctx.fillRect(0,0,innerWidth,innerHeight);
@@ -3836,6 +3969,9 @@ function draw(){
       }
     }
   }
+
+  // the railhead: rail line, sleepers, supplied-corridor wash, forward depots
+  if (railSide('G') && G.railDepth) drawRailhead();
 
   // supply view: darken everything outside your network
   if (supplyView){
@@ -4780,7 +4916,7 @@ try { if (localStorage.getItem(SAVE_KEY)) $('btn-continue').classList.remove('hi
 if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor,
-    computeSupply, computeZOC, reachable, previewCombat, resolveCombat,
+    computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,

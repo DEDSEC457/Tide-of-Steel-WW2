@@ -32,7 +32,8 @@ deps, runs offline by double-clicking. Keep it that way.
 | `VETERANCY & HQ` | xp levels, vetMul, underHQ, previewGroup (combined arms) |
 | `FUEL (realistic mode)` | usesFuel/fuelOf, FUEL_MAX/REGEN/DEPOT/TRICKLE — gated by `SCN.fuel` |
 | `SCENARIOS.realistic =` | Realistic Mode — 60×36 front, `fuel`/`harshOOS` flags, g_mot/g_ss/s_cav kinds |
-| `============ SUPPLY` | computeSupply (edgeSupply, supplySeeds, range), ZOC |
+| `============ SUPPLY` | computeSupply (heap Dijkstra; edgeSupply, supplySeeds, range), ZOC, railNetwork |
+| `makeHeap` / `railNetwork` | binary heap for the hot Dijkstras; railhead BFS (SCN.railhead) |
 | `============ TERRITORY` | terr ownership grid → map tint + front line |
 | `============ MOVEMENT` | moveCost, reachable (HQ +1 mp, snow penalties) |
 | `============ COMBAT` | combatMods (the WHY factors list!), resolveCombat (groups, xp, advance) |
