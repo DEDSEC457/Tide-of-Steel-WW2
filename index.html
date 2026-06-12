@@ -268,6 +268,9 @@
        without winter equipment the men can barely hold their positions, let alone march.
        With it, the infantry keeps moving and the line holds far better — though no greatcoat
        will unfreeze a panzer's engine, or make a winter offensive easy.</p>
+    <p style="color:var(--dim);font-size:12px;margin-top:8px;">Short on production? The order can
+       still be placed on credit — your balance goes negative, and future income pays it off
+       (you can't reinforce or deploy until you're out of debt).</p>
     <div class="mrow">
       <button class="primary" id="btn-gear-buy">Divert the trains — winter equipment (10 ⚙)</button>
       <button id="btn-gear-front">"Home before the snow" — everything to the front</button>
@@ -489,10 +492,12 @@ function hasWinterGear(){ return G.winterGear === true; }
 function decideWinterGear(buy){
   if (!G || G.winterGear !== 'pending') return false;
   if (buy){
-    if (G.pp.G < WINTER_GEAR_COST) return false;
+    // the order can be placed on credit: production goes negative and
+    // future income pays it off (nothing else can be bought meanwhile)
     G.pp.G -= WINTER_GEAR_COST;
     G.winterGear = true;
-    logMsg('l-g', '⬛ Supply trains divert east — greatcoats, felt boots and stoves for three million men.');
+    logMsg('l-g', '⬛ Supply trains divert east — greatcoats, felt boots and stoves for three million men.' +
+      (G.pp.G < 0 ? ' The quartermasters run up a debt doing it.' : ''));
   } else {
     G.winterGear = false;
     logMsg('l-g', '⬛ "The campaign will be decided before winter." Every train carries ammunition and fuel.');
@@ -1673,7 +1678,6 @@ $('btn-event-close').onclick = ()=>{ sClick(); eventQueue.shift(); showNextEvent
 function maybeShowGear(){
   if (!G || G.winterGear !== 'pending' || G.phase !== 'G') return;
   if (G.mode !== 'hotseat' && G.playerSide !== 'G') return;   // AI Germany decides itself
-  $('btn-gear-buy').disabled = G.pp.G < WINTER_GEAR_COST;
   show('gear-modal', true);
 }
 $('btn-gear-buy').onclick  = ()=>{ if (decideWinterGear(true)){  sCity();  show('gear-modal', false); updateAll(); } };

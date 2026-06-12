@@ -238,12 +238,13 @@ console.log('— events & winter gear —');
   // the winter question is asked in mid-August
   G.turn = 9; E.startPhase('G');
   check('winter question offered turn 9', G.winterGear === 'pending', String(G.winterGear));
-  const poor = G.pp.G; G.pp.G = 3;
-  check('cannot buy gear without production', E.decideWinterGear(true)===false && G.winterGear==='pending');
-  G.pp.G = Math.max(poor, 14);
-  const before = G.pp.G;
-  check('buying gear costs 10 production',
-    E.decideWinterGear(true)===true && E.hasWinterGear() && G.pp.G === before-10);
+  // gear can always be bought — short funds just go on credit (negative pp)
+  G.pp.G = 8;
+  check('gear can be bought on credit',
+    E.decideWinterGear(true)===true && E.hasWinterGear() && G.pp.G === -2, 'pp='+G.pp.G);
+  const owed = G.pp.G;
+  E.startPhase('G');
+  check('income pays the debt down', G.pp.G > owed && G.winterGear === true, 'pp='+G.pp.G);
   // gear softens snow attacks a little (0.65 vs 0.6) and German defense a lot (0.9 vs 0.8)
   G.turn = 22;
   const att = E.unitsOf('G').find(u=>u.name==='9. Armee');
