@@ -149,6 +149,7 @@
       <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
       <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
+      <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
     </div>
     <div class="pick-row">
       <div class="pick p-ger sel" id="pick-ger">
@@ -729,6 +730,186 @@ SCENARIOS.winter41 = {
   ]; },
 };
 
+/* ---------- Scenario 3: Case Blue — Stalingrad, June–December 1942 ----------
+   A new map: the southern steppe from the Donets to the Volga and the
+   Caucasus foothills. The Don makes its great bend in the center; the
+   Volga runs down the east with Stalingrad on its bank; the Sea of Azov
+   and the Caspian pin the corners. Long flanks, brittle allies. */
+SCENARIOS.stalingrad = {
+  id: 'stalingrad',
+  title: 'CASE BLUE — STALINGRAD', short: 'STALINGRAD',
+  sub: 'SOUTHERN RUSSIA · JUNE — DECEMBER 1942 · TURN-BASED STRATEGY',
+  menu: {
+    ger: {h:'⬛ Germany (Axis)', p:'Drive east to the Volga and take the city that bears Stalin\'s name — but every kilometre stretches your flanks thinner, and they are held by allies.'},
+    sov: {h:'🟥 Soviet Union', p:'Trade the burning steppe for time. Hold the rubble of Stalingrad house by house while the reserves gather on the far bank for the counterblow.'},
+  },
+  cols: 30, rows: 20,
+  map: [
+  /*           0    5    10   15   20   25     */
+  /* 0*/ "..ff......r................r..",
+  /* 1*/ ".ff........r..............r...",
+  /* 2*/ ".....f......r.............r...",
+  /* 3*/ ".......f.....r...........r....",
+  /* 4*/ "..............r..........r....",
+  /* 5*/ "...hh..........r.........r....",
+  /* 6*/ ".................r......r.....",
+  /* 7*/ "..................r.....r.....",
+  /* 8*/ "...................r....r.....",
+  /* 9*/ "....................r...r.....",
+  /*10*/ "...................r....r.....",
+  /*11*/ "..................r......r....",
+  /*12*/ "................r........r....",
+  /*13*/ "..............r...........r...",
+  /*14*/ "............r.............rs..",
+  /*15*/ "..........r...hhh.........sr..",
+  /*16*/ "~~~~~~...r..hhhhhh.........r..",
+  /*17*/ "~~~~~~~~ss...hhhhhh.......~~~~",
+  /*18*/ "~~~~~~~~~~....hhhhhh....~~~~~~",
+  /*19*/ "~~~~~~~~~~~~...hhhh...~~~~~~~~",
+  ],
+  /* vp>0 are Axis objectives. Stalingrad is a fortress city on the Volga. */
+  cities: [
+    {x:2, y:0,  name:'Kursk',       vp:0, owner:'G'},
+    {x:3, y:3,  name:'Belgorod',    vp:0, owner:'G'},
+    {x:1, y:4,  name:'Kharkov',     vp:0, owner:'G'},
+    {x:3, y:9,  name:'Stalino',     vp:0, owner:'G'},
+    {x:4, y:13, name:'Taganrog',    vp:0, owner:'G'},
+    {x:8, y:1,  name:'Voronezh',    vp:1, owner:'S'},
+    {x:8, y:6,  name:'Rossosh',     vp:0, owner:'S'},
+    {x:10,y:9,  name:'Millerovo',   vp:0, owner:'S'},
+    {x:14,y:10, name:'Morozovsk',   vp:0, owner:'S'},
+    {x:19,y:9,  name:'Kalach',      vp:1, owner:'S'},
+    {x:23,y:9,  name:'Stalingrad',  vp:4, owner:'S'},
+    {x:17,y:12, name:'Kotelnikovo', vp:0, owner:'S'},
+    {x:8, y:15, name:'Rostov',      vp:2, owner:'S'},
+    {x:10,y:17, name:'Krasnodar',   vp:1, owner:'S'},
+    {x:14,y:18, name:'Maikop',      vp:2, owner:'S'},
+    {x:19,y:18, name:'Grozny',      vp:2, owner:'S'},
+    {x:20,y:14, name:'Elista',      vp:0, owner:'S'},
+    {x:25,y:14, name:'Astrakhan',   vp:1, owner:'S'},
+    {x:24,y:5,  name:'Kamyshin',    vp:0, owner:'S'},
+    {x:27,y:1,  name:'Saratov',     vp:0, owner:'S'},
+  ],
+  sovSpawns: [[23,9],[25,14],[24,5],[27,1],[29,4],[29,8],[29,12],[8,15],[20,14]],
+  gerSpawns: [[1,4],[2,0],[3,9],[0,2],[0,7],[0,12]],
+  /* Case Blue order of battle: a strong Axis spearhead, Soviet armies
+     still rebuilding after the Kharkov disaster. */
+  startUnits: [
+    // — Axis: Army Group B (north), Army Group A (south) —
+    ['g_inf','2. Armee',        1,1, 9],  ['g_ally','Hungarian 2nd',  1,3, 8],
+    ['g_pz' ,'4. Panzerarmee',  2,2, 10], ['g_inf','6. Armee',        2,5, 10],
+    ['g_ally','Italian 8th',    2,7, 8],  ['g_pz' ,'1. Panzerarmee',  2,8, 10],
+    ['g_ally','Romanian 3rd',   3,10, 8], ['g_inf','17. Armee',       2,11, 9],
+    ['g_ally','Romanian 4th',   3,12, 8], ['g_inf','11. Armee',       3,13, 8],
+    // — Soviet fronts: thin screens and the tank reserves —
+    ['s_inf','40th Army',  6,1, 6],  ['s_inf','21st Army',  6,4, 6],
+    ['s_inf','28th Army',  6,6, 6],  ['s_inf','38th Army',  7,8, 6],
+    ['s_inf','9th Army',   6,10, 6], ['s_inf','37th Army',  6,12, 6],
+    ['s_inf','12th Army',  7,14, 6], ['s_inf','56th Army',  8,15, 7],
+    ['s_tank','1st Tank Army', 13,7, 7], ['s_tank','4th Tank Army', 16,8, 7],
+    ['s_inf','62nd Army', 19,9, 7],  ['s_inf','64th Army',  17,10, 7],
+    ['s_inf','51st Army', 14,13, 6],
+  ],
+  sovSchedule: [
+    [3,'s_inf','63rd Army'], [4,'s_inf','60th Army'],
+    [5,'s_tank','13th Tank Corps'], [6,'s_inf','57th Army'],
+    [8,'s_inf','66th Army'], [9,'s_inf','24th Army'],
+    [10,'s_mil','Stalingrad Militia'], [11,'s_inf','1st Guards Army'],
+    [13,'s_tank','4th Mech Corps'], [15,'s_tank','5th Tank Army'],
+    [17,'s_inf','46th Army'], [19,'s_guard','2nd Guards Army'],
+    [21,'s_tank','26th Tank Corps'],
+  ],
+  generals: [
+    // — Axis —
+    {side:'G', unit:'6. Armee',        name:'Paulus',       def:1.10,
+     bio:'The methodical staff officer marching on Stalingrad — brilliant on paper, cautious in a crisis.'},
+    {side:'G', unit:'4. Panzerarmee',  name:'Hoth',         atk:1.10,
+     bio:'"Papa" Hoth again — his panzers swing between the Don and the Volga all summer.'},
+    {side:'G', unit:'1. Panzerarmee',  name:'von Kleist',   atk:1.10,
+     bio:'Driving for the Caucasus oil — the prize the whole war economy is aimed at.'},
+    {side:'G', unit:'11. Armee',       name:'von Manstein', atk:1.15,
+     bio:'Conqueror of Sevastopol — and the man who will be sent to break any encirclement.'},
+    // — Soviet —
+    {side:'S', unit:'62nd Army',       name:'Chuikov',      def:1.15,
+     bio:'"There is no land for us beyond the Volga." Master of the hugging defense in the rubble.'},
+    {side:'S', unit:'64th Army',       name:'Shumilov',     def:1.10,
+     bio:'Holds the southern shoulder of the city, rock-steady, for five months.'},
+    {side:'S', unit:'1st Tank Army',   name:'Moskalenko',   atk:1.10,
+     bio:'Counterattacks in the Don bend bleed the 6th Army a week at a time.'},
+    {side:'S', unit:'5th Tank Army',   name:'Romanenko',    atk:1.15,
+     bio:'His tank army is the northern pincer of Operation Uranus.'},
+    {side:'S', unit:'2nd Guards Army', name:'Malinovsky',   atk:1.10,
+     bio:'The finest army the USSR has yet fielded — held back for the killing blow.'},
+  ],
+  capitalDefense: {turn:10, range:3, def:1.3, city:'Stalingrad',
+    announce:'⭐ Stalingrad Front: Yeryomenko takes command in the burning city — every house a fortress, every cellar a strongpoint.'},
+  winterQuestion: {turn:16, cost:10},
+  events: [
+    {turn:1,  date:'28 June 1942',      title:'CASE BLUE',
+     text:'The summer offensive erupts across the southern steppe — a million men, aimed not at Moscow but at the Volga and the oil of the Caucasus. Directive No. 45 will soon split the drive in two: Stalingrad AND the oil, at once. The flanks grow longer every week.'},
+    {turn:2,  date:'4 July 1942',       title:'SEVASTOPOL FALLS',
+     text:'After 250 days of siege, the great fortress of the Crimea surrenders to Manstein\'s 11th Army. Hitler makes him Field Marshal — and begins wondering where else to spend his siege artillery.'},
+    {turn:5,  date:'28 July 1942',      title:'ORDER 227', pp:{S:2},
+     text:'"Panic-mongers and cowards must be exterminated on the spot. Not one step back!" Stalin\'s order is read to every company in the Red Army. Blocking detachments form behind the lines. The retreat across the steppe is over.'},
+    {turn:7,  date:'9 August 1942',     title:'THE OIL OF MAIKOP',
+     text:'Kleist\'s panzers roll into Maikop — the first Caucasus oilfield. They find it expertly wrecked: not a barrel will flow for a year. The prize the offensive was aimed at is already burning.'},
+    {turn:9,  date:'23 August 1942',    title:'FIRE ON THE VOLGA',
+     text:'Luftflotte 4 firebombs Stalingrad with a thousand sorties; perhaps 40,000 die in a single day, and the panzers reach the Volga north of the city. The Stukas have created the perfect fortress: a city of rubble.'},
+    {turn:12, date:'13 September 1942', title:'RATTENKRIEG',
+     text:'The first great assault goes into the city itself. The war shrinks to grain silos, stairwells and sewers — the Germans call it Rattenkrieg, the war of rats. Chuikov\'s men hug the enemy so close the Stukas cannot strike.'},
+    {turn:16, date:'14 October 1942',   title:'THE LAST ASSAULT',
+     text:'Paulus throws everything at the tractor works in the heaviest attack of the battle. The 62nd Army is split into islands with the Volga at its back — and holds. In Moscow, Zhukov and Vasilevsky put the finishing touches on something much bigger.'},
+    {turn:21, date:'19 November 1942',  title:'OPERATION URANUS', pp:{S:2},
+     text:'A million men, 13,500 guns. The Soviet pincers smash through the Romanian armies north and south of the city — exactly where the flanks were weakest. Within four days the spearheads will meet at Kalach, and the 6th Army will be inside the cauldron.'},
+    {turn:24, date:'12 December 1942',  title:'WINTER STORM',
+     text:'Manstein attacks through the snow toward the pocket — Operation Winter Storm. Inside, a quarter of a million men wait on a promise that the Luftwaffe cannot keep and a relief that will never arrive.'},
+  ],
+  maxTurn: 24,                              // 24 weeks: 28 Jun → mid-Dec 1942
+  startDate: Date.UTC(1942,5,28),
+  // a long hot summer, the October rasputitsa, then Uranus weather
+  weather(turn){ return turn>=21?'snow' : turn>=19?'freeze' : turn>=16?'mud' : 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=14 ? 6 : 5;           // the spearhead outruns the railheads
+    return turn<=8 ? 5 : turn<=16 ? 7 : 8;             // STAVKA hoards for the counterblow
+  },
+  // Axis objective points held at the end (14 total; history ≈ 6-7)
+  victoryTiers: [
+    [12,'DECISIVE AXIS VICTORY','The Volga is cut and the oil fields burn under German control. The Soviet south is broken — the war economy starves.'],
+    [9,'AXIS VICTORY','Stalingrad falls and the flanks hold. The city of Stalin is a German winter quarters — history takes a darker road.'],
+    [5,'STALEMATE — HISTORY REPEATS','Vast gains across the steppe — but the city holds, the flanks are brittle, and the winter belongs to the Red Army.'],
+    [3,'SOVIET VICTORY','The summer offensive dies on the Don. The Ostheer\'s last great attack has failed.'],
+    [0,'DECISIVE SOVIET VICTORY','Uranus closes the year of encirclements — the 6th Army dies in the steppe, and with it the myth of the Wehrmacht.'],
+  ],
+  sudden: {
+    axisCities: ['Stalingrad','Astrakhan'], minAxisUnits: 6,
+    axisTitle: 'DECISIVE AXIS VICTORY',
+    axisText:  'Stalingrad and Astrakhan have fallen — the Volga is severed and the Caucasus cut off. The Soviet war economy is strangled.',
+    sovTitle:  'DECISIVE SOVIET VICTORY',
+    sovText:   'The Axis southern wing is annihilated on the steppe. The road to the Dnieper — and Berlin — lies open.',
+  },
+  airInit: [
+    ['G','Luftflotte 4', 10],               // Richthofen's air fleet rules the steppe
+    ['S','8th Air Army', 5],
+  ],
+  sovAirSchedule: [
+    [8,  '16th Air Army', 6],
+    [18, '17th Air Army', 8],
+  ],
+  setup(st){
+    // Rostov's garrison is dug in; the 62nd holds the Don bend at Kalach
+    for (const [name,e] of [['56th Army',2],['62nd Army',1],['64th Army',1]]){
+      const u = st.units.find(t=>t.name===name);
+      if (u) u.entrench = e;
+    }
+  },
+  opening(playerSide){ return [
+    '28 June 1942 — CASE BLUE. The panzers roll east across the burning steppe, toward the Don, the Volga, and the oil.',
+    playerSide==='G'
+      ? 'Take Stalingrad before winter — and mind your flanks: your allies hold them.'
+      : 'Screen, delay, survive. The city must hold until the reserves are ready.',
+  ]; },
+};
+
 /* ---- current scenario: mutable mirrors the engine reads ---- */
 let SCN = null;
 let COLS, ROWS, MAP_ROWS, CITIES_INIT, TOTAL_VP, SOV_SPAWNS, GER_SPAWNS,
@@ -805,10 +986,10 @@ const TERRAIN = {
 const KINDS = {
   g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
   g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
-  g_ally: {side:'G', label:'Romanian Army',  atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  g_ally: {side:'G', label:'Allied Army',    atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
   s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
   s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
-  s_guard:{side:'S', label:'Siberian Guards',atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
+  s_guard:{side:'S', label:'Guards Army',    atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
   s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf'},
 };
 

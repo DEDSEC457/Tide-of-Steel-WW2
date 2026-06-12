@@ -4,7 +4,13 @@ Tyler's personal turn-based WW2 strategy game project. A fan-made hobby game —
 not affiliated with Paradox or the real Hearts of Iron series; the name is a
 loving nickname for "the strategy game I always wanted."
 
-**Campaign 1: Operation Barbarossa — Eastern Front 1941.**
+**Three campaigns**, picked from the main menu:
+- **⚙ Operation Barbarossa 1941** — Germany races the winter to Moscow
+- **❄ The Winter Counteroffensive 1941** — Zhukov throws the frozen Wehrmacht
+  back from the gates (now the *Soviets* attack)
+- **🏭 Case Blue — Stalingrad 1942** — a whole new southern map: the Don bend,
+  the Volga, the Caucasus oil — and Operation Uranus waiting in November
+
 The whole game is one file (`index.html`) that runs in any browser:
 **100% offline, no installs, no accounts, autosaves every turn.**
 
@@ -74,5 +80,6 @@ so you can see which feature moves the victory distribution.
 - **Factory evacuation** — dismantle industry in a threatened city: lose production
   now, gain it back behind the Urals later
 - **Partisans** — from October, partisan bands cut German supply behind the lines
-- Scenario starts (Smolensk crisis, the December counteroffensive)
-- Pacific theater: USA vs Japan carrier war (campaign 2?)
+- More scenarios — the framework makes them pure data: Smolensk crisis 1941,
+  Kursk 1943, the Destruction of Army Group Center 1944
+- Pacific theater: USA vs Japan carrier war
