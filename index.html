@@ -586,6 +586,27 @@ SCENARIOS.barbarossa = {
       ],
       ai(G){ return axisVP() >= 6 ? 1 : 0; },   // ahead of schedule? gun for Moscow; else bag Kiev
     },
+    {
+      id:'sorge', turn:15, side:'S',
+      date:'1 October 1941', title:'THE SORGE TELEGRAM',
+      text:'From Tokyo, Richard Sorge has radioed: <b>Japan will strike south</b>, not into Siberia. If you believe him, the divisions watching Manchuria can entrain for Moscow <i>now</i> — weeks before winter. If he is wrong, the Far East lies naked. Stalin has been burned by intelligence before.',
+      options:[
+        {label:'Trust Sorge — bring the Siberians west',
+         blurb:'Two fresh Siberian Guards divisions arrive immediately, ahead of the winter timetable. If Japan strikes north after all… that is next year\'s problem.',
+         log:'🟥 The Trans-Siberian thunders west — the Siberians will be at Moscow before the snow.',
+         apply(G){
+           for (const n of ['6th Siberian Gds','7th Siberian Gds']){
+             const s = deploySpots('S')[0];
+             if (s) G.units.push(makeUnit('s_guard', n, s[0], s[1]));
+           }
+         }},
+        {label:'Keep watching Japan — hedge the bet',
+         blurb:'The Far East stays garrisoned. STAVKA banks the production it saves on rail movement and raises new formations the careful way.',
+         log:'🟥 The Siberian divisions stay east of the Urals. Moscow must hold with what it has.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+6); }},
+      ],
+      ai(G){ return axisVP() >= 6 ? 0 : 1; },   // capital in danger? trust the spy
+    },
   ],
   /* "This week in 1941" — real dispatches from the historical war, shown as
      the matching game week begins. pp:{side:n} grants a small production
@@ -771,6 +792,55 @@ SCENARIOS.winter41 = {
   gerAI: 'defend',                  // the Westheer is on the back foot all winter — dig in
   sovAI: 'attack',                  // Zhukov's counteroffensive — Soviets push forward
   /* no winterQuestion: it is December, and the gamble has already been lost */
+  decisions: [
+    {
+      id:'haltbefehl', turn:2, side:'G',
+      date:'16 December 1941', title:'THE STAND-FAST ORDER',
+      text:'The generals beg permission to withdraw to a defensible winter line. The Führer\'s answer is the <b>Haltbefehl</b>: "Stand fast, not one step back — fanatical resistance in place." Brauchitsch is finished; Hitler takes personal command of the army. Obey, or trade ground for the army\'s life?',
+      options:[
+        {label:'Stand fast — fanatical resistance',
+         blurb:'Every division digs in where it stands. The line hardens immediately — but rigid defense bleeds production that flexible withdrawal would have saved.',
+         log:'⬛ The Haltbefehl: the army freezes in place and digs. There will be no retreat.',
+         apply(G){
+           for (const u of unitsOf('G'))
+             u.entrench = Math.min(effTerrain(u.x,u.y).dig, u.entrench+1);
+         }},
+        {label:'Fighting withdrawal to a winter line',
+         blurb:'Disengage and fall back in good order. Prepared positions are abandoned — every man starts digging anew — but the army saves its strength and its supply trains.',
+         log:'⬛ Against orders, the army leapfrogs back toward a shorter winter line.',
+         apply(G){
+           for (const u of unitsOf('G')) u.entrench = 0;
+           G.pp.G = Math.min(40, G.pp.G+7);
+         }},
+      ],
+      ai(G){ return 0; },   // the AI obeys the Führer — history's choice
+    },
+    {
+      id:'genoffensive', turn:5, side:'S',
+      date:'5 January 1942', title:'THE GENERAL OFFENSIVE',
+      text:'Moscow is saved — and Stalin smells total victory. He orders an offensive <b>along the entire front</b>, nine armies attacking everywhere at once. Zhukov protests: concentrate on Army Group Center and destroy it, or the attacks will everywhere be too weak. Stalin: "We must grind the Germans down with all speed."',
+      options:[
+        {label:'Attack everywhere — grind them down',
+         blurb:'Every army joins the offensive. The whole front surges — a little stronger everywhere, decisive nowhere.',
+         log:'🟥 The general offensive: nine armies attack from Leningrad to the Crimea.',
+         apply(G){
+           for (const u of unitsOf('S'))
+             u.str = Math.min(KINDS[u.kind].maxStr, u.str+1);
+         }},
+        {label:'Concentrate on Army Group Center — Zhukov\'s way',
+         blurb:'Mass the shock armies against the frozen Wehrmacht before Moscow. The spearhead units are heavily reinforced; the rest of the front holds.',
+         log:'🟥 Zhukov masses the Guards. One target: Army Group Center.',
+         apply(G){
+           const tgt = G.cities.filter(c=>c.owner==='G' && c.vp>0).sort((a,b)=>b.vp-a.vp)[0];
+           if (!tgt) return;
+           unitsOf('S').slice().sort((a,b)=>hexDist(a.x,a.y,tgt.x,tgt.y)-hexDist(b.x,b.y,tgt.x,tgt.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+           G.pp.S = Math.min(40, G.pp.S+2);
+         }},
+      ],
+      ai(G){ return 1; },   // the AI listens to Zhukov
+    },
+  ],
   events: [
     {turn:1,  date:'5 December 1941',  title:'THE SLEDGEHAMMER FALLS', pp:{S:2},
      text:'At dawn, in -25° cold, the Kalinin Front attacks. By the next day the whole Moscow line is ablaze. The German army — exhausted, frostbitten, 30 kilometres from the Kremlin — discovers the Red Army it destroyed three times over still has reserves.'},
@@ -949,6 +1019,54 @@ SCENARIOS.stalingrad = {
   capitalDefense: {turn:10, range:3, def:1.3, city:'Stalingrad',
     announce:'⭐ Stalingrad Front: Yeryomenko takes command in the burning city — every house a fortress, every cellar a strongpoint.'},
   winterQuestion: {turn:16, cost:10},
+  decisions: [
+    {
+      id:'directive45', turn:4, side:'G',
+      date:'23 July 1942', title:'DIRECTIVE No. 45',
+      text:'The summer drive is rolling and the Führer wants <b>everything at once</b>: Army Group A wheels south for the Caucasus oil while Army Group B takes Stalingrad — two offensives, diverging across a thousand kilometres of steppe. Halder calls it madness. Concentrate on one objective, or reach for both?',
+      options:[
+        {label:'Split the drive — Stalingrad AND the oil',
+         blurb:'Both prizes at once. The captured economy of the south pays dividends now — but the spearheads thin with every kilometre they diverge.',
+         log:'⬛ Directive 45: the army groups part ways across the steppe. The maps look magnificent.',
+         apply(G){ G.pp.G = Math.min(40, G.pp.G+7); }},
+        {label:'Concentrate on Stalingrad — Halder\'s way',
+         blurb:'One schwerpunkt. The divisions nearest the Volga are massed and reinforced; the oil can wait until the city of Stalin falls.',
+         log:'⬛ The panzers concentrate. One objective: the city on the Volga.',
+         apply(G){
+           const st = G.cities.find(c=>c.name==='Stalingrad') || {x:23,y:9};
+           unitsOf('G').slice().sort((a,b)=>hexDist(a.x,a.y,st.x,st.y)-hexDist(b.x,b.y,st.x,st.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+         }},
+      ],
+      ai(G){ return 1; },   // the AI takes Halder's advice, not history's
+    },
+    {
+      id:'volga', turn:12, side:'S',
+      date:'13 September 1942', title:'ACROSS THE VOLGA',
+      text:'Chuikov\'s 62nd Army is bleeding to death in the rubble, and every division STAVKA owns could be fed across the river into the furnace. Zhukov and Vasilevsky urge the opposite: send the <b>minimum</b> to hold the city, hoard everything else for the counterblow forming on the flanks. The city — or the encirclement?',
+      options:[
+        {label:'Feed the furnace — hold every street',
+         blurb:'Divisions cross the burning river by night. The defenders of Stalingrad are heavily reinforced and dig into the rubble — but the great counteroffensive is weakened before it begins.',
+         log:'🟥 Across the Volga by night ferry — into the city of fire. Not one step back.',
+         apply(G){
+           const st = G.cities.find(c=>c.name==='Stalingrad') || {x:23,y:9};
+           unitsOf('S').slice().sort((a,b)=>hexDist(a.x,a.y,st.x,st.y)-hexDist(b.x,b.y,st.x,st.y))
+             .slice(0,3).forEach(u=>{
+               u.str = Math.min(KINDS[u.kind].maxStr, u.str+2);
+               u.entrench = Math.min(effTerrain(u.x,u.y).dig, u.entrench+1);
+             });
+         }},
+        {label:'Hoard for Uranus — Zhukov\'s way',
+         blurb:'Chuikov gets just enough to keep a foothold. Everything else goes to the quiet flanks, where the Romanian lines are thin and November is coming.',
+         log:'🟥 STAVKA\'s answer is cold: the city must hold with what it has. The reserves ride north into the silence.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+7); }},
+      ],
+      ai(G){
+        const st = G.cities.find(c=>c.name==='Stalingrad');
+        return (st && st.owner==='S') ? 1 : 0;   // city safe? hoard. city falling? feed it.
+      },
+    },
+  ],
   events: [
     {turn:1,  date:'28 June 1942',      title:'CASE BLUE',
      text:'The summer offensive erupts across the southern steppe — a million men, aimed not at Moscow but at the Volga and the oil of the Caucasus. Directive No. 45 will soon split the drive in two: Stalingrad AND the oil, at once. The flanks grow longer every week.'},
@@ -1191,6 +1309,25 @@ SCENARIOS.dday = {
          }},
       ],
       ai(G){ return 1; },   // the strategically sound choice: don't deepen the trap
+    },
+    {
+      id:'panzers', turn:2, side:'S',
+      date:'7 June 1944', title:'RELEASE THE PANZERS',
+      text:'The invasion is ashore — and the panzer reserves that could throw it back into the sea sit idle, because <b>only the Führer can release them</b>, and no one at Berchtesgaden will wake him. Rommel: "If we don\'t throw the invaders into the sea within 24 hours, the war is lost." Von Rundstedt demands their release. The OKW hesitates: what if Normandy is the diversion, and the real blow falls at Calais?',
+      options:[
+        {label:'Release them now — Rommel\'s 24 hours',
+         blurb:'The armoured reserve rolls for the beaches at once, under the fighter-bombers, before the Allies are dug in. The panzer divisions arrive battle-ready.',
+         log:'⬛ The reserve is released. Panzer columns roll north under a sky that belongs to the enemy.',
+         apply(G){
+           unitsOf('S').filter(u=>KINDS[u.kind].sym==='arm')
+             .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+         }},
+        {label:'Hold for Calais — it may be a feint',
+         blurb:'Fortitude has worked: the OKW keeps the reserve watching the Pas-de-Calais. The army husbands its strength — and the men on the beaches fight alone.',
+         log:'⬛ "Normandy may be the diversion." The panzers wait for an invasion that will never come.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+6); }},
+      ],
+      ai(G){ return 0; },   // the AI wakes the Führer
     },
   ],
   events: [
