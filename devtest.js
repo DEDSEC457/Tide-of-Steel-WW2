@@ -2,11 +2,17 @@
 /* Headless test & balance harness for index.html.
    Runs the game's <script> in a sandbox (no DOM), validates the map and
    rules, then plays full AI-vs-AI campaigns to smoke-test and check balance.
-   Usage: node devtest.js [runs]                                     */
+   Usage: node devtest.js [runs] [--quiet]
+     --quiet / -q : print only failures and the final summary (saves tokens
+                    when an AI assistant reads the output — use for routine
+                    verification; drop it when debugging). */
 'use strict';
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+
+const QUIET = process.argv.includes('--quiet') || process.argv.includes('-q');
+const say = (...a) => { if (!QUIET) console.log(...a); };
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const m = html.match(/<script>([\s\S]*)<\/script>/);
@@ -17,14 +23,14 @@ vm.createContext(sandbox);
 vm.runInContext(m[1], sandbox, {filename: 'barbarossa.js'});
 const E = sandbox.module.exports;
 
-let failures = 0;
+let failures = 0, passes = 0;
 function check(name, cond, extra){
-  if (cond) { console.log('  ok  ' + name); }
+  if (cond) { passes++; say('  ok  ' + name); }
   else { failures++; console.log('  FAIL ' + name + (extra ? ' — ' + extra : '')); }
 }
 
 /* ---------------- static data validation ---------------- */
-console.log('— map & data —');
+say('— map & data —');
 check('map has '+E.ROWS+' rows', E.MAP_ROWS.length === E.ROWS);
 check('all rows are '+E.COLS+' chars',
   E.MAP_ROWS.every(r => r.length === E.COLS),
@@ -47,7 +53,7 @@ check('weather schedule', E.weatherFor(1)==='clear' && E.weatherFor(16)==='mud'
   && E.weatherFor(20)==='freeze' && E.weatherFor(22)==='snow');
 
 /* every scenario in the registry must be internally consistent */
-console.log('— scenario registry —');
+say('— scenario registry —');
 for (const id of Object.keys(E.SCENARIOS)){
   const s = E.SCENARIOS[id];
   const K = s.kinds || E.KINDS;
@@ -100,7 +106,7 @@ for (const id of Object.keys(E.SCENARIOS)){
 }
 
 /* coastal sanity: Riga, Odessa near sea; Moscow not */
-console.log('— rules sanity —');
+say('— rules sanity —');
 {
   const G = E.newGame('G','normal','ai');
   check('Germany opens, turn 1', G.turn===1 && G.phase==='G');
@@ -168,7 +174,7 @@ console.log('— rules sanity —');
 }
 
 /* air power */
-console.log('— air power —');
+say('— air power —');
 {
   E.newGame('G','normal','hotseat');
   const G = E.getState();
@@ -205,7 +211,7 @@ console.log('— air power —');
 }
 
 /* generals */
-console.log('— generals —');
+say('— generals —');
 {
   E.newGame('G','normal','hotseat');
   const G = E.getState();
@@ -257,7 +263,7 @@ console.log('— generals —');
 }
 
 /* territory control */
-console.log('— territory —');
+say('— territory —');
 {
   E.newGame('G','normal','hotseat');
   check('Moscow soil starts Soviet', E.terrOwner(24,4)==='S', E.terrOwner(24,4));
@@ -277,7 +283,7 @@ console.log('— territory —');
 }
 
 /* QoL: undo snapshot pattern & hotseat pass report */
-console.log('— QoL —');
+say('— QoL —');
 {
   E.newGame('G','normal','hotseat');
   const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
@@ -295,7 +301,7 @@ console.log('— QoL —');
 }
 
 /* veterancy, HQ command, and combined arms */
-console.log('— veterancy · HQ · combined arms —');
+say('— veterancy · HQ · combined arms —');
 {
   E.newGame('G','normal','hotseat');
   const pz  = E.unitsOf('G').find(u=>u.kind==='g_pz');
@@ -351,7 +357,7 @@ console.log('— veterancy · HQ · combined arms —');
 }
 
 /* combat readability: the forecast exposes a legible modifier breakdown */
-console.log('— combat readability —');
+say('— combat readability —');
 {
   E.newGame('G','normal','hotseat');
   const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');   // Guderian, +15% atk
@@ -377,7 +383,7 @@ console.log('— combat readability —');
 }
 
 /* strategic decisions */
-console.log('— decisions —');
+say('— decisions —');
 {
   // every scenario's decisions are well-formed and target real units/cities where named
   for (const id of Object.keys(E.SCENARIOS)){
@@ -420,7 +426,7 @@ console.log('— decisions —');
 }
 
 /* historical events & the winter question */
-console.log('— events & winter gear —');
+say('— events & winter gear —');
 {
   E.newGame('G','normal','hotseat');
   const G = E.getState();
@@ -479,7 +485,7 @@ console.log('— events & winter gear —');
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
-console.log(`— ${RUNS} AI-vs-AI campaigns —`);
+say(`— ${RUNS} AI-vs-AI campaigns —`);
 const results = {};
 let crashed = 0;
 const vpAt = {8:[], 15:[], 21:[], 28:[]};
@@ -521,7 +527,7 @@ for (let run=0; run<RUNS; run++){
     if (fell['Moscow']) moscowFell++;
     const r = G.result ? G.result.title : 'TIMEOUT';
     results[r] = (results[r]||0)+1;
-    console.log(`  run ${run+1}: ${r} — axis VP ${E.axisVP()}, ` +
+    say(`  run ${run+1}: ${r} — axis VP ${E.axisVP()}, ` +
       `G units ${E.unitsOf('G').length}, S units ${E.unitsOf('S').length}, ` +
       `losses G ${G.stats.G.lost} / S ${G.stats.S.lost}`);
   } catch(err){
@@ -532,7 +538,7 @@ for (let run=0; run<RUNS; run++){
 function MAXPHASES(){ return 28*2 + 10; }
 
 /* ---------------- every other scenario must play to completion too ---------------- */
-console.log('— scenario campaigns —');
+say('— scenario campaigns —');
 for (const id of Object.keys(E.SCENARIOS)){
   if (id === 'barbarossa') continue;                  // covered by the main sims above
   const res = {};
@@ -559,13 +565,13 @@ for (const id of Object.keys(E.SCENARIOS)){
       res[r] = (res[r]||0)+1;
     } catch(err){ bad++; res['CRASH: '+err.message] = (res['CRASH: '+err.message]||0)+1; }
   }
-  console.log(`  [${id}] ${JSON.stringify(res)} — axis VP ${E.axisVP()}`);
+  say(`  [${id}] ${JSON.stringify(res)} — axis VP ${E.axisVP()}`);
   check(`[${id}] campaigns complete without crashes`, bad===0);
 }
 E.loadScenario('barbarossa');                          // restore the default
 
 /* ---------------- UI smoke test (fake DOM) ---------------- */
-console.log('— UI smoke test —');
+say('— UI smoke test —');
 function uiSmoke(side){
   const els = new Map();
   const mkClassList = el => ({
@@ -659,11 +665,11 @@ for (const side of ['G','S']){
 }
 
 const avg = a => a.length ? (a.reduce((x,y)=>x+y,0)/a.length).toFixed(1) : '—';
-console.log('— balance summary —');
-console.log(`  results: ${JSON.stringify(results)}`);
-console.log(`  avg axis VP  t8=${avg(vpAt[8])}  t15=${avg(vpAt[15])}  t21=${avg(vpAt[21])}  end=${avg(vpAt[28])}`);
-console.log(`  city falls   Minsk t${avg(minskT)} (${minskT.length}/${RUNS})  Smolensk t${avg(smolenskT)} (${smolenskT.length}/${RUNS})  Kiev t${avg(kievT)} (${kievT.length}/${RUNS})  Moscow ${moscowFell}/${RUNS}`);
+say('— balance summary —');
+say(`  results: ${JSON.stringify(results)}`);
+say(`  avg axis VP  t8=${avg(vpAt[8])}  t15=${avg(vpAt[15])}  t21=${avg(vpAt[21])}  end=${avg(vpAt[28])}`);
+say(`  city falls   Minsk t${avg(minskT)} (${minskT.length}/${RUNS})  Smolensk t${avg(smolenskT)} (${smolenskT.length}/${RUNS})  Kiev t${avg(kievT)} (${kievT.length}/${RUNS})  Moscow ${moscowFell}/${RUNS}`);
 check('no crashes in campaign sims', crashed===0, crashed+' crashed');
 
-console.log(failures ? `\n${failures} FAILURE(S)` : '\nALL CHECKS PASSED');
+console.log(failures ? `\n${failures} FAILURE(S) (of ${passes+failures} checks)` : `ALL ${passes} CHECKS PASSED`);
 process.exit(failures ? 1 : 0);
