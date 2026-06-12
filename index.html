@@ -235,17 +235,17 @@
     <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 18px;">EASTERN FRONT 1941–1945 · REALISTIC MODE</div>
     <div style="font-size:52px;margin-bottom:10px;">🗺</div>
     <p style="color:var(--dim);font-size:14px;line-height:1.75;max-width:440px;margin:0 auto;">
-      The full Eastern Front at operational scale — playable now as an early preview.
-      Deeper logistics mechanics arrive in coming updates.
+      The full Eastern Front at operational scale, with fuel logistics and the
+      lethal pockets of the real war. Playable now — more depth still to come.
     </p>
     <div class="rm-features">
       <div class="rml">BUILD PROGRESS</div>
       <span style="color:var(--grn)">✔</span> &nbsp;Full 60×36 map — the Baltic to the Caucasus, 32 cities<br>
       <span style="color:var(--grn)">✔</span> &nbsp;Historical June '41 deployment — 3 army groups vs the border districts<br>
-      <span style="color:var(--grn)">✔</span> &nbsp;40-week campaign through the winter counteroffensive<br>
-      ◆ &nbsp;Fuel tracking for armored divisions — <i>coming</i><br>
-      ◆ &nbsp;Railhead &amp; forward depot logistics — <i>coming</i><br>
-      ◆ &nbsp;Motorized, SS &amp; allied Axis formations — <i>coming</i>
+      <span style="color:var(--grn)">✔</span> &nbsp;⛽ Fuel logistics — panzers outrun supply and culminate<br>
+      <span style="color:var(--grn)">✔</span> &nbsp;Motorized, SS Panzer &amp; cavalry formations<br>
+      <span style="color:var(--grn)">✔</span> &nbsp;Lethal encirclement — cut-off pockets fight weak and starve<br>
+      ◆ &nbsp;Railhead &amp; forward depot logistics — <i>coming</i>
     </div>
     <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:18px 0 0;">
       <div class="pick p-ger sel" id="rm-pick-ger" style="max-width:240px;">
@@ -1680,20 +1680,29 @@ SCENARIOS.realistic = {
     ger: {h:'⬛ Germany (Axis)', p:'Three army groups, one campaigning season. Leningrad, Moscow, the Donbas — take them before the winter, on a front two thousand kilometres wide.'},
     sov: {h:'🟥 Soviet Union', p:'Trade a continent for time. Hold the river lines, save the armies from the pockets, and when the snow falls — strike back.'},
   },
+  fuel: true,                                   // mechanized formations burn & refuel fuel
+  harshOOS: true,                               // pockets fight at a fraction and starve fast
   /* operational scale: ~40 km per hex, one week per turn. Movement is slower
      than arcade mode — a panzer group covers ~160 km a week in open country,
-     infantry half that. The tempo of the real campaign, not the arcade dash. */
+     infantry half that. The tempo of the real campaign, not the arcade dash.
+     fuel:true kinds burn fuel to move (see the FUEL section). */
   kinds: {
-    g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
-    g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm'},
-    g_ally: {side:'G', label:'Allied Army',    atk:3, def:3, mp:2, maxStr:8,  cost:8,  sym:'inf', color:'#5c5536'},
-    s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:2, maxStr:8,  cost:8,  sym:'inf'},
-    s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:4, maxStr:8,  cost:12, sym:'arm'},
-    s_guard:{side:'S', label:'Guards Army',    atk:6, def:6, mp:3, maxStr:10, cost:14, sym:'inf', winter:true, color:'#b04a18'},
-    s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#7a4a3a'},
-    g_hq:   {side:'G', label:'Army Group HQ',  atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
-    s_hq:   {side:'S', label:'Front HQ',       atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6e2620'},
+    g_inf:  {side:'G', label:'Infantry Army',    atk:5, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
+    g_mot:  {side:'G', label:'Motorized Corps',  atk:6, def:5, mp:3, maxStr:9,  cost:14, sym:'inf', fast:true, fuel:true, color:'#46504a'},
+    g_pz:   {side:'G', label:'Panzer Group',     atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true},
+    g_ss:   {side:'G', label:'SS Panzer Korps',  atk:9, def:7, mp:4, maxStr:10, cost:24, sym:'arm', fuel:true, color:'#23262b'},
+    g_ally: {side:'G', label:'Allied Army',      atk:3, def:3, mp:2, maxStr:8,  cost:8,  sym:'inf', color:'#5c5536'},
+    s_inf:  {side:'S', label:'Rifle Army',       atk:3, def:5, mp:2, maxStr:8,  cost:8,  sym:'inf'},
+    s_tank: {side:'S', label:'Tank Corps',       atk:5, def:4, mp:4, maxStr:8,  cost:12, sym:'arm', fuel:true},
+    s_cav:  {side:'S', label:'Cavalry Corps',    atk:4, def:4, mp:4, maxStr:7,  cost:9,  sym:'inf', fast:true, winter:true, color:'#7a6a3a'},
+    s_guard:{side:'S', label:'Guards Army',      atk:6, def:6, mp:3, maxStr:10, cost:14, sym:'inf', winter:true, color:'#b04a18'},
+    s_mil:  {side:'S', label:'Militia',          atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#7a4a3a'},
+    g_hq:   {side:'G', label:'Army Group HQ',    atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+    s_hq:   {side:'S', label:'Front HQ',         atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6e2620'},
   },
+  deployNames: {g_inf:'Ersatz Armee', g_mot:'Motorized Reserve', g_pz:'Panzer Reserve',
+    g_ss:'SS Reserve Korps', s_inf:'Reserve Army', s_tank:'Tank Reserve',
+    s_cav:'Cavalry Reserve', s_mil:'People’s Militia'},
   cols: 60, rows: 36,
   map: [
 /*           0    5    10   15   20   25   30   35   40   45   50   55     */
@@ -1779,10 +1788,12 @@ SCENARIOS.realistic = {
     ['g_inf','16th Army',          10,9],
     ['g_pz', '3rd Panzer Group',   10,11],
     ['g_inf','9th Army',           9, 12],
+    ['g_ss', 'SS Panzer Korps',    10,13],
     ['g_inf','4th Army',           9, 14],
     ['g_pz', '2nd Panzer Group',   9, 16],
     ['g_hq', 'AGC Headquarters',   6, 13],
     ['g_inf','6th Army',           8, 19],
+    ['g_mot','XXXIX Motorized',    7, 19],
     ['g_pz', '1st Panzer Group',   8, 21],
     ['g_inf','17th Army',          7, 23],
     ['g_ally','3rd Romanian Army', 8, 27],
@@ -1813,30 +1824,29 @@ SCENARIOS.realistic = {
     ['s_mil','Leningrad Militia',  23,4],
     ['s_inf','55th Army',          23,3,  8],
     ['s_inf','48th Army',          21,6,  7],
+    ['s_inf','23rd Army',          24,4,  8],
+    ['s_inf','42nd Army',          22,7,  7],
     ['s_inf','32nd Army',          37,10, 8],
     ['s_inf','24th Army',          30,11, 8],
     ['s_inf','22nd Army',          22,9,  7],
     ['s_hq', 'STAVKA Reserve',     36,11],
   ],
-  /* mobilization: the deluge. The USSR raised over 200 new divisions in 1941 —
-     the Red Army the Wehrmacht destroyed by August was simply replaced by October. */
+  /* mobilization: the USSR raised armies faster than the Ostheer could destroy
+     them — but the early waves are raw and the Germans get a couple of allied
+     armies of their own. Tuned so the historical stalemate is the median result. */
   sovSchedule: [
-    [2, 's_inf','28th Army'],     [3, 's_inf','29th Army'],
-    [3, 's_mil','Moscow Militia'],[4, 's_inf','30th Army'],
-    [5, 's_inf','31st Army'],     [5, 's_mil','Kiev Militia'],
-    [6, 's_inf','33rd Army'],     [7, 's_inf','34th Army'],
-    [8, 's_inf','40th Army'],     [8, 's_tank','1st Tank Corps'],
-    [9, 's_inf','43rd Army'],     [10,'s_guard','1st Guards Army'],
-    [11,'s_inf','49th Army'],     [12,'s_inf','50th Army'],
-    [13,'s_inf','52nd Army'],     [14,'s_inf','54th Army'],
-    [14,'g_inf','2nd Army'],      [15,'s_tank','2nd Tank Corps'],
-    [16,'s_inf','57th Army'],     [17,'s_inf','58th Army'],
-    [18,'s_guard','1st Shock Army'], [19,'s_inf','59th Army'],
+    [3, 's_inf','28th Army'],     [4, 's_mil','Moscow Militia'],
+    [5, 's_inf','29th Army'],     [6, 's_inf','30th Army'],
+    [8, 's_inf','31st Army'],     [9, 's_inf','33rd Army'],
+    [10,'s_guard','1st Guards Army'], [11,'s_inf','40th Army'],
+    [13,'s_inf','49th Army'],     [14,'g_inf','2nd Army'],
+    [15,'s_tank','2nd Tank Corps'], [16,'s_inf','52nd Army'],
+    [18,'s_guard','1st Shock Army'], [19,'s_inf','57th Army'],
     [20,'s_guard','1st Siberian Gds'], [20,'g_ally','8th Italian Army'],
-    [21,'s_guard','2nd Siberian Gds'], [22,'s_inf','60th Army'],
-    [23,'s_guard','3rd Siberian Gds'], [24,'s_tank','3rd Tank Corps'],
-    [25,'s_guard','4th Siberian Gds'], [26,'s_inf','61st Army'],
-    [28,'s_tank','5th Tank Corps'],    [30,'s_guard','2nd Shock Army'],
+    [21,'s_guard','2nd Siberian Gds'], [21,'s_cav','2nd Cavalry Corps'],
+    [23,'s_guard','3rd Siberian Gds'], [24,'s_cav','5th Cavalry Corps'],
+    [25,'s_guard','4th Siberian Gds'], [26,'s_inf','60th Army'],
+    [28,'s_tank','3rd Tank Corps'],    [30,'s_guard','2nd Shock Army'],
   ],
   generals: [
   {side:'G', unit:'2nd Panzer Group', name:'Guderian', atk:1.15,
@@ -1903,7 +1913,7 @@ SCENARIOS.realistic = {
     return 'clear';
   },
   pp(side, turn){
-    if (side==='G') return turn<=13 ? 8 : 6;            // overstretch after autumn
+    if (side==='G') return turn<=13 ? 9 : 6;            // overstretch after autumn
     return turn<=6 ? 5 : turn<=14 ? 8 : 11;             // Soviet mobilization ramps up
   },
   victoryTiers: [
@@ -1940,7 +1950,7 @@ SCENARIOS.realistic = {
     if (lm) lm.entrench = 2;
     // city garrisons start fortified — the blitz must be fought through them
     for (const u of st.units)
-      if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = 2;
+      if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = 1;
   },
   opening(playerSide){ return [
     '22 June 1941 — Operation Barbarossa begins on a front two thousand kilometres wide. ' +
@@ -2088,9 +2098,11 @@ function effTerrain(x,y){
 
 function makeUnit(kind, name, x, y, str){
   const k = KINDS[kind];
-  return { id: nextId++, kind, name, side:k.side, x, y,
+  const u = { id: nextId++, kind, name, side:k.side, x, y,
            str: str ?? k.maxStr, entrench: 0, moved:false, attacked:false,
            oos:false, oosTurns:0, xp:0 };
+  if (SCN && SCN.fuel && k.fuel) u.fuel = FUEL_MAX;
+  return u;
 }
 
 /* ============================ VETERANCY & HQ ============================ */
@@ -2119,6 +2131,16 @@ function underHQ(u){
   if (KINDS[u.kind].hq) return false;
   return unitsOf(u.side).some(h => KINDS[h.kind].hq && hexDist(u.x,u.y,h.x,h.y) <= HQ_RANGE);
 }
+
+/* ============================ FUEL (realistic mode) ============================ */
+/* Operational logistics. Mechanized formations (kinds flagged fuel:true) burn
+   fuel to move and refuel only while in supply — more when sitting on a depot
+   city. Panzers that outrun their supply lines run dry and must wait for the
+   trains, and the infantry, to catch up. All gated by SCN.fuel, so the five
+   arcade scenarios never touch a drop of it. */
+const FUEL_MAX = 18, FUEL_REGEN = 6, FUEL_DEPOT = 12, FUEL_TRICKLE = 2;
+function usesFuel(u){ return !!(SCN && SCN.fuel) && !!KINDS[u.kind].fuel; }
+function fuelOf(u){ return u.fuel == null ? FUEL_MAX : u.fuel; }
 
 /* combined-arms forecast — shared by the UI and the engine. Each attacker
    brings its own power; coordinating several adds synergy, and mixing armor
@@ -2318,6 +2340,7 @@ function reachable(u){
   if (wx==='snow' && u.side==='G' && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
     mp = Math.max(1, mp-1);
   if (underHQ(u)) mp += 1;                      // forward HQ keeps the formation moving
+  if (usesFuel(u)) mp = Math.min(mp, Math.max(1, fuelOf(u))); // low on fuel = short hops; dry = a 1-hex crawl back to supply
   const foeZOC = computeZOC(enemyOf(u.side));
   const occ = {};
   for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
@@ -2346,6 +2369,10 @@ function reachable(u){
 }
 
 function doMove(u, x, y){
+  if (usesFuel(u)){                              // burn fuel equal to the distance covered
+    const cost = reachable(u).get(keyOf(x,y));
+    u.fuel = Math.max(0, fuelOf(u) - (cost ?? hexDist(u.x,u.y,x,y)));
+  }
   u.x = x; u.y = y; u.moved = true; u.entrench = 0;
   const c = cityAt(x,y);
   if (c && c.owner !== u.side && !KINDS[u.kind].noCapture){
@@ -2381,8 +2408,8 @@ function combatMods(att, def){
   if (underHQ(att)) af('⌂ HQ command', HQ_MUL);
   if (underHQ(def)) df('⌂ HQ command', HQ_MUL);
   if (terrainAt(att.x,att.y)==='r') af('Attacking across river', RIVER_ATK);
-  if (att.oos) af('Attacker cut off', OOS_ATK);
-  if (def.oos) df('Defender cut off', OOS_DEF);
+  if (att.oos) af('Attacker cut off', SCN.harshOOS ? 0.35 : OOS_ATK);
+  if (def.oos) df('Defender cut off', SCN.harshOOS ? 0.60 : OOS_DEF);
   // concentric attack: every other friendly unit adjacent to the defender
   let ring = 0;
   for (const [nx,ny] of neighbors(def.x,def.y)){
@@ -2681,16 +2708,34 @@ function startPhase(side){
   for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; }
   for (const a of airOf(side)) a.mission = 'ready';   // patrols land, bombers rearm
   refreshSupply();
-  // attrition for cut-off units: pockets starve from the very first week
+  // attrition for cut-off units: pockets starve from the very first week. In
+  // realistic mode a formation that stays cut off TWO turns or more collapses
+  // twice as fast — so a deliberate encirclement is lethal, but a spearhead that
+  // briefly outruns supply and then reconnects (or takes a city) survives.
   for (const u of [...unitsOf(side)]){
     if (u.oos){
       u.oosTurns++;
-      u.str -= 1; G.stats[side].lost += 1; G.stats[enemyOf(side)].killed += 1;
+      const bleed = (SCN.harshOOS && u.oosTurns >= 2) ? 2 : 1;
+      u.str -= bleed; G.stats[side].lost += bleed; G.stats[enemyOf(side)].killed += bleed;
       if (u.str <= 0){
         killUnit(u);
         logMsg('sys', `${flag(side)} ${u.name} surrenders — starved out in the pocket.`);
       }
     } else u.oosTurns = 0;
+  }
+  // mechanized formations refuel when supplied — a depot city fills the tanks
+  // fast; an outrun spearhead gets only a trickle (fuel trucks, captured stocks),
+  // so it culminates and slows but never freezes solid mid-breakthrough
+  if (SCN.fuel) for (const u of unitsOf(side)){
+    if (!KINDS[u.kind].fuel) continue;
+    let gain;
+    if (u.oos) gain = FUEL_TRICKLE;
+    else {
+      const onDepot = !!cityAt(u.x,u.y) ||
+        neighbors(u.x,u.y).some(([nx,ny])=>{ const c=cityAt(nx,ny); return c && c.owner===side; });
+      gain = onDepot ? FUEL_DEPOT : FUEL_REGEN;
+    }
+    u.fuel = Math.min(FUEL_MAX, fuelOf(u) + gain);
   }
   G.pp[side] += ppFor(side, G.turn) + diffPP(side);
   if (G.pp[side] > 40) G.pp[side] = 40;
@@ -3327,6 +3372,8 @@ function deserialize(json){
   G = d.G; nextId = d.nextId;
   if (!G.scenario) G.scenario = SCN.id;
   if (!G.air) G.air = AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s));   // migrate pre-air saves
+  if (SCN.fuel) for (const u of G.units)                            // migrate pre-fuel saves
+    if (KINDS[u.kind].fuel && u.fuel == null) u.fuel = FUEL_MAX;
   refreshSupply();
 }
 function saveGame(){
@@ -4059,6 +4106,13 @@ function drawUnit(u, cx, cy){
   ctx.fillStyle = '#000a'; ctx.fillRect(-w/2+3, h/2-2.6, w-6, 2);
   ctx.fillStyle = frac > 0.55 ? '#7a9d54' : frac > 0.3 ? '#e8b34b' : '#e2493b';
   ctx.fillRect(-w/2+3, h/2-2.6, (w-6)*frac, 2);
+  // fuel strip just above it (realistic mode, mechanized only)
+  if (usesFuel(u)){
+    const ff = Math.max(0, Math.min(1, fuelOf(u)/FUEL_MAX));
+    ctx.fillStyle = '#000a'; ctx.fillRect(-w/2+3, h/2-4.7, w-6, 1.4);
+    ctx.fillStyle = ff > 0.5 ? '#5fa8d8' : ff > 0.2 ? '#e8b34b' : '#e2493b';
+    ctx.fillRect(-w/2+3, h/2-4.7, (w-6)*ff, 1.4);
+  }
   // entrench pips
   ctx.fillStyle = '#cfe6a8';
   for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-7, 3.5, 3.5);
@@ -4305,6 +4359,7 @@ function updateUnitCard(){
     <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
     <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
     <div class="statrow"><span>Movement</span><span>${k.mp}</span></div>
+    ${usesFuel(u) ? `<div class="statrow"><span>⛽ Fuel</span><span class="${fuelOf(u)<=3?'bad':fuelOf(u)>=FUEL_MAX?'good':''}">${fuelOf(u)} / ${FUEL_MAX}${fuelOf(u)<=0?' — DRY':''}</span></div>` : ''}
     ${(k.range||1)>1 ? `<div class="statrow"><span>Gunnery range</span><span>${k.range} hexes</span></div>` : ''}
     ${k.carrier ? `<div class="statrow"><span>Air operations</span><span>✈ floating airfield</span></div>` : ''}
     <div class="statrow"><span>Dug in</span><span>${'▮'.repeat(u.entrench)||'—'}</span></div>

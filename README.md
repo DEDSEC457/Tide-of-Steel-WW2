@@ -4,7 +4,9 @@ Tyler's personal turn-based WW2 strategy game project. A fan-made hobby game —
 not affiliated with Paradox or the real Hearts of Iron series; the name is a
 loving nickname for "the strategy game I always wanted."
 
-**Five campaigns**, picked from the main menu:
+Two ways to play, chosen from the main menu.
+
+**🎮 Arcade Mode — five campaigns**, streamlined and quick to learn:
 - **⚙ Operation Barbarossa 1941** — Germany races the winter to Moscow
 - **❄ The Winter Counteroffensive 1941** — Zhukov throws the frozen Wehrmacht
   back from the gates (now the *Soviets* attack)
@@ -14,6 +16,18 @@ loving nickname for "the strategy game I always wanted."
   day: float­ing airfields, fragile flattops, and the ambush of the century
 - **🟦 D-Day 1944** — the Allies hit five beaches: win the buildup race, take
   a port, break out of the bocage, and liberate Paris before autumn
+
+**🗺 Realistic Mode — War in the East 1941–42** *(early preview)* — the entire
+Eastern Front at operational scale on a 60×36 map, the Baltic to the Caucasus:
+- **⛽ Fuel logistics** — panzers, motorized and SS corps burn fuel to move and
+  refuel only in supply; a spearhead that outruns its trains runs dry and
+  culminates, exactly as the real ones did
+- **New formations** — Motorized Corps, SS Panzer Korps, and Soviet Cavalry,
+  on top of the rifle armies, tank corps and Guards
+- **Lethal encirclement** — cut-off pockets fight at a fraction *and* starve
+  fast; close a ring and hold it two turns and the trapped army collapses
+- A **40-week campaign** through the autumn mud, the deep winter and the Soviet
+  counteroffensive, with the historical mobilization deluge arriving by rail
 
 The whole game is one file (`index.html`) that runs in any browser:
 **100% offline, no installs, no accounts, autosaves every turn.**

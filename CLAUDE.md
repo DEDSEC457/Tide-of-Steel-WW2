@@ -30,6 +30,8 @@ deps, runs offline by double-clicking. Keep it that way.
 | `DEFAULT_KINDS` / `DEFAULT_SIDES` | Eastern-front unit types; side names/flags/colors |
 | `function loadScenario` | Sets the mutable mirrors (COLS, KINDS, EVENTS…) engine reads |
 | `VETERANCY & HQ` | xp levels, vetMul, underHQ, previewGroup (combined arms) |
+| `FUEL (realistic mode)` | usesFuel/fuelOf, FUEL_MAX/REGEN/DEPOT/TRICKLE — gated by `SCN.fuel` |
+| `SCENARIOS.realistic =` | Realistic Mode — 60×36 front, `fuel`/`harshOOS` flags, g_mot/g_ss/s_cav kinds |
 | `============ SUPPLY` | computeSupply (edgeSupply, supplySeeds, range), ZOC |
 | `============ TERRITORY` | terr ownership grid → map tint + front line |
 | `============ MOVEMENT` | moveCost, reachable (HQ +1 mp, snow penalties) |
