@@ -112,7 +112,7 @@
 <canvas id="map"></canvas>
 
 <div id="topbar" class="hidden">
-  <span class="t-title">⚙ BARBAROSSA</span>
+  <span class="t-title" id="game-title">⚙ BARBAROSSA</span>
   <span class="t-chip" id="date-chip"><b>Turn 1</b> · 22 Jun 1941</span>
   <span class="t-chip" id="wx-chip">Weather: <b>Clear</b></span>
   <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
@@ -143,8 +143,12 @@
 <!-- ============ TITLE / MENU ============ -->
 <div id="menu" class="modal-back">
   <div class="modal">
-    <h1>OPERATION BARBAROSSA</h1>
-    <div class="sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
+    <h1 id="menu-title">OPERATION BARBAROSSA</h1>
+    <div class="sub" id="menu-sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
+    <div class="opt-row" id="scn-row">
+      <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
+      <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
+    </div>
     <div class="pick-row">
       <div class="pick p-ger sel" id="pick-ger">
         <h4>⬛ Germany (Axis)</h4>
@@ -322,11 +326,25 @@
      - Production & the weather clock (Hearts of Iron)
    ===================================================================== */
 
-/* ============================ MAP DATA ============================ */
-/* 30 x 20 hexes, odd-r offset (pointy-top, odd rows shift right).
+/* ============================ SCENARIOS ============================ */
+/* All campaign-specific data lives here: map, armies, schedules, weather,
+   generals, events, victory conditions. The engine reads only the mutable
+   mirrors set by loadScenario() — adding a campaign means adding data. */
+const SCENARIOS = {};
+
+/* ---------- Scenario 1: Operation Barbarossa, June–December 1941 ----------
+   Map: 30 x 20 hexes, odd-r offset (pointy-top, odd rows shift right).
    ~ water   . plains   f forest   h hills   s swamp   r river        */
-const COLS = 30, ROWS = 20;
-const MAP_ROWS = [
+SCENARIOS.barbarossa = {
+  id: 'barbarossa',
+  title: 'OPERATION BARBAROSSA', short: 'BARBAROSSA',
+  sub: 'EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY',
+  menu: {
+    ger: {h:'⬛ Germany (Axis)', p:'Race the clock. Use your panzers to break through, encircle whole Soviet armies, and take Moscow before the winter snows stop you cold.'},
+    sov: {h:'🟥 Soviet Union', p:'Trade space for time. Hold the rivers and cities, never let your armies get surrounded, and bleed the invader until winter — then strike back.'},
+  },
+  cols: 30, rows: 20,
+  map: [
 /*           0    5    10   15   20   25     */
 /* 0*/ "~~~~~~~~~~~~~~.ffffff.ffff.fff",
 /* 1*/ "~~~~~~~~~~~~~..f.fff.f.ffff.ff",
@@ -348,20 +366,9 @@ const MAP_ROWS = [
 /*17*/ "..........~~~~~~~~~~~~~.......",
 /*18*/ "....~~~~~~~~~~~~~~~~~~~~~.....",
 /*19*/ "...~~~~~~~~~~~~~~~~~~~~~~~....",
-];
-
-const TERRAIN = {
-  '.': {name:'Plains',  move:1, def:1.00, dig:1, color:'#4a5234'},
-  'f': {name:'Forest',  move:2, def:1.30, dig:2, color:'#33422a'},
-  'h': {name:'Hills',   move:2, def:1.40, dig:2, color:'#56503a'},
-  's': {name:'Marshes', move:3, def:1.15, dig:1, color:'#3c4a42'},
-  'r': {name:'River',   move:3, def:0.85, dig:0, color:'#33505e'},
-  '~': {name:'Sea',     move:0, def:1.00, dig:0, color:'#1d2c38'},
-  'c': {name:'City',    move:1, def:1.70, dig:3, color:'#5a5648'}, // virtual: hex with a city
-};
-
-/* Cities: vp>0 are German objectives. owner 'G' | 'S'. */
-const CITIES_INIT = [
+  ],
+  /* Cities: vp>0 are Axis objectives. owner 'G' | 'S'. */
+  cities: [
   {x:1, y:3,  name:'Königsberg',     vp:0, owner:'G'},
   {x:2, y:7,  name:'Warsaw',         vp:0, owner:'G'},
   {x:1, y:15, name:'Bucharest',      vp:0, owner:'G'},
@@ -387,27 +394,13 @@ const CITIES_INIT = [
   {x:25,y:16, name:'Rostov',         vp:2, owner:'S'},
   {x:27,y:8,  name:'Voronezh',       vp:0, owner:'S'},
   {x:28,y:3,  name:'Yaroslavl',      vp:0, owner:'S'},
-];
-const TOTAL_VP = CITIES_INIT.reduce((a,c)=>a+c.vp,0);
-
-/* Soviet reinforcements appear at these (if friendly, supplied, empty), in order:
-   interior cities first — fresh armies form near the fighting, not just the far edge. */
-const SOV_SPAWNS = [[24,4],[18,8],[19,11],[27,8],[21,9],[25,16],[29,5],[29,9],[29,13],[28,3]];
-const GER_SPAWNS = [[1,2],[2,7],[1,15],[0,3],[0,5],[0,11]];
-
-/* ============================ UNIT TYPES ============================ */
-const KINDS = {
-  g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
-  g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
-  g_ally: {side:'G', label:'Romanian Army',  atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
-  s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
-  s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
-  s_guard:{side:'S', label:'Siberian Guards',atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
-  s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf'},
-};
-
-/* Starting order of battle. [kind, name, x, y, str] */
-const START_UNITS = [
+  ],
+  /* Reinforcements appear at these (if friendly, supplied, empty), in order:
+     interior cities first — fresh armies form near the fighting. */
+  sovSpawns: [[24,4],[18,8],[19,11],[27,8],[21,9],[25,16],[29,5],[29,9],[29,13],[28,3]],
+  gerSpawns: [[1,3],[2,7],[1,15],[0,3],[0,5],[0,11]],   // Königsberg, Warsaw, Bucharest + the frontier
+  /* Starting order of battle. [kind, name, x, y, str] */
+  startUnits: [
   // — Army Group North —
   ['g_inf','18. Armee',        4,2, 10], ['g_inf','16. Armee',  4,3, 10],
   ['g_pz' ,'4. Panzergruppe',  5,3, 10],
@@ -432,10 +425,9 @@ const START_UNITS = [
   ['s_tank','1st Mech Corps', 7,5, 7], ['s_tank','4th Mech Corps', 7,11,7],
   // — Reserve —
   ['s_inf','16th Army', 19,5, 7], ['s_inf','24th Army', 24,4, 8],
-];
-
-/* Soviet mobilization: extra units per turn [turn, kind, name]. */
-const SOV_SCHEDULE = [
+  ],
+  /* Soviet mobilization: extra units per turn [turn, kind, name]. */
+  sovSchedule: [
   [2,'s_inf','22nd Army'], [3,'s_inf','21st Army'], [3,'s_inf','29th Army'],
   [4,'s_inf','19th Army'],
   [4,'s_tank','5th Mech Corps'], [5,'s_inf','28th Army'], [6,'s_inf','30th Army'],
@@ -451,13 +443,11 @@ const SOV_SCHEDULE = [
   [22,'s_inf','59th Army'], [23,'s_guard','4th Siberian Gds'],
   [24,'s_guard','5th Siberian Gds'], [25,'s_inf','60th Army'],
   [26,'s_inf','61st Army'], [27,'s_inf','62nd Army'],
-];
-
-/* ============================ GENERALS ============================ */
-/* Named commanders attached to their historical formations. Small edges:
-   atk/def are multipliers, mp is extra movement. The bonus is lost with the
-   unit — generals go down with their commands, so guard them well. */
-const GENERALS = [
+  ],
+  /* Named commanders attached to their historical formations. Small edges:
+     atk/def are multipliers, mp is extra movement. The bonus is lost with the
+     unit — generals go down with their commands, so guard them well. */
+  generals: [
   // — German —
   {side:'G', unit:'2. Panzergruppe', name:'Guderian',     atk:1.15,
    bio:'"Schneller Heinz", father of the blitzkrieg — leads from a radio truck at the point of the spearhead.'},
@@ -484,55 +474,20 @@ const GENERALS = [
    bio:'His counterattacks out of the Pripyat marshes haunt the German flanks for months.'},
   {side:'S', unit:'4th Tank Corps',  name:'Katukov',      atk:1.15,
    bio:'Ambushes German armor with hull-down T-34s — Guderian learns his name at Mtsensk.'},
-];
-const GEN_BY_UNIT = new Map(GENERALS.map(g => [g.side+'|'+g.unit, g]));
-function generalOf(u){ return GEN_BY_UNIT.get(u.side+'|'+u.name) || null; }
-function genBonusText(g){
-  const b = [];
-  if (g.atk) b.push('+'+Math.round((g.atk-1)*100)+'% attack');
-  if (g.def) b.push('+'+Math.round((g.def-1)*100)+'% defense');
-  if (g.mp)  b.push('+'+g.mp+' movement');
-  return b.join(' · ');
-}
-
-/* Zhukov sits above army command. Recalled to the capital in early October
-   (turn 16 = 5 Oct 1941 — he arrived on the 7th), he directs the Moscow
-   defense: Soviet units fighting near a Soviet-held Moscow defend harder. */
-const ZHUKOV_TURN = 16, ZHUKOV_RANGE = 5, ZHUKOV_DEF = 1.25;
-function zhukovDefends(def){
-  if (def.side !== 'S' || G.turn < ZHUKOV_TURN) return false;
-  const moscow = G.cities.find(c => c.name === 'Moscow');
-  return moscow.owner === 'S' && hexDist(def.x, def.y, moscow.x, moscow.y) <= ZHUKOV_RANGE;
-}
-
-/* ============================ THE WINTER QUESTION ============================ */
-/* Mid-August: the Quartermaster-General reports winter clothing for barely
-   one man in five. Divert supply trains to winter equipment — or gamble,
-   as the OKH did, that the war ends before the snow falls? Without gear,
-   deep snow cripples German attack, defense and movement far harder. */
-const WINTER_GEAR_TURN = 9, WINTER_GEAR_COST = 10;
-function hasWinterGear(){ return G.winterGear === true; }
-function decideWinterGear(buy){
-  if (!G || G.winterGear !== 'pending') return false;
-  if (buy){
-    // the order can be placed on credit: production goes negative and
-    // future income pays it off (nothing else can be bought meanwhile)
-    G.pp.G -= WINTER_GEAR_COST;
-    G.winterGear = true;
-    logMsg('l-g', '⬛ Supply trains divert east — greatcoats, felt boots and stoves for three million men.' +
-      (G.pp.G < 0 ? ' The quartermasters run up a debt doing it.' : ''));
-  } else {
-    G.winterGear = false;
-    logMsg('l-g', '⬛ "The campaign will be decided before winter." Every train carries ammunition and fuel.');
-  }
-  return true;
-}
-
-/* ============================ HISTORICAL EVENTS ============================ */
-/* "This week in 1941" — real dispatches from the historical war, shown as
-   the matching game week begins. pp:{side:n} grants a small production
-   bonus. Pure static data keyed by turn — saves stay compatible. */
-const EVENTS = [
+  ],
+  /* Zhukov sits above army command. Recalled to the capital in early October
+     (turn 16 = 5 Oct 1941 — he arrived on the 7th), he directs the Moscow
+     defense: Soviet units fighting near the held capital defend harder. */
+  capitalDefense: {turn:16, range:5, def:1.25, city:'Moscow',
+    announce:'⭐ STAVKA recalls Army General Zhukov from Leningrad to command the Western Front — the defense of Moscow stiffens.'},
+  /* Mid-August: the Quartermaster-General reports winter clothing for barely
+     one man in five. Divert supply trains to winter equipment — or gamble,
+     as the OKH did, that the war ends before the snow falls? */
+  winterQuestion: {turn:9, cost:10},
+  /* "This week in 1941" — real dispatches from the historical war, shown as
+     the matching game week begins. pp:{side:n} grants a small production
+     bonus. Pure static data keyed by turn — saves stay compatible. */
+  events: [
   {turn:1,  date:'22 June 1941',      title:'OPERATION BARBAROSSA',
    text:'At 03:15 the guns open fire along an 1,800-kilometre front. Over three million Axis soldiers — the largest invasion force in history — cross into the Soviet Union. At noon it is Molotov, not Stalin, who tells the nation: “Our cause is just. The enemy will be beaten. Victory will be ours.”'},
   {turn:2,  date:'3 July 1941',       title:'STALIN SPEAKS', pp:{S:2},
@@ -559,7 +514,106 @@ const EVENTS = [
    text:'On the anniversary of the Revolution, with the front barely 70 kilometres away, Stalin holds the parade anyway. Fresh divisions march past Lenin’s tomb through the falling snow — and keep marching, straight to the front line.'},
   {turn:25, date:'7 December 1941',   title:'PEARL HARBOR',
    text:'Japanese carrier aircraft devastate the US Pacific Fleet at Pearl Harbor. Four days later, Hitler declares war on the United States. Whatever happens in the snow before Moscow, this is now a world war — and Germany cannot win a long one.'},
-];
+  ],
+  maxTurn: 28,                              // 28 weeks: 22 Jun 1941 → 4 Jan 1942
+  startDate: Date.UTC(1941,5,22),
+  // weather: turns 1-15 clear · 16-19 mud · 20-21 freeze · 22+ snow
+  weather(turn){ return turn>=22?'snow' : turn>=20?'freeze' : turn>=16?'mud' : 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=13 ? 6 : 4;           // overstretch after autumn
+    return turn<=6 ? 4 : turn<=14 ? 6 : 8;             // Soviet mobilization ramps up
+  },
+  // Axis victory tiers by objective points held at the end of the campaign
+  victoryTiers: [
+    [12,'DECISIVE AXIS VICTORY','The Soviet state collapses. Moscow has fallen and the Red Army is shattered — history takes a darker road.'],
+    [8,'AXIS OPERATIONAL VICTORY','The Wehrmacht winters deep inside Russia, better placed than history. But the giant is waking…'],
+    [5,'STALEMATE — HISTORY REPEATS','Like 1941 itself: vast gains, but the objectives held. Frozen soldiers stare at the spires of Moscow they will never reach.'],
+    [0,'SOVIET VICTORY','The invasion is broken on the Red Army’s back. The counteroffensive rolls west through the snow.'],
+  ],
+  sudden: {
+    axisCities: ['Moscow','Leningrad'], minAxisUnits: 5,
+    axisTitle: 'DECISIVE AXIS VICTORY',
+    axisText:  'Moscow and Leningrad have both fallen — Soviet command collapses. The war in the East is decided.',
+    sovTitle:  'DECISIVE SOVIET VICTORY',
+    sovText:   'The invading army has been annihilated. The Red Army marches west — years ahead of schedule.',
+  },
+  airInit: [
+    ['G','Luftflotte 2', 9],
+    ['G','Luftflotte 4', 7],
+    ['S','VVS West Front', 4],              // caught on the ground, 22 June 1941
+  ],
+  sovAirSchedule: [                         // the Red Air Force rebuilds: [turn, name, str]
+    [4,  'VVS Reserve Group', 6],
+    [9,  '1st Air Army', 7],
+    [18, 'Winter Air Command', 9],
+  ],
+  setup(st){
+    // Soviet border armies start partly dug in along the frontier
+    for (const u of st.units) if (u.side==='S' && u.x<=6) u.entrench = 1;
+    // Brest fortress: starts beyond supply range, dug in deep — holds out like 1941
+    const brest = st.units.find(u=>u.name==='4th Army');
+    if (brest) brest.entrench = 3;
+  },
+  opening(playerSide){ return [
+    '22 June 1941 — Operation Barbarossa begins. ' +
+      (playerSide==='G' ? 'Strike fast: winter is coming.' : 'Hold the line: winter is coming.'),
+    '✈ The Luftwaffe catches the Red Air Force on the ground — over 1,800 Soviet planes lost in a day.',
+  ]; },
+};
+
+/* ---- current scenario: mutable mirrors the engine reads ---- */
+let SCN = null;
+let COLS, ROWS, MAP_ROWS, CITIES_INIT, TOTAL_VP, SOV_SPAWNS, GER_SPAWNS,
+    START_UNITS, SOV_SCHEDULE, GENERALS, GEN_BY_UNIT, EVENTS,
+    AIR_INIT, SOV_AIR_SCHEDULE, MAX_TURN, START_DATE, VICTORY_TIERS;
+function loadScenario(id){
+  SCN = SCENARIOS[id] || SCENARIOS.barbarossa;
+  COLS = SCN.cols; ROWS = SCN.rows; MAP_ROWS = SCN.map;
+  CITIES_INIT = SCN.cities; TOTAL_VP = SCN.cities.reduce((a,c)=>a+c.vp,0);
+  SOV_SPAWNS = SCN.sovSpawns; GER_SPAWNS = SCN.gerSpawns;
+  START_UNITS = SCN.startUnits; SOV_SCHEDULE = SCN.sovSchedule;
+  GENERALS = SCN.generals; GEN_BY_UNIT = new Map(GENERALS.map(g => [g.side+'|'+g.unit, g]));
+  EVENTS = SCN.events;
+  AIR_INIT = SCN.airInit; SOV_AIR_SCHEDULE = SCN.sovAirSchedule;
+  MAX_TURN = SCN.maxTurn; START_DATE = SCN.startDate;
+  VICTORY_TIERS = SCN.victoryTiers;
+  return SCN;
+}
+loadScenario('barbarossa');
+
+/* ---- scenario-driven helpers ---- */
+function weatherFor(turn){ return SCN.weather(turn); }
+function ppFor(side, turn){ return SCN.pp(side, turn); }
+function generalOf(u){ return GEN_BY_UNIT.get(u.side+'|'+u.name) || null; }
+function genBonusText(g){
+  const b = [];
+  if (g.atk) b.push('+'+Math.round((g.atk-1)*100)+'% attack');
+  if (g.def) b.push('+'+Math.round((g.def-1)*100)+'% defense');
+  if (g.mp)  b.push('+'+g.mp+' movement');
+  return b.join(' · ');
+}
+function zhukovDefends(def){
+  const cd = SCN.capitalDefense;
+  if (!cd || def.side !== 'S' || G.turn < cd.turn) return false;
+  const cap = G.cities.find(c => c.name === cd.city);
+  return !!cap && cap.owner === 'S' && hexDist(def.x, def.y, cap.x, cap.y) <= cd.range;
+}
+function hasWinterGear(){ return G.winterGear === true; }
+function decideWinterGear(buy){
+  if (!G || G.winterGear !== 'pending') return false;
+  if (buy){
+    // the order can be placed on credit: production goes negative and
+    // future income pays it off (nothing else can be bought meanwhile)
+    G.pp.G -= SCN.winterQuestion.cost;
+    G.winterGear = true;
+    logMsg('l-g', '⬛ Supply trains divert east — greatcoats, felt boots and stoves for three million men.' +
+      (G.pp.G < 0 ? ' The quartermasters run up a debt doing it.' : ''));
+  } else {
+    G.winterGear = false;
+    logMsg('l-g', '⬛ "The campaign will be decided before winter." Every train carries ammunition and fuel.');
+  }
+  return true;
+}
 function fireEvents(){
   const evs = EVENTS.filter(e => e.turn === G.turn);
   for (const e of evs){
@@ -570,27 +624,32 @@ function fireEvents(){
   return evs;
 }
 
+/* ============================ TERRAIN & UNIT TYPES ============================ */
+const TERRAIN = {
+  '.': {name:'Plains',  move:1, def:1.00, dig:1, color:'#4a5234'},
+  'f': {name:'Forest',  move:2, def:1.30, dig:2, color:'#33422a'},
+  'h': {name:'Hills',   move:2, def:1.40, dig:2, color:'#56503a'},
+  's': {name:'Marshes', move:3, def:1.15, dig:1, color:'#3c4a42'},
+  'r': {name:'River',   move:3, def:0.85, dig:0, color:'#33505e'},
+  '~': {name:'Sea',     move:0, def:1.00, dig:0, color:'#1d2c38'},
+  'c': {name:'City',    move:1, def:1.70, dig:3, color:'#5a5648'}, // virtual: hex with a city
+};
+const KINDS = {
+  g_inf:  {side:'G', label:'Infantry Army',  atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
+  g_pz:   {side:'G', label:'Panzer Group',   atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+  g_ally: {side:'G', label:'Romanian Army',  atk:3, def:3, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  s_inf:  {side:'S', label:'Rifle Army',     atk:3, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+  s_tank: {side:'S', label:'Tank Corps',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm'},
+  s_guard:{side:'S', label:'Siberian Guards',atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', winter:true},
+  s_mil:  {side:'S', label:'Militia',        atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf'},
+};
+
 /* ============================ RULES CONSTANTS ============================ */
-const MAX_TURN = 28;                       // 28 weeks: 22 Jun 1941 → 4 Jan 1942
-const START_DATE = Date.UTC(1941,5,22);
 const ENTRENCH_DEF = 0.15;                 // +15% defense per dig-in pip
 const CONCENTRIC = 0.12;                   // +12% attack per extra adjacent friend
 const OOS_ATK = 0.4, OOS_DEF = 0.65;       // encircled: savage combat penalties
 const RIVER_ATK = 0.6;                     // attacking out of a river hex
-// weather: turns 1-15 clear · 16-19 mud · 20-21 freeze · 22+ snow
-function weatherFor(turn){ return turn>=22?'snow' : turn>=20?'freeze' : turn>=16?'mud' : 'clear'; }
 const WX_LABEL = {clear:'Clear', mud:'Mud — Rasputitsa', freeze:'Hard Frost', snow:'Deep Snow'};
-function ppFor(side, turn){
-  if (side==='G') return turn<=13 ? 6 : 4;             // overstretch after autumn
-  return turn<=6 ? 4 : turn<=14 ? 6 : 8;               // Soviet mobilization ramps up
-}
-// German victory tiers by objective points held at the end of turn 28
-const VICTORY_TIERS = [
-  [12,'DECISIVE AXIS VICTORY','The Soviet state collapses. Moscow has fallen and the Red Army is shattered — history takes a darker road.'],
-  [8,'AXIS OPERATIONAL VICTORY','The Wehrmacht winters deep inside Russia, better placed than history. But the giant is waking…'],
-  [5,'STALEMATE — HISTORY REPEATS','Like 1941 itself: vast gains, but the objectives held. Frozen soldiers stare at the spires of Moscow they will never reach.'],
-  [0,'SOVIET VICTORY','The invasion is broken on the Red Army’s back. The counteroffensive rolls west through the snow.'],
-];
 
 /* ============================ HEX MATH (odd-r offset, pointy-top) ============================ */
 function inMap(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
@@ -633,10 +692,12 @@ function makeUnit(kind, name, x, y, str){
            oos:false, oosTurns:0 };
 }
 
-function newGame(playerSide, difficulty, mode){
+function newGame(playerSide, difficulty, mode, scenario){
+  loadScenario(scenario || (SCN && SCN.id) || 'barbarossa');
   nextId = 1;
   G = {
-    turn: 1, phase: 'G',                       // Germany always moves first
+    scenario: SCN.id,
+    turn: 1, phase: 'G',                       // Axis always moves first
     playerSide, difficulty: difficulty||'normal', mode: mode||'ai',
     cities: CITIES_INIT.map(c => ({...c})),
     units: START_UNITS.map(([k,n,x,y,s]) => makeUnit(k,n,x,y,s)),
@@ -648,17 +709,11 @@ function newGame(playerSide, difficulty, mode){
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
   };
-  // Soviet border armies start partly dug in along the frontier
-  for (const u of unitsOf('S')) if (u.x<=6) u.entrench = 1;
-  // Brest fortress: starts beyond supply range, dug in deep — holds out like 1941
-  const brest = G.units.find(u=>u.name==='4th Army');
-  if (brest) brest.entrench = 3;
+  if (SCN.setup) SCN.setup(G);                 // scenario-specific touches (fortresses etc.)
   G.pp.G = ppFor('G',1) + diffPP('G');
   G.pp.S = ppFor('S',1) + diffPP('S');
   refreshSupply();
-  logMsg('sys', '22 June 1941 — Operation Barbarossa begins. ' +
-    (playerSide==='G' ? 'Strike fast: winter is coming.' : 'Hold the line: winter is coming.'));
-  logMsg('sys', '✈ The Luftwaffe catches the Red Air Force on the ground — over 1,800 Soviet planes lost in a day.');
+  for (const line of SCN.opening(playerSide)) logMsg('sys', line);
   fireEvents();
   return G;
 }
@@ -847,7 +902,7 @@ function combatMods(att, def){
   const ag = generalOf(att), dg = generalOf(def);
   if (ag && ag.atk) aMul *= ag.atk;
   if (dg && dg.def) dMul *= dg.def;
-  if (zhukovDefends(def)) dMul *= ZHUKOV_DEF;
+  if (zhukovDefends(def)) dMul *= SCN.capitalDefense.def;
   if (terrainAt(att.x,att.y)==='r') aMul *= RIVER_ATK;
   if (att.oos) aMul *= OOS_ATK;
   if (def.oos) dMul *= OOS_DEF;
@@ -1020,16 +1075,6 @@ function doDeploy(side, kind, x, y){
    your next turn), or rest to repair. Strikes only reach AIR_RANGE hexes
    from a city you control — airfields advance with the front. */
 const AIR_RANGE = 8;
-const AIR_INIT = [
-  ['G','Luftflotte 2', 9],
-  ['G','Luftflotte 4', 7],
-  ['S','VVS West Front', 4],     // caught on the ground, 22 June 1941
-];
-const SOV_AIR_SCHEDULE = [       // the Red Air Force rebuilds: [turn, name, str]
-  [4,  'VVS Reserve Group', 6],
-  [9,  '1st Air Army', 7],
-  [18, 'Winter Air Command', 9],
-];
 const AIR_MAXSTR = 10;
 function makeAir(side, name, str){ return {id:nextId++, side, name, str, mission:'ready'}; }
 function airOf(side){ return G.air.filter(a => a.side===side); }
@@ -1128,11 +1173,12 @@ function startPhase(side){
   G.pp[side] += ppFor(side, G.turn) + diffPP(side);
   if (G.pp[side] > 40) G.pp[side] = 40;
   // the winter question: asked in mid-August, and not open forever
-  if (side==='G' && G.winterGear == null && G.turn >= WINTER_GEAR_TURN && G.turn <= WINTER_GEAR_TURN+3){
+  const wq = SCN.winterQuestion;
+  if (wq && side==='G' && G.winterGear == null && G.turn >= wq.turn && G.turn <= wq.turn+3){
     G.winterGear = 'pending';
     logMsg('sys', '⬛ The Quartermaster-General reports: winter clothing for one soldier in five.');
     if (typeof onWinterDecision === 'function') onWinterDecision();
-  } else if (side==='G' && G.winterGear === 'pending' && G.turn > WINTER_GEAR_TURN+3){
+  } else if (wq && side==='G' && G.winterGear === 'pending' && G.turn > wq.turn+3){
     G.winterGear = false;
     logMsg('sys', '⬛ The railways are saturated — winter equipment stays in Warsaw depots. The army gambles on an early victory.');
   }
@@ -1172,8 +1218,9 @@ function endPhase(){
       if (msg) logMsg('sys', '❄ ' + msg);
     }
     fireEvents();
-    if (G.turn === ZHUKOV_TURN && G.cities.find(c=>c.name==='Moscow').owner==='S')
-      logMsg('sys', '⭐ STAVKA recalls Army General Zhukov from Leningrad to command the Western Front — the defense of Moscow stiffens.');
+    const cd = SCN.capitalDefense;
+    if (cd && G.turn === cd.turn && G.cities.find(c=>c.name===cd.city)?.owner==='S')
+      logMsg('sys', cd.announce);
     for (const [t,kind,name] of SOV_SCHEDULE){
       if (t === G.turn){
         const spot = deploySpots('S')[0];
@@ -1201,11 +1248,11 @@ function axisVP(){
 }
 function checkSuddenDeath(){
   if (G.over) return;
-  const moscow = G.cities.find(c=>c.name==='Moscow'), lenin = G.cities.find(c=>c.name==='Leningrad');
-  if (moscow.owner==='G' && lenin.owner==='G'){
+  const sd = SCN.sudden;
+  if (sd.axisCities && sd.axisCities.every(n => G.cities.find(c=>c.name===n)?.owner==='G')){
     endGame('axis-sudden'); return;
   }
-  if (unitsOf('G').length < 5){
+  if (unitsOf('G').length < (sd.minAxisUnits ?? 5)){
     endGame('soviet-sudden'); return;
   }
 }
@@ -1215,11 +1262,9 @@ function endGame(sudden){
   const vp = axisVP();
   let title, text;
   if (sudden==='axis-sudden'){
-    title = 'DECISIVE AXIS VICTORY';
-    text  = 'Moscow and Leningrad have both fallen — Soviet command collapses. The war in the East is decided.';
+    title = SCN.sudden.axisTitle; text = SCN.sudden.axisText;
   } else if (sudden==='soviet-sudden'){
-    title = 'DECISIVE SOVIET VICTORY';
-    text  = 'The invading army has been annihilated. The Red Army marches west — years ahead of schedule.';
+    title = SCN.sudden.sovTitle; text = SCN.sudden.sovText;
   } else {
     for (const [min,t,x] of VICTORY_TIERS){ if (vp >= min){ title=t; text=x; break; } }
   }
@@ -1307,7 +1352,7 @@ function aiAir(side){
 function aiSpend(side){
   // the winter question: insurance for gains worth holding — if there's cash to spare
   if (side==='G' && G.winterGear === 'pending')
-    decideWinterGear(G.pp.G >= WINTER_GEAR_COST + 4 && axisVP() >= 5);
+    decideWinterGear(G.pp.G >= SCN.winterQuestion.cost + 4 && axisVP() >= 5);
   aiAir(side);
   // 1. reinforce hurt units (cheap, in the rear first)
   const mine = unitsOf(side).slice().sort((a,b)=>
@@ -1364,7 +1409,7 @@ function gerPickTarget(u){
     const w = c.vp*3 - hexDist(u.x,u.y,c.x,c.y)*0.9;
     if (w > bestW){ bestW=w; best=c; }
   }
-  return best || G.cities.find(c=>c.name==='Moscow');
+  return best || G.cities.slice().sort((a,b)=>b.vp-a.vp)[0];
 }
 
 function gerScoreHex(u, x, y, df, isArm, myNet){
@@ -1447,7 +1492,7 @@ function sovPickCity(u){
     const w = sovThreat(c)*(c.vp+1)*3 - hexDist(u.x,u.y,c.x,c.y)*0.4;
     if (w > bestW){ bestW=w; best=c; }
   }
-  return best || G.cities.find(c=>c.name==='Moscow');
+  return best || G.cities.slice().sort((a,b)=>b.vp-a.vp)[0];
 }
 
 function sovScoreHex(u, x, y, df, myNet){
@@ -1565,7 +1610,9 @@ const SAVE_KEY = 'barbarossa-save-v1';
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
   const d = JSON.parse(json);
+  loadScenario((d.G && d.G.scenario) || 'barbarossa');               // saves remember their campaign
   G = d.G; nextId = d.nextId;
+  if (!G.scenario) G.scenario = SCN.id;
   if (!G.air) G.air = AIR_INIT.map(([sd,n,s]) => makeAir(sd,n,s));   // migrate pre-air saves
   refreshSupply();
 }
@@ -1599,7 +1646,7 @@ if (typeof document !== 'undefined') (function(){
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 const S = 34, HX = Math.sqrt(3)*S, VY = 1.5*S, M = 60;
-const MAPW = HX*(COLS+0.5)+M*2, MAPH = VY*(ROWS-1)+2*S+M*2;
+const mapW = () => HX*(COLS+0.5)+M*2, mapH = () => VY*(ROWS-1)+2*S+M*2;  // per-scenario size
 let cam = {x:0, y:0, z:1};
 let DPR = 1;
 
@@ -1611,10 +1658,11 @@ function resize(){
 window.addEventListener('resize', resize); resize();
 
 function fitCamera(){
-  const z = Math.min(innerWidth/MAPW, (innerHeight-60)/MAPH);
+  const mw = mapW(), mh = mapH();
+  const z = Math.min(innerWidth/mw, (innerHeight-60)/mh);
   cam.z = Math.max(0.45, Math.min(1.4, z));
-  cam.x = (MAPW - innerWidth/cam.z)/2;
-  cam.y = (MAPH - (innerHeight)/cam.z)/2 - 20/cam.z;
+  cam.x = (mw - innerWidth/cam.z)/2;
+  cam.y = (mh - (innerHeight)/cam.z)/2 - 20/cam.z;
 }
 function hexCenter(x,y){ return [M + HX*(x + 0.5*(y&1)) + HX/2, M + VY*y + S]; }
 function toScreen(px,py){ return [(px-cam.x)*cam.z, (py-cam.y)*cam.z]; }
@@ -1751,30 +1799,35 @@ aiSpeedLabel();
 
 $('wx-chip').onclick = ()=>{ if (!G) return; buildClock(); show('clock-modal', true); };
 $('btn-clock-close').onclick = ()=>show('clock-modal', false);
+const WX_FX = {
+  clear: ['Clear skies', 'Full marching speed. The attacker’s window — make your gains now.'],
+  mud:   ['Mud — Rasputitsa', 'Both sides: +1 movement cost everywhere, attacks ×0.5–0.6, air weakened.'],
+  freeze:['Hard frost', 'The ground hardens — movement is normal again, attacks ×0.9. A last window before the snow.'],
+  snow:  ['Deep snow', 'German attacks ×0.6 and defense ×0.8 (winter gear softens both), −1 German movement, the Luftwaffe nearly grounded. Winter-hardened troops attack ×1.2.'],
+};
 function buildClock(){
-  const phases = [
-    [1, 15, 'Clear skies',
-     'Full marching speed. The blitzkrieg window — Germany must make its gains now.'],
-    [16, 19, 'Mud — Rasputitsa',
-     'Both sides: +1 movement cost everywhere, attacks ×0.5–0.6, air weakened.'],
-    [20, 21, 'Hard frost',
-     'The ground hardens — movement is normal again, attacks ×0.9. Germany’s last window.'],
-    [22, MAX_TURN, 'Deep snow',
-     'German attacks ×0.6 and defense ×0.8 (winter gear softens both), −1 German movement, the Luftwaffe nearly grounded. Siberian Guards attack ×1.2.'],
-  ];
+  // derive the weather phases from this scenario's calendar
+  const segs = [];
+  for (let t=1; t<=MAX_TURN; t++){
+    const w = weatherFor(t);
+    if (!segs.length || segs[segs.length-1].w !== w) segs.push({w, a:t, b:t});
+    else segs[segs.length-1].b = t;
+  }
   let html = '';
-  for (const [a, b, name, fx] of phases){
+  for (const {w, a, b} of segs){
+    const [name, fx] = WX_FX[w] || [WX_LABEL[w]||w, ''];
     const now = G.turn >= a && G.turn <= b;
     html += `<div class="clk${now?' now':''}">
       <span class="c-turns">Turns ${a}–${b} · from ${dateStr(a)}</span>
       <div><b>${name}${now?` — NOW (turn ${G.turn})`:''}</b><br><span style="color:var(--dim)">${fx}</span></div></div>`;
   }
-  const gearNote = G.winterGear===true ? '✓ Winter equipment ordered — December will bite less.'
+  const gearNote = !SCN.winterQuestion ? ''
+    : G.winterGear===true ? '✓ Winter equipment ordered — December will bite less.'
     : G.winterGear===false ? '✗ No winter equipment — December will be brutal for the Wehrmacht.'
     : G.winterGear==='pending' ? '⚠ The winter question awaits an answer at German headquarters.'
-    : 'The winter question reaches German headquarters in mid-August (turn 9).';
+    : `The winter question reaches German headquarters in mid-August (turn ${SCN.winterQuestion.turn}).`;
   html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is one week.
-    The campaign ends after turn ${MAX_TURN} (week of ${dateStr(MAX_TURN)}).<br>${gearNote}</div>`;
+    The campaign ends after turn ${MAX_TURN} (week of ${dateStr(MAX_TURN)}).${gearNote?'<br>'+gearNote:''}</div>`;
   $('clock-body').innerHTML = html;
 }
 
@@ -2283,10 +2336,13 @@ $('btn-objectives').onclick = ()=>{
     `<div>${c.owner==='G'?'⬛':'🟥'} <b>${c.name}</b> — ${'★'.repeat(c.vp)} ${c.owner==='G'?'<span style="color:#9fb0c4">Axis-held</span>':'<span style="color:#e09a90">Soviet-held</span>'}</div>`).join('');
   $('obj-list').innerHTML = list;
   const vp = axisVP();
+  const tierLine = VICTORY_TIERS.slice(0,-1).map(([min,t])=>`★ ${min}+ ${t.toLowerCase()}`).join(' · ');
+  const lastTier = VICTORY_TIERS[VICTORY_TIERS.length-1][1].toLowerCase();
+  const sdc = SCN.sudden.axisCities;
   $('obj-summary').innerHTML =
     `Axis hold <b>${vp}</b> of ${TOTAL_VP} objective points. At the end of turn ${MAX_TURN}:<br>
-     ★ 12+ decisive Axis victory · 8+ Axis victory · 5–7 stalemate · under 5 Soviet victory.<br>
-     Capturing <b>both Moscow and Leningrad</b> ends the war at once.`;
+     ${tierLine} · otherwise ${lastTier}.` +
+    (sdc && sdc.length ? `<br>Capturing <b>${sdc.join(' and ')}</b> ends the war at once.` : '');
   show('obj-modal', true);
 };
 $('btn-obj-close').onclick = ()=>show('obj-modal', false);
@@ -2435,7 +2491,22 @@ function showEnd(){
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false); show('menu',true); $('btn-continue').classList.add('hidden'); };
 
 /* ---------------- menu ---------------- */
-let mSide='G', mDiff='normal', mMode='ai';
+let mSide='G', mDiff='normal', mMode='ai', mScn='barbarossa';
+function applyScenarioMenu(){
+  const s = SCENARIOS[mScn];
+  $('menu-title').textContent = s.title;
+  $('menu-sub').textContent = s.sub;
+  $('pick-ger').innerHTML = `<h4>${s.menu.ger.h}</h4><p>${s.menu.ger.p}</p>`;
+  $('pick-sov').innerHTML = `<h4>${s.menu.sov.h}</h4><p>${s.menu.sov.p}</p>`;
+}
+for (const el of document.querySelectorAll('#scn-row .opt')){
+  el.onclick = ()=>{
+    mScn = el.dataset.s;
+    document.querySelectorAll('#scn-row .opt').forEach(o=>o.classList.remove('sel'));
+    el.classList.add('sel');
+    applyScenarioMenu(); sClick();
+  };
+}
 $('pick-ger').onclick = ()=>{ mSide='G'; $('pick-ger').classList.add('sel'); $('pick-sov').classList.remove('sel'); };
 $('pick-sov').onclick = ()=>{ mSide='S'; $('pick-sov').classList.add('sel'); $('pick-ger').classList.remove('sel'); };
 for (const el of document.querySelectorAll('#diff-row .opt')){
@@ -2462,7 +2533,7 @@ $('btn-start').onclick = ()=>{
   startPendingUntil = 0;
   $('btn-start').textContent = 'BEGIN CAMPAIGN';
   eventQueue.length = 0;                       // drop popups from a previous campaign
-  newGame(mSide, mDiff, mMode);                // fires the turn-1 event
+  newGame(mSide, mDiff, mMode, mScn);          // fires the turn-1 event
   startCampaign();
 };
 $('btn-continue').onclick = ()=>{
@@ -2471,6 +2542,7 @@ $('btn-continue').onclick = ()=>{
 };
 function startCampaign(loaded){
   undoSnap = null;
+  $('game-title').textContent = '⚙ ' + SCN.short;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true);
   fitCamera();
@@ -2495,6 +2567,7 @@ if (typeof module !== 'undefined' && module.exports){
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
     GENERALS, generalOf, zhukovDefends,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner,
+    SCENARIOS, loadScenario,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };

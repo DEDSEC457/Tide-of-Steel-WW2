@@ -46,6 +46,50 @@ check('no two start units share a hex', E.START_UNITS.every(([k,n,x,y]) => {
 check('weather schedule', E.weatherFor(1)==='clear' && E.weatherFor(16)==='mud'
   && E.weatherFor(20)==='freeze' && E.weatherFor(22)==='snow');
 
+/* every scenario in the registry must be internally consistent */
+console.log('— scenario registry —');
+for (const id of Object.keys(E.SCENARIOS)){
+  const s = E.SCENARIOS[id];
+  const land = (x,y) => s.map[y] && s.map[y][x] && s.map[y][x] !== '~';
+  check(`[${id}] map is ${s.cols}x${s.rows}, legal terrain`,
+    s.map.length===s.rows && s.map.every(r=>r.length===s.cols && /^[.fhsr~]+$/.test(r)));
+  check(`[${id}] cities on land, unique hexes`,
+    s.cities.every(c=>land(c.x,c.y)) &&
+    new Set(s.cities.map(c=>c.x+','+c.y)).size===s.cities.length);
+  check(`[${id}] start units on land, unique hexes, known kinds`,
+    s.startUnits.every(([k,n,x,y])=>land(x,y) && E.KINDS[k]) &&
+    new Set(s.startUnits.map(u=>u[2]+','+u[3])).size===s.startUnits.length);
+  check(`[${id}] schedules use known kinds`, s.sovSchedule.every(r=>E.KINDS[r[1]]));
+  const names = new Set([...s.startUnits.map(u=>u[1]), ...s.sovSchedule.map(r=>r[2])]);
+  check(`[${id}] generals command real formations`, s.generals.every(g=>names.has(g.unit)));
+  check(`[${id}] events land inside the campaign`,
+    s.events.every(e=>e.turn>=1 && e.turn<=s.maxTurn && e.date && e.title && e.text));
+  check(`[${id}] victory tiers descend to 0`,
+    s.victoryTiers.every((t,i,a)=>i===0 || t[0] < a[i-1][0]) &&
+    s.victoryTiers[s.victoryTiers.length-1][0]===0);
+  check(`[${id}] sudden-death cities exist`,
+    !s.sudden.axisCities || s.sudden.axisCities.every(n=>s.cities.some(c=>c.name===n)));
+  check(`[${id}] capital-defense city exists`,
+    !s.capitalDefense || s.cities.some(c=>c.name===s.capitalDefense.city));
+  check(`[${id}] spawns are on land`,
+    [...s.sovSpawns, ...s.gerSpawns].every(([x,y])=>land(x,y)));
+  check(`[${id}] weather & pp defined for every turn`, (()=>{
+    for (let t=1;t<=s.maxTurn;t++)
+      if (!['clear','mud','freeze','snow'].includes(s.weather(t)) ||
+          !(s.pp('G',t)>0) || !(s.pp('S',t)>0)) return false;
+    return true;
+  })());
+}
+/* saves remember which scenario they belong to */
+{
+  E.newGame('G','normal','hotseat','barbarossa');
+  check('new games record their scenario', E.getState().scenario === 'barbarossa');
+  const snap = JSON.parse(E.serialize());
+  delete snap.G.scenario;
+  E.deserialize(JSON.stringify(snap));
+  check('pre-scenario saves default to Barbarossa', E.getState().scenario === 'barbarossa');
+}
+
 /* coastal sanity: Riga, Odessa near sea; Moscow not */
 console.log('— rules sanity —');
 {
