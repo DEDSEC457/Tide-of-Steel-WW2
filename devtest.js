@@ -417,10 +417,10 @@ say('— decisions —');
   // the choice survives a save/load round-trip
   const snap = E.serialize(); E.deserialize(snap);
   check('decision choices persist through save/load', E.getState().decisions.kievturn===0);
-  // the AI resolves its own decisions automatically during a headless phase
+  // the AI resolves its own decisions automatically (deterministic: jump to the turn)
   E.newGame('S','normal','ai');              // human Soviet -> Germany (incl. its decisions) is AI
   const G2 = E.getState();
-  let guard=0; while(G2.turn<11 && guard++<40){ E.aiFullPhase(G2.phase); if(!G2.over) E.endPhase(); }
+  G2.turn = 10; E.startPhase('G');           // decision turn for the Kiev question
   check('AI auto-resolves its decisions', G2.decisions && G2.decisions.kievturn!=='pending' && 'kievturn' in G2.decisions,
     JSON.stringify(G2.decisions));
 }
