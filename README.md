@@ -61,6 +61,14 @@ AI turn-speed toggle (normal/fast/instant), "units still ready" end-turn warning
 save-overwrite warning, hotseat turn reports — plus visible rain in the rasputitsa
 and falling snow, drifts and snow-capped forests in winter.
 
+**Looks & sound:** a drawn front line snakes across the map between the armies,
+coastlines glow, water shimmers, counters cast shadows, battles explode, and the
+edges of the map fade into the war room's dark. An **original orchestral score**
+— somber minor-key strings, a lone horn, distant timpani and a military snare —
+is synthesized live by the game itself (no audio files, still a single
+`index.html`). The Settings menu (🔊 button, or from the title screen) has
+sliders for music and effects volume.
+
 ## 🌐 Play from anywhere (optional)
 If you make this repo **public**, you can turn on GitHub Pages
 (*Settings → Pages → Deploy from branch → main*) and GitHub gives you a link like

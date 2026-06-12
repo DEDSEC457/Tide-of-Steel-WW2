@@ -105,6 +105,24 @@
   .pulse{animation:pulse 1.2s infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
+  /* ---------- polish pass ---------- */
+  button{background:linear-gradient(#262c1d,#181d12);box-shadow:0 1px 3px #0009;
+    transition:border-color .15s, color .15s, box-shadow .15s;}
+  button:hover{box-shadow:0 1px 6px #000b, 0 0 8px #e8b34b22;}
+  button.primary{background:linear-gradient(#564418,#3d3114);}
+  button.primary:hover{background:linear-gradient(#64511f,#473a18);}
+  .card{box-shadow:0 4px 16px #0008;border-radius:9px;}
+  .t-chip{background:linear-gradient(#222719,#191e12)!important;box-shadow:0 1px 3px #0008;}
+  .modal{animation:fadeUp .22s ease-out;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  #menu h1{animation:titleGlow 3.5s ease-in-out infinite alternate;}
+  @keyframes titleGlow{from{text-shadow:0 0 16px #e8b34b33;}to{text-shadow:0 0 34px #e8b34b88,0 0 80px #e8b34b22;}}
+  .pick{transition:border-color .15s, box-shadow .15s, background .15s;}
+  #hint{box-shadow:0 2px 10px #0008;}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0;font-size:14px;}
+  .setrow input[type=range]{width:150px;accent-color:var(--amber);}
+  .setrow .vlabel{color:var(--amber);min-width:42px;text-align:right;font-weight:600;}
+
   ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
 </style>
 </head>
@@ -181,6 +199,7 @@
     </div>
     <div class="mrow" style="justify-content:center;">
       <button id="btn-help">How to Play</button>
+      <button id="btn-settings-menu">Settings</button>
     </div>
     <div class="foot">Runs 100% on your PC — no internet needed. Progress autosaves every turn.</div>
   </div>
@@ -263,6 +282,24 @@
     <div class="mrow">
       <button class="primary" id="btn-end-menu">Back to Menu</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div id="settings-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:440px;">
+    <h2>SETTINGS</h2>
+    <div class="setrow"><span>🎵 Music volume</span>
+      <input type="range" id="vol-music" min="0" max="100" step="1">
+      <span class="vlabel" id="vol-music-val">40%</span></div>
+    <div class="setrow"><span>💥 Effects volume</span>
+      <input type="range" id="vol-sfx" min="0" max="100" step="1">
+      <span class="vlabel" id="vol-sfx-val">80%</span></div>
+    <div class="setrow"><span>🔇 Mute everything</span>
+      <button id="btn-mute">Sound: ON</button></div>
+    <div style="color:var(--dim);font-size:12px;margin-top:6px;">The soundtrack is an original score
+      played live by the game's own synthesizer — somber strings for a long war.</div>
+    <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
   </div>
 </div>
 
@@ -2403,29 +2440,126 @@ let undoSnap = null;       // serialized state before the player's last move
 let showSupply = false, supplyView = null;
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
+let vignette = null, vgW = 0, vgH = 0;
 
 const $ = id => document.getElementById(id);
 const show = (id,on) => $(id).classList.toggle('hidden', !on);
 
 /* ---------------- sound (tiny WebAudio synth) ---------------- */
 let AC = null;
+let sfxVol = 0.8, musicVol = 0.4;
+try {
+  const sv = parseFloat(localStorage.getItem('barb-sfxvol'));  if (!isNaN(sv)) sfxVol = sv;
+  const mv = parseFloat(localStorage.getItem('barb-musvol'));  if (!isNaN(mv)) musicVol = mv;
+} catch(e){}
 function ac(){ if (!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
 function tone(f, dur, type='square', vol=0.06, slide=0){
-  if (muted) return; const a = ac(); if (!a) return;
+  if (muted || sfxVol<=0) return; const a = ac(); if (!a) return;
   const o = a.createOscillator(), g = a.createGain();
   o.type = type; o.frequency.value = f;
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide), a.currentTime+dur);
-  g.gain.value = vol; g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+dur);
+  g.gain.value = vol*sfxVol; g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+dur);
   o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur);
 }
 function noise(dur, vol=0.12){
-  if (muted) return; const a = ac(); if (!a) return;
+  if (muted || sfxVol<=0) return; const a = ac(); if (!a) return;
   const n = a.sampleRate*dur, buf = a.createBuffer(1,n,a.sampleRate), d = buf.getChannelData(0);
   for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1-i/n);
   const src = a.createBufferSource(); src.buffer = buf;
-  const g = a.createGain(); g.gain.value = vol;
+  const g = a.createGain(); g.gain.value = vol*sfxVol;
   src.connect(g); g.connect(a.destination); src.start();
 }
+
+/* ---------------- soundtrack (original score, synthesized live) ----------------
+   In the somber-orchestral spirit of the grand-strategy classics: slow minor-key
+   string pads, a lone horn-like melody, distant timpani and a military snare.
+   Composed for this game — eight bars in A minor, looping with variations. */
+const MUSIC = {
+  bpm: 56,
+  bars: [   // ch: chord pad (Hz) · mel: [freq, beats] · drum/snare: percussion
+    {ch:[110.00,130.81,164.81], mel:[[329.63,2],[261.63,2]], drum:1},   // Am
+    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[220.00,2]]},           // F
+    {ch:[130.81,164.81,196.00], mel:[[196.00,2],[329.63,2]]},           // C
+    {ch:[ 98.00,123.47,146.83], mel:[[293.66,2],[246.94,2]], drum:1},   // G
+    {ch:[110.00,130.81,164.81], mel:[[220.00,4]]},                      // Am
+    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[293.66,2]]},           // F
+    {ch:[ 73.42, 87.31,110.00], mel:[[349.23,2],[293.66,2]], drum:1},   // Dm
+    {ch:[ 82.41,103.83,123.47], mel:[[329.63,4]], snare:1},             // E
+  ],
+};
+let musicGain = null, musicTimer = null, musicBar = 0;
+function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; }
+function startMusic(){
+  const a = ac(); if (!a || musicGain) return;
+  musicGain = a.createGain(); applyMusicVol();
+  musicGain.connect(a.destination);
+  scheduleBar();
+}
+function padNote(a, f, t, dur){
+  for (const det of [1, 1.004]){
+    const o = a.createOscillator(), fl = a.createBiquadFilter(), g = a.createGain();
+    o.type = 'sawtooth'; o.frequency.value = f*det;
+    fl.type = 'lowpass'; fl.frequency.value = 480; fl.Q.value = 0.4;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.045, t+1.1);
+    g.gain.setValueAtTime(0.045, t+dur-0.9);
+    g.gain.linearRampToValueAtTime(0.0001, t+dur+0.6);
+    o.connect(fl); fl.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t+dur+0.8);
+  }
+}
+function hornNote(a, f, t, dur){
+  const o = a.createOscillator(), fl = a.createBiquadFilter(), g = a.createGain();
+  const lfo = a.createOscillator(), lg = a.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  lfo.frequency.value = 4.6; lg.gain.value = 2.4;
+  lfo.connect(lg); lg.connect(o.frequency);
+  fl.type = 'lowpass'; fl.frequency.value = 1500;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.075, t+0.18);
+  g.gain.linearRampToValueAtTime(0.05, t+dur*0.7);
+  g.gain.linearRampToValueAtTime(0.0001, t+dur+0.25);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); lfo.start(t); o.stop(t+dur+0.4); lfo.stop(t+dur+0.4);
+}
+function timpani(a, t){
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(62, t); o.frequency.exponentialRampToValueAtTime(38, t+0.5);
+  g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.7);
+  o.connect(g); g.connect(musicGain); o.start(t); o.stop(t+0.8);
+}
+function snareHit(a, t, vol){
+  const n = a.sampleRate*0.07, buf = a.createBuffer(1,n,a.sampleRate), d = buf.getChannelData(0);
+  for (let i=0;i<n;i++) d[i] = (Math.random()*2-1)*(1-i/n);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const fl = a.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = 1800;
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(fl); fl.connect(g); g.connect(musicGain); src.start(t);
+}
+function scheduleBar(){
+  if (!musicGain || !AC) return;
+  const a = AC;
+  const beat = 60/MUSIC.bpm, barDur = beat*4;
+  const t = a.currentTime + 0.08;
+  const bar = MUSIC.bars[musicBar % MUSIC.bars.length];
+  const loop = Math.floor(musicBar / MUSIC.bars.length);
+  for (const f of bar.ch) padNote(a, f, t, barDur);
+  if (loop % 2 === 0){                                  // melody alternates with pad-only passes
+    let bt = 0;
+    for (const [f, beats] of bar.mel){ hornNote(a, f, t + bt*beat, beats*beat*0.96); bt += beats; }
+  }
+  if (bar.drum) timpani(a, t);
+  if (bar.snare) for (let i=0;i<3;i++) snareHit(a, t + barDur - (0.45 - i*0.15), 0.05 + i*0.015);
+  musicBar++;
+  musicTimer = setTimeout(scheduleBar, barDur*1000 - 60);
+}
+// the browser unlocks audio on the first gesture — start the score then
+window.addEventListener('pointerdown', ()=>{
+  const a = ac();
+  if (a && a.state === 'suspended') a.resume();
+  if (musicVol > 0) startMusic();
+}, {once:false});
 const sClick = ()=>tone(660,0.05,'square',0.04);
 const sMove  = ()=>tone(220,0.1,'triangle',0.05,-80);
 const sShot  = ()=>{ noise(0.18,0.1); tone(120,0.15,'sawtooth',0.05,-60); };
@@ -2441,6 +2575,7 @@ onLog = function(){
 onCityTaken = function(c){ if (c.vp>0) sCity(); };
 onGameOver = function(){ setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
+  boomAt(t.x, t.y, res.killed);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
 };
@@ -2555,6 +2690,7 @@ function draw(){
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
   if (!G) return;
   const wx = weatherFor(G.turn);
+  const now = performance.now();
 
   // terrain
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
@@ -2564,6 +2700,14 @@ function draw(){
     if (wx==='snow' && t!=='~') col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
     else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.'?'#54482e':'#463f2e';
     ctx.fillStyle = col; ctx.fill();
+    // subtle per-hex ground variation; living water shimmer
+    const hv = (x*2654435761 ^ y*40503) >>> 0;
+    if (t==='~' || t==='o'){
+      ctx.fillStyle = `rgba(255,255,255,${(0.022 + 0.018*Math.sin(now*0.0011 + hv)).toFixed(3)})`;
+    } else {
+      ctx.fillStyle = (hv & 1) ? 'rgba(255,255,255,0.030)' : 'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')';
+    }
+    ctx.fill();
     // translucent territory tint in each side's color
     const to = t!=='~' && terrOwner(x,y);
     if (to){
@@ -2609,6 +2753,35 @@ function draw(){
     ctx.restore();
   }
 
+  // coastlines, and the front line drawn on the shared edges between territories
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t1 = terrainAt(x,y);
+    const [ax,ay] = hexCenter(x,y);
+    for (const [nx,ny] of neighbors(x,y)){
+      if (ny<y || (ny===y && nx<x)) continue;                 // draw each edge once
+      const t2 = terrainAt(nx,ny);
+      const w1 = t1==='~'||t1==='o', w2 = t2==='~'||t2==='o';
+      const coast = w1 !== w2;
+      let front = false;
+      if (t1!=='~' && t2!=='~'){
+        const fa = terrOwner(x,y), fb = terrOwner(nx,ny);
+        front = !!fa && !!fb && fa!==fb;
+      }
+      if (!coast && !front) continue;
+      const [bx,by] = hexCenter(nx,ny);
+      const mx=(ax+bx)/2, my=(ay+by)/2;
+      let dx=bx-ax, dy=by-ay; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+      const ex=-dy*S*0.5, ey=dx*S*0.5;
+      ctx.beginPath(); ctx.moveTo(mx-ex,my-ey); ctx.lineTo(mx+ex,my+ey);
+      if (front){
+        ctx.strokeStyle = '#160d08'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.strokeStyle = '#c4453a'; ctx.lineWidth = 1.6; ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#cdbd8a55'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+  }
+
   // supply view: darken everything outside your network
   if (supplyView){
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
@@ -2625,7 +2798,9 @@ function draw(){
     ctx.fillStyle = c.owner==='G' ? '#3b414b' : '#6e2620';
     ctx.strokeStyle = '#000a'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.rect(-9,-2,7,9); ctx.rect(-1,-8,8,15); ctx.rect(8,1,6,6); ctx.fill(); ctx.stroke();
-    if (c.vp>0){ ctx.fillStyle = '#ffd34d'; star(0,-14,5); }
+    ctx.fillStyle = '#ffd98a66';                              // lit windows
+    ctx.fillRect(-7,0,2,2); ctx.fillRect(1,-5,2,2); ctx.fillRect(3,1,2,2); ctx.fillRect(9,2,2,2);
+    if (c.vp>0){ ctx.fillStyle = '#ffd34d2e'; star(0,-14,9.5); ctx.fillStyle = '#ffd34d'; star(0,-14,5); }
     ctx.font = '600 11px Segoe UI'; ctx.textAlign = 'center';
     ctx.fillStyle = '#000c'; ctx.fillText(c.name, 1, 25);
     ctx.fillStyle = c.vp>0 ? '#ffe9a8' : '#cfccba'; ctx.fillText(c.name, 0, 24);
@@ -2665,7 +2840,6 @@ function draw(){
   }
 
   // units
-  const now = performance.now();
   for (const u of G.units){
     let [cx,cy] = hexCenter(u.x,u.y);
     if (moveAnim && moveAnim.unit.id===u.id){
@@ -2677,16 +2851,46 @@ function draw(){
     drawUnit(u, cx, cy);
   }
 
-  // floating texts
+  // floating texts & explosions
   anims = anims.filter(a => now - a.t0 < 1100);
   for (const a of anims){
     const p = (now-a.t0)/1100;
+    if (a.type === 'boom'){
+      const pr = Math.min(1, p*1.7);
+      const r = (a.big?26:15)*pr + 4;
+      ctx.globalAlpha = (1-pr)*0.85;
+      ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3*(1-pr)+0.5;
+      ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = '#ff6b35';
+      for (let i=0;i<6;i++){
+        const ang = (a.seed + i*60) * Math.PI/180;
+        ctx.beginPath();
+        ctx.arc(a.x+Math.cos(ang)*r*1.15, a.y+Math.sin(ang)*r*1.15, 2.2*(1-pr)+0.4, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      continue;
+    }
     ctx.globalAlpha = 1-p;
     ctx.font = '700 15px Segoe UI'; ctx.textAlign='center';
     ctx.fillStyle = a.color;
     ctx.fillText(a.text, a.x, a.y - p*26);
     ctx.globalAlpha = 1;
   }
+
+  // vignette: focus the eye on the front
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if (!vignette || vgW!==innerWidth || vgH!==innerHeight){
+    const g2 = ctx.createRadialGradient
+      && ctx.createRadialGradient(innerWidth/2, innerHeight/2, Math.min(innerWidth,innerHeight)*0.45,
+                                  innerWidth/2, innerHeight/2, Math.max(innerWidth,innerHeight)*0.78);
+    if (g2 && g2.addColorStop){
+      g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(0,0,0,0.33)');
+      vignette = g2; vgW = innerWidth; vgH = innerHeight;
+    }
+  }
+  if (vignette){ ctx.fillStyle = vignette; ctx.fillRect(0,0,innerWidth,innerHeight); }
+  ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
 
   // falling weather: autumn rain in the mud, snowfall in winter (screen space)
   if (wx !== 'clear'){
@@ -2725,11 +2929,17 @@ function star(x,y,r){
 function drawUnit(u, cx, cy){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
-  // counter
+  // drop shadow, counter, bevel
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  roundRect(-w/2+2, -h/2+3, w, h, 5); ctx.fill();
   ctx.fillStyle = k.color || SIDES[u.side].color;
   roundRect(-w/2,-h/2,w,h,5); ctx.fill();
   ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
   ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.moveTo(-w/2+4,-h/2+1.3); ctx.lineTo(w/2-4,-h/2+1.3); ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+  ctx.beginPath(); ctx.moveTo(-w/2+4,h/2-1.3); ctx.lineTo(w/2-4,h/2-1.3); ctx.stroke();
   if (u.side===G.phase && u.moved && (u.attacked || !adjacentEnemies(u).length)){
     roundRect(-w/2,-h/2,w,h,5); ctx.fillStyle = '#00000055'; ctx.fill();
   }
@@ -2771,6 +2981,10 @@ function roundRect(x,y,w,h,r){
 function floatText(x,y,text,color){
   const [cx,cy] = hexCenter(x,y);
   anims.push({x:cx, y:cy-S*0.4, text, color, t0:performance.now()});
+}
+function boomAt(x,y,big){
+  const [cx,cy] = hexCenter(x,y);
+  anims.push({type:'boom', x:cx, y:cy, big:!!big, seed:(x*31+y*47)%360, t0:performance.now()});
 }
 
 (function loop(){
@@ -2875,6 +3089,7 @@ function playerAttack(att,def){
   clearUndo();
   sShot();
   const ev = resolveCombat(att,def);
+  if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
   if (ev.atkLoss>0) floatText(att.x,att.y,'-'+ev.atkLoss,'#ffd98a');
   if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
@@ -3058,12 +3273,34 @@ $('btn-help2').onclick = ()=>show('help-modal',true);
 $('btn-help-close').onclick = ()=>show('help-modal',false);
 
 /* ---------------- sound / menu buttons ---------------- */
-$('btn-sound').onclick = ()=>{
+/* ---------------- settings: volume sliders & mute ---------------- */
+function syncSoundUI(){
+  $('btn-sound').textContent = muted ? '🔇' : '🔊';
+  $('btn-mute').textContent = muted ? 'Sound: MUTED' : 'Sound: ON';
+  $('vol-music-val').textContent = Math.round(musicVol*100)+'%';
+  $('vol-sfx-val').textContent = Math.round(sfxVol*100)+'%';
+}
+$('btn-sound').onclick = ()=>{ $('vol-music').value = Math.round(musicVol*100);
+  $('vol-sfx').value = Math.round(sfxVol*100); syncSoundUI(); show('settings-modal', true); };
+$('btn-settings-menu').onclick = $('btn-sound').onclick;
+$('btn-settings-close').onclick = ()=>{ show('settings-modal', false); sClick(); };
+$('btn-mute').onclick = ()=>{
   muted = !muted;
   try{ localStorage.setItem('barb-muted', muted?'1':'0'); }catch(e){}
-  $('btn-sound').textContent = muted ? '🔇' : '🔊';
+  applyMusicVol(); syncSoundUI();
 };
-$('btn-sound').textContent = muted ? '🔇' : '🔊';
+$('vol-music').oninput = ()=>{
+  musicVol = $('vol-music').value/100;
+  try{ localStorage.setItem('barb-musvol', musicVol); }catch(e){}
+  if (musicVol > 0) startMusic();
+  applyMusicVol(); syncSoundUI();
+};
+$('vol-sfx').oninput = ()=>{
+  sfxVol = $('vol-sfx').value/100;
+  try{ localStorage.setItem('barb-sfxvol', sfxVol); }catch(e){}
+  syncSoundUI(); tone(440,0.08,'square',0.06);
+};
+syncSoundUI();
 $('btn-menu').onclick = ()=>{
   saveGame();
   show('menu', true);
@@ -3145,6 +3382,7 @@ function runAIPhase(){
     } else if (res && res.type==='attack'){
       sShot();
       const ev = res.ev;
+      if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
       if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
       if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
       updateAll();

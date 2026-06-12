@@ -509,7 +509,12 @@ function uiSmoke(side){
   if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();
   if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
   if ($('btn-undo').onclick) $('btn-undo').onclick();
-  $('btn-sound').onclick(); drain();
+  $('btn-sound').onclick();                  // opens the settings modal
+  if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }
+  if ($('vol-sfx').oninput){ $('vol-sfx').value = 70; $('vol-sfx').oninput(); }
+  if ($('btn-mute').onclick){ $('btn-mute').onclick(); $('btn-mute').onclick(); }
+  if ($('btn-settings-close').onclick) $('btn-settings-close').onclick();
+  drain();
   return {over: UI.getState().over, result: UI.getState().result, uiErrors};
 }
 for (const side of ['G','S']){
