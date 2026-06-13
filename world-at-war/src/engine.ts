@@ -385,19 +385,16 @@ function claimTerritory(): void {
   }
 }
 
+// Initial control = political map: each hex belongs to its own nation's coalition.
+// Neutrals (Spain, Sweden, Switzerland, the Balkans, Turkey…) stay uncontrolled (0)
+// and untinted until someone invades — the front line then grows from the fighting.
 function seedOwnership(): void {
   for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) {
-    if (!passable(col, row)) continue;
-    let dG = 999, dS = 999;
-    for (const u of G.units) {
-      const d = hexDist(col, row, u.col, u.row);
-      if (unitSide(u) === 'G') dG = Math.min(dG, d); else dS = Math.min(dS, d);
-    }
-    for (const c of G.cities) {
-      const d = hexDist(col, row, c.col, c.row);
-      if (c.owner === 'G') dG = Math.min(dG, d); else if (c.owner === 'S') dS = Math.min(dS, d);
-    }
-    G.ownership[row * COLS + col] = dG <= dS ? 1 : 2;
+    const i = row * COLS + col;
+    const id = nat[i];
+    if (id < 0) { G.ownership[i] = 0; continue; }
+    const side = nationSide(nations[id].name);
+    G.ownership[i] = side === 'G' ? 1 : side === 'S' ? 2 : 0;
   }
 }
 

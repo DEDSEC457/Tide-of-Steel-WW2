@@ -1,25 +1,28 @@
-// Bake the accurate 1938 Europe hex map to a canvas the GPU displays: War-in-the-
-// East style terrain (clear/forest/steppe/marsh/mountain/tundra/desert) with a
-// subtle nation tint, national borders, rivers and depth-graded sea.
+// Build the 1938 Europe hex map as VECTOR geometry (PixiJS Graphics) so it stays
+// razor-sharp at any zoom — every hex is a real filled polygon, not a baked image.
+// Same War-in-the-East colour treatment as before (per-biome colour + gentle
+// coherent-noise variation + seam softening + depth-graded sea + nation tint),
+// just painted as polygons instead of onto a canvas.
+import { Container, Graphics } from 'pixi.js';
 import { COLS, ROWS, SIZE, nat, terr, nations, rivers, hexCenter,
-         mapW, mapH, NB_EVEN, NB_ODD, hexToRgb } from './mapdata';
+         mapW as MAPW, mapH as MAPH, NB_EVEN, NB_ODD, hexToRgb } from './mapdata';
 
 type RGB = [number, number, number];
 const lerp = (a: RGB, b: RGB, t: number): RGB => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
 
 // terrain palette (id → colour), muted/realistic like War in the East
 const TERR: Record<number, RGB> = {
-  1: [168, 180, 102],  // plains (light yellow-green)
-  2: [82, 124, 66],    // forest (distinct, richer green)
+  1: [168, 180, 102],  // plains
+  2: [82, 124, 66],    // forest
   3: [156, 144, 98],   // hills
   4: [138, 120, 96],   // mountain
   5: [118, 152, 128],  // marsh
-  6: [212, 162, 88],   // steppe (clear orange)
-  7: [186, 192, 182],  // tundra (pale snow)
+  6: [212, 162, 88],   // steppe
+  7: [186, 192, 182],  // tundra
   8: [218, 196, 140],  // desert
   9: [184, 176, 104],  // mediterranean
-  10: [158, 166, 84],  // wooded steppe (khaki — forest↔steppe transition)
-  11: [126, 152, 116], // taiga (sub-arctic — bridges forest↔tundra)
+  10: [158, 166, 84],  // wooded steppe
+  11: [126, 152, 116], // taiga
 };
 const SEA_SHALLOW: RGB = [96, 142, 178], SEA_DEEP: RGB = [40, 74, 116];
 const nationRgb = nations.map(n => hexToRgb(n.color));
@@ -30,7 +33,7 @@ function noise(x: number, y: number) { const xi=Math.floor(x), yi=Math.floor(y),
   const a=vhash(xi,yi), b=vhash(xi+1,yi), c=vhash(xi,yi+1), d=vhash(xi+1,yi+1);
   return (a+(b-a)*u)*(1-v) + (c+(d-c)*u)*v; }
 
-// distance (in hexes) from each sea hex to the nearest land — for sea depth
+// distance (in hexes) from each sea hex to nearest land — for sea depth shading
 function seaDepth(): Int16Array {
   const d = new Int16Array(COLS*ROWS).fill(9999);
   const qx: number[] = [], qy: number[] = [];
@@ -44,33 +47,28 @@ function seaDepth(): Int16Array {
   return d;
 }
 
-export interface Baked { canvas: HTMLCanvasElement; }
+const clamp255 = (v: number) => v < 0 ? 0 : v > 255 ? 255 : v|0;
+const toHex = (c: RGB) => (clamp255(c[0])<<16) | (clamp255(c[1])<<8) | clamp255(c[2]);
 
-export function bakeTerrain(): Baked {
-  const PAD = 2;
-  const W = Math.ceil(mapW) + PAD*2, H = Math.ceil(mapH) + PAD*2;
-  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
+export const PAD = 2;
+
+export interface BuiltMap { layer: Container; mapW: number; mapH: number; }
+
+export function buildTerrain(): BuiltMap {
+  const W = Math.ceil(MAPW) + PAD*2, H = Math.ceil(MAPH) + PAD*2;
   const depth = seaDepth();
 
-  const hexPath = (cx: number, cy: number) => {
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) { const a = (-90 + 60*i) * Math.PI/180, x = cx + SIZE*Math.cos(a), y = cy + SIZE*Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-    ctx.closePath();
-  };
-  const rgb = (c: RGB) => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
-
-  // 1) base terrain colour per land hex (distinct per biome) + gentle variation
+  // 1) base terrain colour per land hex + gentle variation
   const base: (RGB | null)[] = new Array(COLS*ROWS).fill(null);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const i = r*COLS+c; if (nat[i] < 0) continue;
     const t = terr[i], tc = TERR[t] || TERR[1];
-    const lf = noise(c*0.26, r*0.26) * 8;                  // subtle light/dark
-    const hf = noise(c*0.62, r*0.62) * (t===4 ? 10 : 4);   // fine grain
+    const lf = noise(c*0.26, r*0.26) * 8;
+    const hf = noise(c*0.62, r*0.62) * (t===4 ? 10 : 4);
     base[i] = [tc[0]+lf+hf, tc[1]+lf+hf, tc[2]+(lf+hf)*0.85];
   }
   // 2) soften ONLY the seams between different terrain types — interiors stay crisp
-  for (let pass = 0; pass < 1; pass++) {
+  {
     const src = base.map(c => c ? [c[0], c[1], c[2]] as RGB : null);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const i = r*COLS+c, s = src[i]; if (!s) continue;
@@ -80,42 +78,70 @@ export function bakeTerrain(): Baked {
       if (dn > 0) { const k = 0.22*Math.min(1, dn/3); base[i] = [s[0]+(dr/dn-s[0])*k, s[1]+(dg/dn-s[1])*k, s[2]+(db/dn-s[2])*k]; }
     }
   }
-  // 3) paint: sea by depth, land = blended terrain + subtle nation tint
-  ctx.fillStyle = rgb(SEA_DEEP); ctx.fillRect(0, 0, W, H);
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const i = r*COLS+c, [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD, n = nat[i];
-    const col: RGB = n < 0 ? lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8)) : lerp(base[i]!, nationRgb[n], 0.16);
-    hexPath(cx, cy); ctx.fillStyle = rgb(col); ctx.fill();
+
+  const colorOf = (i: number): RGB => nat[i] < 0
+    ? lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8))
+    : lerp(base[i]!, nationRgb[nat[i]], 0.16);
+
+  // pre-compute the 6 corner offsets of a hex (pointy-top)
+  const corner: [number, number][] = [];
+  for (let k = 0; k < 6; k++) { const a = (-90 + 60*k) * Math.PI/180; corner.push([SIZE*Math.cos(a), SIZE*Math.sin(a)]); }
+
+  const layer = new Container();
+
+  // 3) terrain fills — one Graphics per row-band keeps each GraphicsContext light
+  const BANDS = 10, rowsPerBand = Math.ceil(ROWS / BANDS);
+  for (let b = 0; b < BANDS; b++) {
+    const r0 = b*rowsPerBand, r1 = Math.min(ROWS, r0+rowsPerBand);
+    if (r0 >= ROWS) break;
+    const g = new Graphics();
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      const i = r*COLS+c;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      g.moveTo(cx+corner[0][0], cy+corner[0][1]);
+      for (let k = 1; k < 6; k++) g.lineTo(cx+corner[k][0], cy+corner[k][1]);
+      g.closePath();
+      g.fill({ color: toHex(colorOf(i)) });
+    }
+    layer.addChild(g);
   }
 
-  // national borders (land vs different land) — dark, thin
-  ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(34,34,40,0.85)'; ctx.lineCap = 'round';
+  // 4) subtle hex grid (land only) — crisp cell lines that appear as you zoom in
+  const grid = new Graphics();
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (nat[r*COLS+c] < 0) continue;
+    const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+    grid.moveTo(cx+corner[0][0], cy+corner[0][1]);
+    for (let k = 1; k < 6; k++) grid.lineTo(cx+corner[k][0], cy+corner[k][1]);
+    grid.closePath();
+  }
+  grid.stroke({ color: 0x000000, width: 0.35, alpha: 0.10 });
+  layer.addChild(grid);
+
+  // 5) national borders (land vs different land) — dark, one stroke pass
+  const borders = new Graphics();
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const n = nat[r*COLS+c]; if (n < 0) continue;
-    const [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
+    const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
     const NB = (r & 1) ? NB_ODD : NB_EVEN;
     for (let e = 0; e < 6; e++) {
       const [dc, dr] = NB[e]; const nc = c+dc, nr = r+dr; if (nc<0||nr<0||nc>=COLS||nr>=ROWS) continue;
-      if (nat[nr*COLS+nc] !== n && nat[nr*COLS+nc] >= 0) {
-        const a1 = (-90+60*e)*Math.PI/180, a2 = (-90+60*(e+1))*Math.PI/180;
-        ctx.beginPath(); ctx.moveTo(cx+SIZE*Math.cos(a1), cy+SIZE*Math.sin(a1)); ctx.lineTo(cx+SIZE*Math.cos(a2), cy+SIZE*Math.sin(a2)); ctx.stroke();
-      }
+      const m = nat[nr*COLS+nc]; if (m < 0 || m === n) continue;
+      const a1 = (-90+60*e)*Math.PI/180, a2 = (-90+60*(e+1))*Math.PI/180;
+      borders.moveTo(cx+SIZE*Math.cos(a1), cy+SIZE*Math.sin(a1));
+      borders.lineTo(cx+SIZE*Math.cos(a2), cy+SIZE*Math.sin(a2));
     }
   }
+  borders.stroke({ color: 0x22222a, width: 1.0, alpha: 0.85 });
+  layer.addChild(borders);
 
-  // rivers
-  ctx.lineWidth = Math.max(1.5, SIZE*0.28); ctx.strokeStyle = 'rgba(70,120,170,0.95)'; ctx.lineJoin = 'round';
-  for (const line of rivers) { ctx.beginPath(); line.forEach(([c, r], k) => { const [x, y] = hexCenter(c, r); k ? ctx.lineTo(x+PAD, y+PAD) : ctx.moveTo(x+PAD, y+PAD); }); ctx.stroke(); }
-
-  // faint hex grid overlay
-  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.045)';
-  ctx.beginPath();
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
-    for (let i = 0; i < 6; i++) { const a = (-90+60*i)*Math.PI/180, x = cx+SIZE*Math.cos(a), y = cy+SIZE*Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-    const a0 = (-90)*Math.PI/180; ctx.lineTo(cx+SIZE*Math.cos(a0), cy+SIZE*Math.sin(a0));
+  // 6) rivers
+  const riv = new Graphics();
+  for (const line of rivers) {
+    line.forEach(([c, r], k) => { const [x, y] = hexCenter(c, r); k ? riv.lineTo(x+PAD, y+PAD) : riv.moveTo(x+PAD, y+PAD); });
   }
-  ctx.stroke();
+  riv.stroke({ color: 0x4678aa, width: Math.max(1.4, SIZE*0.28), alpha: 0.95, join: 'round', cap: 'round' });
+  layer.addChild(riv);
 
-  return { canvas };
+  return { layer, mapW: W, mapH: H };
 }

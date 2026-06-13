@@ -1,7 +1,7 @@
 // The World at War — WebGL entry. Terrain, cities, 1938 NATO counters, playable
 // hex movement & combat ported from Realistic mode.
-import { Application, Container, Sprite, Texture, Graphics, Text } from 'pixi.js';
-import { bakeTerrain } from './terrain';
+import { Application, Container, Graphics, Text } from 'pixi.js';
+import { buildTerrain } from './terrain';
 import { cities, nations, nat, COLS, ROWS, hexCenter, hexW, SIZE } from './mapdata';
 import { buildUnitLayer } from './unitrender';
 import { drawOverlay } from './hexoverlay';
@@ -24,11 +24,27 @@ async function boot() {
     resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
   document.getElementById('app')!.appendChild(app.canvas);
 
-  // ── Bake terrain ─────────────────────────────────────────────────────────────
-  const { canvas } = bakeTerrain();
-  const mapW = canvas.width, mapH = canvas.height;
+  // ── Vector terrain (crisp at any zoom) ───────────────────────────────────────
+  const { layer: terrainLayer, mapW, mapH } = buildTerrain();
   const world = new Container(); app.stage.addChild(world);
-  world.addChild(new Sprite(Texture.from(canvas)));
+  world.addChild(terrainLayer);
+
+  // ── Territory-control tint (War-in-the-East front line) ──────────────────────
+  const tintLayer = new Graphics(); world.addChild(tintLayer);
+  const AXIS_TINT = 0x6a6f78, ALLIED_TINT = 0xb04438;
+  function refreshTint() {
+    const own = getG().ownership;
+    tintLayer.clear();
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const v = own[r*COLS+c]; if (v === 0) continue;
+      const [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
+      tintLayer.moveTo(cx, cy - SIZE);
+      for (let k = 1; k < 6; k++) { const a = (-90+60*k)*Math.PI/180; tintLayer.lineTo(cx+SIZE*Math.cos(a), cy+SIZE*Math.sin(a)); }
+      tintLayer.closePath();
+      tintLayer.fill({ color: v === 1 ? AXIS_TINT : ALLIED_TINT, alpha: 0.22 });
+    }
+  }
+  refreshTint();
 
   // ── Nation labels ─────────────────────────────────────────────────────────────
   const cent: Record<string, { sx: number; sy: number; n: number }> = {};
@@ -180,6 +196,7 @@ async function boot() {
       showCombatResult(res, sel.name, clickedUnit.name);
       deselect();
       rebuildUnits();
+      refreshTint();
       updateTurnUI();
       return;
     }
@@ -193,6 +210,7 @@ async function boot() {
       reachable = null;
       updateOverlay();
       rebuildUnits();
+      refreshTint();
       updateInfoPanel();
       return;
     }
@@ -299,6 +317,7 @@ async function boot() {
     deselect();
     endTurn(getG().phase);
     rebuildUnits();
+    refreshTint();
     updateTurnUI();
   });
 
