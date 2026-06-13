@@ -3927,7 +3927,10 @@ const GW_SEALINK = [['london','normandy'],['london','nether'],['scotland','norwa
   ['baltics','sweden'],['denmark','norway'],['leningrad','finland'],['egypt','turkey'],
   ['algeria','marseille'],['algeria','spain'],['algeria','sicily'],['wales','ireland']];
 const GW_LANDLINK = [['moscow','stalingrad'],['stalingrad','caucasus'],['caucasus','kiev'],
-  ['moscow','leningrad'],['kiev','romania'],['romania','hungary']];
+  ['moscow','leningrad'],['kiev','romania'],['romania','hungary'],
+  // the central front: Minsk is the hub of Army Group Centre — the Smolensk
+  // highway to Moscow and the boundary with Army Group South at Kiev
+  ['minsk','moscow'],['minsk','kiev']];
 const GW_ISLAND = new Set(['scotland','london','wales','ireland']);   // the British Isles — reachable only by sea
 const GW_KEY_CITIES = new Set(['moscow','leningrad','stalingrad']);   // the three that decide the war
 function gwIsKeyCity(id){ return GW_KEY_CITIES.has(id); }
