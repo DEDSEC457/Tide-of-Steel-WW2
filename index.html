@@ -3761,12 +3761,12 @@ const GW_DIV_MP = 8;                           // manpower per division
 /* the great powers (and Poland). civ/mil = factories, mp = manpower (thousands),
    army = starting field strength. joinTurn: month they enter the war. */
 const GW_POWERS = {
-  GE: {name:'Germany',        adj:'German',  color:'#6b7480', faction:'axis',      cap:'berlin',  civ:22, mil:16, mp:70,  army:65, join:0,  playable:true},
-  SU: {name:'Soviet Union',   adj:'Soviet',  color:'#b5392c', faction:'comintern', cap:'moscow',  civ:30, mil:20, mp:170, army:95, join:GW_BARBAROSSA, playable:true},
-  UK: {name:'United Kingdom', adj:'British',  color:'#b59a4a', faction:'allies',    cap:'london',  civ:26, mil:12, mp:55,  army:38, join:0,  playable:true},
-  FR: {name:'France',         adj:'French',  color:'#4a6fa5', faction:'allies',     cap:'paris',   civ:18, mil:9,  mp:45,  army:55, join:0,  playable:true},
-  IT: {name:'Italy',          adj:'Italian', color:'#5a9a6a', faction:'axis',       cap:'rome',    civ:13, mil:9,  mp:38,  army:45, join:9,  playable:true},
-  PL: {name:'Poland',         adj:'Polish',  color:'#c08a3a', faction:'allies',     cap:'warsaw',  civ:6,  mil:3,  mp:22,  army:28, join:0,  playable:false},
+  GE: {name:'Germany',        adj:'German',  color:'#6b7480', faction:'axis',      cap:'berlin',  civ:22, mil:16, mp:70,  army:65, join:0,  will:0.40, playable:true},
+  SU: {name:'Soviet Union',   adj:'Soviet',  color:'#b5392c', faction:'comintern', cap:'moscow',  civ:30, mil:20, mp:170, army:95, join:GW_BARBAROSSA, will:0.18, playable:true},
+  UK: {name:'United Kingdom', adj:'British',  color:'#b59a4a', faction:'allies',    cap:'london',  civ:26, mil:12, mp:55,  army:38, join:0,  will:0.32, playable:true},
+  FR: {name:'France',         adj:'French',  color:'#4a6fa5', faction:'allies',     cap:'paris',   civ:16, mil:7,  mp:40,  army:34, join:0,  will:0.72, playable:true},
+  IT: {name:'Italy',          adj:'Italian', color:'#5a9a6a', faction:'axis',       cap:'rome',    civ:13, mil:9,  mp:38,  army:45, join:9,  will:0.55, playable:true},
+  PL: {name:'Poland',         adj:'Polish',  color:'#c08a3a', faction:'allies',     cap:'warsaw',  civ:6,  mil:3,  mp:22,  army:28, join:0,  will:0.5,  playable:false},
 };
 const GW_FACT_NAME = {axis:'Axis', allies:'Allies', comintern:'Comintern', neutral:'Neutral'};
 
@@ -3776,7 +3776,7 @@ const GW_FACT_NAME = {axis:'Axis', allies:'Allies', comintern:'Comintern', neutr
    passive neutral country. */
 const GW_REGIONS = {
   scotland:{name:'Scotland', owner:'UK', x:16,y:10, ind:1, vp:0},
-  london:  {name:'London',   owner:'UK', x:18,y:21, ind:6, vp:5, port:1, cap:'UK'},
+  london:  {name:'London',   owner:'UK', x:18,y:21, ind:6, vp:5, port:1, cap:'UK', def:6},
   wales:   {name:'Wales',    owner:'UK', x:13,y:23, ind:2, vp:0},
   ireland: {name:'Ireland',  owner:'ireland', x:8,y:21, ind:1, vp:0},
   norway:  {name:'Norway',   owner:'norway', x:32,y:7, ind:1, vp:1, port:1},
@@ -3810,11 +3810,11 @@ const GW_REGIONS = {
   turkey:  {name:'Turkey',   owner:'turkey', x:57,y:49, ind:2, vp:1},
   baltics: {name:'Baltic States', owner:'baltics', x:52,y:16, ind:1, vp:1, port:1},
   minsk:   {name:'Minsk',    owner:'SU', x:55,y:22, ind:2, vp:2},
-  kiev:    {name:'Kiev',     owner:'SU', x:57,y:31, ind:4, vp:3},
-  leningrad:{name:'Leningrad', owner:'SU', x:59,y:13, ind:4, vp:4, port:1},
-  moscow:  {name:'Moscow',   owner:'SU', x:65,y:19, ind:6, vp:6, cap:'SU'},
-  stalingrad:{name:'Stalingrad', owner:'SU', x:73,y:29, ind:4, vp:4},
-  caucasus:{name:'Caucasus', owner:'SU', x:71,y:39, ind:3, vp:3},
+  kiev:    {name:'Kiev',     owner:'SU', x:57,y:31, ind:4, vp:3, def:3},
+  leningrad:{name:'Leningrad', owner:'SU', x:59,y:13, ind:4, vp:4, port:1, def:12},
+  moscow:  {name:'Moscow',   owner:'SU', x:65,y:19, ind:6, vp:6, cap:'SU', def:24},
+  stalingrad:{name:'Stalingrad', owner:'SU', x:73,y:29, ind:4, vp:4, def:15},
+  caucasus:{name:'Caucasus', owner:'SU', x:71,y:39, ind:3, vp:3, def:3},
   egypt:   {name:'Egypt',    owner:'UK', x:53,y:62, ind:2, vp:2, port:1},
   algeria: {name:'Algeria',  owner:'FR', x:28,y:58, ind:1, vp:1, port:1},
 };
@@ -3829,13 +3829,15 @@ const GW_SEALINK = [['london','normandy'],['london','nether'],['scotland','norwa
   ['algeria','marseille'],['algeria','spain'],['algeria','sicily'],['wales','ireland']];
 const GW_LANDLINK = [['moscow','stalingrad'],['stalingrad','caucasus'],['caucasus','kiev'],
   ['moscow','leningrad'],['kiev','romania'],['romania','hungary']];
+const GW_ISLAND = new Set(['scotland','london','wales','ireland']);   // the British Isles — reachable only by sea
 function gwAdjacency(){
   if (GW_ADJ) return GW_ADJ;
   GW_ADJ = {}; const ids = Object.keys(GW_REGIONS);
   for (const a of ids) GW_ADJ[a] = new Set();
   for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++){
-    const A=GW_REGIONS[ids[i]], B=GW_REGIONS[ids[j]];
-    if (Math.hypot(A.x-B.x, A.y-B.y) <= 9.2){ GW_ADJ[ids[i]].add(ids[j]); GW_ADJ[ids[j]].add(ids[i]); }
+    const a=ids[i], b=ids[j], A=GW_REGIONS[a], B=GW_REGIONS[b];
+    if (GW_ISLAND.has(a) !== GW_ISLAND.has(b)) continue;           // no land bridge across the Channel
+    if (Math.hypot(A.x-B.x, A.y-B.y) <= 9.2){ GW_ADJ[a].add(b); GW_ADJ[b].add(a); }
   }
   for (const [a,b] of [...GW_SEALINK, ...GW_LANDLINK]){ GW_ADJ[a].add(b); GW_ADJ[b].add(a); }
   return GW_ADJ;
@@ -3965,10 +3967,11 @@ function gwOffenseMod(cc, targetOwner){
   let m = 1;
   if (af==='axis' && df==='allies'    && t<=14)            m *= 2.1;   // the 1940 blitzkrieg
   else if (af==='axis' && df==='allies' && t<=30)          m *= 1.5;   // and the years after
-  if (af==='axis' && df==='comintern' && t>=GW_BARBAROSSA && t<=36) m *= 1.8;   // Barbarossa
+  if (af==='axis' && df==='comintern' && t>=GW_BARBAROSSA && t<=30) m *= 1.35;  // Barbarossa's hammer blow…
+  // …then it culminates at the gates of Moscow; no Axis bonus 1942 onward
   if (af==='comintern' && df==='axis' && t<=36)            m *= 0.5;   // Red Army not yet ready
   if (af==='allies'    && df==='axis' && t<=32)            m *= 0.6;   // Allies on the back foot
-  if ((af==='comintern'||af==='allies') && df==='axis' && t>=40) m *= 1.35;     // material superiority
+  if ((af==='comintern'||af==='allies') && df==='axis' && t>=38) m *= 1.6;      // the tide turns: material superiority
   return m;
 }
 function gwRegionDefense(id){
@@ -3978,12 +3981,12 @@ function gwRegionDefense(id){
     const e = GW.eco[o];
     if (e){
       d += e.army / gwOwnFrontCount(o) * 0.55;       // not all of it holds one spot
-      if (e.posture==='defend') d *= 1.4;            // dug in
+      if (e.posture==='defend') d *= 1.6;            // dug in hard
     }
   } else if (gwFactionOf(o)==='neutral'){
     d += 8;                                          // a neutral nation's standing garrison
   }
-  if (GW_REGIONS[id].cap) d *= 1.7;                  // capitals are fortified — but not impregnable
+  if (GW_REGIONS[id].cap) d *= 1.4;                  // capitals are fortified — but not impregnable
   else if ((r.vp||0) >= 4) d *= 1.3;                 // and the great cities are stubborn
   return d;
 }
@@ -3993,7 +3996,7 @@ function gwResolveFronts(){
   for (const cc of Object.keys(GW_POWERS)){
     const e = GW.eco[cc];
     if (!e || GW.capitulated[cc] || GW.turn < GW_POWERS[cc].join || e.army <= 0) continue;
-    const aggression = e.posture==='attack' ? 1 : e.posture==='defend' ? 0.2 : 0.55;
+    const aggression = e.posture==='attack' ? 1 : e.posture==='defend' ? 0 : 0.55;
     if (aggression <= 0) continue;
     let targets = gwFrontTargets(cc).filter(id => gwCanAttack(cc, GW.regions[id]));
     if (!targets.length) continue;
@@ -4008,7 +4011,11 @@ function gwResolveFronts(){
     for (const id of targets){
       if (captured >= capMax) break;
       const def = gwRegionDefense(id);
-      let atk = perPush * (id===e.preferredTarget ? 1.6 : 1) * gwOffenseMod(cc, GW.regions[id]);
+      const focus = id===e.preferredTarget ? (GW_REGIONS[id].cap ? 1.9 : 1.6) : 1;  // concentrate on a capital
+      let atk = perPush * focus * gwOffenseMod(cc, GW.regions[id]);
+      // amphibious assault — no land border to this region, only a sea crossing
+      const landAdj = gwNeighbors(id).some(n => GW.regions[n]===cc && !gwIsSeaLink(id,n));
+      if (!landAdj) atk *= 0.15;                       // the Channel & Royal Navy protect Britain
       if (atk > def * 1.2){                            // real superiority needed to break a front
         const from = GW.regions[id];
         GW.regions[id] = cc;
@@ -4042,7 +4049,7 @@ function gwCheckCapitulation(){
     // lost AND most of its homeland VP overrun (or its army destroyed)
     const e = GW.eco[cc];
     const heldVP = gwRegionsOf(cc).reduce((a,id)=>a+(GW_REGIONS[id].vp||0),0);
-    const broken = heldVP < (e.origVP||1)*0.40 || (e && e.army <= 1);
+    const broken = heldVP < (e.origVP||1)*(GW_POWERS[cc].will||0.4) || (e && e.army <= 1);
     if (!broken) continue;
     GW.capitulated[cc] = true;
     if (e) e.army = 0;
@@ -4067,12 +4074,15 @@ function gwAIEco(cc){
   e.milTo = { army:0.85, air:0.15 };
   // posture reads the historical arc, not just raw numbers: a power attacks only
   // when its offensive is actually capable (mod ≥ 1) and it has local superiority
-  let myDensity = e.army / gwOwnFrontCount(cc), foe = 0, mod = 1;
+  let myDensity = e.army / gwOwnFrontCount(cc), foe = 0, mod = 0;
   for (const id of gwFrontTargets(cc)){
     const o = GW.regions[id];
-    if (gwIsPower(o) && GW.eco[o]) foe = Math.max(foe, GW.eco[o].army / gwOwnFrontCount(o));
-    mod = Math.max(mod, gwOffenseMod(cc, o));
+    if (gwIsPower(o) && GW.eco[o] && gwAtWar(cc,o)){
+      foe = Math.max(foe, GW.eco[o].army / gwOwnFrontCount(o));
+      mod = Math.max(mod, gwOffenseMod(cc, o));        // our offensive capability vs the enemy powers we face
+    }
   }
+  if (mod === 0) mod = 1;                               // only neutrals in front of us → normal footing
   const myOffense = myDensity * mod;
   e.posture = (myOffense > foe*1.1 && mod >= 0.95) ? 'attack'
             : (myDensity < foe*0.7) ? 'defend' : 'balanced';
@@ -4095,22 +4105,24 @@ function gwFactionVP(){
   for (const id in GW.regions) v[gwFactionOf(GW.regions[id])] += GW_REGIONS[id].vp||0;
   return v;
 }
+/* the war has two sides: the Axis vs everyone else (the Western Allies and the
+   USSR are co-belligerents, never at war with each other here) */
+function gwSideOf(cc){ const f=gwFactionOf(cc); return f==='axis'?'axis':(f==='neutral'?'neutral':'allied'); }
+function gwSideVP(){ const v=gwFactionVP(); return { axis:v.axis, allied:v.allies+v.comintern }; }
 function gwCheckVictory(){
   if (GW.capitulated[GW.player]){ gwEndCampaign('defeat','DEFEAT', `${GW_POWERS[GW.player].name} has been conquered.`); return; }
-  // decisive win: every power at war with you (and your faction) has capitulated
-  const myFac = gwFactionOf(GW.player);
-  const standingEnemies = Object.keys(GW_POWERS).filter(cc =>
-    gwFactionOf(cc)!==myFac && gwFactionOf(cc)!=='neutral' && !GW.capitulated[cc] && GW.turn>=GW_POWERS[cc].join);
-  if (standingEnemies.length===0 && GW.turn>3){
-    const anyEnemyEver = Object.keys(GW_POWERS).some(cc => gwFactionOf(cc)!==myFac && gwFactionOf(cc)!=='neutral');
-    if (anyEnemyEver) gwEndCampaign('victory','DECISIVE VICTORY', `${GW_FACT_NAME[myFac]} stands triumphant over Europe.`);
-  }
+  const mySide = gwSideOf(GW.player);
+  const foes = Object.keys(GW_POWERS).filter(cc => gwSideOf(cc)!==mySide && gwSideOf(cc)!=='neutral');
+  if (foes.length && GW.turn>3 && foes.every(cc => GW.capitulated[cc]))
+    gwEndCampaign('victory','DECISIVE VICTORY',
+      mySide==='axis' ? 'The Axis stands triumphant over all of Europe.' : 'The Axis is utterly crushed — the war is won.');
 }
 function gwScoreEnd(){
-  const v = gwFactionVP(), myFac = gwFactionOf(GW.player);
-  const mine = v[myFac], best = Math.max(v.axis, v.allies, v.comintern);
-  gwEndCampaign(mine>=best ? 'victory':'defeat', mine>=best ? 'VICTORY':'DEFEAT',
-    `May 1945 — the guns fall silent. ${GW_FACT_NAME[myFac]} held ${mine} victory points.`);
+  const sv = gwSideVP(), mySide = gwSideOf(GW.player);
+  const mine = mySide==='axis'?sv.axis:sv.allied, foe = mySide==='axis'?sv.allied:sv.axis;
+  const win = mine >= foe;
+  gwEndCampaign(win?'victory':'defeat', win?'VICTORY':'DEFEAT',
+    `May 1945 — the guns fall silent. Your side held ${mine} victory points to the enemy's ${foe}.`);
 }
 function gwEndMonth(){
   if (!GW || GW.over) return;
