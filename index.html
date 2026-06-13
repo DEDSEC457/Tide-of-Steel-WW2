@@ -2195,15 +2195,51 @@ SCENARIOS.wawtest = (function build3x(){
   }
   const P = x => x*N+1;                                  // features at block centre
   const sxy = a => a.map(([x,y])=>[P(x),P(y)]);
-  const kinds = {};
-  for (const k in B.kinds){ kinds[k] = {...B.kinds[k], mp: B.kinds[k].mp*N}; }
+  // movement scales ×2 (not ×3): a more deliberate WitE-style tempo, and far
+  // cheaper pathfinding floods — which keeps the AI quick with a full front.
+  const MS = 2, kinds = {};
+  for (const k in B.kinds){ kinds[k] = {...B.kinds[k], mp: Math.max(2, B.kinds[k].mp*MS)}; }
+
+  // ---- fill the front into a continuous War-in-the-East line ----
+  // Start from the upscaled historical armies, then thread a dense front between
+  // them with operational depth behind — Soviets numerous and thin, Germans
+  // fewer but with concentrated panzer reserves, exactly the WitE2 texture.
+  const units = B.startUnits.map(u=>{ const v=u.slice(); v[2]=P(u[2]); v[3]=P(u[3]); return v; });
+  const occ = new Set(units.map(u=>u[2]+','+u[3]));
+  const land = (x,y)=>{ if (x<1||y<1||x>=C-1||y>=R-1) return false; const row=map[y]; const t=row&&row[x]; return !!t && t!=='~' && t!=='o'; };
+  const place = (kind,name,x,y,str)=>{
+    for (const [dx,dy] of [[0,0],[0,-1],[0,1],[-1,0],[1,0],[0,-2],[0,2],[-2,0]]){
+      const X=x+dx, Y=y+dy;
+      if (land(X,Y) && !occ.has(X+','+Y)){ const u=[kind,name,X,Y]; if(str!=null)u.push(str); units.push(u); occ.add(X+','+Y); return true; }
+    }
+    return false;
+  };
+  const gName = (k,n)=> ({g_inf:'Korps ',g_mot:'mot.Korps ',g_pz:'Pz.Korps ',g_ss:'SS-Korps ',res:'Res.Korps '}[k]||'Korps ')+'z'+n;
+  const sName = (k,n)=> ({s_inf:'Rifle Corps ',s_tank:'Tank Corps ',res:'Reserve Rifle '}[k]||'Rifle Corps ')+n;
+  // per-row contact line, derived from the existing armies (smoothed to nearest row)
+  const gF=new Array(R).fill(null), sF=new Array(R).fill(null);
+  for (const u of units){ const side=kinds[u[0]].side, x=u[2], y=u[3];
+    if (side==='G'){ if(gF[y]==null||x>gF[y]) gF[y]=x; } else { if(sF[y]==null||x<sF[y]) sF[y]=x; } }
+  const near=(arr,y)=>{ for(let d=0;d<R;d++){ if(y-d>=0&&arr[y-d]!=null) return arr[y-d]; if(y+d<R&&arr[y+d]!=null) return arr[y+d]; } return null; };
+  let gi=0, si=0, hg=0, hs=0;
+  for (let y=3; y<R-3; y++){
+    const g=near(gF,y), s=near(sF,y); if (g==null||s==null) continue;
+    const k = Math.round((g+s)/2);                            // contact column
+    if (y%3===0) place((y%12===0)?'g_pz':(y%6===0)?'g_mot':'g_inf', gName('g_inf',++gi), k-1, y, 9);  // German line
+    if (y%2===0) place((y%10===0)?'s_tank':'s_inf', sName('s_inf',++si), k+1, y, 7);                    // Soviet line — a continuous wall
+    if (y%8===0) place((y%16===0)?'g_ss':'g_pz', gName('res',++gi), k-5, y, 9);                         // German mobile reserve
+    if (y%6===0) place((y%12===0)?'s_tank':'s_inf', sName('res',++si), k+5, y, 7);                      // Soviet operational reserve
+    if (y%14===0){ place('g_inf', gName('res',++gi), k-9, y, 8); place('s_inf', sName('res',++si), k+9, y, 6); } // deep reserves
+    if (y%20===10){ place('g_hq','Korps-HQ '+(++hg), k-6, y); place('s_hq','Front-HQ '+(++hs), k+7, y); }          // HQs
+  }
+
   return { ...B,
     id:'wawtest', realistic:true,
     title:'WORLD AT WAR — TEST', short:'WORLD AT WAR TEST',
     sub:'EASTERN FRONT · 3× OPERATIONAL SCALE · TEST BUILD',
     cols:C, rows:R, map, kinds,
     cities: B.cities.map(c=>({...c, x:P(c.x), y:P(c.y)})),
-    startUnits: B.startUnits.map(u=>{ const v=u.slice(); v[2]=P(u[2]); v[3]=P(u[3]); return v; }),
+    startUnits: units,
     sovSpawns: sxy(B.sovSpawns), gerSpawns: sxy(B.gerSpawns),
     supplyRange: (B.supplyRange||12)*N,
     fuel:false, railhead:undefined,
