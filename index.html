@@ -258,18 +258,31 @@
       </div>
     </div>
     <div class="mode-row" style="margin-top:2px;">
-      <div class="mode-card" id="mc-hex" style="max-width:480px;">
-        <span class="mc-badge ready">PLAYABLE</span>
+      <div class="mode-card" id="mc-wawtest">
+        <span class="mc-badge ready">NEW · TEST</span>
         <div class="mc-icon">🗺</div>
+        <h2>WORLD AT WAR — TEST</h2>
+        <p class="mc-desc">The Realistic eastern front, scaled up 3× into a much larger operational map. Same engine, art and rules you like — just three times the hexes, with real room to manoeuvre.</p>
+        <ul class="mc-features">
+          <li>180×108 hex eastern front (3× Realistic)</li>
+          <li>Detailed counters, cities, weather &amp; terrain</li>
+          <li>Same combat · supply · AI as Realistic mode</li>
+          <li>Play Germany — September 1941 onward</li>
+        </ul>
+        <button class="primary mc-btn">LAUNCH ▶</button>
+      </div>
+      <div class="mode-card" id="mc-hex">
+        <span class="mc-badge wip">WEBGL · WIP</span>
+        <div class="mc-icon">🌐</div>
         <h2>EUROPE 1939</h2>
-        <p class="mc-desc">Operational hex wargame — 150×149 hex map of all Europe with real 1938 borders. Move armies hex by hex, fight with NATO mil-sym counters, trace supply lines. War in the East style.</p>
-        <ul class="mc-features" style="text-align:center;list-style:none;">
+        <p class="mc-desc">Experimental WebGL hex wargame — all of Europe, 150×149 hexes, real 1938 borders. Move armies hex by hex with NATO counters. Still rough.</p>
+        <ul class="mc-features">
           <li>Germany · USSR · France · UK · Poland · Italy</li>
           <li>Terrain: forest, steppe, mountain, marsh, taiga</li>
           <li>ZOC · supply · entrenchment · OOS attrition</li>
           <li>Weekly turns from September 1939</li>
         </ul>
-        <button class="primary mc-btn">LAUNCH ▶</button>
+        <button class="mc-btn">LAUNCH ▶</button>
       </div>
     </div>
     <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
@@ -2146,6 +2159,53 @@ SCENARIOS.realistic = {
   ]; },
 };
 
+/* ---- WORLD AT WAR — TEST: the Realistic eastern front, programmatically scaled
+   up 3× into a much larger operational map. Same engine, rules, rendering, units,
+   generals and events — just three times the hexes, so there's real room to
+   manoeuvre. mp and supply reach scale with the finer hexes to keep the tempo;
+   fuel/railhead are left off here (their constants are map-scale and would need
+   separate tuning). This is the "make a larger eastern front" experiment. */
+SCENARIOS.wawtest = (function build3x(){
+  const B = SCENARIOS.realistic, N = 3;
+  const C = B.cols*N, R = B.rows*N;
+  const jh = (x,y)=>{ let h=(x*374761393 ^ y*668265263)>>>0; h=Math.imul(h^(h>>>13),1274126177); return (h^(h>>>16))>>>0; };
+  const at = (ox,oy)=>{ const row=B.map[Math.max(0,Math.min(B.rows-1,oy))]; return row[Math.max(0,Math.min(B.cols-1,ox))]||'.'; };
+  const map = [];
+  for (let ty=0; ty<R; ty++){
+    const oy = Math.floor(ty/N), sy = ty%N; let line='';
+    for (let tx=0; tx<C; tx++){
+      const ox = Math.floor(tx/N), sx = tx%N, h = jh(tx,ty);
+      let gx=ox, gy=oy;                                  // centre cell = pure source
+      if (sx!==1 && (h&3)===0)      gx = ox + (sx===0?-1:1);   // jitter edges so
+      if (sy!==1 && ((h>>2)&3)===0) gy = oy + (sy===0?-1:1);   // regions look organic
+      line += at(gx,gy);
+    }
+    map.push(line.length>=C ? line.slice(0,C) : line.padEnd(C,'.'));
+  }
+  const P = x => x*N+1;                                  // features at block centre
+  const sxy = a => a.map(([x,y])=>[P(x),P(y)]);
+  const kinds = {};
+  for (const k in B.kinds){ kinds[k] = {...B.kinds[k], mp: B.kinds[k].mp*N}; }
+  return { ...B,
+    id:'wawtest', realistic:true,
+    title:'WORLD AT WAR — TEST', short:'WORLD AT WAR TEST',
+    sub:'EASTERN FRONT · 3× OPERATIONAL SCALE · TEST BUILD',
+    cols:C, rows:R, map, kinds,
+    cities: B.cities.map(c=>({...c, x:P(c.x), y:P(c.y)})),
+    startUnits: B.startUnits.map(u=>{ const v=u.slice(); v[2]=P(u[2]); v[3]=P(u[3]); return v; }),
+    sovSpawns: sxy(B.sovSpawns), gerSpawns: sxy(B.gerSpawns),
+    supplyRange: (B.supplyRange||12)*N,
+    fuel:false, railhead:undefined,
+    capitalDefense: {...B.capitalDefense, range:(B.capitalDefense.range||5)*N},
+    setup(st){
+      for (const u of st.units) if (u.side==='S' && u.x <= 13*N+1) u.entrench = 1;
+      for (const u of st.units)
+        if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = 1;
+      const lm = st.units.find(u=>u.name==='Leningrad Militia'); if (lm) lm.entrench = 2;
+    },
+  };
+})();
+
 /* ---- side identities & unit types: scenarios may override ---- */
 const DEFAULT_SIDES = {
   G: {name:'Axis',   flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
@@ -3817,9 +3877,9 @@ function aiFullPhase(side){
 /* Two independent slots — Arcade and Realistic — so starting (or autosaving)
    a game in one mode never clobbers the other's campaign. A pre-slots save is
    migrated into the slot matching its own scenario. */
-const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1' };
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
-function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : 'arcade'; }
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : 'arcade'; }
 function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
@@ -4634,10 +4694,15 @@ function resize(){
 }
 window.addEventListener('resize', resize); resize();
 
+// lowest zoom we allow — small maps stay readable (0.35), but big maps (the
+// 3×-scale World-at-War-Test) may zoom out far enough to see the whole front.
+function minZoom(){
+  return Math.min(0.35, Math.min(innerWidth/mapW(), (innerHeight-60)/mapH()) * 0.85);
+}
 function fitCamera(){
   const mw = mapW(), mh = mapH();
   const z = Math.min(innerWidth/mw, (innerHeight-60)/mh);
-  cam.z = Math.max(0.45, Math.min(1.4, z));
+  cam.z = Math.max(minZoom(), Math.min(1.4, z));
   cam.x = (mw - innerWidth/cam.z)/2;
   cam.y = (mh - (innerHeight)/cam.z)/2 - 20/cam.z;
 }
@@ -5094,10 +5159,15 @@ function draw(){
   if (!G) return;
   const wx = weatherFor(G.turn);
   const now = performance.now();
+  // viewport cull bounds (world space) — only draw what's on screen. Cheap on the
+  // small arcade/realistic maps, essential on the 3×-scale World-at-War-Test map.
+  const vL = cam.x - S, vT = cam.y - S,
+        vR = cam.x + innerWidth/cam.z + S, vB = cam.y + innerHeight/cam.z + S;
 
   // terrain
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t = terrainAt(x,y), [cx,cy] = hexCenter(x,y);
+    if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
     hexPath(cx,cy,S-0.6);
     let col = TERRAIN[t].color;
     if (wx==='snow' && t!=='~') col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
@@ -5160,6 +5230,7 @@ function draw(){
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t1 = terrainAt(x,y);
     const [ax,ay] = hexCenter(x,y);
+    if (ax<vL || ax>vR || ay<vT || ay>vB) continue;
     for (const [nx,ny] of neighbors(x,y)){
       if (ny<y || (ny===y && nx<x)) continue;                 // draw each edge once
       const t2 = terrainAt(nx,ny);
@@ -5851,7 +5922,7 @@ canvas.addEventListener('wheel', e=>{
   e.preventDefault();
   const f = e.deltaY < 0 ? 1.12 : 1/1.12;
   const [wx,wy] = toWorld(e.clientX,e.clientY);
-  cam.z = Math.max(0.35, Math.min(2.2, cam.z*f));
+  cam.z = Math.max(minZoom(), Math.min(2.2, cam.z*f));
   cam.x = wx - e.clientX/cam.z; cam.y = wy - e.clientY/cam.z;
 }, {passive:false});
 
@@ -6250,6 +6321,19 @@ function openHexGame(){
 }
 window.addEventListener('message',e=>{ if(e.data==='waw-back'){ document.getElementById('waw-frame').style.display='none'; showModeSelect(); } });
 $('mc-hex').onclick = openHexGame;
+$('mc-wawtest').onclick = ()=>{
+  if (hasSaveSlot('wawtest') && performance.now() > wawtestPendingUntil){
+    wawtestPendingUntil = performance.now() + 3000;
+    const b = $('mc-wawtest').querySelector('.mc-btn'); if (b) b.textContent = '⚠ OVERWRITES TEST SAVE — SURE?';
+    setTimeout(()=>{ const b2 = $('mc-wawtest').querySelector('.mc-btn'); if (b2 && performance.now()>=wawtestPendingUntil) b2.textContent = 'LAUNCH ▶'; }, 3100);
+    return;
+  }
+  eventQueue.length = 0;
+  newGame('G', 'normal', 'ai', 'wawtest');
+  show('mode-select', false);
+  startCampaign();
+};
+let wawtestPendingUntil = 0;
 $('mc-arcade').onclick = ()=>{
   show('mode-select', false); show('menu', true); sClick();
   $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
