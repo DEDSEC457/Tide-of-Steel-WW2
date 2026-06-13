@@ -4113,15 +4113,37 @@ function gwAIEco(cc){
   e.posture = (myOffense > foe*1.1 && mod >= 0.95) ? 'attack'
             : (myDensity < foe*0.7) ? 'defend' : 'balanced';
   if (mod < 0.8) e.posture = 'defend';     // a power not yet ready for offensives holds the line (USSR 1941)
-  let best=null, bs=-1e9;
-  for (const id of gwFrontTargets(cc)){
-    const o = GW.regions[id], r = GW_REGIONS[id];
-    let s = (r.vp||0)*3 + (r.ind||0) - gwRegionDefense(id)*0.35;
-    // an enemy capital ends the war — go for the throat, the more so as they weaken
-    if (r.cap && gwIsPower(o)){ const oe=GW.eco[o]; s += 10 + (oe ? Math.max(0, 30 - oe.army)*0.4 : 0); }
-    if (s > bs){ bs=s; best=id; }
+  // THINK AHEAD: commit to knocking out ONE enemy at a time and drive on its
+  // capital across many months — finish France, THEN turn east — instead of
+  // grabbing the locally-shiniest province and dithering.
+  const atWarPowers = Object.keys(GW_POWERS).filter(pc => gwAtWar(cc,pc) && !GW.capitulated[pc]);
+  if (!e.objective || GW.capitulated[e.objective] || !gwAtWar(cc, e.objective)) e.objective = null;
+  if (!e.objective && atWarPowers.length){
+    let best=null, bs=-1e9;
+    for (const pc of atWarPowers){
+      const cap = GW_REGIONS[GW_POWERS[pc].cap];
+      let near=1e9; for (const id of gwRegionsOf(cc)){ const r=GW_REGIONS[id]; near=Math.min(near, Math.hypot(r.x-cap.x, r.y-cap.y)); }
+      const enemyArmy = GW.eco[pc] ? GW.eco[pc].army : 50;
+      const s = -near*0.7 - enemyArmy*0.12 + (GW_POWERS[pc].will>0.6 ? 8 : 0);   // near, weak, brittle first
+      if (s > bs){ bs=s; best=pc; }
+    }
+    e.objective = best;
   }
-  e.preferredTarget = best;
+  const targets = gwFrontTargets(cc);
+  if (e.objective && targets.length){
+    const capId = GW_POWERS[e.objective].cap, cap = GW_REGIONS[capId];
+    if (targets.includes(capId)) e.preferredTarget = capId;          // the capital is in reach — storm it
+    else {                                                            // else advance the front toward it
+      let best=null, bd=1e9;
+      for (const id of targets){ const r=GW_REGIONS[id]; const d=Math.hypot(r.x-cap.x, r.y-cap.y) + gwRegionDefense(id)*0.2;
+        if (d < bd){ bd=d; best=id; } }
+      e.preferredTarget = best;
+    }
+  } else {                                                            // no enemy powers in front — take the best neutral
+    let best=null, bs=-1e9;
+    for (const id of targets){ const r=GW_REGIONS[id]; const s=(r.vp||0)*3+(r.ind||0)-gwRegionDefense(id)*0.35; if(s>bs){bs=s;best=id;} }
+    e.preferredTarget = best;
+  }
 }
 
 /* ---- victory & the master monthly tick ---- */
@@ -5093,6 +5115,15 @@ function gwDraw(){
   if(!GW) return;
   gwViewCache=gwView();
   const player=GW.player, pe=GW.eco[player], adj=gwAdjacency();
+  // territory wash: a soft owner-coloured halo so neighbouring regions read as
+  // one contiguous nation rather than floating dots
+  for(const id in GW_REGIONS){
+    const owner=GW.regions[id], [x,y]=gwPos(id);
+    const col=gwIsPower(owner)?GW_POWERS[owner].color:'#55564e';
+    const g=ctx.createRadialGradient(x,y,2,x,y,gwViewCache.s*6.5);
+    if(g&&g.addColorStop){ g.addColorStop(0,col+'4d'); g.addColorStop(1,col+'00');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,gwViewCache.s*6.5,0,Math.PI*2); ctx.fill(); }
+  }
   // links
   for(const id in adj){ const [ax,ay]=gwPos(id);
     for(const n of adj[id]){ if(n<id)continue; const [bx,by]=gwPos(n);
