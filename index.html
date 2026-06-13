@@ -3012,7 +3012,74 @@ function endGame(sudden){
    aiPlanAction(side) -> {type:'move'|'attack'|'hold', ...} or null when done. */
 
 let dfCache = {};
-function clearAICache(){ dfCache = {}; }
+let threatCache = {};
+function clearAICache(){ dfCache = {}; threatCache = {}; }
+
+/* ---- OPPONENT-RESPONSE AWARENESS (the anti-human core) ----
+   AI-vs-AI tuning makes the AI good against a passive mirror; a human is
+   adversarial and hunts blunders. So before committing a unit to a hex, the AI
+   asks "where can the enemy hit me next turn?" — a threat field over the board.
+   It models where the foe could concentrate fire or close a pocket, and steers
+   units away from being cheaply destroyed or encircled by a thinking opponent. */
+function enemyReach(f){
+  // cheap terrain-only movement flood for a foe unit; conservative — it ignores
+  // my units as blockers, since I may move them out of the way before its turn
+  const mp = KINDS[f.kind].mp + (generalOf(f)?.mp || 0);
+  const out = new Set([keyOf(f.x,f.y)]);
+  const best = new Map([[keyOf(f.x,f.y),0]]);
+  const heap = makeHeap(); heap.push(0,f.x,f.y);
+  while (heap.size()){
+    const [c,x,y] = heap.pop();
+    if (c > (best.get(keyOf(x,y)) ?? 1e9)) continue;
+    for (const [nx,ny] of neighbors(x,y)){
+      if (!passable(nx,ny)) continue;
+      const nc = c + effTerrain(nx,ny).move;
+      if (nc > mp) continue;
+      if (nc < (best.get(keyOf(nx,ny)) ?? 1e9)){ best.set(keyOf(nx,ny),nc); out.add(keyOf(nx,ny)); heap.push(nc,nx,ny); }
+    }
+  }
+  return out;
+}
+/* Threat TO `side`: for each hex, how much enemy attack power can strike it next
+   turn and how many distinct enemy units (≥3 ⇒ encirclement risk). Cached per
+   AI sub-phase — enemy positions don't change while I move (recomputed on kills
+   via clearAICache). */
+function threatField(side){
+  if (threatCache[side]) return threatCache[side];
+  const power = new Map(), count = new Map();
+  for (const f of unitsOf(enemyOf(side))){
+    if (KINDS[f.kind].hq) continue;
+    const atk = KINDS[f.kind].atk * (f.str/10) * (generalOf(f)?.atk || 1);
+    const hit = new Set();
+    for (const k of enemyReach(f)){                       // a foe here threatens its neighbours
+      const [x,y] = k.split(',').map(Number);
+      for (const [nx,ny] of neighbors(x,y)) if (passable(nx,ny)) hit.add(keyOf(nx,ny));
+    }
+    for (const k of hit){ power.set(k,(power.get(k)||0)+atk); count.set(k,(count.get(k)||0)+1); }
+  }
+  return threatCache[side] = {power, count};
+}
+/* The danger of a unit ending at (x,y). The thing a human exploits is LOCAL
+   INFERIORITY — concentrating more attackers on a hex than the AI can support,
+   then encircling — not merely being near the enemy. So the penalty is how
+   badly the unit would be OUTNUMBERED there, net of friendly support and good
+   ground. A supported line position, or an objective worth holding, costs
+   nothing: the AI holds its front but won't leave a lone unit in a kill-sack. */
+function threatPenalty(u, x, y, offensive){
+  const sk = aiSkill(u.side);
+  if (sk === 0) return 0;
+  const c = cityAt(x,y);
+  if (c && c.owner===u.side && c.vp>0) return 0;          // never abandon your own objective
+  const tf = threatField(u.side), k = keyOf(x,y);
+  const tc = tf.count.get(k) || 0;
+  if (tc < 2) return 0;                                   // a single threat is just the front line
+  let support = 0;                                        // friends who'd fight alongside here
+  for (const fr of unitsOf(u.side)) if (fr.id!==u.id && hexDist(x,y,fr.x,fr.y) <= 1) support++;
+  const ground = effTerrain(x,y).def + (u.entrench||0)*0.15;
+  let outnum = (tc - support - 1) - (ground - 1)*2;       // hills/forts/dug-in shrug it off
+  if (outnum <= 0) return 0;
+  return outnum * (offensive ? 1.0 : 1.6) * sk;
+}
 
 /* Dijkstra distance field TO (tx,ty) for `side`, over terrain move costs.
    Enemy-held hexes are near-walls, enemy ZOC is sticky — paths route around. */
@@ -3141,6 +3208,15 @@ function bestAttack(u, minRatio){
     let util = p.defLoss*1.6 - p.atkLoss + (wouldDestroy ? 6+2*sk : 0) + (noRetreat?4:0)
              + (t.oos?2:0) + (cityAt(t.x,t.y)?1:0) + p.ratio
              + (t.str<=4 ? sk*1.5 : 0);                 // focus fire: finish off the weakened
+    if (sk > 0){
+      // don't trade into a hex where the human destroys my weakened unit next turn
+      const tp = threatField(u.side).power.get(keyOf(u.x,u.y)) || 0;
+      const afterStr = u.str - p.atkLoss;
+      if (!wouldDestroy && afterStr <= 5 && tp > 5) util -= (tp - 5) * (0.4 + 0.3*sk);
+      // an isolated enemy (no friends beside it) is easy to finish and exploit
+      let efr = 0; for (const [nx,ny] of neighbors(t.x,t.y)){ const q=unitAt(nx,ny); if (q&&q.side===t.side) efr++; }
+      if (efr === 0) util += sk*1.5;
+    }
     if (util > bestU){ bestU = util; best = t; }
   }
   return best;
@@ -3222,6 +3298,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   for (const [nx,ny] of neighbors(x,y)){ const t = unitAt(nx,ny); if (t && t.side==='S') adjEnemy++; }
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
+  s -= threatPenalty(u, x, y, offensive);                      // don't step where the enemy can punish you
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
   // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
   // (no adjacent enemy) that gets meaningfully closer to its objective pours
@@ -3376,6 +3453,7 @@ function sovScoreHex(u, x, y, df, myNet){
   if (adjE >= 3) s -= 10;                                       // don't walk into a pocket
   else if (adjE === 2) s -= 3;
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
+  s -= threatPenalty(u, x, y, SCN.sovAI==='attack');          // don't step where the enemy can punish you
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
   const wx = weatherFor(G.turn);
   if (wx==='snow' && weakest){
@@ -4976,6 +5054,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork,
+    threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,

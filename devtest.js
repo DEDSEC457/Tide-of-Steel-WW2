@@ -356,6 +356,39 @@ say('— veterancy · HQ · combined arms —');
   } else check('combined attackers both gain experience', true, 'no room — skipped');
 }
 
+/* AI skill & opponent-response awareness — difficulty changes how it plays,
+   and it anticipates where a (human) enemy can concentrate or encircle. */
+say('— AI skill & threat awareness —');
+{
+  // skill ordering on the AI side (German is the AI when the player is Soviet)
+  E.newGame('S','easy','ai','barbarossa');   const skE = E.aiSkill('G');
+  E.newGame('S','normal','ai','barbarossa'); const skN = E.aiSkill('G');
+  E.newGame('S','hard','ai','barbarossa');   const skH = E.aiSkill('G');
+  check('skill rises with difficulty', skE===0 && skN===1 && skH===2, `${skE}/${skN}/${skH}`);
+  // build a swarm: three enemies that can reach one hex ⇒ threat count ≥3
+  const G = E.getState(); G.units.length=0; let id=1;
+  const mk=(k,n,x,y)=>{const u={id:id++,kind:k,name:n,side:E.KINDS[k].side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+  const pz=mk('g_pz','Spear',14,10); mk('g_inf','Prop',13,10);
+  mk('s_inf','A',16,9); mk('s_inf','B',16,11); mk('s_inf','C',17,10);
+  E.clearAICache();
+  const tf = E.threatField('G');
+  let maxCount=0; for (const v of tf.count.values()) maxCount=Math.max(maxCount,v);
+  check('threat field sees a multi-unit swarm', maxCount>=3, `max ${maxCount}`);
+  // a sharp AI fears an exposed forward hex more than a sloppy one
+  const penHard = E.threatPenalty(pz,15,10,true);
+  E.newGame('S','easy','ai','barbarossa'); const Ge=E.getState(); Ge.units.length=0; let id2=1;
+  const mk2=(k,n,x,y)=>{const u={id:id2++,kind:k,name:n,side:E.KINDS[k].side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};Ge.units.push(u);return u;};
+  const pz2=mk2('g_pz','Spear',14,10); mk2('g_inf','Prop',13,10);
+  mk2('s_inf','A',16,9); mk2('s_inf','B',16,11); mk2('s_inf','C',17,10);
+  E.clearAICache();
+  const penEasy = E.threatPenalty(pz2,15,10,true);
+  check('higher skill is more threat-averse', penHard > penEasy && penEasy===0, `hard ${penHard.toFixed(1)} easy ${penEasy}`);
+  // an objective worth holding is never abandoned for fear of threat
+  const cityHex = Ge.cities.find(c=>c.owner==='S'&&c.vp>0);
+  check('own objective is exempt from threat penalty',
+    E.threatPenalty({...pz2,side:'S',kind:'s_inf'}, cityHex.x, cityHex.y, false)===0);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {
