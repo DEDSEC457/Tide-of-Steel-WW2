@@ -280,6 +280,12 @@
     <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 16px;">EUROPE &amp; THE MEDITERRANEAN · SEPTEMBER 1939 — MAY 1945</div>
     <p style="color:var(--dim);font-size:13px;max-width:520px;margin:0 auto 6px;">Choose the power you will lead through the Second World War. Build its industry, raise its armies, and win the war for your faction.</p>
     <div id="gw-powers" class="pick-row" style="flex-wrap:wrap;gap:10px;margin:16px auto;max-width:680px;"></div>
+    <div class="opt-row" id="gw-diff-row" style="display:flex;gap:8px;justify-content:center;margin:8px 0;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+      <span class="opt" data-d="easy">Recruit</span>
+      <span class="opt sel" data-d="normal">Field Marshal</span>
+      <span class="opt" data-d="hard">Iron Will</span>
+    </div>
     <div class="mrow" style="justify-content:center;">
       <button id="gw-back">← Back</button>
       <button id="gw-continue" class="hidden">CONTINUE WAR</button>
@@ -3893,10 +3899,13 @@ function gwAtWar(ccA, ccB){
   return GW.factionWar.some(([x,y]) => (x===fa&&y===fb)||(x===fb&&y===fa));
 }
 
-function gwNewGame(playerCC){
+const GW_DIFF_MUL = { easy:1.3, normal:1.0, hard:0.82 };   // scales YOUR war-economy output
+const GW_DIFF_COMBAT = { easy:1.15, normal:1.0, hard:0.85 };  // …and your battlefield effectiveness
+function gwDiffCombat(cc){ return cc===GW.player ? (GW_DIFF_COMBAT[GW.diff]||1) : 1; }
+function gwNewGame(playerCC, diff){
   gwAdjacency();
   GW = {
-    player: playerCC || 'GE',
+    player: playerCC || 'GE', diff: diff || 'normal',
     turn: 1, over:false, result:null, log:[],
     factionWar: [['axis','allies']],          // comintern joins at Barbarossa
     regions: {},                               // id -> owner (mutable)
@@ -3926,10 +3935,11 @@ function gwControlledInd(cc){ return gwRegionsOf(cc).reduce((a,id)=>a+(GW_REGION
 /* ---- economy: one month of construction & production for a power ---- */
 function gwEcoTick(cc){
   const e = GW.eco[cc]; if (!e) return;
+  const dm = cc===GW.player ? (GW_DIFF_MUL[GW.diff]||1) : 1;   // difficulty buffs/nerfs YOUR economy
   // 0. MANPOWER trickles in from the population of the land you hold
   e.mp += gwControlledInd(cc) * 0.35;
   // 1. CONSTRUCTION: civilian factories pour points into the build queue
-  e.cp += e.civ * GW_CIV_OUT;
+  e.cp += e.civ * GW_CIV_OUT * dm;
   while (e.build.length){
     const item = e.build[0];
     const cost = GW_FACT_COST[item.type];
@@ -3944,7 +3954,7 @@ function gwEcoTick(cc){
   }
   // 2. PRODUCTION: military factories build army strength (and a little air),
   //    limited by manpower. Output compounds as you build more mil factories.
-  const out = e.mil * GW_MIL_OUT;
+  const out = e.mil * GW_MIL_OUT * dm;
   e.prod += out * (e.milTo.army ?? 1);
   while (e.prod >= GW_DIV_COST && e.mp >= GW_DIV_MP){
     e.prod -= GW_DIV_COST; e.mp -= GW_DIV_MP; e.army += 1;
@@ -4036,7 +4046,7 @@ function gwRegionDefense(id){
   if (gwIsPower(o) && GW.turn>=GW_POWERS[o].join && !GW.capitulated[o]){
     const e = GW.eco[o];
     if (e){
-      d += e.army / gwOwnFrontCount(o) * 0.45 * gwAirMul(o);   // army + air defense
+      d += e.army / gwOwnFrontCount(o) * 0.45 * gwAirMul(o) * gwDiffCombat(o);   // army + air + difficulty
       if (e.posture==='defend') d *= 1.7;            // dug in — holding a line is a real strategy
     }
   } else if (gwFactionOf(o)==='neutral'){
@@ -4074,7 +4084,7 @@ function gwResolveFronts(){
       // can break a fortress; other attacks make do with the dispersed front
       let atk = ((id===e.preferredTarget)
         ? e.army * 0.5 * gwOffenseMod(cc, GW.regions[id])
-        : perPush * gwOffenseMod(cc, GW.regions[id])) * gwAirMul(cc);   // close air support
+        : perPush * gwOffenseMod(cc, GW.regions[id])) * gwAirMul(cc) * gwDiffCombat(cc);   // CAS + difficulty
       if (!landAdj) atk *= 0.18;                       // amphibious assaults are very hard
       if (atk > def * 1.2){                            // real superiority needed to break a front
         const from = GW.regions[id];
@@ -5298,7 +5308,10 @@ function gwEnter(){
   show('gw-select',false); show('mode-select',false); show('topbar',false); show('side',false);
   show('gw-game',true); gwUpdateUI();
 }
-function gwStart(cc){ gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced'; gwSave(); gwEnter();
+let gwSelDiff='normal';
+for (const el of document.querySelectorAll('#gw-diff-row .opt')) el.onclick=()=>{
+  gwSelDiff=el.dataset.d; document.querySelectorAll('#gw-diff-row .opt').forEach(o=>o.classList.toggle('sel',o===el)); };
+function gwStart(cc){ gwNewGame(cc, gwSelDiff); GW.active=true; GW.eco[cc].posture='balanced'; gwSave(); gwEnter();
   $('gw-hint').innerHTML = (GW_BRIEF[cc]||'') + '<br><span style="color:var(--dim)">🏗 queue factories · ⚙ set production · click a <b style="color:var(--redL)">red front</b> to attack · End Month to advance</span>';
   show('gw-hint', true);
 }
