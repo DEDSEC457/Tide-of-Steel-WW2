@@ -154,6 +154,37 @@
     padding:16px 20px;margin:20px auto 0;max-width:400px;text-align:left;
     font-size:13px;color:var(--ink);line-height:1.9;}
   .rm-features .rml{color:var(--dim);font-size:11px;letter-spacing:2px;margin-bottom:10px;}
+
+  /* ---------- The World at War ---------- */
+  .gw-pick{flex:0 0 200px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+    cursor:pointer;background:var(--panel2);text-align:left;transition:border-color .15s, box-shadow .15s;}
+  .gw-pick:hover{border-color:var(--amber);}
+  .gw-pick.sel{border-color:var(--amber);box-shadow:0 0 14px #e8b34b33;background:#242a1b;}
+  .gw-pick h4{font-size:15px;margin-bottom:3px;}
+  .gw-pick .gw-fac{font-size:11px;letter-spacing:1px;color:var(--dim);margin-bottom:5px;}
+  .gw-pick .gw-stats{font-size:11px;color:var(--dim);line-height:1.5;}
+  .gw-pick .gw-stats b{color:var(--ink);}
+  #gw-topbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    gap:10px;padding:0 14px;background:linear-gradient(#181c13ee,#12150eee);
+    border-bottom:1px solid var(--line);z-index:20;font-size:14px;}
+  #gw-side{position:absolute;top:60px;right:8px;width:288px;z-index:20;display:flex;
+    flex-direction:column;gap:8px;max-height:calc(100% - 130px);}
+  #gw-log{font-size:12px;color:var(--dim);max-height:150px;overflow-y:auto;line-height:1.5;}
+  #gw-side .card{max-height:none;}
+  #gw-con-body .qrow,#gw-prod-body .prow{display:flex;justify-content:space-between;align-items:center;
+    gap:6px;margin:3px 0;font-size:12px;}
+  .gw-btn{background:linear-gradient(#262c1d,#181d12);border:1px solid var(--line);color:var(--ink);
+    border-radius:5px;padding:3px 9px;font-size:12px;cursor:pointer;}
+  .gw-btn:hover{border-color:var(--amber);color:var(--amber);}
+  .gw-bar{height:7px;background:#000a;border-radius:3px;overflow:hidden;margin:3px 0;}
+  .gw-bar > i{display:block;height:100%;background:var(--amber);}
+  .gw-seg{display:flex;gap:4px;margin:4px 0;}
+  .gw-seg .gw-opt{flex:1;text-align:center;border:1px solid var(--line);border-radius:5px;padding:3px 0;
+    font-size:11px;cursor:pointer;color:var(--dim);}
+  .gw-seg .gw-opt.sel{border-color:var(--amber);color:var(--amber);background:#242a1b;}
+  #gw-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
+    background:#14180fcc;border:1px solid var(--line);border-radius:8px;padding:6px 16px;
+    font-size:13px;color:var(--dim);}
 </style>
 </head>
 <body>
@@ -224,8 +255,61 @@
         <button class="mc-btn">PREVIEW ▶</button>
       </div>
     </div>
+    <div class="mode-row" style="margin-top:2px;">
+      <div class="mode-card" id="mc-grand" style="max-width:480px;">
+        <span class="mc-badge wip">EARLY BUILD</span>
+        <div class="mc-icon">🌍</div>
+        <h2>THE WORLD AT WAR</h2>
+        <p class="mc-desc">Grand strategy across Europe &amp; the Mediterranean, 1939–45. Pick a great power, build a war economy — factories, production, armies — and fight the whole war, one month per turn.</p>
+        <ul class="mc-features" style="text-align:center;list-style:none;">
+          <li>Play Germany · USSR · Britain · France · Italy</li>
+          <li>Build factories → divisions → conquer the map</li>
+          <li>Monthly turns · the war unfolds 1939–1945</li>
+        </ul>
+        <button class="primary mc-btn">SELECT ▶</button>
+      </div>
+    </div>
     <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
   </div>
+</div>
+
+<!-- ============ THE WORLD AT WAR — power select ============ -->
+<div id="gw-select" class="modal-back hidden">
+  <div class="modal" style="max-width:760px;text-align:center;">
+    <h2>THE WORLD AT WAR</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 16px;">EUROPE &amp; THE MEDITERRANEAN · SEPTEMBER 1939 — MAY 1945</div>
+    <p style="color:var(--dim);font-size:13px;max-width:520px;margin:0 auto 6px;">Choose the power you will lead through the Second World War. Build its industry, raise its armies, and win the war for your faction.</p>
+    <div id="gw-powers" class="pick-row" style="flex-wrap:wrap;gap:10px;margin:16px auto;max-width:680px;"></div>
+    <div class="mrow" style="justify-content:center;">
+      <button id="gw-back">← Back</button>
+      <button class="primary" id="gw-begin">BEGIN THE WAR ▶</button>
+    </div>
+    <div style="color:var(--dim);font-size:11px;margin-top:10px;">⚠ Early build — the strategic AI &amp; balance are still being tuned.</div>
+  </div>
+</div>
+
+<!-- ============ THE WORLD AT WAR — in-game ============ -->
+<div id="gw-game" class="hidden">
+  <div id="gw-topbar">
+    <span class="t-title" id="gw-title">🌍 THE WORLD AT WAR</span>
+    <span class="t-chip" id="gw-date"><b>Sep 1939</b></span>
+    <span class="t-chip" id="gw-country">—</span>
+    <span class="t-chip" title="Civilian factories — build things">🏭 <b id="gw-civ">0</b> civ</span>
+    <span class="t-chip" title="Military factories — produce equipment">⚙ <b id="gw-mil">0</b> mil</span>
+    <span class="t-chip" title="Manpower available to conscript">👤 <b id="gw-mp">0</b></span>
+    <span class="t-chip" title="Field army strength">🪖 <b id="gw-army">0</b></span>
+    <span class="t-chip" id="gw-vp" title="Faction victory points">VP —</span>
+    <span class="spacer"></span>
+    <button id="gw-menu-btn">Menu</button>
+    <button class="primary" id="gw-end">End Month ▶</button>
+  </div>
+  <div id="gw-side">
+    <div class="card" id="gw-con-card"><h3>🏗 CONSTRUCTION</h3><div id="gw-con-body"></div></div>
+    <div class="card" id="gw-prod-card"><h3>⚙ PRODUCTION</h3><div id="gw-prod-body"></div></div>
+    <div class="card" id="gw-war-card"><h3>⚔ WAR</h3><div id="gw-war-body"></div></div>
+    <div class="card" id="gw-log-card"><h3>WAR DIARY</h3><div id="gw-log"></div></div>
+  </div>
+  <div id="gw-hint" class="hidden"></div>
 </div>
 
 <!-- ============ REALISTIC MODE STUB ============ -->
@@ -3703,7 +3787,7 @@ const GW_REGIONS = {
   belgium: {name:'Belgium',  owner:'belgium', x:25,y:25, ind:2, vp:1},
   normandy:{name:'Normandy', owner:'FR', x:16,y:29, ind:2, vp:1, port:1},
   paris:   {name:'Paris',    owner:'FR', x:22,y:31, ind:6, vp:5, cap:'FR'},
-  alsace:  {name:'Alsace',   owner:'FR', x:29,y:30, ind:2, vp:1},
+  alsace:  {name:'Maginot Line', owner:'FR', x:29,y:30, ind:2, vp:1, def:20},
   marseille:{name:'Marseille', owner:'FR', x:24,y:42, ind:3, vp:1, port:1},
   spain:   {name:'Spain',    owner:'spain', x:12,y:45, ind:2, vp:1},
   portugal:{name:'Portugal', owner:'portugal', x:6,y:46, ind:1, vp:0},
@@ -3889,7 +3973,7 @@ function gwOffenseMod(cc, targetOwner){
 }
 function gwRegionDefense(id){
   const o = GW.regions[id], r = GW_REGIONS[id];
-  let d = 4 + (r.ind||0)*0.4 + ((GW.forts&&GW.forts[id]) ? GW.forts[id]*4 : 0);
+  let d = 4 + (r.ind||0)*0.4 + (r.def||0) + ((GW.forts&&GW.forts[id]) ? GW.forts[id]*4 : 0);
   if (gwIsPower(o) && GW.turn>=GW_POWERS[o].join && !GW.capitulated[o]){
     const e = GW.eco[o];
     if (e){
@@ -3918,9 +4002,11 @@ function gwResolveFronts(){
     if (e.preferredTarget && targets.includes(e.preferredTarget))
       targets = [e.preferredTarget, ...targets.filter(t => t!==e.preferredTarget)];
     const perPush = e.army / gwOwnFrontCount(cc) * aggression;
+    // a blitz (or Barbarossa) can overrun two regions in a month; otherwise one
+    const capMax = targets.some(id => gwOffenseMod(cc, GW.regions[id]) >= 1.4) ? 2 : 1;
     let captured = 0;
     for (const id of targets){
-      if (captured >= 1) break;                       // the front advances at most one region a month
+      if (captured >= capMax) break;
       const def = gwRegionDefense(id);
       let atk = perPush * (id===e.preferredTarget ? 1.6 : 1) * gwOffenseMod(cc, GW.regions[id]);
       if (atk > def * 1.2){                            // real superiority needed to break a front
@@ -3990,6 +4076,7 @@ function gwAIEco(cc){
   const myOffense = myDensity * mod;
   e.posture = (myOffense > foe*1.1 && mod >= 0.95) ? 'attack'
             : (myDensity < foe*0.7) ? 'defend' : 'balanced';
+  if (mod < 0.8) e.posture = 'defend';     // a power not yet ready for offensives holds the line (USSR 1941)
   let best=null, bs=-1e9;
   for (const id of gwFrontTargets(cc)){
     const o = GW.regions[id], r = GW_REGIONS[id];
@@ -4939,8 +5026,139 @@ function attackArrow(att, def){
   anims.push({type:'arrow', x1, y1, x2, y2, t0:performance.now()});
 }
 
+/* ================= THE WORLD AT WAR — UI ================= */
+let gwViewCache = null;
+function gwView(){
+  const topPad=72, pad=64, rightPad=304;
+  const W=innerWidth-rightPad, H=innerHeight;
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  for(const id in GW_REGIONS){ const r=GW_REGIONS[id];
+    minx=Math.min(minx,r.x); maxx=Math.max(maxx,r.x); miny=Math.min(miny,r.y); maxy=Math.max(maxy,r.y); }
+  const s=Math.min((W-pad*2)/(maxx-minx), (H-topPad-pad)/(maxy-miny));
+  return {s, ox:pad-minx*s, oy:topPad-miny*s};
+}
+function gwPos(id){ const r=GW_REGIONS[id]; return [gwViewCache.ox+r.x*gwViewCache.s, gwViewCache.oy+r.y*gwViewCache.s]; }
+function gwDraw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const bg=ctx.createLinearGradient(0,0,0,innerHeight);
+  if (bg && bg.addColorStop){ bg.addColorStop(0,'#0b1622'); bg.addColorStop(1,'#070c12'); ctx.fillStyle=bg; }
+  else ctx.fillStyle='#0b1420';
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+  if(!GW) return;
+  gwViewCache=gwView();
+  const player=GW.player, pe=GW.eco[player], adj=gwAdjacency();
+  // links
+  for(const id in adj){ const [ax,ay]=gwPos(id);
+    for(const n of adj[id]){ if(n<id)continue; const [bx,by]=gwPos(n);
+      const war=gwAtWar(GW.regions[id],GW.regions[n]);
+      if(war){ ctx.setLineDash([]); ctx.strokeStyle='#c4453aaa'; ctx.lineWidth=2.6; }
+      else if(gwIsSeaLink(id,n)){ ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(90,140,180,0.22)'; ctx.lineWidth=1; }
+      else { ctx.setLineDash([]); ctx.strokeStyle='rgba(120,150,170,0.10)'; ctx.lineWidth=1; }
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    }
+  }
+  ctx.setLineDash([]);
+  // regions
+  for(const id in GW_REGIONS){
+    const r=GW_REGIONS[id], owner=GW.regions[id], [x,y]=gwPos(id);
+    const col=gwIsPower(owner)?GW_POWERS[owner].color:'#55564e';
+    const rad=6.5+(r.vp||0)*1.7;
+    ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.fill();
+    if(owner===player){ ctx.strokeStyle='#ffd98a'; ctx.lineWidth=2.5; }
+    else if(id===pe.preferredTarget){ ctx.strokeStyle='#ff5340'; ctx.lineWidth=2.5; }
+    else { ctx.strokeStyle='#0009'; ctx.lineWidth=1; }
+    ctx.stroke();
+    if(r.cap){ ctx.fillStyle='#ffd34d'; star(x,y,rad*0.55); }
+    ctx.fillStyle='#e8e4d2'; ctx.font='10px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText(r.name, x, y+rad+11);
+  }
+}
+function gwSeg(opts, cur, attr){ return '<div class="gw-seg">'+opts.map(o=>
+  '<div class="gw-opt'+(cur===o[0]?' sel':'')+'" '+attr+'="'+o[0]+'">'+o[1]+'</div>').join('')+'</div>'; }
+function gwUpdateUI(){
+  if(!GW) return;
+  const p=GW.player, e=GW.eco[p], pw=GW_POWERS[p];
+  $('gw-date').innerHTML='<b>'+gwDateStr(GW.turn)+'</b>';
+  $('gw-country').innerHTML='<b style="color:'+pw.color+'">'+pw.name+'</b>';
+  $('gw-civ').textContent=e.civ; $('gw-mil').textContent=e.mil;
+  $('gw-mp').textContent=Math.round(e.mp); $('gw-army').textContent=Math.round(e.army);
+  const v=gwFactionVP(); $('gw-vp').textContent='VP '+v[gwFactionOf(p)];
+  // construction
+  let h='<div class="statrow"><span>Civilian factories</span><span>'+e.civ+'</span></div>'
+      +'<div class="statrow"><span>Military factories</span><span>'+e.mil+'</span></div>'
+      +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">Queue · '+Math.floor(e.cp)+' pts banked</div>';
+  e.build.forEach((it,i)=>{ h+='<div class="qrow"><span>'+(it.type==='civ'?'🏭 Civilian factory':it.type==='mil'?'⚙ Military factory':'🛡 Fort')+'</span><button class="gw-btn" data-cancel="'+i+'">✕</button></div>'; });
+  if(!e.build.length) h+='<div style="color:var(--dim);font-size:11px;">— idle, nothing building —</div>';
+  h+='<div style="display:flex;gap:6px;margin-top:6px;"><button class="gw-btn" id="gw-bc">+ Civ ('+GW_FACT_COST.civ+')</button><button class="gw-btn" id="gw-bm">+ Mil ('+GW_FACT_COST.mil+')</button></div>';
+  $('gw-con-body').innerHTML=h;
+  $('gw-bc').onclick=()=>{ gwQueueBuild(p,'civ'); gwUpdateUI(); };
+  $('gw-bm').onclick=()=>{ gwQueueBuild(p,'mil'); gwUpdateUI(); };
+  $('gw-con-body').querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{ gwCancelBuild(p,+b.dataset.cancel); gwUpdateUI(); });
+  // production
+  const milMode = e.milTo.army>=0.99?'army':e.milTo.air>=0.5?'air':'mix';
+  $('gw-prod-body').innerHTML='<div class="statrow"><span>Army strength</span><span>'+Math.round(e.army)+'</span></div>'
+    +'<div class="statrow"><span>Air strength</span><span>'+Math.round(e.air)+'</span></div>'
+    +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">'+e.mil+' factories → '+(e.mil*GW_MIL_OUT).toFixed(1)+'/mo · '+Math.round(e.mp)+' manpower</div>'
+    +'<div style="color:var(--dim);font-size:11px;margin:2px 0;">Output goes to:</div>'
+    +gwSeg([['army','Army'],['mix','Mixed'],['air','Air']], milMode, 'data-mil');
+  $('gw-prod-body').querySelectorAll('[data-mil]').forEach(b=>b.onclick=()=>{ const m=b.dataset.mil;
+    gwSetMilAlloc(p, m==='army'?1:m==='air'?0.35:0.7, m==='army'?0:m==='air'?0.65:0.3); gwUpdateUI(); });
+  // war
+  const enemies=Object.keys(GW_POWERS).filter(cc=>gwAtWar(p,cc)).map(cc=>GW_POWERS[cc].name);
+  const tgt=e.preferredTarget&&GW_REGIONS[e.preferredTarget]?GW_REGIONS[e.preferredTarget].name:'<i>click a red front</i>';
+  let wh='<div class="statrow"><span>Faction</span><span>'+GW_FACT_NAME[gwFactionOf(p)]+'</span></div>'
+    +'<div style="font-size:11px;color:var(--dim);margin:2px 0 5px;">At war with: '+(enemies.join(', ')||'no one yet')+'</div>'
+    +'<div style="color:var(--dim);font-size:11px;">Posture:</div>'
+    +gwSeg([['attack','Attack'],['balanced','Balanced'],['defend','Defend']], e.posture||'balanced','data-pos')
+    +'<div style="color:var(--dim);font-size:11px;margin-top:5px;">Offensive focus: <b style="color:var(--ink)">'+tgt+'</b></div>';
+  if(GW.over) wh='<div class="big" style="color:'+(GW.result.result==='victory'?'var(--grn)':'var(--redL)')+'">'+GW.result.title+'</div><div style="font-size:12px;color:var(--dim);margin-top:4px;">'+GW.result.text+'</div>';
+  $('gw-war-body').innerHTML=wh;
+  if(!GW.over){
+    $('gw-war-body').querySelectorAll('[data-pos]').forEach(b=>b.onclick=()=>{ e.posture=b.dataset.pos; gwUpdateUI(); });
+  }
+  $('gw-end').textContent = GW.over?'Return to Menu':'End Month ▶';
+  $('gw-log').innerHTML = GW.log.slice(-16).reverse().map(l=>'<div>'+l+'</div>').join('');
+}
+let gwSelCC='GE';
+function gwBuildSelect(){
+  const box=$('gw-powers'); box.innerHTML='';
+  for(const cc in GW_POWERS){ const pw=GW_POWERS[cc]; if(!pw.playable) continue;
+    const d=document.createElement('div'); d.className='gw-pick'+(cc===gwSelCC?' sel':'');
+    d.innerHTML='<h4 style="color:'+pw.color+'">'+pw.name+'</h4><div class="gw-fac">'+GW_FACT_NAME[pw.faction].toUpperCase()+'</div>'
+      +'<div class="gw-stats">🏭 <b>'+pw.civ+'</b> civ · ⚙ <b>'+pw.mil+'</b> mil<br>🪖 <b>'+pw.army+'</b> army · 👤 <b>'+pw.mp+'</b></div>';
+    d.onclick=()=>{ gwSelCC=cc; gwBuildSelect(); };
+    box.appendChild(d);
+  }
+}
+function gwStart(cc){
+  gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced';
+  show('gw-select',false); show('mode-select',false); show('topbar',false); show('side',false);
+  show('gw-game',true);
+  gwUpdateUI();
+}
+function gwQuit(){ if(GW) GW.active=false; show('gw-game',false); showModeSelect(); }
+$('mc-grand').onclick=()=>{ show('mode-select',false); show('gw-select',true); gwBuildSelect(); };
+$('gw-back').onclick=()=>{ show('gw-select',false); show('mode-select',true); };
+$('gw-begin').onclick=()=>gwStart(gwSelCC);
+$('gw-menu-btn').onclick=gwQuit;
+$('gw-end').onclick=()=>{
+  if(!GW||!GW.active) return;
+  if(GW.over){ gwQuit(); return; }
+  gwEndMonth(); gwUpdateUI();
+};
+function gwClickMap(e){
+  if(!gwViewCache) return;
+  const mx=e.clientX, my=e.clientY; let best=null, bd=1e9;
+  for(const id in GW_REGIONS){ const [x,y]=gwPos(id); const d=Math.hypot(mx-x,my-y); if(d<bd){bd=d;best=id;} }
+  if(best && bd<24 && !GW.over){
+    const p=GW.player;
+    if(gwCanAttack(p, GW.regions[best])){ GW.eco[p].preferredTarget=best; gwUpdateUI(); }
+  }
+}
+
 (function loop(){
-  try{ if (G) draw(); }
+  try{ if (typeof GW!=='undefined' && GW && GW.active) gwDraw(); else if (G) draw(); }
   catch(e){ if (!window.__drawErr){ window.__drawErr = 1; console.error('draw error:', e); } }
   requestAnimationFrame(loop);
 })();
@@ -4968,6 +5186,7 @@ canvas.addEventListener('wheel', e=>{
 }, {passive:false});
 
 canvas.addEventListener('click', e=>{
+  if (typeof GW!=='undefined' && GW && GW.active){ if(!dragMoved) gwClickMap(e); return; }
   if (dragMoved || !G || G.over || aiRunning) return;
   const isHuman = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!isHuman) return;
