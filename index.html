@@ -5242,9 +5242,13 @@ function gwUpdateUI(){
   $('gw-mp').textContent=Math.round(e.mp); $('gw-army').textContent=Math.round(e.army);
   const v=gwFactionVP(); $('gw-vp').textContent='VP '+v[gwFactionOf(p)];
   // construction
+  const dmul = (typeof GW_DIFF_MUL!=='undefined' && GW_DIFF_MUL[GW.diff]) || 1;
+  const cpMo = e.civ * 1 * dmul;     // GW_CIV_OUT = 1
+  let eta = '';
+  if (e.build.length){ const cost=({civ:10,mil:12,fort:5})[e.build[0].type]; eta = ' · next in ~'+Math.max(1,Math.ceil((cost-e.cp)/Math.max(0.1,cpMo)))+' mo'; }
   let h='<div class="statrow"><span>Civilian factories</span><span>'+e.civ+'</span></div>'
       +'<div class="statrow"><span>Military factories</span><span>'+e.mil+'</span></div>'
-      +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">Queue · '+Math.floor(e.cp)+' pts banked</div>';
+      +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">+'+cpMo.toFixed(0)+' build pts/mo · '+Math.floor(e.cp)+' banked'+eta+'</div>';
   e.build.forEach((it,i)=>{ const lbl = it.type==='civ'?'🏭 Civilian factory':it.type==='mil'?'⚙ Military factory':'🛡 Fort · '+(GW_REGIONS[it.region]?GW_REGIONS[it.region].name:'?');
     h+='<div class="qrow"><span>'+lbl+'</span><button class="gw-btn" data-cancel="'+i+'">✕</button></div>'; });
   if(!e.build.length) h+='<div style="color:var(--dim);font-size:11px;">— idle, nothing building —</div>';
@@ -5259,9 +5263,11 @@ function gwUpdateUI(){
   $('gw-con-body').querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{ gwCancelBuild(p,+b.dataset.cancel); gwUpdateUI(); });
   // production
   const milMode = e.milTo.army>=0.99?'army':e.milTo.air>=0.5?'air':'mix';
+  const armyMo = (e.mil*GW_MIL_OUT*dmul*(e.milTo.army??1))/4;   // GW_DIV_COST=4 → divisions(army)/mo
+  const mpOK = e.mp>=6;
   $('gw-prod-body').innerHTML='<div class="statrow"><span>Army strength</span><span>'+Math.round(e.army)+'</span></div>'
     +'<div class="statrow"><span>Air strength</span><span>'+Math.round(e.air)+'</span></div>'
-    +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">'+e.mil+' factories → '+(e.mil*GW_MIL_OUT).toFixed(1)+'/mo · '+Math.round(e.mp)+' manpower</div>'
+    +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">+'+armyMo.toFixed(1)+' army/mo'+(mpOK?'':' <span class="bad">⚠ low manpower</span>')+' · '+Math.round(e.mp)+' manpower</div>'
     +'<div style="color:var(--dim);font-size:11px;margin:2px 0;">Output goes to:</div>'
     +gwSeg([['army','Army'],['mix','Mixed'],['air','Air']], milMode, 'data-mil');
   $('gw-prod-body').querySelectorAll('[data-mil]').forEach(b=>b.onclick=()=>{ const m=b.dataset.mil;
@@ -6019,7 +6025,7 @@ if (typeof module !== 'undefined' && module.exports){
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     GW_POWERS, GW_REGIONS, gwAdjacency, gwNeighbors, gwNewGame, gwEcoTick, gwAtWar,
     gwQueueBuild, gwCancelBuild, gwSetMilAlloc, gwRegionsOf, gwDateStr, gwGetState: () => GW,
-    gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense,
+    gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense, gwMostThreatenedRegion,
     gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
