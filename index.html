@@ -3991,6 +3991,18 @@ function gwFrontTargets(cc){
     for (const n of gwNeighbors(id)) if (gwCanAttack(cc, GW.regions[n])) out.add(n);
   return [...out];
 }
+/* the friendly front region most worth fortifying (high value, few forts) —
+   where a player's "build fort" order goes */
+function gwMostThreatenedRegion(cc){
+  let best=null, bs=-1e9;
+  for (const id of gwRegionsOf(cc)){
+    if (!gwNeighbors(id).some(n => { const o=GW.regions[n]; return gwIsPower(o) && gwAtWar(cc,o); })) continue;
+    const forts = (GW.forts && GW.forts[id]) || 0;
+    const s = (GW_REGIONS[id].vp||0)*2 - forts*3 + (GW_REGIONS[id].cap?5:0);
+    if (s > bs){ bs=s; best=id; }
+  }
+  return best;
+}
 function gwOwnFrontCount(cc){
   let n = 0;          // only borders with enemy POWERS we're actually fighting dilute the army
   for (const id of gwRegionsOf(cc))
@@ -5193,6 +5205,8 @@ function gwDraw(){
       ctx.beginPath(); ctx.arc(x,y,rad+3.5,0,Math.PI*2); ctx.stroke();
     }
     if(r.cap){ ctx.fillStyle='#ffd34d'; star(x,y,rad*0.55); }
+    const ft=(GW.forts&&GW.forts[id])||0;
+    if(ft>0){ ctx.fillStyle='#cfe0ee'; ctx.font='9px Segoe UI'; ctx.textAlign='left'; ctx.fillText('🛡'+ft, x+rad-1, y-rad+1); }
     ctx.fillStyle='#e8e4d2'; ctx.font='10px Segoe UI'; ctx.textAlign='center';
     ctx.fillText(r.name, x, y+rad+11);
   }
@@ -5221,12 +5235,17 @@ function gwUpdateUI(){
   let h='<div class="statrow"><span>Civilian factories</span><span>'+e.civ+'</span></div>'
       +'<div class="statrow"><span>Military factories</span><span>'+e.mil+'</span></div>'
       +'<div style="color:var(--dim);font-size:11px;margin:5px 0 2px;">Queue · '+Math.floor(e.cp)+' pts banked</div>';
-  e.build.forEach((it,i)=>{ h+='<div class="qrow"><span>'+(it.type==='civ'?'🏭 Civilian factory':it.type==='mil'?'⚙ Military factory':'🛡 Fort')+'</span><button class="gw-btn" data-cancel="'+i+'">✕</button></div>'; });
+  e.build.forEach((it,i)=>{ const lbl = it.type==='civ'?'🏭 Civilian factory':it.type==='mil'?'⚙ Military factory':'🛡 Fort · '+(GW_REGIONS[it.region]?GW_REGIONS[it.region].name:'?');
+    h+='<div class="qrow"><span>'+lbl+'</span><button class="gw-btn" data-cancel="'+i+'">✕</button></div>'; });
   if(!e.build.length) h+='<div style="color:var(--dim);font-size:11px;">— idle, nothing building —</div>';
-  h+='<div style="display:flex;gap:6px;margin-top:6px;"><button class="gw-btn" id="gw-bc">+ Civ ('+GW_FACT_COST.civ+')</button><button class="gw-btn" id="gw-bm">+ Mil ('+GW_FACT_COST.mil+')</button></div>';
+  h+='<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
+    +'<button class="gw-btn" id="gw-bc">+ Civ ('+GW_FACT_COST.civ+')</button>'
+    +'<button class="gw-btn" id="gw-bm">+ Mil ('+GW_FACT_COST.mil+')</button>'
+    +'<button class="gw-btn" id="gw-bf" title="Fortify your most important frontline province">+ Fort ('+GW_FACT_COST.fort+')</button></div>';
   $('gw-con-body').innerHTML=h;
   $('gw-bc').onclick=()=>{ gwQueueBuild(p,'civ'); gwUpdateUI(); };
   $('gw-bm').onclick=()=>{ gwQueueBuild(p,'mil'); gwUpdateUI(); };
+  $('gw-bf').onclick=()=>{ const r=gwMostThreatenedRegion(p); if(r){ gwQueueBuild(p,'fort',r); gwUpdateUI(); } };
   $('gw-con-body').querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{ gwCancelBuild(p,+b.dataset.cancel); gwUpdateUI(); });
   // production
   const milMode = e.milTo.army>=0.99?'army':e.milTo.air>=0.5?'air':'mix';
