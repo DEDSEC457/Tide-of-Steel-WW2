@@ -4,7 +4,7 @@ Tyler's personal turn-based WW2 strategy game project. A fan-made hobby game —
 not affiliated with Paradox or the real Hearts of Iron series; the name is a
 loving nickname for "the strategy game I always wanted."
 
-Two ways to play, chosen from the main menu.
+Three ways to play, chosen from the main menu.
 
 **🎮 Arcade Mode — five campaigns**, streamlined and quick to learn:
 - **⚙ Operation Barbarossa 1941** — Germany races the winter to Moscow
@@ -28,6 +28,21 @@ Eastern Front at operational scale on a 60×36 map, the Baltic to the Caucasus:
   fast; close a ring and hold it two turns and the trapped army collapses
 - A **40-week campaign** through the autumn mud, the deep winter and the Soviet
   counteroffensive, with the historical mobilization deluge arriving by rail
+
+**🌍 The World at War — grand strategy 1939–45** *(early build)* — a whole second
+game: pick a great power (Germany · USSR · Britain · France · Italy) and fight
+the entire war across Europe and the Mediterranean, **one month per turn**.
+- **Build a war economy** — civilian factories pour into a construction queue
+  (build *more* factories, compounding your output); military factories produce
+  the divisions that become your field armies; manpower limits how many you raise
+- **Fight a multi-front war** on a strategic map — set each front's posture and
+  pick where to concentrate your offensive; capitals fall, nations capitulate,
+  the victor seizes the loser's industry
+- **The real shape of WWII emerges** — France falls in 1940 (the blitz flanks the
+  Maginot Line through the Low Countries), Britain holds behind the Channel, the
+  USSR is caught off-guard at Barbarossa but its fortified depth turns the tide,
+  and the Axis is ground down by 1944 — unless *you* rewrite history
+- Dated dispatches (Pearl Harbor & Lend-Lease, Stalingrad, D-Day…) and autosave
 
 The whole game is one file (`index.html`) that runs in any browser:
 **100% offline, no installs, no accounts, autosaves every turn.**

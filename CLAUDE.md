@@ -57,6 +57,7 @@ deps, runs offline by double-clicking. Keep it that way.
 | `canvas.addEventListener('click'` | input: select/shift-group/attack/advance-choice |
 | `function updateUnitCard` / `updatePreview` | side-panel cards; combined forecast |
 | `soundtrack (original score` | WebAudio music engine; settings sliders nearby |
+| `GRAND CAMPAIGN (strategic layer)` | The World at War — wholly separate `GW` state & `gw*` fns: GW_POWERS/GW_REGIONS, gwEcoTick (economy), gwResolveFronts/gwOffenseMod (combat + historical arc), gwAIEco, gwEndMonth, gwDraw/gwUpdateUI (UI). Own localStorage slot `gw-save-v1`. |
 
 ## Invariants & gotchas
 
