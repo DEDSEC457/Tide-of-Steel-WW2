@@ -3,6 +3,8 @@
 import { Application, Container, Sprite, Texture, Graphics, Text } from 'pixi.js';
 import { bakeTerrain } from './terrain';
 import { cities, nations, nat, COLS, ROWS, hexCenter } from './mapdata';
+import { STARTING_UNITS } from './units';
+import { buildUnitLayer } from './unitrender';
 
 const PAD = 2; // matches terrain bake padding
 
@@ -45,6 +47,10 @@ async function boot() {
       stroke: { color: 0x10140c, width: 3 }, fontWeight: ct.cap ? '700' : '400' } });
     label.anchor.set(0.5, 0); label.x = x; label.y = y + (ct.cap?9:5); label.scale.set(0.62); cityLayer.addChild(label);
   }
+
+  // --- unit counters (1939 order of battle) ---
+  const unitLayer = buildUnitLayer(STARTING_UNITS, PAD);
+  world.addChild(unitLayer);
 
   // --- fit, pan, zoom ---
   let scale = Math.min(window.innerWidth/mapW, window.innerHeight/mapH) * 0.98;
