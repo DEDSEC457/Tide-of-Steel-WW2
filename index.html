@@ -1693,13 +1693,13 @@ SCENARIOS.realistic = {
      fuel:true kinds burn fuel to move (see the FUEL section). */
   kinds: {
     g_inf:  {side:'G', label:'Infantry Army',    atk:5, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
-    g_mot:  {side:'G', label:'Motorized Corps',  atk:6, def:5, mp:3, maxStr:9,  cost:14, sym:'inf', fast:true, fuel:true, color:'#46504a'},
+    g_mot:  {side:'G', label:'Motorized Corps',  atk:6, def:5, mp:3, maxStr:9,  cost:14, sym:'mot', fast:true, fuel:true, color:'#46504a'},
     g_pz:   {side:'G', label:'Panzer Group',     atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true},
     g_ss:   {side:'G', label:'SS Panzer Korps',  atk:9, def:7, mp:4, maxStr:10, cost:24, sym:'arm', fuel:true, color:'#23262b'},
     g_ally: {side:'G', label:'Allied Army',      atk:3, def:3, mp:2, maxStr:8,  cost:8,  sym:'inf', color:'#5c5536'},
     s_inf:  {side:'S', label:'Rifle Army',       atk:3, def:5, mp:2, maxStr:8,  cost:8,  sym:'inf'},
     s_tank: {side:'S', label:'Tank Corps',       atk:5, def:4, mp:4, maxStr:8,  cost:12, sym:'arm', fuel:true},
-    s_cav:  {side:'S', label:'Cavalry Corps',    atk:4, def:4, mp:4, maxStr:7,  cost:9,  sym:'inf', fast:true, winter:true, color:'#7a6a3a'},
+    s_cav:  {side:'S', label:'Cavalry Corps',    atk:4, def:4, mp:4, maxStr:7,  cost:9,  sym:'cav', fast:true, winter:true, color:'#7a6a3a'},
     s_guard:{side:'S', label:'Guards Army',      atk:6, def:6, mp:3, maxStr:10, cost:14, sym:'inf', winter:true, color:'#b04a18'},
     s_mil:  {side:'S', label:'Militia',          atk:2, def:3, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#7a4a3a'},
     g_hq:   {side:'G', label:'Army Group HQ',    atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
@@ -2157,7 +2157,7 @@ function previewGroup(attackers, def){
     A += combatPower(u, def).A;
     const s = KINDS[u.kind].sym;
     if (s==='arm') hasArm = true;
-    if (s==='inf' || s==='para') hasInf = true;
+    if (s==='inf' || s==='para' || s==='mot' || s==='cav') hasInf = true;   // foot/horse/truck all count as the infantry arm
   }
   let synergy = 1;
   if (attackers.length > 1){ synergy *= 1.10; if (hasArm && hasInf) synergy *= 1.15; }
@@ -2609,7 +2609,7 @@ function resolveCombat(att, def, supports){
     A += combatPower(u, def).A;
     const s = KINDS[u.kind].sym;
     if (s==='arm') hasArm = true;
-    if (s==='inf' || s==='para') hasInf = true;
+    if (s==='inf' || s==='para' || s==='mot' || s==='cav') hasInf = true;   // foot/horse/truck all count as the infantry arm
   }
   if (combined){ A *= 1.10; if (hasArm && hasInf) A *= 1.15; }
   const rnd = () => 0.75 + Math.random()*0.5;
@@ -3659,6 +3659,198 @@ let onLog = null, onCityTaken = null, onGameOver = null, onAirStrike = null,
     onEvents = null, onWinterDecision = null, onDecision = null, onLevelUp = null;
 
 /* ====================================================================
+   GRAND CAMPAIGN (strategic layer) — an optional second game mode.
+   World War 1939–45 over Europe & the Mediterranean: pick a major power,
+   build a war economy (factories → production → armies) and fight a
+   multi-front war, one month per turn. Entirely separate state (GW) and
+   logic (gw*) from the tactical game above; runs headless for tests.
+   ==================================================================== */
+const GW_START = Date.UTC(1939, 8, 1);      // 1 September 1939
+const GW_END_TURN = 69;                       // → mid-1945 (69 months)
+const GW_BARBAROSSA = 22;                     // ~June 1941
+const GW_FACT_COST = { civ:10, mil:12, fort:5 };   // construction points to build one
+const GW_CIV_OUT = 1;                         // construction points per civilian factory / month
+const GW_MIL_OUT = 0.5;                        // army-build points per military factory / month
+const GW_DIV_COST = 4;                         // army-build points for one division (+army strength)
+const GW_DIV_MP = 8;                           // manpower per division
+
+/* the great powers (and Poland). civ/mil = factories, mp = manpower (thousands),
+   army = starting field strength. joinTurn: month they enter the war. */
+const GW_POWERS = {
+  GE: {name:'Germany',        adj:'German',  color:'#6b7480', faction:'axis',      cap:'berlin',  civ:22, mil:16, mp:70,  army:65, join:0,  playable:true},
+  SU: {name:'Soviet Union',   adj:'Soviet',  color:'#b5392c', faction:'comintern', cap:'moscow',  civ:30, mil:20, mp:170, army:95, join:GW_BARBAROSSA, playable:true},
+  UK: {name:'United Kingdom', adj:'British',  color:'#b59a4a', faction:'allies',    cap:'london',  civ:26, mil:12, mp:55,  army:38, join:0,  playable:true},
+  FR: {name:'France',         adj:'French',  color:'#4a6fa5', faction:'allies',     cap:'paris',   civ:18, mil:9,  mp:45,  army:55, join:0,  playable:true},
+  IT: {name:'Italy',          adj:'Italian', color:'#5a9a6a', faction:'axis',       cap:'rome',    civ:13, mil:9,  mp:38,  army:45, join:9,  playable:true},
+  PL: {name:'Poland',         adj:'Polish',  color:'#c08a3a', faction:'allies',     cap:'warsaw',  civ:6,  mil:3,  mp:22,  army:28, join:0,  playable:false},
+};
+const GW_FACT_NAME = {axis:'Axis', allies:'Allies', comintern:'Comintern', neutral:'Neutral'};
+
+/* Europe & the Med as a region graph. [id]: {name, owner, x, y, ind, vp, port}.
+   x,y are layout coords (0–100). Adjacency is computed from proximity with a
+   few hand-set sea links. owner is a power code, or the region's own id for a
+   passive neutral country. */
+const GW_REGIONS = {
+  scotland:{name:'Scotland', owner:'UK', x:16,y:10, ind:1, vp:0},
+  london:  {name:'London',   owner:'UK', x:18,y:21, ind:6, vp:5, port:1, cap:'UK'},
+  wales:   {name:'Wales',    owner:'UK', x:13,y:23, ind:2, vp:0},
+  ireland: {name:'Ireland',  owner:'ireland', x:8,y:21, ind:1, vp:0},
+  norway:  {name:'Norway',   owner:'norway', x:32,y:7, ind:1, vp:1, port:1},
+  sweden:  {name:'Sweden',   owner:'sweden', x:39,y:9, ind:2, vp:0},
+  finland: {name:'Finland',  owner:'finland', x:49,y:5, ind:1, vp:0},
+  denmark: {name:'Denmark',  owner:'denmark', x:34,y:17, ind:1, vp:0, port:1},
+  nether:  {name:'Netherlands', owner:'nether', x:26,y:21, ind:2, vp:1, port:1},
+  belgium: {name:'Belgium',  owner:'belgium', x:25,y:25, ind:2, vp:1},
+  normandy:{name:'Normandy', owner:'FR', x:16,y:29, ind:2, vp:1, port:1},
+  paris:   {name:'Paris',    owner:'FR', x:22,y:31, ind:6, vp:5, cap:'FR'},
+  alsace:  {name:'Alsace',   owner:'FR', x:29,y:30, ind:2, vp:1},
+  marseille:{name:'Marseille', owner:'FR', x:24,y:42, ind:3, vp:1, port:1},
+  spain:   {name:'Spain',    owner:'spain', x:12,y:45, ind:2, vp:1},
+  portugal:{name:'Portugal', owner:'portugal', x:6,y:46, ind:1, vp:0},
+  rhine:   {name:'Rhineland',owner:'GE', x:30,y:26, ind:5, vp:2},
+  berlin:  {name:'Berlin',   owner:'GE', x:36,y:23, ind:6, vp:5, cap:'GE'},
+  bavaria: {name:'Bavaria',  owner:'GE', x:34,y:32, ind:4, vp:2},
+  prussia: {name:'Prussia',  owner:'GE', x:42,y:20, ind:3, vp:2, port:1},
+  austria: {name:'Austria',  owner:'GE', x:38,y:33, ind:3, vp:1},
+  czech:   {name:'Bohemia',  owner:'GE', x:39,y:28, ind:4, vp:2},
+  warsaw:  {name:'Warsaw',   owner:'PL', x:47,y:24, ind:3, vp:3, cap:'PL'},
+  krakow:  {name:'Krakow',   owner:'PL', x:46,y:29, ind:2, vp:1},
+  milan:   {name:'Milan',    owner:'IT', x:31,y:39, ind:5, vp:2, port:1},
+  rome:    {name:'Rome',     owner:'IT', x:35,y:46, ind:4, vp:4, cap:'IT', port:1},
+  sicily:  {name:'Sicily',   owner:'IT', x:37,y:53, ind:1, vp:1, port:1},
+  libya:   {name:'Libya',    owner:'IT', x:40,y:63, ind:1, vp:1, port:1},
+  yugo:    {name:'Yugoslavia', owner:'yugo', x:41,y:40, ind:2, vp:1},
+  hungary: {name:'Hungary',  owner:'hungary', x:45,y:34, ind:2, vp:1},
+  romania: {name:'Romania',  owner:'romania', x:51,y:36, ind:3, vp:2, port:1},
+  greece:  {name:'Greece',   owner:'greece', x:47,y:51, ind:1, vp:1, port:1},
+  turkey:  {name:'Turkey',   owner:'turkey', x:57,y:49, ind:2, vp:1},
+  baltics: {name:'Baltic States', owner:'baltics', x:52,y:16, ind:1, vp:1, port:1},
+  minsk:   {name:'Minsk',    owner:'SU', x:55,y:22, ind:2, vp:2},
+  kiev:    {name:'Kiev',     owner:'SU', x:57,y:31, ind:4, vp:3},
+  leningrad:{name:'Leningrad', owner:'SU', x:59,y:13, ind:4, vp:4, port:1},
+  moscow:  {name:'Moscow',   owner:'SU', x:65,y:19, ind:6, vp:6, cap:'SU'},
+  stalingrad:{name:'Stalingrad', owner:'SU', x:73,y:29, ind:4, vp:4},
+  caucasus:{name:'Caucasus', owner:'SU', x:71,y:39, ind:3, vp:3},
+  egypt:   {name:'Egypt',    owner:'UK', x:53,y:62, ind:2, vp:2, port:1},
+  algeria: {name:'Algeria',  owner:'FR', x:28,y:58, ind:1, vp:1, port:1},
+};
+
+/* proximity adjacency + explicit sea links (channel, invasions) */
+let GW_ADJ = null;
+/* sea crossings + the long land links the proximity rule misses (the sprawling
+   east, North Africa). Sea links are also where amphibious invasions happen. */
+const GW_SEALINK = [['london','normandy'],['london','nether'],['scotland','norway'],
+  ['sicily','libya'],['libya','egypt'],['rome','marseille'],['greece','turkey'],
+  ['baltics','sweden'],['denmark','norway'],['leningrad','finland'],['egypt','turkey'],
+  ['algeria','marseille'],['algeria','spain'],['algeria','sicily'],['wales','ireland']];
+const GW_LANDLINK = [['moscow','stalingrad'],['stalingrad','caucasus'],['caucasus','kiev'],
+  ['moscow','leningrad'],['kiev','romania'],['romania','hungary']];
+function gwAdjacency(){
+  if (GW_ADJ) return GW_ADJ;
+  GW_ADJ = {}; const ids = Object.keys(GW_REGIONS);
+  for (const a of ids) GW_ADJ[a] = new Set();
+  for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++){
+    const A=GW_REGIONS[ids[i]], B=GW_REGIONS[ids[j]];
+    if (Math.hypot(A.x-B.x, A.y-B.y) <= 9.2){ GW_ADJ[ids[i]].add(ids[j]); GW_ADJ[ids[j]].add(ids[i]); }
+  }
+  for (const [a,b] of [...GW_SEALINK, ...GW_LANDLINK]){ GW_ADJ[a].add(b); GW_ADJ[b].add(a); }
+  return GW_ADJ;
+}
+function gwIsSeaLink(a,b){ return GW_SEALINK.some(([x,y])=>(x===a&&y===b)||(x===b&&y===a)); }
+function gwNeighbors(id){ return [...gwAdjacency()[id]]; }
+
+let GW = null;
+function gwPowerOf(cc){ return GW_POWERS[cc] || null; }
+function gwIsPower(cc){ return !!GW_POWERS[cc]; }
+function gwFactionOf(cc){ const p=GW_POWERS[cc]; return p ? p.faction : 'neutral'; }
+/* two regions' owners are at war? */
+function gwAtWar(ccA, ccB){
+  if (ccA===ccB || !GW) return false;
+  const fa=gwFactionOf(ccA), fb=gwFactionOf(ccB);
+  if (fa==='neutral' || fb==='neutral') return false;
+  if (fa===fb) return false;
+  // a power only fights once it has entered the war
+  const pa=GW_POWERS[ccA], pb=GW_POWERS[ccB];
+  if (pa && GW.turn < pa.join) return false;
+  if (pb && GW.turn < pb.join) return false;
+  return GW.factionWar.some(([x,y]) => (x===fa&&y===fb)||(x===fb&&y===fa));
+}
+
+function gwNewGame(playerCC){
+  gwAdjacency();
+  GW = {
+    player: playerCC || 'GE',
+    turn: 1, over:false, result:null, log:[],
+    factionWar: [['axis','allies']],          // comintern joins at Barbarossa
+    regions: {},                               // id -> owner (mutable)
+    eco: {},                                   // cc -> {civ, mil, army, mp, build:[], milAlloc:{army,air}, air, cp}
+    capitulated: {},
+  };
+  for (const id in GW_REGIONS) GW.regions[id] = GW_REGIONS[id].owner;
+  for (const cc in GW_POWERS){
+    const p = GW_POWERS[cc];
+    GW.eco[cc] = { civ:p.civ, mil:p.mil, army:p.army, air:0, mp:p.mp,
+                   cp:0, build:[], milTo:{army:1.0, air:0.0}, prod:0 };
+  }
+  gwLog(`1 September 1939 — Germany invades Poland. The Second World War begins.`);
+  return GW;
+}
+function gwLog(t){ if (GW){ GW.log.push(t); if (GW.log.length>120) GW.log.shift(); } }
+function gwDate(turn){ const d=new Date(GW_START); d.setUTCMonth(d.getUTCMonth()+(turn-1)); return d; }
+function gwDateStr(turn){ const d=gwDate(turn); return d.toLocaleString('en',{month:'long',year:'numeric',timeZone:'UTC'}); }
+
+/* regions a power owns */
+function gwRegionsOf(cc){ return Object.keys(GW.regions).filter(id=>GW.regions[id]===cc); }
+/* industry (factory potential) a power currently controls — drives nothing yet
+   directly but used for AI valuation and post-conquest gains */
+function gwControlledInd(cc){ return gwRegionsOf(cc).reduce((a,id)=>a+(GW_REGIONS[id].ind||0),0); }
+
+/* ---- economy: one month of construction & production for a power ---- */
+function gwEcoTick(cc){
+  const e = GW.eco[cc]; if (!e) return;
+  // 0. MANPOWER trickles in from the population of the land you hold
+  e.mp += gwControlledInd(cc) * 0.35;
+  // 1. CONSTRUCTION: civilian factories pour points into the build queue
+  e.cp += e.civ * GW_CIV_OUT;
+  while (e.build.length){
+    const item = e.build[0];
+    const cost = GW_FACT_COST[item.type];
+    if (e.cp >= cost){
+      e.cp -= cost; e.build.shift();
+      if (item.type==='civ') e.civ++;
+      else if (item.type==='mil') e.mil++;
+      else if (item.type==='fort' && item.region && GW.regions[item.region]===cc)
+        GW.forts = GW.forts || {}, GW.forts[item.region] = (GW.forts[item.region]||0)+1;
+      if (cc===GW.player) gwLog(`A ${item.type==='civ'?'civilian':item.type==='mil'?'military':'fortification'} project is completed.`);
+    } else break;
+  }
+  // 2. PRODUCTION: military factories build army strength (and a little air),
+  //    limited by manpower. Output compounds as you build more mil factories.
+  const out = e.mil * GW_MIL_OUT;
+  e.prod += out * (e.milTo.army ?? 1);
+  while (e.prod >= GW_DIV_COST && e.mp >= GW_DIV_MP){
+    e.prod -= GW_DIV_COST; e.mp -= GW_DIV_MP; e.army += 1;
+  }
+  e.air += out * (e.milTo.air ?? 0) * 0.5;
+}
+
+/* ---- player economy actions (also used by AI) ---- */
+function gwQueueBuild(cc, type, region){
+  const e = GW.eco[cc]; if (!e) return false;
+  if (!GW_FACT_COST[type]) return false;
+  e.build.push({type, region});
+  return true;
+}
+function gwCancelBuild(cc, idx){
+  const e = GW.eco[cc]; if (e && e.build[idx]){ e.build.splice(idx,1); return true; } return false;
+}
+function gwSetMilAlloc(cc, army, air){
+  const e = GW.eco[cc]; if (!e) return;
+  const s = Math.max(0.0001, army+air);
+  e.milTo = { army:army/s, air:air/s };
+}
+
+/* ====================================================================
    Everything below is browser-only: rendering, input, UI, sound.
    The game engine above runs headless too (used by the test harness).
    ==================================================================== */
@@ -4455,6 +4647,14 @@ function drawUnit(u, cx, cy){
     ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/6);
     ctx.moveTo(bx+bw/2,bh/2); ctx.lineTo(bx-bw/2,-bh/6); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, -bh/6, bw*0.36, Math.PI, 0); ctx.stroke();
+  } else if (k.sym==='mot'){                              // motorized: infantry cross + wheels
+    ctx.beginPath();
+    ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
+    ctx.moveTo(bx+bw/2,-bh/2); ctx.lineTo(bx-bw/2,bh/2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(bx,0,bw*0.36,bh*0.22,0,0,Math.PI*2); ctx.stroke();
+  } else if (k.sym==='cav'){                              // cavalry: single diagonal slash
+    ctx.beginPath();
+    ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/2); ctx.stroke();
   } else if (k.sym==='cv'){
     ctx.fillRect(bx-bw*0.42, -2.6, bw*0.84, 2.6);         // flight deck
     ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 3);              // hull
@@ -5202,6 +5402,8 @@ if (typeof module !== 'undefined' && module.exports){
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
+    GW_POWERS, GW_REGIONS, gwAdjacency, gwNeighbors, gwNewGame, gwEcoTick, gwAtWar,
+    gwQueueBuild, gwCancelBuild, gwSetMilAlloc, gwRegionsOf, gwDateStr, gwGetState: () => GW,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };
