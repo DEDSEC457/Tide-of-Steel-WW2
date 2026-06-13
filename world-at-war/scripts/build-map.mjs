@@ -68,23 +68,25 @@ function smooth(x,y){ const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=
   const a=vhash(xi,yi),b=vhash(xi+1,yi),c=vhash(xi,yi+1),d=vhash(xi+1,yi+1);
   return (a+(b-a)*u)*(1-v)+(c+(d-c)*u)*v; }
 function noise(lon,lat){ return smooth(lon*0.42,lat*0.42) + smooth(lon*1.05,lat*1.05)*0.4; }  // ~ -1.4..1.4, coherent over ~5 hexes
-// terrain ids: 0 sea,1 plains,2 forest,3 hills,4 mountain,5 marsh,6 steppe,7 tundra,8 desert,9 medit
+// terrain ids: 0 sea,1 plains,2 forest,3 hills,4 mountain,5 marsh,6 steppe,7 tundra,8 desert,9 medit,10 wooded-steppe
 function terrainAt(lon,lat,isLand){ if(!isLand) return 0;
   let mtn=1e9; for(const r of RIDGES) for(let i=0;i+1<r.length;i++) mtn=Math.min(mtn,distLL(lon,lat,r[i],r[i+1]));
   if(mtn<0.55) return 4; if(mtn<1.05) return 3;                     // mountain / hills near ranges
   if(lat>=66) return 7;                                            // tundra (far north)
-  if(lat<34.5 || (lat<31.5)) return 8;                            // desert (deep N Africa)
-  if(lat<37 && lon>-2 && lon<35){ return (noise(lon,lat)>0.3)?8:9; } // N Africa coast: desert/medit mix
-  // Pripyat marshes
-  if(lon>25&&lon<30&&lat>51&&lat<53) return 5;
-  // steppe: Ukraine & south Russia
-  if(lat>=45&&lat<=53&&lon>=29&&lon<=52 && noise(lon,lat)>-0.4) return 6;
-  if(lat<43 && lat>=34){ if(noise(lon,lat)>0.5) return 2; return 9; } // Mediterranean Europe scrub/forest
-  // forest belts (boreal north, Russian/Belarus woods) + scattered
-  const boreal = lat>58 && lon>4 && lon<45;
-  const russWoods = lat>=52&&lat<=60&&lon>=24&&lon<=50;
-  if(boreal||russWoods){ return (noise(lon,lat)>-0.5)?2:1; }
-  if(noise(lon,lat)>0.75) return 2;                               // scattered temperate woodland
+  if(lat<31.5) return 8;                                           // deep desert
+  if(lat<37 && lon>-2 && lon<35) return (noise(lon,lat)>0.2)?8:9;  // N Africa coast: desert/medit
+  if(lon>25&&lon<30&&lat>51&&lat<53) return 5;                     // Pripyat marshes
+  const n=noise(lon,lat);
+  // the great eastern latitude gradient: steppe → wooded-steppe → forest (no hard wall)
+  if(lon>=27&&lon<=56 && lat>=43.5 && lat<57){
+    if(lat<48.5) return n>-0.5?6:10;                               // steppe core, wooded-steppe islands
+    if(lat<52)   return n>0.3?6:(n>-0.5?10:2);                     // transition band
+    return n>0.45?10:2;                                            // mostly forest, some wooded-steppe
+  }
+  if(lat<43 && lat>=34) return n>0.5?2:9;                          // Mediterranean scrub/forest
+  if(lat>57 && lon>4 && lon<55) return n>-0.5?2:1;                 // taiga (boreal forest)
+  if(lat>=50 && lat<58 && lon>=6 && lon<56) return n>0.1?2:1;      // mixed-forest belt
+  if(n>0.6) return 2;                                              // scattered temperate woodland
   return 1;                                                        // plains
 }
 

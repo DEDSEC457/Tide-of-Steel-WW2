@@ -9,15 +9,16 @@ const lerp = (a: RGB, b: RGB, t: number): RGB => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]
 
 // terrain palette (id → colour), muted/realistic like War in the East
 const TERR: Record<number, RGB> = {
-  1: [150, 162, 98],   // plains
-  2: [84, 114, 70],    // forest
-  3: [150, 146, 102],  // hills
-  4: [142, 122, 96],   // mountain
-  5: [120, 150, 124],  // marsh
-  6: [201, 162, 102],  // steppe
-  7: [168, 174, 158],  // tundra
-  8: [214, 194, 142],  // desert
-  9: [178, 174, 110],  // mediterranean
+  1: [168, 180, 102],  // plains (light yellow-green)
+  2: [82, 124, 66],    // forest (distinct, richer green)
+  3: [156, 144, 98],   // hills
+  4: [138, 120, 96],   // mountain
+  5: [118, 152, 128],  // marsh
+  6: [212, 162, 88],   // steppe (clear orange)
+  7: [178, 184, 168],  // tundra
+  8: [218, 196, 140],  // desert
+  9: [184, 176, 104],  // mediterranean
+  10: [158, 166, 84],  // wooded steppe (khaki — forest↔steppe transition)
 };
 const SEA_SHALLOW: RGB = [96, 142, 178], SEA_DEEP: RGB = [40, 74, 116];
 const nationRgb = nations.map(n => hexToRgb(n.color));
@@ -58,24 +59,24 @@ export function bakeTerrain(): Baked {
   };
   const rgb = (c: RGB) => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
 
-  // 1) base terrain colour per land hex, with coherent light/dark variation
+  // 1) base terrain colour per land hex (distinct per biome) + gentle variation
   const base: (RGB | null)[] = new Array(COLS*ROWS).fill(null);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const i = r*COLS+c; if (nat[i] < 0) continue;
     const t = terr[i], tc = TERR[t] || TERR[1];
-    const lf = noise(c*0.16, r*0.16) * 18;                 // light/dark across a biome
-    const hf = noise(c*0.5, r*0.5) * (t===4 ? 12 : 6);     // fine grain
+    const lf = noise(c*0.26, r*0.26) * 8;                  // subtle light/dark
+    const hf = noise(c*0.62, r*0.62) * (t===4 ? 10 : 4);   // fine grain
     base[i] = [tc[0]+lf+hf, tc[1]+lf+hf, tc[2]+(lf+hf)*0.85];
   }
-  // 2) blur the terrain colours over land so biomes BLEND, not hard patches
-  for (let pass = 0; pass < 2; pass++) {
+  // 2) soften ONLY the seams between different terrain types — interiors stay crisp
+  for (let pass = 0; pass < 1; pass++) {
     const src = base.map(c => c ? [c[0], c[1], c[2]] as RGB : null);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const i = r*COLS+c, s = src[i]; if (!s) continue;
-      let sr = s[0]*2, sg = s[1]*2, sb = s[2]*2, w = 2;     // self-weight keeps features from washing out
-      const NB = (r&1) ? NB_ODD : NB_EVEN;
-      for (const [dc, dr] of NB) { const nc=c+dc, nr=r+dr; if(nc<0||nr<0||nc>=COLS||nr>=ROWS) continue; const ns = src[nr*COLS+nc]; if(!ns) continue; sr+=ns[0]; sg+=ns[1]; sb+=ns[2]; w++; }
-      base[i] = [sr/w, sg/w, sb/w];
+      let dr=0, dg=0, db=0, dn=0; const NB = (r&1) ? NB_ODD : NB_EVEN;
+      for (const [dc, drr] of NB) { const nc=c+dc, nr=r+drr; if(nc<0||nr<0||nc>=COLS||nr>=ROWS) continue; const j=nr*COLS+nc; if(nat[j]<0) continue; const ns=src[j]; if(!ns) continue;
+        if (terr[j] !== terr[i]) { dr+=ns[0]; dg+=ns[1]; db+=ns[2]; dn++; } }
+      if (dn > 0) { const k = 0.22*Math.min(1, dn/3); base[i] = [s[0]+(dr/dn-s[0])*k, s[1]+(dg/dn-s[1])*k, s[2]+(db/dn-s[2])*k]; }
     }
   }
   // 3) paint: sea by depth, land = blended terrain + subtle nation tint
