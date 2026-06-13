@@ -346,6 +346,10 @@
           (a force multiplier — up to +14% in battle). Choose the split.</li>
       <li><b>⚔ War.</b> Set your <b>posture</b> (Attack / Balanced / Defend) and <b>click a red front</b> on the map
           to choose where you concentrate your offensive. Capitals fall, nations capitulate, the victor takes the spoils.</li>
+      <li><b>🤝 Diplomacy.</b> Open the panel (the badge counts your available moves). <b>Court a neutral</b>
+          that leans your way — Romania, Hungary and Finland to the Axis; Yugoslavia, Greece and the Baltics to the
+          Allies — and its factories and divisions join your war. If you lead <b>Germany</b>, <b>you choose when to
+          launch Operation Barbarossa</b>; the USSR never strikes first.</li>
       <li><b>🎯 The hinge of the war.</b> The <b>Axis wins only by holding Moscow, Leningrad AND Stalingrad
           at the same time</b> — then the USSR collapses. Anything less and the Allies grind it down.
           <b>Britain can never be invaded</b> — it holds for D-Day.</li>
@@ -3979,11 +3983,32 @@ function gwCanCourt(faction, neutralId){
   if (lean==='none') return false;
   return gwSideForLean(lean) === gwSideForFaction(faction);
 }
+/* the dominant power of a faction — the one that absorbs a new partner's industry */
+function gwLeadPower(faction){
+  const order = faction==='axis' ? ['GE','IT'] : faction==='comintern' ? ['SU'] : ['UK','FR'];
+  for (const cc of order) if (GW.eco[cc] && !GW.capitulated[cc]) return cc;
+  // fall back to any live power of that faction
+  for (const cc in GW_POWERS) if (GW_POWERS[cc].faction===faction && !GW.capitulated[cc]) return cc;
+  return null;
+}
 function gwCourtNeutral(faction, neutralId){
   if (!gwCanCourt(faction, neutralId)) return false;
   GW.aligned[neutralId] = faction;
-  gwLog(`${GW_REGIONS[neutralId] ? GW_REGIONS[neutralId].name : neutralId} joins the ${GW_FACT_NAME[faction]}.`);
+  // the new partner throws its industry and a small expeditionary force behind the faction
+  const r = GW_REGIONS[neutralId], ind = r ? (r.ind||0) : 0, lead = gwLeadPower(faction);
+  if (lead && ind){ const e = GW.eco[lead];
+    e.mil += ind; e.mp += ind*2; e.army += ind*1.4; }
+  gwLog(`${r ? r.name : neutralId} joins the ${GW_FACT_NAME[faction]}${ind?` — ${ind} war factories and fresh divisions march under its banner`:''}.`);
   return true;
+}
+/* how many diplomatic actions the player could take right now (drives the
+   notification badge on the Diplomacy button) */
+function gwDiploActions(){
+  if (!GW) return 0;
+  const fac = gwFactionOf(GW.player); let n = 0;
+  if (fac==='axis' && !GW.barbarossa && GW.turn>=GW_BARBAROSSA-4) n++;          // the Barbarossa window is open
+  n += Object.keys(GW_NEUTRAL_LEAN).filter(id => gwCanCourt(fac, id)).length;   // courtable minors
+  return n;
 }
 
 const GW_DIFF_MUL = { easy:1.3, normal:1.0, hard:0.82 };   // scales YOUR war-economy output
@@ -5339,6 +5364,10 @@ function gwUpdateUI(){
   $('gw-civ').textContent=e.civ; $('gw-mil').textContent=e.mil;
   $('gw-mp').textContent=Math.round(e.mp); $('gw-army').textContent=Math.round(e.army);
   const v=gwFactionVP(); $('gw-vp').textContent='VP '+v[gwFactionOf(p)];
+  // diplomacy: badge the button when there's a move to make (Barbarossa / a minor to court)
+  const dipN = GW.over ? 0 : gwDiploActions();
+  $('gw-diplo-btn').innerHTML = '🤝 Diplomacy'+(dipN?' <span style="background:var(--amber);color:#1a1a1a;border-radius:8px;padding:0 5px;font-size:11px;font-weight:700;">'+dipN+'</span>':'');
+  $('gw-diplo-btn').style.boxShadow = dipN ? '0 0 7px var(--amber)' : '';
   // construction
   const dmul = (typeof GW_DIFF_MUL!=='undefined' && GW_DIFF_MUL[GW.diff]) || 1;
   const cpMo = e.civ * 1 * dmul;     // GW_CIV_OUT = 1
@@ -6206,6 +6235,7 @@ if (typeof module !== 'undefined' && module.exports){
     gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense, gwMostThreatenedRegion,
     gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo, gwFactionOf, gwSideOf,
     gwDeclareWar, gwCourtNeutral, gwCanCourt, gwFactionsAtWar, GW_NEUTRAL_LEAN,
+    gwDiploActions, gwLeadPower, gwAxisHoldsKeyCities,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };

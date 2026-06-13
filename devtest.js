@@ -780,11 +780,18 @@ try {
     E.gwCanCourt('axis','yugo')===false, 'Yugoslavia wrongly courtable by Axis');
   check('a strictly-neutral minor is not courtable',
     E.gwCanCourt('axis','spain')===false, 'Spain wrongly courtable');
+  const milBefore = E.gwGetState().eco.GE.mil;
   const ok = E.gwCourtNeutral('axis','romania');
   check('courting aligns the minor with the faction',
     ok===true && E.gwFactionOf('romania')==='axis', 'Romania did not join the Axis');
+  check('courting hands the lead power the minor\'s war industry',
+    E.gwGetState().eco.GE.mil > milBefore, 'Germany gained no factories from Romania');
   check('an already-aligned minor cannot be courted again',
     E.gwCourtNeutral('allies','romania')===false, 'Romania re-courted');
+  // the notification badge surfaces real moves: a German player can launch Barbarossa
+  E.gwNewGame('GE','normal'); E.gwGetState().turn = 20;   // inside the historical window
+  check('the diplomacy badge flags available moves for a German player',
+    E.gwDiploActions() > 0, 'no diplomacy actions surfaced');
 } catch(err){
   failures++;
   console.log(`  FAIL diplomacy engine — ${err.message}`);
