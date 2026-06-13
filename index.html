@@ -3770,6 +3770,15 @@ const GW_POWERS = {
   PL: {name:'Poland',         adj:'Polish',  color:'#c08a3a', faction:'allies',     cap:'warsaw',  civ:6,  mil:3,  mp:22,  army:28, join:0,  will:0.5,  playable:false},
 };
 const GW_FACT_NAME = {axis:'Axis', allies:'Allies', comintern:'Comintern', neutral:'Neutral'};
+/* dated dispatches for flavour (and one real effect: US Lend-Lease) */
+const GW_EVENTS = [
+  {turn:8,  text:'📰 April 1940 — Germany seizes Denmark and Norway, securing the iron-ore route.'},
+  {turn:9,  text:'📰 May 1940 — the Wehrmacht storms west through the Low Countries, around the Maginot Line.'},
+  {turn:27, text:'📰 December 1941 — Pearl Harbor. The United States enters the war; Lend-Lease floods the Allied factories.', lend:true},
+  {turn:39, text:'📰 November 1942 — Stalingrad and El Alamein. The tide of the war begins to turn.'},
+  {turn:57, text:'📰 June 1944 — D-Day: the Western Allies return to the continent of Europe.'},
+  {turn:68, text:'📰 May 1945 — the war in Europe draws toward its end.'},
+];
 
 /* Europe & the Med as a region graph. [id]: {name, owner, x, y, ind, vp, port}.
    x,y are layout coords (0–100). Adjacency is computed from proximity with a
@@ -4143,6 +4152,9 @@ function gwEndMonth(){
     gwLog(`${gwDateStr(GW.turn)} — Operation Barbarossa: the Axis invades the Soviet Union.`);
   }
   for (const cc in GW_POWERS) if (GW_POWERS[cc].join===GW.turn && GW.turn>1) gwLog(`${GW_POWERS[cc].name} enters the war.`);
+  for (const ev of GW_EVENTS) if (ev.turn===GW.turn){ gwLog(ev.text);
+    if (ev.lend) for (const cc of ['UK','SU','FR']) if (GW.eco[cc] && !GW.capitulated[cc]) GW.eco[cc].mil += 3;  // US industrial aid
+  }
   // every AI power plans; the player too when simulated
   for (const cc in GW_POWERS){ if (GW.capitulated[cc]) continue; if (cc!==GW.player || GW.autoPlayer) gwAIEco(cc); }
   for (const cc in GW_POWERS) if (!GW.capitulated[cc]) gwEcoTick(cc);
@@ -5094,6 +5106,16 @@ function gwDraw(){
     if(r.cap){ ctx.fillStyle='#ffd34d'; star(x,y,rad*0.55); }
     ctx.fillStyle='#e8e4d2'; ctx.font='10px Segoe UI'; ctx.textAlign='center';
     ctx.fillText(r.name, x, y+rad+11);
+  }
+  // each surviving power's field-army strength, by its capital
+  for(const cc in GW_POWERS){
+    if(GW.capitulated[cc]) continue;
+    const capId=GW_POWERS[cc].cap; if(GW.regions[capId]!==cc) continue;
+    const e=GW.eco[cc]; if(!e) continue;
+    const [x,y]=gwPos(capId), cr=6.5+(GW_REGIONS[capId].vp||0)*1.7;
+    ctx.font='700 11px Segoe UI'; ctx.textAlign='center';
+    ctx.fillStyle='#101208'; ctx.fillText('🪖'+Math.round(e.army), x+0.5, y-cr-7.5);
+    ctx.fillStyle=cc===player?'#ffe9a8':'#cfe0ee'; ctx.fillText('🪖'+Math.round(e.army), x, y-cr-8);
   }
 }
 function gwSeg(opts, cur, attr){ return '<div class="gw-seg">'+opts.map(o=>
