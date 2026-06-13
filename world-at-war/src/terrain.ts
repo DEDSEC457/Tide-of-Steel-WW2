@@ -15,10 +15,11 @@ const TERR: Record<number, RGB> = {
   4: [138, 120, 96],   // mountain
   5: [118, 152, 128],  // marsh
   6: [212, 162, 88],   // steppe (clear orange)
-  7: [178, 184, 168],  // tundra
+  7: [186, 192, 182],  // tundra (pale snow)
   8: [218, 196, 140],  // desert
   9: [184, 176, 104],  // mediterranean
   10: [158, 166, 84],  // wooded steppe (khaki — forest↔steppe transition)
+  11: [126, 152, 116], // taiga (sub-arctic — bridges forest↔tundra)
 };
 const SEA_SHALLOW: RGB = [96, 142, 178], SEA_DEEP: RGB = [40, 74, 116];
 const nationRgb = nations.map(n => hexToRgb(n.color));
