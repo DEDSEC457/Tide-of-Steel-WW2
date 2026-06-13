@@ -282,9 +282,10 @@
     <div id="gw-powers" class="pick-row" style="flex-wrap:wrap;gap:10px;margin:16px auto;max-width:680px;"></div>
     <div class="mrow" style="justify-content:center;">
       <button id="gw-back">← Back</button>
+      <button id="gw-continue" class="hidden">CONTINUE WAR</button>
       <button class="primary" id="gw-begin">BEGIN THE WAR ▶</button>
     </div>
-    <div style="color:var(--dim);font-size:11px;margin-top:10px;">⚠ Early build — the strategic AI &amp; balance are still being tuned.</div>
+    <div style="color:var(--dim);font-size:11px;margin-top:10px;">⚠ Early build — the strategic AI &amp; balance are still being tuned. Autosaves every month.</div>
   </div>
 </div>
 
@@ -3937,6 +3938,15 @@ function gwSetMilAlloc(cc, army, air){
   e.milTo = { army:army/s, air:air/s };
 }
 
+/* ---- save / load (its own localStorage slot, separate from the tactical game) ---- */
+const GW_SAVE_KEY = 'gw-save-v1';
+function gwSave(){ try{ if(typeof localStorage!=='undefined' && GW) localStorage.setItem(GW_SAVE_KEY, JSON.stringify(GW)); }catch(e){} }
+function gwHasSave(){ try{ return typeof localStorage!=='undefined' && !!localStorage.getItem(GW_SAVE_KEY); }catch(e){ return false; } }
+function gwLoad(){ try{ const j=localStorage.getItem(GW_SAVE_KEY); if(!j) return false; GW=JSON.parse(j); GW.active=true; gwAdjacency(); return true; }catch(e){ return false; } }
+function gwClearSave(){ try{ if(typeof localStorage!=='undefined') localStorage.removeItem(GW_SAVE_KEY); }catch(e){} }
+function gwSaveInfo(){ try{ const j=localStorage.getItem(GW_SAVE_KEY); if(!j) return null; const s=JSON.parse(j);
+  return { player:s.player, name:GW_POWERS[s.player]?GW_POWERS[s.player].name:s.player, turn:s.turn }; }catch(e){ return null; } }
+
 /* ---- the front: who can hit whom, how strong each region is ---- */
 function gwCanAttack(cc, owner){
   if (owner===cc) return false;
@@ -5143,21 +5153,28 @@ function gwBuildSelect(){
     box.appendChild(d);
   }
 }
-function gwStart(cc){
-  gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced';
+function gwEnter(){
   show('gw-select',false); show('mode-select',false); show('topbar',false); show('side',false);
-  show('gw-game',true);
-  gwUpdateUI();
+  show('gw-game',true); gwUpdateUI();
 }
+function gwStart(cc){ gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced'; gwSave(); gwEnter(); }
+function gwContinue(){ if(gwLoad()) gwEnter(); }
 function gwQuit(){ if(GW) GW.active=false; show('gw-game',false); showModeSelect(); }
-$('mc-grand').onclick=()=>{ show('mode-select',false); show('gw-select',true); gwBuildSelect(); };
+function gwOpenSelect(){
+  show('mode-select',false); show('gw-select',true); gwBuildSelect();
+  const info=gwSaveInfo();
+  $('gw-continue').classList.toggle('hidden', !info);
+  if(info) $('gw-continue').textContent='CONTINUE · '+info.name+' · '+gwDateStr(info.turn);
+}
+$('mc-grand').onclick=gwOpenSelect;
 $('gw-back').onclick=()=>{ show('gw-select',false); show('mode-select',true); };
 $('gw-begin').onclick=()=>gwStart(gwSelCC);
+$('gw-continue').onclick=gwContinue;
 $('gw-menu-btn').onclick=gwQuit;
 $('gw-end').onclick=()=>{
   if(!GW||!GW.active) return;
-  if(GW.over){ gwQuit(); return; }
-  gwEndMonth(); gwUpdateUI();
+  if(GW.over){ gwClearSave(); gwQuit(); return; }
+  gwEndMonth(); gwSave(); gwUpdateUI();
 };
 function gwClickMap(e){
   if(!gwViewCache) return;
@@ -5830,6 +5847,7 @@ if (typeof module !== 'undefined' && module.exports){
     GW_POWERS, GW_REGIONS, gwAdjacency, gwNeighbors, gwNewGame, gwEcoTick, gwAtWar,
     gwQueueBuild, gwCancelBuild, gwSetMilAlloc, gwRegionsOf, gwDateStr, gwGetState: () => GW,
     gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense,
+    gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };
