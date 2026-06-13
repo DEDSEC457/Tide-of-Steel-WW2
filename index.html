@@ -2752,6 +2752,11 @@ SCENARIOS.wawtest = (function buildBig(){
     if (t%2===0) longSched.push([t, pickS(t), 'Reserve Army '+t]);     // Soviets reinforce hard
     if (t%3===0) longSched.push([t, pickG(t), 'Verstärkung '+t]);      // Germans more slowly
   }
+  // Uranus buildup and pincers — these arrive regardless of schedule parity
+  for (const [t,k,n] of [[8,'g_ally','2nd Hungarian Army'],[14,'g_ally','Romanian Reserve Corps'],
+    [20,'s_tank','Southwest Front Tanks'],[21,'s_tank','Uranus Shock Army (N)'],
+    [21,'s_tank','Uranus Shock Army (S)'],[22,'s_inf','Don Front Reserve']])
+    longSched.push([t,k,n]);
   const longWeather = turn => {
     const m = new Date(START + (turn-1)*7*864e5).getUTCMonth();
     if (m===11||m===0||m===1) return 'snow';                           // Dec–Feb deep winter
@@ -2766,6 +2771,13 @@ SCENARIOS.wawtest = (function buildBig(){
     {turn:46, date:'May 1942',     title:'THE SPRING LULL', text:'The rasputitsa drains away. Both armies, bled white through the winter, rebuild for the summer. The front held — now the question is who strikes first.'},
     {turn:64, date:'September 1942',title:'A SECOND WINTER NEARS', pp:{S:2}, text:'A second year of war in the East. The Soviet reserves run deeper now, the German spearheads blunter. The cold is coming again — and this time the Red Army is ready for it.'},
     {turn:80, date:'January 1943',  title:'THE TIDE', pp:{S:3}, text:'Eighteen months of grinding war. Where the line stands now decides whether this is the road to Berlin — or the high-water mark of the Reich.'},
+    // Stalingrad arc
+    {turn:16, date:'September 1942', title:'DRIVE ON STALINGRAD',
+     text:'Army Group B drives south-east through the steppe toward the Volga. The flanks — held by Romanian and Italian armies — stretch dangerously thin as the Sixth Army approaches the city.'},
+    {turn:21, date:'19 November 1942', title:'OPERATION URANUS', pp:{S:3},
+     text:'Two Soviet armoured thrusts burst through the satellite armies north and south of Stalingrad. The Romanian and Italian flanks collapse within hours. The Sixth Army is surrounded — a quarter-million men.'},
+    {turn:23, date:'December 1942', title:'WINTER STORM',
+     text:'Manstein\'s relief force drives to within 48 km of the pocket — but Hitler refuses to allow a breakout. The last chance to save the Sixth Army dies in the snow.'},
   ];
 
   return { ...B,
