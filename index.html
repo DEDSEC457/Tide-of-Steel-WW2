@@ -3792,6 +3792,7 @@ function gwNewGame(playerCC){
     GW.eco[cc] = { civ:p.civ, mil:p.mil, army:p.army, air:0, mp:p.mp,
                    cp:0, build:[], milTo:{army:1.0, air:0.0}, prod:0 };
   }
+  for (const cc in GW_POWERS) GW.eco[cc].origVP = gwRegionsOf(cc).reduce((a,id)=>a+(GW_REGIONS[id].vp||0),0);
   gwLog(`1 September 1939 — Germany invades Poland. The Second World War begins.`);
   return GW;
 }
@@ -3848,6 +3849,199 @@ function gwSetMilAlloc(cc, army, air){
   const e = GW.eco[cc]; if (!e) return;
   const s = Math.max(0.0001, army+air);
   e.milTo = { army:army/s, air:air/s };
+}
+
+/* ---- the front: who can hit whom, how strong each region is ---- */
+function gwCanAttack(cc, owner){
+  if (owner===cc) return false;
+  const fo = gwFactionOf(owner), fc = gwFactionOf(cc);
+  if (fo==='neutral') return true;                 // expansion into neutral ground
+  if (fo===fc) return false;                       // an ally
+  return gwAtWar(cc, owner);                        // an enemy we are actually fighting
+}
+function gwFrontTargets(cc){
+  const out = new Set();
+  for (const id of gwRegionsOf(cc))
+    for (const n of gwNeighbors(id)) if (gwCanAttack(cc, GW.regions[n])) out.add(n);
+  return [...out];
+}
+function gwOwnFrontCount(cc){
+  let n = 0;          // only borders with enemy POWERS we're actually fighting dilute the army
+  for (const id of gwRegionsOf(cc))
+    if (gwNeighbors(id).some(x => { const o=GW.regions[x]; return gwIsPower(o) && gwAtWar(cc,o); })) n++;
+  return Math.max(1, n);
+}
+/* the historical arc of the war as an offensive modifier: the Axis has the
+   initiative and doctrine edge early (blitzkrieg, Barbarossa); from 1943 the
+   far larger Allied & Soviet economies turn the tide. Without this the war is
+   just "bigger army wins", which makes France beat Germany and the USSR overrun
+   Berlin in 1941 — the opposite of history. */
+function gwOffenseMod(cc, targetOwner){
+  const af = gwFactionOf(cc), df = gwFactionOf(targetOwner), t = GW.turn;
+  let m = 1;
+  if (af==='axis' && df==='allies'    && t<=14)            m *= 2.1;   // the 1940 blitzkrieg
+  else if (af==='axis' && df==='allies' && t<=30)          m *= 1.5;   // and the years after
+  if (af==='axis' && df==='comintern' && t>=GW_BARBAROSSA && t<=36) m *= 1.8;   // Barbarossa
+  if (af==='comintern' && df==='axis' && t<=36)            m *= 0.5;   // Red Army not yet ready
+  if (af==='allies'    && df==='axis' && t<=32)            m *= 0.6;   // Allies on the back foot
+  if ((af==='comintern'||af==='allies') && df==='axis' && t>=40) m *= 1.35;     // material superiority
+  return m;
+}
+function gwRegionDefense(id){
+  const o = GW.regions[id], r = GW_REGIONS[id];
+  let d = 4 + (r.ind||0)*0.4 + ((GW.forts&&GW.forts[id]) ? GW.forts[id]*4 : 0);
+  if (gwIsPower(o) && GW.turn>=GW_POWERS[o].join && !GW.capitulated[o]){
+    const e = GW.eco[o];
+    if (e){
+      d += e.army / gwOwnFrontCount(o) * 0.55;       // not all of it holds one spot
+      if (e.posture==='defend') d *= 1.4;            // dug in
+    }
+  } else if (gwFactionOf(o)==='neutral'){
+    d += 8;                                          // a neutral nation's standing garrison
+  }
+  if (GW_REGIONS[id].cap) d *= 1.7;                  // capitals are fortified — but not impregnable
+  else if ((r.vp||0) >= 4) d *= 1.3;                 // and the great cities are stubborn
+  return d;
+}
+
+/* ---- one month of fighting: each power presses its offensives ---- */
+function gwResolveFronts(){
+  for (const cc of Object.keys(GW_POWERS)){
+    const e = GW.eco[cc];
+    if (!e || GW.capitulated[cc] || GW.turn < GW_POWERS[cc].join || e.army <= 0) continue;
+    const aggression = e.posture==='attack' ? 1 : e.posture==='defend' ? 0.2 : 0.55;
+    if (aggression <= 0) continue;
+    let targets = gwFrontTargets(cc).filter(id => gwCanAttack(cc, GW.regions[id]));
+    if (!targets.length) continue;
+    // strike the chosen objective first, then the softest valuable ground
+    targets.sort((a,b) => (gwRegionDefense(a)-(GW_REGIONS[a].vp||0)*3) - (gwRegionDefense(b)-(GW_REGIONS[b].vp||0)*3));
+    if (e.preferredTarget && targets.includes(e.preferredTarget))
+      targets = [e.preferredTarget, ...targets.filter(t => t!==e.preferredTarget)];
+    const perPush = e.army / gwOwnFrontCount(cc) * aggression;
+    let captured = 0;
+    for (const id of targets){
+      if (captured >= 1) break;                       // the front advances at most one region a month
+      const def = gwRegionDefense(id);
+      let atk = perPush * (id===e.preferredTarget ? 1.6 : 1) * gwOffenseMod(cc, GW.regions[id]);
+      if (atk > def * 1.2){                            // real superiority needed to break a front
+        const from = GW.regions[id];
+        GW.regions[id] = cc;
+        const loss = Math.min(e.army*0.35, def*0.12 + 0.8);
+        e.army = Math.max(0, e.army - loss);
+        const fe = GW.eco[from]; if (gwIsPower(from) && fe) fe.army = Math.max(0, fe.army - loss*0.6);
+        captured++;
+        if (cc===GW.player || from===GW.player || (GW_REGIONS[id].vp||0)>=3)
+          gwLog(`${GW_POWERS[cc].adj} forces take ${GW_REGIONS[id].name}.`);
+      }
+    }
+  }
+}
+/* grinding attrition on every active front — armies must be replaced from the
+   factories, which is the whole point of the economy */
+function gwAttrition(){
+  for (const cc in GW_POWERS){
+    const e = GW.eco[cc];
+    if (!e || GW.capitulated[cc] || GW.turn < GW_POWERS[cc].join) continue;
+    const fronts = gwFrontTargets(cc).length;
+    if (fronts > 0) e.army = Math.max(0, e.army - (e.army*0.015 + fronts*0.25));
+  }
+}
+/* a power whose capital is taken capitulates; its land falls to the conqueror */
+function gwCheckCapitulation(){
+  for (const cc in GW_POWERS){
+    if (GW.capitulated[cc]) continue;
+    const capId = GW_POWERS[cc].cap, holder = GW.regions[capId];
+    if (!holder || holder===cc || gwFactionOf(holder)===gwFactionOf(cc)) continue;
+    // a raid on the capital isn't enough — the country must be broken: capital
+    // lost AND most of its homeland VP overrun (or its army destroyed)
+    const e = GW.eco[cc];
+    const heldVP = gwRegionsOf(cc).reduce((a,id)=>a+(GW_REGIONS[id].vp||0),0);
+    const broken = heldVP < (e.origVP||1)*0.40 || (e && e.army <= 1);
+    if (!broken) continue;
+    GW.capitulated[cc] = true;
+    if (e) e.army = 0;
+    for (const id of gwRegionsOf(cc)) GW.regions[id] = holder;
+    // the victor seizes the loser's industry & manpower — the spoils that let
+    // Germany turn French factories east, and the Allies grow as they liberate
+    const he = GW.eco[holder];
+    if (gwIsPower(holder) && he && e){
+      he.civ += Math.round(e.civ*0.45); he.mil += Math.round(e.mil*0.45); he.mp += e.mp*0.3;
+    }
+    gwLog(`${GW_POWERS[cc].name} capitulates — its territory falls to ${GW_POWERS[holder] ? GW_POWERS[holder].name : holder}.`);
+  }
+}
+
+/* ---- the AI that runs every power's economy and war effort ---- */
+function gwAIEco(cc){
+  const e = GW.eco[cc]; if (!e) return;
+  if (e.build.length < 2){                            // keep the builders busy
+    const growIndustry = GW.turn < 20 && e.civ < e.mil*1.6 + 8;
+    gwQueueBuild(cc, growIndustry ? 'civ' : 'mil');
+  }
+  e.milTo = { army:0.85, air:0.15 };
+  // posture reads the historical arc, not just raw numbers: a power attacks only
+  // when its offensive is actually capable (mod ≥ 1) and it has local superiority
+  let myDensity = e.army / gwOwnFrontCount(cc), foe = 0, mod = 1;
+  for (const id of gwFrontTargets(cc)){
+    const o = GW.regions[id];
+    if (gwIsPower(o) && GW.eco[o]) foe = Math.max(foe, GW.eco[o].army / gwOwnFrontCount(o));
+    mod = Math.max(mod, gwOffenseMod(cc, o));
+  }
+  const myOffense = myDensity * mod;
+  e.posture = (myOffense > foe*1.1 && mod >= 0.95) ? 'attack'
+            : (myDensity < foe*0.7) ? 'defend' : 'balanced';
+  let best=null, bs=-1e9;
+  for (const id of gwFrontTargets(cc)){
+    const o = GW.regions[id], r = GW_REGIONS[id];
+    let s = (r.vp||0)*3 + (r.ind||0) - gwRegionDefense(id)*0.35;
+    // an enemy capital ends the war — go for the throat, the more so as they weaken
+    if (r.cap && gwIsPower(o)){ const oe=GW.eco[o]; s += 10 + (oe ? Math.max(0, 30 - oe.army)*0.4 : 0); }
+    if (s > bs){ bs=s; best=id; }
+  }
+  e.preferredTarget = best;
+}
+
+/* ---- victory & the master monthly tick ---- */
+function gwEndCampaign(result, title, text){ if(!GW.over){ GW.over=true; GW.result={result,title,text}; gwLog(title+' — '+text); } }
+function gwFactionVP(){
+  const v = {axis:0, allies:0, comintern:0, neutral:0};
+  for (const id in GW.regions) v[gwFactionOf(GW.regions[id])] += GW_REGIONS[id].vp||0;
+  return v;
+}
+function gwCheckVictory(){
+  if (GW.capitulated[GW.player]){ gwEndCampaign('defeat','DEFEAT', `${GW_POWERS[GW.player].name} has been conquered.`); return; }
+  // decisive win: every power at war with you (and your faction) has capitulated
+  const myFac = gwFactionOf(GW.player);
+  const standingEnemies = Object.keys(GW_POWERS).filter(cc =>
+    gwFactionOf(cc)!==myFac && gwFactionOf(cc)!=='neutral' && !GW.capitulated[cc] && GW.turn>=GW_POWERS[cc].join);
+  if (standingEnemies.length===0 && GW.turn>3){
+    const anyEnemyEver = Object.keys(GW_POWERS).some(cc => gwFactionOf(cc)!==myFac && gwFactionOf(cc)!=='neutral');
+    if (anyEnemyEver) gwEndCampaign('victory','DECISIVE VICTORY', `${GW_FACT_NAME[myFac]} stands triumphant over Europe.`);
+  }
+}
+function gwScoreEnd(){
+  const v = gwFactionVP(), myFac = gwFactionOf(GW.player);
+  const mine = v[myFac], best = Math.max(v.axis, v.allies, v.comintern);
+  gwEndCampaign(mine>=best ? 'victory':'defeat', mine>=best ? 'VICTORY':'DEFEAT',
+    `May 1945 — the guns fall silent. ${GW_FACT_NAME[myFac]} held ${mine} victory points.`);
+}
+function gwEndMonth(){
+  if (!GW || GW.over) return;
+  // war-entry triggers
+  if (GW.turn===GW_BARBAROSSA &&
+      !GW.factionWar.some(([a,b]) => (a==='axis'&&b==='comintern')||(a==='comintern'&&b==='axis'))){
+    GW.factionWar.push(['axis','comintern']);
+    gwLog(`${gwDateStr(GW.turn)} — Operation Barbarossa: the Axis invades the Soviet Union.`);
+  }
+  for (const cc in GW_POWERS) if (GW_POWERS[cc].join===GW.turn && GW.turn>1) gwLog(`${GW_POWERS[cc].name} enters the war.`);
+  // every AI power plans; the player too when simulated
+  for (const cc in GW_POWERS){ if (GW.capitulated[cc]) continue; if (cc!==GW.player || GW.autoPlayer) gwAIEco(cc); }
+  for (const cc in GW_POWERS) if (!GW.capitulated[cc]) gwEcoTick(cc);
+  gwResolveFronts();
+  gwAttrition();
+  gwCheckCapitulation();
+  gwCheckVictory();
+  if (!GW.over){ GW.turn++; if (GW.turn > GW_END_TURN) gwScoreEnd(); }
 }
 
 /* ====================================================================
@@ -5404,6 +5598,7 @@ if (typeof module !== 'undefined' && module.exports){
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     GW_POWERS, GW_REGIONS, gwAdjacency, gwNeighbors, gwNewGame, gwEcoTick, gwAtWar,
     gwQueueBuild, gwCancelBuild, gwSetMilAlloc, gwRegionsOf, gwDateStr, gwGetState: () => GW,
+    gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };
