@@ -3698,6 +3698,53 @@ function airStrike(au, t){
   return res;
 }
 
+/* ---- raising & re-equipping air groups with production ---- */
+/* Air groups still trickle back +1/turn when rested, but production now lets
+   you re-equip a mauled group faster, or raise a whole new wing — so your air
+   arm is a lever you control, not a fixed gift of the scenario script. */
+const AIR_BUILD_COST = 16, AIR_BUILD_STR = 6, AIR_REINF_COST = 2, AIR_REINF_MAX = 3;
+function airInUse(side){ return (AIR_INIT && AIR_INIT.length>0) || airOf(side).length>0; }
+function canBuildAir(side){ return airInUse(side) && G.pp[side] >= AIR_BUILD_COST; }
+function airBuildName(side){
+  if (!G.airBuilt) G.airBuilt = {G:0, S:0};
+  const n = (G.airBuilt[side]||0) + 1; G.airBuilt[side] = n;
+  const base = (SCN.airBuildName && SCN.airBuildName[side]) || (SIDES[side].name + ' Air Reserve');
+  return base + ' ' + n;
+}
+function buildAir(side){
+  if (!canBuildAir(side)) return false;
+  G.pp[side] -= AIR_BUILD_COST;
+  const au = makeAir(side, airBuildName(side), AIR_BUILD_STR);
+  au.mission = 'done';                                  // raised this turn — flies next turn
+  G.air.push(au);
+  logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ✈ ${au.name} is raised — a fresh air wing joins the order of battle.`);
+  return true;
+}
+function canReinfAir(au){
+  if (au.str >= AIR_MAXSTR) return false;
+  const steps = Math.min(AIR_MAXSTR - au.str, AIR_REINF_MAX, Math.floor(G.pp[au.side]/AIR_REINF_COST));
+  return steps > 0 ? {steps, cost: steps*AIR_REINF_COST} : false;
+}
+function reinforceAir(au){
+  const r = canReinfAir(au);
+  if (!r) return false;
+  au.str += r.steps; G.pp[au.side] -= r.cost;
+  if (au.mission === 'ready') au.mission = 'done';      // re-equipping spends the sortie
+  logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} re-equips to strength ${au.str}.`);
+  return true;
+}
+/* the AI invests any air surplus last, after its ground needs are met */
+function aiAirBuild(side){
+  if (!airInUse(side)) return;
+  const my = airOf(side), foe = airOf(enemyOf(side));
+  const myStr = my.reduce((a,p)=>a+p.str,0), foeStr = foe.reduce((a,p)=>a+p.str,0);
+  // re-equip one badly mauled group that wouldn't fly anyway — keep a ground cushion
+  const hurt = my.filter(a=>a.str>0 && a.str<=4 && a.mission!=='done').sort((a,b)=>a.str-b.str)[0];
+  if (hurt && G.pp[side] >= AIR_REINF_COST + 8) reinforceAir(hurt);
+  // raise a new wing when outnumbered in the air and flush with cash
+  if (foeStr > myStr + 2 && G.pp[side] >= AIR_BUILD_COST + 10) buildAir(side);
+}
+
 /* ============================ TURN FLOW ============================ */
 function dateStr(turn){
   const d = new Date(START_DATE + (turn-1)*(SCN.turnDays||7)*864e5);
@@ -4068,6 +4115,7 @@ function aiSpend(side){
     if (!kind) break;
     if (!doDeploy(side, kind, spots[0][0], spots[0][1])) break;
   }
+  aiAirBuild(side);                          // spend any leftover air surplus last
 }
 
 /* ---- attack choice shared by both AIs ---- */
@@ -6904,7 +6952,7 @@ function updateAirCard(){
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
   const mine = airOf(side), foe = airOf(enemyOf(side));
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
-  if (!mine.length && !foe.length){ body.innerHTML = '—'; return; }
+  if (!mine.length && !foe.length && !(isHuman && canBuildAir(side))){ body.innerHTML = '—'; return; }
   body.innerHTML = '';
   for (const au of mine){
     const row = document.createElement('div');
@@ -6927,6 +6975,19 @@ function updateAirCard(){
       act.appendChild(bs); act.appendChild(bp);
       row.appendChild(act);
     }
+    if (isHuman){
+      const r = canReinfAir(au);
+      if (r){
+        const ar = document.createElement('div');
+        ar.style.cssText = 'margin:0 0 6px;';
+        const br = document.createElement('button');
+        br.textContent = `⚙ Re-equip +${r.steps} (${r.cost}⚙)`;
+        br.style.cssText = 'padding:2px 10px;font-size:12px;';
+        br.title = 'Pay production to restore strength now, instead of waiting for the slow rebuild.';
+        br.onclick = ()=>{ clearUndo(); sClick(); reinforceAir(au); updateAll(); };
+        ar.appendChild(br); row.appendChild(ar);
+      }
+    }
     body.appendChild(row);
   }
   const foePat = foe.some(p=>p.mission==='patrol');
@@ -6943,6 +7004,14 @@ function updateAirCard(){
     w.textContent = wm < 0.5 ? '❄ Aircraft frozen on their fields — barely able to fly.'
                              : 'Bad flying weather — strikes are weakened.';
     body.appendChild(w);
+  }
+  if (isHuman && canBuildAir(side)){
+    const bb = document.createElement('button');
+    bb.textContent = `➕ Build Air Wing (${AIR_BUILD_COST}⚙)`;
+    bb.style.cssText = 'margin-top:8px;padding:4px 12px;font-size:12px;';
+    bb.title = `Raise a fresh air wing at strength ${AIR_BUILD_STR}. It flies next turn.`;
+    bb.onclick = ()=>{ clearUndo(); sClick(); buildAir(side); updateAll(); };
+    body.appendChild(bb);
   }
 }
 
@@ -7403,6 +7472,7 @@ if (typeof module !== 'undefined' && module.exports){
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
+    buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
     GENERALS, generalOf, zhukovDefends,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
