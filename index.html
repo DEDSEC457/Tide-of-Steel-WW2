@@ -2205,41 +2205,43 @@ SCENARIOS.realistic = {
 };
 
 /* ---------- Realistic scenario 2: BATTLE OF FRANCE, May–June 1940 ----------
-   Same operational engine as War in the East, on the Western front. Germany (G)
-   attacks left→right: Army Group B fixes the Allies in Belgium while the panzers
-   of Army Group A burst through the Ardennes, cross the Meuse at Sedan and race
-   for the Channel — the Sichelschnitt. The Allies (S) are strong but mis-deployed
-   forward, with the Maginot Line anchoring the south. Germany supplies from the
-   west (left) edge, the engine's default, so the blitz needs no special rules.
-   The map is built procedurally to keep every row exactly `cols` wide. */
+   Fall Gelb on the same operational engine, with true geography: Germany attacks
+   WEST out of the Rhineland (the right/east edge). The Maginot Line walls off the
+   direct route, so the Schwerpunkt swings through the Ardennes while Army Group B
+   drives into the Low Countries — and the panzers race for the Channel to trap the
+   Allied armies in Belgium. "reversed:true" flips the engine's home edges and AI
+   bias so the attacker is based in the east. The map is built procedurally so
+   every row is exactly cols wide. */
 SCENARIOS.france = (function buildFrance(){
-  const C = 40, R = 24;
+  const C = 46, R = 28;
   const box = (x,y,a,b,c,d)=> x>=a && x<=c && y>=b && y<=d;
   const map = [];
   for (let y=0; y<R; y++){
     let row = '';
     for (let x=0; x<C; x++){
       let t = '.';
-      // North Sea / English Channel along the top, with a coastal indent
-      if (y===0) t='~';
-      else if (y===1 && x>=5 && x<=33) t='~';
-      else if (y===2 && x>=13 && x<=27) t='~';
-      if (t==='.'){
-        if (x===3 && y>=3 && y<=20) t='r';                                  // the Rhine (German border)
-        else if (Math.abs(x-(9+(y-4)*0.5))<0.5 && y>=4 && y<=13) t='r';      // the Meuse (Sedan)
-        else if (Math.abs(x-(22-(11-y)*0.9))<0.5 && y>=3 && y<=11) t='r';    // the Seine (Paris→Le Havre)
+      const britain = box(x,y,2,0,10,3);                          // England — an island in the NW
+      if (!britain){
+        const coast = x<12 ? 5 : x<28 ? 4 : x<40 ? 2 : 3;         // the Channel / North Sea coast
+        if (y < coast) t = '~';
       }
-      if (t==='.' && box(x,y,5,4,12,11) && (x*3+y*5)%5!==0) t='f';           // the Ardennes
-      if (t==='.' && box(x,y,4,13,8,21)) t='h';                             // the Maginot Line
-      if (t==='.' && y>=21 && x>=4 && x<=22) t='h';                         // the Jura / Alps (south)
-      if (t==='.' && box(x,y,9,18,15,23) && (x*y)%4===0) t='h';             // southern foothills
-      if (t==='.' && box(x,y,14,2,23,4) && (x+y)%3===0) t='s';              // Flanders marsh
+      if (t==='.'){
+        if (x===41 && y>=4 && y<=22) t='r';                                  // the Rhine
+        else if (Math.abs(x-(38-(y-10)*1.1))<0.5 && y>=10 && y<=16) t='r';   // the Meuse (Sedan)
+        else if (Math.abs(x-(18-(14-y)*0.45))<0.6 && y>=5 && y<=14) t='r';   // the Seine
+        if (t==='.' && box(x,y,32,9,39,13) && (x*3+y*5)%5!==0) t='f';        // the Ardennes
+        else if (t==='.' && box(x,y,30,6,34,8) && (x+y)%4===0) t='f';        // Belgian woods
+        if (t==='.' && box(x,y,33,2,41,5) && (x*y)%3===0) t='s';             // Dutch polders
+        if (t==='.' && box(x,y,37,13,41,22)) t='h';                          // the Maginot Line
+        if (t==='.' && y>=22 && x>=22) t='h';                                // the Jura / Alps (south)
+        if (t==='.' && box(x,y,30,18,40,23) && (x*y)%4===0) t='h';           // foothills
+      }
       row += t;
     }
     map.push(row);
   }
   return {
-  id: 'france', realistic: true,
+  id: 'france', realistic: true, reversed: true,
   title: 'BATTLE OF FRANCE', short: 'FRANCE 1940',
   sub: 'THE WESTERN FRONT · MAY — JUNE 1940 · REALISTIC MODE',
   sides: {
@@ -2248,8 +2250,8 @@ SCENARIOS.france = (function buildFrance(){
   },
   fuel: true, harshOOS: true, supplyRange: 11,
   menu: {
-    ger: {h:'⬛ Germany (Wehrmacht)', p:'Fix the Allies in Belgium, then cut the sickle through the Ardennes — cross the Meuse, reach the Channel, and trap the armies of the north before they escape at Dunkirk.'},
-    sov: {h:'🟦 Allies (France & BEF)', p:'You are strong but deployed forward. Hold the Meuse at Sedan, save the armies in Belgium from encirclement, and keep the road to Paris closed.'},
+    ger: {h:'⬛ Germany (Wehrmacht)', p:'Swing the Schwerpunkt through the Ardennes while Army Group B fixes the Allies in Belgium — cross the Meuse, race the panzers west to the Channel, and trap the northern armies before Dunkirk.'},
+    sov: {h:'🟦 Allies (France & BEF)', p:'You are strong but deployed forward. Hold the Meuse at Sedan, pull the armies in Belgium back before they are cut off, and keep the road to Paris closed.'},
   },
   kinds: {
     g_inf:  {side:'G', label:'Infanterie-Korps', atk:5, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
@@ -2267,87 +2269,94 @@ SCENARIOS.france = (function buildFrance(){
     s_inf:'Réserve Générale', s_tank:'DCR Reserve', s_mil:'Dépôt Division'},
   cols: C, rows: R, map,
   cities: [
-    {x:2,  y:5,  name:'Köln',        vp:0, owner:'G'},
-    {x:5,  y:7,  name:'Aachen',      vp:0, owner:'G'},
-    {x:2,  y:16, name:'Saarbrücken', vp:0, owner:'G'},
-    {x:9,  y:3,  name:'Antwerp',     vp:1, owner:'S'},
-    {x:11, y:5,  name:'Brussels',    vp:2, owner:'S'},
-    {x:8,  y:7,  name:'Liège',       vp:1, owner:'S'},
-    {x:16, y:3,  name:'Dunkirk',     vp:2, owner:'S'},
-    {x:19, y:4,  name:'Calais',      vp:1, owner:'S'},
-    {x:11, y:9,  name:'Sedan',       vp:1, owner:'S'},
-    {x:15, y:5,  name:'Lille',       vp:1, owner:'S'},
-    {x:18, y:7,  name:'Amiens',      vp:1, owner:'S'},
-    {x:20, y:9,  name:'Reims',       vp:1, owner:'S'},
-    {x:9,  y:12, name:'Verdun',      vp:1, owner:'S'},
-    {x:7,  y:14, name:'Metz',        vp:1, owner:'S'},
-    {x:5,  y:19, name:'Strasbourg',  vp:1, owner:'S'},
-    {x:16, y:5,  name:'Le Havre',    vp:1, owner:'S'},
-    {x:20, y:6,  name:'Rouen',       vp:0, owner:'S'},
-    {x:22, y:11, name:'Paris',       vp:5, owner:'S'},
-    {x:25, y:15, name:'Orléans',     vp:1, owner:'S'},
-    {x:18, y:17, name:'Dijon',       vp:1, owner:'S'},
-    {x:24, y:21, name:'Lyon',        vp:2, owner:'S'},
-    {x:28, y:16, name:'Tours',       vp:0, owner:'S'},
-    {x:31, y:13, name:'Le Mans',     vp:0, owner:'S'},
-    {x:35, y:11, name:'Rennes',      vp:1, owner:'S'},
-    {x:38, y:8,  name:'Brest',       vp:1, owner:'S'},
-    {x:34, y:18, name:'Nantes',      vp:1, owner:'S'},
-    {x:36, y:22, name:'Bordeaux',    vp:2, owner:'S'},
+    {x:6,  y:2,  name:'London',      vp:0, owner:'S'},
+    {x:10, y:3,  name:'Dover',       vp:0, owner:'S'},
+    {x:43, y:7,  name:'Köln',        vp:0, owner:'G'},
+    {x:40, y:8,  name:'Aachen',      vp:0, owner:'G'},
+    {x:42, y:17, name:'Saarbrücken', vp:0, owner:'G'},
+    {x:37, y:3,  name:'Amsterdam',   vp:1, owner:'S'},
+    {x:35, y:4,  name:'Rotterdam',   vp:1, owner:'S'},
+    {x:33, y:4,  name:'Antwerp',     vp:1, owner:'S'},
+    {x:31, y:6,  name:'Brussels',    vp:2, owner:'S'},
+    {x:35, y:8,  name:'Liège',       vp:1, owner:'S'},
+    {x:38, y:11, name:'Luxemburg',   vp:0, owner:'S'},
+    {x:27, y:4,  name:'Dunkirk',     vp:2, owner:'S'},
+    {x:24, y:4,  name:'Calais',      vp:1, owner:'S'},
+    {x:14, y:5,  name:'Le Havre',    vp:1, owner:'S'},
+    {x:28, y:6,  name:'Lille',       vp:1, owner:'S'},
+    {x:22, y:7,  name:'Amiens',      vp:1, owner:'S'},
+    {x:18, y:7,  name:'Rouen',       vp:0, owner:'S'},
+    {x:33, y:11, name:'Sedan',       vp:1, owner:'S'},
+    {x:26, y:11, name:'Reims',       vp:1, owner:'S'},
+    {x:34, y:13, name:'Verdun',      vp:1, owner:'S'},
+    {x:38, y:14, name:'Metz',        vp:1, owner:'S'},
+    {x:39, y:16, name:'Nancy',       vp:0, owner:'S'},
+    {x:41, y:18, name:'Strasbourg',  vp:1, owner:'S'},
+    {x:19, y:14, name:'Paris',       vp:5, owner:'S'},
+    {x:16, y:17, name:'Orléans',     vp:1, owner:'S'},
+    {x:28, y:18, name:'Dijon',       vp:1, owner:'S'},
+    {x:23, y:21, name:'Lyon',        vp:2, owner:'S'},
+    {x:12, y:18, name:'Tours',       vp:0, owner:'S'},
+    {x:9,  y:15, name:'Le Mans',     vp:0, owner:'S'},
+    {x:5,  y:13, name:'Rennes',      vp:1, owner:'S'},
+    {x:1,  y:10, name:'Brest',       vp:1, owner:'S'},
+    {x:6,  y:19, name:'Nantes',      vp:1, owner:'S'},
+    {x:4,  y:24, name:'Bordeaux',    vp:2, owner:'S'},
   ],
-  gerSpawns: [[0,5],[0,8],[0,11],[0,14],[1,4]],
-  sovSpawns: [[39,11],[37,15],[35,19],[39,7],[30,13]],
-  /* 10 May 1940 — Army Group A's panzers massed opposite the Ardennes, Army
-     Group B driving into the Low Countries, the Allies wheeling forward into
-     Belgium exactly as the German plan needs them to. */
+  gerSpawns: [[45,5],[45,9],[45,12],[45,16],[44,7]],
+  sovSpawns: [[0,10],[0,14],[0,18],[1,8],[2,22]],
+  /* 10 May 1940 — Army Group A massed in the Eifel opposite the Ardennes, Army
+     Group B driving into the Low Countries, and the Allies wheeling forward into
+     Belgium exactly as the German plan requires. */
   startUnits: [
-    // Army Group B — pins the Allies in the north
-    ['g_inf','18. Armee',       6, 2],
-    ['g_pz', '9. Panzer',       7, 3],
-    ['g_inf','6. Armee',        5, 4],
-    ['g_hq', 'HG B',            3, 3],
-    // Army Group A — the Schwerpunkt through the Ardennes
-    ['g_inf','4. Armee',        4, 6],
-    ['g_pz', 'Pz.Gr. Kleist',   5, 8],
-    ['g_pz', 'Pz.Gr. Guderian', 4, 9],
-    ['g_pz', '7. Panzer',       5, 10],
-    ['g_inf','12. Armee',       4, 8],
-    ['g_inf','16. Armee',       4, 11],
-    ['g_hq', 'HG A',            2, 8],
-    // Army Group C — holds the Maginot front
-    ['g_inf','1. Armee',        3, 14],
-    ['g_inf','7. Armee',        3, 17],
-    ['g_hq', 'HG C',            1, 16],
+    // Army Group B — fixes the Allies in the north
+    ['g_inf','18. Armee',       39, 4],
+    ['g_pz', '9. Panzer',       40, 5],
+    ['g_inf','6. Armee',        40, 7],
+    ['g_hq', 'HG B',            44, 4],
+    // Army Group A — the Schwerpunkt opposite the Ardennes
+    ['g_inf','4. Armee',        40, 9],
+    ['g_pz', 'Pz.Gr. Kleist',   40, 10],
+    ['g_pz', 'Pz.Gr. Guderian', 40, 11],
+    ['g_pz', '7. Panzer',       40, 12],
+    ['g_inf','12. Armee',       43, 10],
+    ['g_inf','16. Armee',       43, 12],
+    ['g_hq', 'HG A',            44, 11],
+    // Army Group C — holds opposite the Maginot
+    ['g_inf','1. Armee',        43, 15],
+    ['g_inf','7. Armee',        43, 18],
+    ['g_hq', 'HG C',            45, 17],
     // ---- Allies (S) ----
-    // forward into Belgium & Holland — the Dyle–Breda gamble
-    ['s_inf', '7e Armée',      10, 2, 8],
-    ['s_guard','BEF',          13, 5, 9],
-    ['s_inf', '1re Armée',     12, 4, 8],
-    ['s_inf', 'Armée Belge',   10, 6, 7],
-    // the Meuse hinge at Sedan — historically the weak point
-    ['s_inf', '9e Armée',      13, 8, 6],
-    ['s_inf', '2e Armée',      12, 11, 7],
+    // forward into the Low Countries — the Dyle–Breda gamble
+    ['s_inf', '7e Armée',      33, 4, 8],
+    ['s_inf', 'Dutch Army',    36, 3, 6],
+    ['s_inf', 'Belgian Army',  32, 6, 7],
+    ['s_guard','BEF',          30, 6, 9],
+    ['s_inf', '1re Armée',     29, 7, 8],
+    // the Meuse hinge at Sedan — the historical weak point
+    ['s_inf', '9e Armée',      33, 11, 6],
+    ['s_inf', '2e Armée',      35, 13, 7],
     // the Maginot armies — strong and static in the south
-    ['s_inf', '3e Armée',       7, 15, 8],
-    ['s_inf', '4e Armée',       7, 18, 8],
-    ['s_inf', '5e Armée',       6, 20, 8],
+    ['s_inf', '3e Armée',      37, 15, 8],
+    ['s_inf', '4e Armée',      38, 18, 8],
+    ['s_inf', '5e Armée',      39, 20, 8],
     // the operational reserves (the depth France historically lacked)
-    ['s_tank','1re DCR',       16, 7, 7],
-    ['s_tank','4e DCR',        18, 11, 7],
-    ['s_inf', '6e Armée',      19, 13, 7],
-    ['s_inf', '10e Armée',     24, 14, 7],
-    ['s_mil', 'Paris Garrison',22, 11, 6],
-    ['s_hq',  'GQG',           26, 13],
+    ['s_tank','1re DCR',       28, 9, 7],
+    ['s_tank','4e DCR',        26, 12, 7],
+    ['s_inf', '6e Armée',      24, 13, 7],
+    ['s_inf', '10e Armée',     22, 15, 7],
+    ['s_mil', 'Paris Garrison',19, 14, 6],
+    ['s_hq',  'GQG',           16, 15],
   ],
   generals: [
     {side:'G', unit:'Pz.Gr. Guderian', name:'Guderian', atk:1.18,
-     bio:'The panzer prophet leads the Sedan breakthrough — and races for the Channel against his own high command\'s nerves.'},
+     bio:'The panzer prophet leads the Sedan breakthrough — and races west for the Channel against his own high command\'s nerves.'},
     {side:'G', unit:'7. Panzer', name:'Rommel', atk:1.15,
      bio:'The "Ghost Division" — Rommel drives so fast and so far that his own headquarters loses track of where he is.'},
     {side:'G', unit:'Pz.Gr. Kleist', name:'von Kleist', atk:1.10,
      bio:'Commands the massed armor of Army Group A through the Ardennes — the largest concentration of tanks yet seen.'},
     {side:'S', unit:'4e DCR', name:'de Gaulle', atk:1.18,
-     bio:'His lone armored counterattack at Montcornet bloodies Guderian\'s flank — a glimpse of a war France could have fought.'},
+     bio:'His lone armored counterattack at Montcornet bloodies the German flank — a glimpse of a war France could have fought.'},
     {side:'S', unit:'2e Armée', name:'Huntziger', def:1.06,
      bio:'Holds the hinge at Sedan where the whole campaign will be decided — with too few men and too little armor.'},
   ],
@@ -2369,11 +2378,10 @@ SCENARIOS.france = (function buildFrance(){
     {turn:6, date:'14 June 1940', title:'PARIS',
      text:'German troops march down the Champs-Élysées. The government has fled to Bordeaux; Reynaud falls, Pétain rises, and a little-known general broadcasts defiance from London.'},
   ],
-  maxTurn: 7,                              // 7 weeks: 10 May → late June 1940
+  maxTurn: 7,
   startDate: Date.UTC(1940,4,10),
-  weather(turn){ return turn>=7 ? 'mud' : 'clear'; },   // the famous fine weather of May 1940
+  weather(turn){ return turn>=7 ? 'mud' : 'clear'; },
   pp(side, turn){ return side==='G' ? 9 : (turn<=2 ? 6 : 5); },
-  // Axis objective points held at the end (28 total; a clean win ≈ 16+)
   victoryTiers: [
     [22,'DECISIVE GERMAN VICTORY','France is overrun in six weeks and the BEF destroyed on the beaches. The myth of the Wehrmacht is born — and the war turns west.'],
     [15,'GERMAN VICTORY','Paris falls and the armies of the north are trapped. France signs the armistice in the railway car at Compiègne, as history demanded.'],
@@ -2395,19 +2403,17 @@ SCENARIOS.france = (function buildFrance(){
   ],
   sovAirSchedule: [ [3,'RAF Reinforcements', 5] ],
   setup(st){
-    // the forward Allied armies in Belgium are NOT dug in (they're advancing);
-    // the Maginot armies and city garrisons are
     for (const u of st.units){
-      if (u.side==='S' && u.x<=8 && u.y>=12) u.entrench = 2;          // Maginot — heavily fortified
+      if (u.side==='S' && u.x>=37 && u.y>=13) u.entrench = 2;          // Maginot — heavily fortified
       if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = Math.max(u.entrench||0,1);
     }
-    const sedan = st.units.find(u=>u.name==='9e Armée'); if (sedan) sedan.entrench = 0;  // the unready hinge
+    const hinge = st.units.find(u=>u.name==='9e Armée'); if (hinge) hinge.entrench = 0;  // the unready hinge
   },
   opening(playerSide){ return [
     '10 May 1940 — Fall Gelb. The panzers move into the Ardennes while the world watches Belgium.',
     playerSide==='G'
-      ? 'Break the Meuse at Sedan, race for the Channel, and trap the north before it reaches Dunkirk.'
-      : 'Hold the Meuse, pull the Belgian armies back before they\'re encircled, and keep Paris.',
+      ? 'Break the Meuse at Sedan, race west to the Channel, and trap the north before it reaches Dunkirk.'
+      : 'Hold the Meuse, pull the Belgian armies back before they are encircled, and keep Paris.',
   ]; },
   };
 })();
@@ -2871,6 +2877,16 @@ function makeHeap(){
    through secured territory. Gated per side by SCN.railhead (only the attacker
    is limited; the defender falls back along intact rail). */
 const RAIL_START = 15, RAIL_RATE = 2;
+/* Which way is a side's rear? By default the attacker (G) is based on the WEST
+   edge and advances east, the defender (S) on the EAST. A scenario can set
+   `reversed:true` (e.g. Battle of France — Germany attacks WEST out of the
+   Rhineland) to flip the home edges, retreat directions and AI fall-back bias.
+   Returns +1 if the side's rear lies toward higher x, −1 toward lower x. */
+function rearDir(side){
+  const rev = !!(SCN && SCN.reversed);
+  return side==='G' ? (rev ? 1 : -1) : (rev ? -1 : 1);
+}
+function homeEdgeX(side){ return rearDir(side) > 0 ? COLS-1 : 0; }
 function railSide(side){ return !!(SCN.railhead && SCN.railhead[side]); }
 function railDepthOf(side){ return (G.railDepth && G.railDepth[side]) ?? RAIL_START; }
 /* BFS from the home edge through secured (friendly, un-contested) territory,
@@ -2882,7 +2898,7 @@ function railNetwork(side){
   const occ = {};
   for (const u of G.units) occ[keyOf(u.x,u.y)] = u.side;
   const depth = railDepthOf(side);
-  const homeX = side==='G' ? 0 : COLS-1;
+  const homeX = homeEdgeX(side);
   const dist = new Map(), parent = new Map();
   // every step costs 1, so a plain FIFO breadth-first sweep gives shortest
   // distances — no priority queue (this runs inside computeSupply, which the
@@ -2930,7 +2946,7 @@ function computeSupply(side){
   const seed = (x,y) => { const k=keyOf(x,y); if(!dist.has(k)){ dist.set(k,0); heap.push(0,x,y); } };
   // home map edge (scenarios can turn this off — e.g. an invader supplied only by sea)
   if ((SCN.edgeSupply && SCN.edgeSupply[side]) ?? true){
-    const homeX = side==='G' ? 0 : COLS-1;
+    const homeX = homeEdgeX(side);
     for (let y=0;y<ROWS;y++)
       if (passable(homeX,y) && occ[keyOf(homeX,y)] !== foe) seed(homeX,y);
   }
@@ -3172,7 +3188,7 @@ function retreatHex(def, att){
   for (const [nx,ny] of neighbors(def.x,def.y)){
     if (!passable(nx,ny) || unitAt(nx,ny)) continue;
     let s = hexDist(nx,ny,att.x,att.y)*3;
-    s += (def.side==='S' ? nx : -nx);                 // bias toward own rear
+    s += rearDir(def.side) * nx;                      // bias toward own rear
     if (foeZOC.has(keyOf(nx,ny))) s -= 8;
     if (s > bestScore){ bestScore=s; best=[nx,ny]; }
   }
@@ -4032,7 +4048,7 @@ function aiPlanHQ(u){
     const [x,y] = k.split(',').map(Number);
     let ed = 99; for (const t of unitsOf(enemyOf(u.side))) ed = Math.min(ed, hexDist(x,y,t.x,t.y));
     let fr = 0; for (const f of unitsOf(u.side)) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=3) fr++;
-    const s = ed*2 + fr*1.5 + (u.side==='G' ? -x : x)*0.3;     // toward safety & friends & home edge
+    const s = ed*2 + fr*1.5 + rearDir(u.side)*x*0.3;           // toward safety & friends & home edge
     if (s > bestS){ bestS = s; best = [x,y]; }
   }
   return (best[0]!==u.x || best[1]!==u.y) ? {type:'move', u:u.id, x:best[0], y:best[1]} : {type:'hold', u:u.id};
@@ -4115,7 +4131,7 @@ function aiPlanSoviet(){
       let best=null, bestS=-1e9;
       for (const k of reach.keys()){
         const [x,y] = k.split(',').map(Number);
-        let s = (net.has(k)?10:0) + x*0.6;                       // east, toward supply
+        let s = (net.has(k)?10:0) + rearDir(u.side)*x*0.6;       // fall back toward own supply
         let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side==='G') e++; }
         s -= e*3;
         s += (effTerrain(x,y).def-1)*3;
