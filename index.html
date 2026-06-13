@@ -5415,6 +5415,9 @@ function gwUpdateUI(){
     +'<div style="font-size:10.5px;">'+cityStat+'</div></div>'
     +'<div class="statrow"><span>Faction</span><span>'+GW_FACT_NAME[gwFactionOf(p)]+'</span></div>'
     +'<div style="font-size:11px;color:var(--dim);margin:2px 0 5px;">At war with: '+(enemies.join(', ')||'no one yet')+'</div>'
+    +(()=>{ const myFac=gwFactionOf(p);
+        const mine=Object.keys(GW.aligned||{}).filter(id=>GW.aligned[id]===myFac).map(id=>GW_REGIONS[id]?GW_REGIONS[id].name:id);
+        return mine.length ? '<div style="font-size:11px;color:var(--dim);margin:2px 0 5px;">Co-belligerents: '+mine.join(', ')+'</div>' : ''; })()
     +'<div style="color:var(--dim);font-size:11px;">Posture:</div>'
     +gwSeg([['attack','Attack'],['balanced','Balanced'],['defend','Defend']], e.posture||'balanced','data-pos')
     +'<div style="color:var(--dim);font-size:11px;margin-top:5px;">Offensive focus: <b style="color:var(--ink)">'+tgt+'</b></div>';

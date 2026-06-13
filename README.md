@@ -38,6 +38,12 @@ the entire war across Europe and the Mediterranean, **one month per turn**.
 - **Fight a multi-front war** on a strategic map — set each front's posture and
   pick where to concentrate your offensive; capitals fall, nations capitulate,
   the victor seizes the loser's industry
+- **Play the politics** — open the 🤝 Diplomacy panel (a badge counts the moves
+  you can make) to **court a leaning neutral** into your faction — Romania,
+  Hungary and Finland to the Axis; Yugoslavia, Greece and the Baltics to the
+  Allies — and its factories and divisions join your war. Lead **Germany** and
+  *you* decide when to launch **Operation Barbarossa**; the USSR never strikes
+  first and is caught off guard whenever you choose to strike
 - **The real shape of WWII emerges** — France falls in 1940 (the blitz flanks the
   Maginot Line through the Low Countries), Britain holds behind the Channel, the
   USSR is caught off-guard at Barbarossa but its fortified depth turns the tide,
