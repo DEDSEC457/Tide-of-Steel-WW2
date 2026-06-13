@@ -308,6 +308,19 @@ async function boot() {
   const land = nat.reduce((a, v) => a + (v >= 0 ? 1 : 0), 0);
   const status = document.getElementById('status');
   if (status) status.textContent = `EUROPE · 1939 · ${COLS}×${ROWS} hexes · ${land.toLocaleString()} land · ${cities.length} cities`;
+
+  // Back-to-menu button — posts message to parent if embedded as iframe
+  const backBtn = document.createElement('button');
+  backBtn.id = 'waw-back-btn';
+  backBtn.textContent = '← MENU';
+  Object.assign(backBtn.style, {
+    position: 'fixed', top: '6px', right: '12px', zIndex: '200',
+    background: '#141c10', color: '#90c070', border: '1px solid #364828',
+    padding: '4px 12px', fontSize: '11px', letterSpacing: '.05em',
+    cursor: 'pointer', fontFamily: 'inherit', borderRadius: '3px',
+  });
+  backBtn.onclick = () => window.parent.postMessage('waw-back', '*');
+  document.body.appendChild(backBtn);
 }
 
 boot();
