@@ -264,15 +264,15 @@
     </div>
     <div class="mode-row" style="margin-top:2px;">
       <div class="mode-card" id="mc-wawtest">
-        <span class="mc-badge ready">NEW · TEST</span>
+        <span class="mc-badge ready">NEW</span>
         <div class="mc-icon">🗺</div>
-        <h2>WORLD AT WAR — TEST</h2>
-        <p class="mc-desc">The Realistic eastern front, scaled up 3× into a much larger operational map. Same engine, art and rules you like — just three times the hexes, with real room to manoeuvre.</p>
+        <h2>GRAND EASTERN FRONT</h2>
+        <p class="mc-desc">Realistic mode made bigger and harder — a 2× eastern front with a continuous line of armies and a long campaign that grinds on into 1943. Choose your side and difficulty, up to Brutal.</p>
         <ul class="mc-features">
-          <li>180×108 hex eastern front (3× Realistic)</li>
-          <li>Detailed counters, cities, weather &amp; terrain</li>
-          <li>Same combat · supply · AI as Realistic mode</li>
-          <li>Play Germany — September 1941 onward</li>
+          <li>120×72 hex front (2× Realistic) — room to manoeuvre</li>
+          <li>~100-unit continuous front with deep reserves</li>
+          <li>Long war: Barbarossa to 1943, escalating reinforcements</li>
+          <li>Play either side · Normal / Hard / Brutal AI</li>
         </ul>
         <button class="primary mc-btn">LAUNCH ▶</button>
       </div>
@@ -438,6 +438,37 @@
       <button id="btn-back-realistic">← Back</button>
       <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
       <button class="primary" id="btn-play-realistic">PLAY EARLY PREVIEW ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GRAND EASTERN FRONT (bigger, harder Realistic) ============ -->
+<div id="waw-menu" class="modal-back hidden">
+  <div class="modal" style="max-width:660px;">
+    <h2>GRAND EASTERN FRONT</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 16px;">BARBAROSSA TO 1943 · 2× SCALE · A LONG, HARD WAR</div>
+    <p style="color:var(--dim);font-size:13px;line-height:1.7;max-width:500px;margin:0 auto 4px;">
+      Realistic mode, doubled in scale and stretched across two years of war — a
+      continuous front from the Baltic to the Black Sea, deeper reserves, and an
+      enemy that keeps coming. Pick your side and how much pain you want.
+    </p>
+    <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:14px 0 0;">
+      <div class="pick p-ger sel" id="waw-pick-ger" style="max-width:240px;">
+        <h4>⬛ Germany</h4><p>Break the front and drive east before the Soviet reserves and the winter bury you.</p>
+      </div>
+      <div class="pick p-sov" id="waw-pick-sov" style="max-width:240px;">
+        <h4>🟥 Soviet Union</h4><p>Trade space for time, survive 1941, then bleed the Wehrmacht white and roll it back.</p>
+      </div>
+    </div>
+    <div class="setrow" style="justify-content:center;gap:10px;margin-top:18px;"><span style="color:var(--dim);font-size:13px;">Difficulty</span>
+      <div class="gfx-seg" id="waw-diff">
+        <button id="waw-diff-normal">Normal</button><button id="waw-diff-hard">Hard</button><button id="waw-diff-brutal">Brutal</button>
+      </div></div>
+    <div id="waw-diff-desc" style="color:var(--dim);font-size:12px;margin-top:2px;min-height:16px;"></div>
+    <div class="mrow" style="justify-content:center;margin-top:18px;">
+      <button id="waw-back">← Back</button>
+      <button id="waw-continue" class="hidden">CONTINUE SAVED WAR</button>
+      <button class="primary" id="waw-play">BEGIN THE WAR ▶</button>
     </div>
   </div>
 </div>
@@ -2176,8 +2207,8 @@ SCENARIOS.realistic = {
    manoeuvre. mp and supply reach scale with the finer hexes to keep the tempo;
    fuel/railhead are left off here (their constants are map-scale and would need
    separate tuning). This is the "make a larger eastern front" experiment. */
-SCENARIOS.wawtest = (function build3x(){
-  const B = SCENARIOS.realistic, N = 3;
+SCENARIOS.wawtest = (function buildBig(){
+  const B = SCENARIOS.realistic, N = 2;          // 2× the eastern front (4× the area)
   const C = B.cols*N, R = B.rows*N;
   const jh = (x,y)=>{ let h=(x*374761393 ^ y*668265263)>>>0; h=Math.imul(h^(h>>>13),1274126177); return (h^(h>>>16))>>>0; };
   const at = (ox,oy)=>{ const row=B.map[Math.max(0,Math.min(B.rows-1,oy))]; return row[Math.max(0,Math.min(B.cols-1,ox))]||'.'; };
@@ -2233,11 +2264,41 @@ SCENARIOS.wawtest = (function build3x(){
     if (y%20===10){ place('g_hq','Korps-HQ '+(++hg), k-6, y); place('s_hq','Front-HQ '+(++hs), k+7, y); }          // HQs
   }
 
+  // ---- a long, escalating campaign deep into 1942–43 ----
+  // Past the historical 40 weeks the front doesn't just stop: both sides keep
+  // raising armies (the Soviets faster), the seasons keep turning, and the war
+  // grinds on toward Berlin or the Volga. This is the "it ends too fast" fix.
+  const MAXT = 90, START = Date.UTC(1941,5,22);
+  const longSched = B.sovSchedule.slice();
+  const pickS = t => (t%8===0)?'s_tank':(t%14===0)?'s_guard':'s_inf';
+  const pickG = t => (t%9===0)?'g_pz':(t%15===0)?'g_mot':'g_inf';
+  for (let t=42; t<=MAXT; t++){
+    if (t%2===0) longSched.push([t, pickS(t), 'Reserve Army '+t]);     // Soviets reinforce hard
+    if (t%3===0) longSched.push([t, pickG(t), 'Verstärkung '+t]);      // Germans more slowly
+  }
+  const longWeather = turn => {
+    const m = new Date(START + (turn-1)*7*864e5).getUTCMonth();
+    if (m===11||m===0||m===1) return 'snow';                           // Dec–Feb deep winter
+    if (m===2) return 'freeze';                                        // March hard frost
+    if (m===3||m===9||m===10) return 'mud';                            // spring & autumn rasputitsa
+    return 'clear';                                                    // summer campaigning season
+  };
+  const longPP = (side, turn) => side==='G'
+    ? (turn<=13 ? 9 : turn<=40 ? 6 : 7)
+    : (turn<=6 ? 5 : turn<=14 ? 7 : turn<=40 ? 11 : 12);               // Soviet output keeps climbing
+  const extraEvents = [
+    {turn:46, date:'May 1942',     title:'THE SPRING LULL', text:'The rasputitsa drains away. Both armies, bled white through the winter, rebuild for the summer. The front held — now the question is who strikes first.'},
+    {turn:64, date:'September 1942',title:'A SECOND WINTER NEARS', pp:{S:2}, text:'A second year of war in the East. The Soviet reserves run deeper now, the German spearheads blunter. The cold is coming again — and this time the Red Army is ready for it.'},
+    {turn:80, date:'January 1943',  title:'THE TIDE', pp:{S:3}, text:'Eighteen months of grinding war. Where the line stands now decides whether this is the road to Berlin — or the high-water mark of the Reich.'},
+  ];
+
   return { ...B,
     id:'wawtest', realistic:true,
-    title:'WORLD AT WAR — TEST', short:'WORLD AT WAR TEST',
-    sub:'EASTERN FRONT · 3× OPERATIONAL SCALE · TEST BUILD',
+    title:'GRAND EASTERN FRONT', short:'GRAND EASTERN FRONT',
+    sub:'BARBAROSSA TO 1943 · 2× OPERATIONAL SCALE · A LONG, HARD WAR',
     cols:C, rows:R, map, kinds,
+    maxTurn: MAXT, weather: longWeather, pp: longPP,
+    sovSchedule: longSched, events: [...B.events, ...extraEvents],
     cities: B.cities.map(c=>({...c, x:P(c.x), y:P(c.y)})),
     startUnits: units,
     sovSpawns: sxy(B.sovSpawns), gerSpawns: sxy(B.gerSpawns),
@@ -2487,8 +2548,9 @@ function newGame(playerSide, difficulty, mode, scenario){
 function diffPP(side){
   if (G.mode==='hotseat') return 0;
   const aiSide = enemyOf(G.playerSide);
-  if (G.difficulty==='easy')  return side===G.playerSide ? 1 : -1;
-  if (G.difficulty==='hard')  return side===aiSide ? 2 : -1;
+  if (G.difficulty==='easy')   return side===G.playerSide ? 1 : -1;
+  if (G.difficulty==='hard')   return side===aiSide ? 2 : -1;
+  if (G.difficulty==='brutal') return side===aiSide ? 3 : -2;       // enemy out-produces you
   return 0;
 }
 function diffCombat(side){           // small attack-multiplier tweak for AI difficulty
@@ -2497,7 +2559,7 @@ function diffCombat(side){           // small attack-multiplier tweak for AI dif
   if (side!==aiSide) return 1;
   // the bulk of the difficulty now comes from how the AI PLAYS (aiSkill), so the
   // raw combat thumb-on-the-scale is light
-  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.1 : 1;
+  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.1 : G.difficulty==='brutal' ? 1.2 : 1;
 }
 /* AI SKILL — the heart of difficulty. 0 = sloppy (easy), 1 = solid (normal),
    2 = sharp (hard). A higher skill makes the AI judge odds better, hold an
@@ -2505,7 +2567,7 @@ function diffCombat(side){           // small attack-multiplier tweak for AI dif
    it plays smarter, it isn't just handed bonuses. Humans / hotseat play at 1. */
 function aiSkill(side){
   if (G.mode==='hotseat' || side===G.playerSide) return 1;
-  return G.difficulty==='easy' ? 0 : G.difficulty==='hard' ? 2 : 1;
+  return G.difficulty==='easy' ? 0 : (G.difficulty==='hard' || G.difficulty==='brutal') ? 2 : 1;
 }
 /* sharper play presses good-but-not-perfect attacks; sloppier play waits for a
    sure thing (or over-commits to a bad one). */
@@ -6533,7 +6595,7 @@ for (const l of ['low','medium','high'])
 syncGfxUI();
 /* mode-select routing — each sub-menu shows its own Continue button only if that
    slot actually holds a saved campaign */
-function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); document.getElementById('waw-frame').style.display='none'; }
+function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); document.getElementById('waw-frame').style.display='none'; }
 /* ---- Europe 1939 hex wargame (iframe embed) ---- */
 let _wawUrl=null;
 function openHexGame(){
@@ -6549,19 +6611,38 @@ function openHexGame(){
 }
 window.addEventListener('message',e=>{ if(e.data==='waw-back'){ document.getElementById('waw-frame').style.display='none'; showModeSelect(); } });
 $('mc-hex').onclick = openHexGame;
+/* ---- Grand Eastern Front: side + difficulty select ---- */
+let wawSide = 'G', wawDiff = 'hard';
+const WAW_DIFF_DESC = {
+  normal: 'A fair fight — the AI plays a solid game with no bonuses.',
+  hard:   'The AI plays sharply, holds its line, and out-produces you. A real test.',
+  brutal: 'A pitiless enemy: out-produces you heavily, hits harder, and gives no ground. For veterans.',
+};
+function syncWawUI(){
+  $('waw-pick-ger').classList.toggle('sel', wawSide==='G');
+  $('waw-pick-sov').classList.toggle('sel', wawSide==='S');
+  for (const d of ['normal','hard','brutal']) $('waw-diff-'+d).classList.toggle('sel', wawDiff===d);
+  $('waw-diff-desc').textContent = WAW_DIFF_DESC[wawDiff] || '';
+}
 $('mc-wawtest').onclick = ()=>{
-  if (hasSaveSlot('wawtest') && performance.now() > wawtestPendingUntil){
-    wawtestPendingUntil = performance.now() + 3000;
-    const b = $('mc-wawtest').querySelector('.mc-btn'); if (b) b.textContent = '⚠ OVERWRITES TEST SAVE — SURE?';
-    setTimeout(()=>{ const b2 = $('mc-wawtest').querySelector('.mc-btn'); if (b2 && performance.now()>=wawtestPendingUntil) b2.textContent = 'LAUNCH ▶'; }, 3100);
-    return;
-  }
+  show('mode-select', false); show('waw-menu', true); sClick();
+  $('waw-continue').classList.toggle('hidden', !hasSaveSlot('wawtest'));
+  syncWawUI();
+};
+$('waw-pick-ger').onclick = ()=>{ wawSide='G'; syncWawUI(); };
+$('waw-pick-sov').onclick = ()=>{ wawSide='S'; syncWawUI(); };
+for (const d of ['normal','hard','brutal']) $('waw-diff-'+d).onclick = ()=>{ wawDiff=d; syncWawUI(); };
+$('waw-back').onclick = ()=>{ show('waw-menu', false); show('mode-select', true); };
+$('waw-play').onclick = ()=>{
   eventQueue.length = 0;
-  newGame('G', 'normal', 'ai', 'wawtest');
-  show('mode-select', false);
+  newGame(wawSide, wawDiff, 'ai', 'wawtest');
+  show('waw-menu', false);
   startCampaign();
 };
-let wawtestPendingUntil = 0;
+$('waw-continue').onclick = ()=>{
+  eventQueue.length = 0; show('event-modal', false);
+  if (loadSlot('wawtest')){ show('waw-menu', false); startCampaign(true); }
+};
 $('mc-arcade').onclick = ()=>{
   show('mode-select', false); show('menu', true); sClick();
   $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
