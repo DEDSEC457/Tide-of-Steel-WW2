@@ -257,6 +257,7 @@
     </div>
     <div class="mrow" style="justify-content:center;margin-top:20px;">
       <button id="btn-back-realistic">← Back</button>
+      <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
       <button class="primary" id="btn-play-realistic">PLAY EARLY PREVIEW ▶</button>
     </div>
   </div>
@@ -3603,7 +3604,13 @@ function aiFullPhase(side){
 }
 
 /* ============================ SAVE / LOAD ============================ */
-const SAVE_KEY = 'barbarossa-save-v1';
+/* Two independent slots — Arcade and Realistic — so starting (or autosaving)
+   a game in one mode never clobbers the other's campaign. A pre-slots save is
+   migrated into the slot matching its own scenario. */
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1' };
+const OLD_SAVE_KEY = 'barbarossa-save-v1';
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : 'arcade'; }
+function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
   const d = JSON.parse(json);
@@ -3617,19 +3624,34 @@ function deserialize(json){
   refreshSupply();
 }
 function saveGame(){
-  try { if (typeof localStorage!=='undefined') localStorage.setItem(SAVE_KEY, serialize()); } catch(e){}
+  try { if (typeof localStorage!=='undefined' && G) localStorage.setItem(saveKeyFor(G.scenario), serialize()); } catch(e){}
 }
-function loadGame(){
+function hasSaveSlot(slot){
+  try { return typeof localStorage!=='undefined' && !!localStorage.getItem(SAVE_KEYS[slot]); } catch(e){ return false; }
+}
+function loadSlot(slot){
   try {
     if (typeof localStorage==='undefined') return false;
-    const j = localStorage.getItem(SAVE_KEY);
+    const j = localStorage.getItem(SAVE_KEYS[slot]);
     if (!j) return false;
     deserialize(j);
     return true;
   } catch(e){ return false; }
 }
 function clearSave(){
-  try { if (typeof localStorage!=='undefined') localStorage.removeItem(SAVE_KEY); } catch(e){}
+  try { if (typeof localStorage!=='undefined' && G) localStorage.removeItem(saveKeyFor(G.scenario)); } catch(e){}
+}
+/* one-time migration of a single-slot save into its proper slot */
+function migrateSaves(){
+  try {
+    if (typeof localStorage==='undefined') return;
+    const old = localStorage.getItem(OLD_SAVE_KEY);
+    if (!old) return;
+    let slot = 'arcade';
+    try { const d = JSON.parse(old); slot = saveSlotFor(d.G && d.G.scenario); } catch(e){}
+    if (!localStorage.getItem(SAVE_KEYS[slot])) localStorage.setItem(SAVE_KEYS[slot], old);
+    localStorage.removeItem(OLD_SAVE_KEY);
+  } catch(e){}
 }
 
 /* ============================ HOOKS (used by the engine) ============================ */
@@ -4854,26 +4876,45 @@ $('vol-sfx').oninput = ()=>{
   syncSoundUI(); tone(440,0.08,'square',0.06);
 };
 syncSoundUI();
-/* mode-select routing */
+/* mode-select routing — each sub-menu shows its own Continue button only if that
+   slot actually holds a saved campaign */
 function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); }
-$('mc-arcade').onclick = ()=>{ show('mode-select', false); show('menu', true); sClick(); };
-$('mc-realistic').onclick = ()=>{ show('mode-select', false); show('realistic-menu', true); sClick(); };
+$('mc-arcade').onclick = ()=>{
+  show('mode-select', false); show('menu', true); sClick();
+  $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
+};
+$('mc-realistic').onclick = ()=>{
+  show('mode-select', false); show('realistic-menu', true); sClick();
+  $('btn-continue-realistic').classList.toggle('hidden', !hasSaveSlot('realistic'));
+};
 $('btn-back-realistic').onclick = ()=>{ show('realistic-menu', false); show('mode-select', true); };
-let rmSide = 'G';
+let rmSide = 'G', rmPendingUntil = 0;
 $('rm-pick-ger').onclick = ()=>{ rmSide='G'; $('rm-pick-ger').classList.add('sel'); $('rm-pick-sov').classList.remove('sel'); };
 $('rm-pick-sov').onclick = ()=>{ rmSide='S'; $('rm-pick-sov').classList.add('sel'); $('rm-pick-ger').classList.remove('sel'); };
 $('btn-play-realistic').onclick = ()=>{
+  // warn before wiping an unfinished Realistic campaign (the Arcade slot is safe)
+  if (hasSaveSlot('realistic') && performance.now() > rmPendingUntil){
+    rmPendingUntil = performance.now() + 3000;
+    $('btn-play-realistic').textContent = '⚠ OVERWRITES YOUR SAVE — SURE?';
+    setTimeout(()=>{ if (performance.now() >= rmPendingUntil) $('btn-play-realistic').textContent = 'PLAY EARLY PREVIEW ▶'; }, 3100);
+    return;
+  }
+  rmPendingUntil = 0;
+  $('btn-play-realistic').textContent = 'PLAY EARLY PREVIEW ▶';
   eventQueue.length = 0;
   newGame(rmSide, 'normal', 'ai', 'realistic');
   show('realistic-menu', false);
   startCampaign();
 };
+$('btn-continue-realistic').onclick = ()=>{
+  eventQueue.length = 0; show('event-modal', false);
+  if (loadSlot('realistic')){ show('realistic-menu', false); startCampaign(true); }
+};
 $('btn-back-arcade').onclick = ()=>{ show('menu', false); show('mode-select', true); };
 
 $('btn-menu').onclick = ()=>{
-  saveGame();
-  showModeSelect();
-  $('btn-continue').classList.remove('hidden');
+  saveGame();                        // autosave into this game's own slot
+  showModeSelect();                  // continue buttons are set when each sub-menu opens
 };
 
 /* ---------------- end turn & AI driver ---------------- */
@@ -5037,10 +5078,9 @@ $('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.a
 
 let startPendingUntil = 0;
 $('btn-start').onclick = ()=>{
-  // safeguard: an unfinished campaign is saved — ask before wiping it
-  let hasSave = false;
-  try { hasSave = !!localStorage.getItem(SAVE_KEY); } catch(e){}
-  if (hasSave && performance.now() > startPendingUntil){
+  // safeguard: an unfinished Arcade campaign is saved — ask before wiping it
+  // (the Realistic slot is independent and untouched)
+  if (hasSaveSlot('arcade') && performance.now() > startPendingUntil){
     startPendingUntil = performance.now() + 3000;
     $('btn-start').textContent = '⚠ OVERWRITES YOUR SAVE — SURE?';
     setTimeout(()=>{ if (performance.now() >= startPendingUntil) $('btn-start').textContent = 'BEGIN CAMPAIGN'; }, 3100);
@@ -5054,7 +5094,7 @@ $('btn-start').onclick = ()=>{
 };
 $('btn-continue').onclick = ()=>{
   eventQueue.length = 0; show('event-modal', false);
-  if (loadGame()) startCampaign(true);
+  if (loadSlot('arcade')) startCampaign(true);
 };
 function startCampaign(loaded){
   undoSnap = null;
@@ -5069,7 +5109,8 @@ function startCampaign(loaded){
   if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
   if (!G.over && G.mode==='hotseat') updateAll();
 }
-try { if (localStorage.getItem(SAVE_KEY)) $('btn-continue').classList.remove('hidden'); } catch(e){}
+migrateSaves();                                        // fold any old single-slot save into its slot
+$('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
 
 })();
 
@@ -5087,6 +5128,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
+    saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };

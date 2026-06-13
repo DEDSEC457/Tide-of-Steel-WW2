@@ -18,7 +18,10 @@ const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m){ console.error('FAIL: no <script> block found'); process.exit(1); }
 
-const sandbox = { module: {exports:{}}, console };
+const memLS = (()=>{ const s = {}; return {
+  getItem: k => (k in s ? s[k] : null), setItem: (k,v) => { s[k] = String(v); },
+  removeItem: k => { delete s[k]; } }; })();
+const sandbox = { module: {exports:{}}, console, localStorage: memLS };
 vm.createContext(sandbox);
 vm.runInContext(m[1], sandbox, {filename: 'barbarossa.js'});
 const E = sandbox.module.exports;
@@ -103,6 +106,28 @@ for (const id of Object.keys(E.SCENARIOS)){
   check('cross-scenario save/load restores the right theater',
     E.getState().scenario === 'midway' && !!E.unitAt(20,9) && E.terrainAt(0,0) === 'o');
   E.loadScenario('barbarossa'); E.newGame('G','normal','hotseat','barbarossa');
+}
+
+/* TWO SAVE SLOTS — Arcade and Realistic must never overwrite each other */
+say('— save slots —');
+{
+  E.newGame('S','normal','ai','realistic'); E.saveGame();
+  E.newGame('G','normal','ai','barbarossa'); E.saveGame();
+  check('arcade and realistic use different slots',
+    E.saveKeyFor('barbarossa') !== E.saveKeyFor('realistic'));
+  check('saving an arcade game does NOT wipe the realistic save',
+    E.hasSaveSlot('realistic') && E.hasSaveSlot('arcade'));
+  E.loadSlot('realistic'); check('realistic slot restores realistic', E.getState().scenario === 'realistic');
+  E.loadSlot('arcade');    check('arcade slot restores barbarossa',  E.getState().scenario === 'barbarossa');
+  check('all five arcade scenarios share the arcade slot',
+    ['barbarossa','winter41','stalingrad','midway','dday'].every(s => E.saveSlotFor(s)==='arcade'));
+  // a pre-slots save migrates into the slot matching its own scenario
+  memLS.removeItem(E.saveKeyFor('realistic'));
+  E.newGame('G','normal','ai','realistic'); memLS.setItem('barbarossa-save-v1', E.serialize());
+  E.migrateSaves();
+  check('legacy single-slot save migrates by scenario',
+    E.hasSaveSlot('realistic') && memLS.getItem('barbarossa-save-v1') === null);
+  E.newGame('G','normal','hotseat','barbarossa');
 }
 
 /* coastal sanity: Riga, Odessa near sea; Moscow not */
