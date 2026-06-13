@@ -1,0 +1,19 @@
+{
+  "name": "world-at-war",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The World at War — a large-scale WWII grand-strategy hex game (WebGL).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7"
+  }
+}
