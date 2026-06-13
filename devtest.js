@@ -653,7 +653,7 @@ function uiSmoke(side){
     const el = {
       id, innerHTML:'', textContent:'', style:{}, dataset:{}, scrollTop:0, scrollHeight:0,
       onclick:null, width:0, height:0,
-      appendChild(){}, addEventListener(){},
+      appendChild(){}, addEventListener(){}, querySelectorAll(){ return []; }, removeChild(){},
       getContext(){ return new Proxy({}, {
         get(t,p){ return (p in t) ? t[p] : ()=>{}; },
         set(t,p,v){ t[p]=v; return true; },
@@ -732,7 +732,20 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors};
+  // The World at War: mode card → power select → begin → build/produce → run months
+  let grandOk = true;
+  if ($('mc-grand').onclick && $('gw-begin').onclick){
+    $('mc-grand').onclick(); drain();
+    if ($('gw-back').onclick){ $('gw-back').onclick(); $('mc-grand').onclick(); }
+    $('gw-begin').onclick(); drain();                       // start as Germany (default)
+    grandOk = !!(UI.gwGetState && UI.gwGetState() && UI.gwGetState().active);
+    if ($('gw-bc').onclick) $('gw-bc').onclick();           // queue a civil factory
+    if ($('gw-bm').onclick) $('gw-bm').onclick();           // queue a military factory
+    if ($('gw-end').onclick) for (let i=0;i<8;i++) $('gw-end').onclick();   // run 8 months
+    drain();
+    $('gw-menu-btn').onclick && $('gw-menu-btn').onclick(); // back to menu
+  }
+  return {over: arcadeOver, realisticOk, grandOk, result: arcadeResult, uiErrors};
 }
 for (const side of ['G','S']){
   try {
@@ -741,6 +754,7 @@ for (const side of ['G','S']){
       r.over && r.uiErrors===0,
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
+    check(`UI World at War campaign runs (${side})`, r.grandOk && r.uiErrors===0, 'grand campaign UI');
   } catch(err){
     failures++;
     console.log(`  FAIL UI smoke (${side}) — ${err.message}`);
