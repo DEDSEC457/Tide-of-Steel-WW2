@@ -12,6 +12,12 @@ const vm = require('vm');
 const path = require('path');
 
 const QUIET = process.argv.includes('--quiet') || process.argv.includes('-q');
+/* --fast skips the AI-vs-AI campaign sims — the slow part, dominated by the
+   60×36 Realistic map (~80s/game). Use it for changes that can't affect
+   combat/AI/balance (UI, saves, menus, graphics): structural, rules, save-slot
+   and UI-smoke checks still run, in ~15s. Run the full suite before committing
+   anything that touches the engine, the AI, or unit stats. */
+const FAST = process.argv.includes('--fast') || process.argv.includes('-f');
 const say = (...a) => { if (!QUIET) console.log(...a); };
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
@@ -543,11 +549,12 @@ say('— events & winter gear —');
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
-say(`— ${RUNS} AI-vs-AI campaigns —`);
 const results = {};
 let crashed = 0;
 const vpAt = {8:[], 15:[], 21:[], 28:[]};
 let minskT=[], kievT=[], smolenskT=[], moscowFell=0;
+if (FAST) say('— AI-vs-AI campaigns SKIPPED (--fast) —');
+else { say(`— ${RUNS} AI-vs-AI campaigns —`);
 
 for (let run=0; run<RUNS; run++){
   try {
@@ -593,9 +600,11 @@ for (let run=0; run<RUNS; run++){
     console.log(`  run ${run+1}: CRASH — ${err.message}`);
   }
 }
+}  // end !FAST AI-vs-AI campaigns
 function MAXPHASES(){ return 28*2 + 10; }
 
 /* ---------------- every other scenario must play to completion too ---------------- */
+if (!FAST){
 say('— scenario campaigns —');
 for (const id of Object.keys(E.SCENARIOS)){
   if (id === 'barbarossa') continue;                  // covered by the main sims above
@@ -626,6 +635,7 @@ for (const id of Object.keys(E.SCENARIOS)){
   say(`  [${id}] ${JSON.stringify(res)} — axis VP ${E.axisVP()}`);
   check(`[${id}] campaigns complete without crashes`, bad===0);
 }
+}  // end !FAST scenario campaigns
 E.loadScenario('barbarossa');                          // restore the default
 
 /* ---------------- UI smoke test (fake DOM) ---------------- */
@@ -738,11 +748,13 @@ for (const side of ['G','S']){
 }
 
 const avg = a => a.length ? (a.reduce((x,y)=>x+y,0)/a.length).toFixed(1) : '—';
-say('— balance summary —');
-say(`  results: ${JSON.stringify(results)}`);
-say(`  avg axis VP  t8=${avg(vpAt[8])}  t15=${avg(vpAt[15])}  t21=${avg(vpAt[21])}  end=${avg(vpAt[28])}`);
-say(`  city falls   Minsk t${avg(minskT)} (${minskT.length}/${RUNS})  Smolensk t${avg(smolenskT)} (${smolenskT.length}/${RUNS})  Kiev t${avg(kievT)} (${kievT.length}/${RUNS})  Moscow ${moscowFell}/${RUNS}`);
-check('no crashes in campaign sims', crashed===0, crashed+' crashed');
+if (!FAST){
+  say('— balance summary —');
+  say(`  results: ${JSON.stringify(results)}`);
+  say(`  avg axis VP  t8=${avg(vpAt[8])}  t15=${avg(vpAt[15])}  t21=${avg(vpAt[21])}  end=${avg(vpAt[28])}`);
+  say(`  city falls   Minsk t${avg(minskT)} (${minskT.length}/${RUNS})  Smolensk t${avg(smolenskT)} (${smolenskT.length}/${RUNS})  Kiev t${avg(kievT)} (${kievT.length}/${RUNS})  Moscow ${moscowFell}/${RUNS}`);
+  check('no crashes in campaign sims', crashed===0, crashed+' crashed');
+}
 
-console.log(failures ? `\n${failures} FAILURE(S) (of ${passes+failures} checks)` : `ALL ${passes} CHECKS PASSED`);
+console.log((FAST?'[--fast] ':'') + (failures ? `\n${failures} FAILURE(S) (of ${passes+failures} checks)` : `ALL ${passes} CHECKS PASSED`));
 process.exit(failures ? 1 : 0);

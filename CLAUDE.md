@@ -8,10 +8,16 @@ deps, runs offline by double-clicking. Keep it that way.
 
 - **Never Read the whole of `index.html`.** Grep a banner/anchor from the map below,
   then Read only that region (`offset`/`limit`). The file is too big to skim.
-- **Verify with `node devtest.js 2 --quiet`** while iterating (one line of output).
-  Run the full `node devtest.js` (8 campaigns, verbose) once before committing.
-- Run `node balance-ab.js 24` **only** when a change touches combat math, unit stats,
-  schedules, or scenario data — not for UI/graphics/audio work.
+- **Match the test to the change — this is the #1 speed lever.** The slow part of
+  the suite is the AI-vs-AI campaign sims, dominated by the 60×36 Realistic map
+  (~80s/game ⇒ full run ~8 min). So:
+  - **UI / saves / menus / graphics / audio / docs →** `node devtest.js --fast`
+    (**~15s**; runs every structural, rules, save-slot and UI-smoke check, skips
+    the balance sims). These changes *cannot* affect balance, so don't pay for it.
+  - **Combat / AI / unit stats / schedules / scenario data →** full
+    `node devtest.js` (8 campaigns, verbose) before committing, plus
+    `node balance-ab.js 24` for combat-math/stat changes.
+- `node devtest.js 2 --quiet` (one-line output) for a quick mid-iteration pulse.
 - Pipe test output through `grep FAIL` or `tail` — don't read 150 ok-lines.
 - Batch all edits, then test once. Don't re-run tests to grep different patterns;
   `tee /tmp/t.out` and grep the file.
