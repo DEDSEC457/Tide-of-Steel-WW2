@@ -3983,6 +3983,10 @@ function gwOwnFrontCount(cc){
     if (gwNeighbors(id).some(x => { const o=GW.regions[x]; return gwIsPower(o) && gwAtWar(cc,o); })) n++;
   return Math.max(1, n);
 }
+/* air strength is a force multiplier — close air support on the attack, air
+   defense on the ground — so building air makes your army hit and hold harder
+   even though it never takes ground itself. Up to ~+28%. */
+function gwAirMul(cc){ const e=GW.eco[cc]; return e ? 1 + Math.min(0.14, (e.air||0)*0.004) : 1; }
 /* the historical arc of the war as an offensive modifier: the Axis has the
    initiative and doctrine edge early (blitzkrieg, Barbarossa); from 1943 the
    far larger Allied & Soviet economies turn the tide. Without this the war is
@@ -4006,7 +4010,7 @@ function gwRegionDefense(id){
   if (gwIsPower(o) && GW.turn>=GW_POWERS[o].join && !GW.capitulated[o]){
     const e = GW.eco[o];
     if (e){
-      d += e.army / gwOwnFrontCount(o) * 0.45;       // not all of it holds one spot
+      d += e.army / gwOwnFrontCount(o) * 0.45 * gwAirMul(o);   // army + air defense
       if (e.posture==='defend') d *= 1.7;            // dug in — holding a line is a real strategy
     }
   } else if (gwFactionOf(o)==='neutral'){
@@ -4042,9 +4046,9 @@ function gwResolveFronts(){
       if (!landAdj && GW_ISLAND.has(id)) continue;     // the British Isles cannot be invaded — they hold for D-Day
       // the schwerpunkt: the chosen offensive MASSES the army at one point and
       // can break a fortress; other attacks make do with the dispersed front
-      let atk = (id===e.preferredTarget)
+      let atk = ((id===e.preferredTarget)
         ? e.army * 0.5 * gwOffenseMod(cc, GW.regions[id])
-        : perPush * gwOffenseMod(cc, GW.regions[id]);
+        : perPush * gwOffenseMod(cc, GW.regions[id])) * gwAirMul(cc);   // close air support
       if (!landAdj) atk *= 0.18;                       // amphibious assaults are very hard
       if (atk > def * 1.2){                            // real superiority needed to break a front
         const from = GW.regions[id];
