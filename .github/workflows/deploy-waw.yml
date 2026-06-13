@@ -36,6 +36,8 @@ jobs:
           npm ci
           npm run build
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true        # auto-enable Pages (works once the repo is public, or on a paid plan)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: world-at-war/dist
