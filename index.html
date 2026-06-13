@@ -2202,11 +2202,63 @@ function diffPP(side){
   if (G.difficulty==='hard')  return side===aiSide ? 2 : -1;
   return 0;
 }
-function diffCombat(side){           // attack multiplier tweak for AI difficulty
+function diffCombat(side){           // small attack-multiplier tweak for AI difficulty
   if (G.mode==='hotseat') return 1;
   const aiSide = enemyOf(G.playerSide);
   if (side!==aiSide) return 1;
-  return G.difficulty==='easy' ? 0.85 : G.difficulty==='hard' ? 1.15 : 1;
+  // the bulk of the difficulty now comes from how the AI PLAYS (aiSkill), so the
+  // raw combat thumb-on-the-scale is light
+  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.1 : 1;
+}
+/* AI SKILL — the heart of difficulty. 0 = sloppy (easy), 1 = solid (normal),
+   2 = sharp (hard). A higher skill makes the AI judge odds better, hold an
+   unbroken line, pull doomed units out of pockets and concentrate its fire —
+   it plays smarter, it isn't just handed bonuses. Humans / hotseat play at 1. */
+function aiSkill(side){
+  if (G.mode==='hotseat' || side===G.playerSide) return 1;
+  return G.difficulty==='easy' ? 0 : G.difficulty==='hard' ? 2 : 1;
+}
+/* sharper play presses good-but-not-perfect attacks; sloppier play waits for a
+   sure thing (or over-commits to a bad one). */
+function skillMinR(side, base){ return base - (aiSkill(side)-1)*0.15; }
+/* line coherence: near the front a unit wants friendly units beside it, so the
+   line has no 1-hex hole for the enemy to pour through. Skill-scaled — a sharp
+   AI keeps a solid line; a sloppy one leaves the gaps you exploit now. */
+function lineBonus(u, x, y){
+  const sk = aiSkill(u.side);
+  if (sk === 0) return 0;
+  const foe = enemyOf(u.side);
+  let nearFoe = false, adj = 0;            // one pass: near the front? friends beside us?
+  for (const t of G.units){
+    if (t.id === u.id) continue;
+    const d = hexDist(x,y,t.x,t.y);
+    if (t.side === foe){ if (d <= 2) nearFoe = true; }
+    else if (d === 1) adj++;
+  }
+  if (!nearFoe) return 0;
+  return (adj===0 ? -3 : Math.min(adj,2)*1.4) * sk;   // isolation = a gap; flanks = a line
+}
+/* a unit about to be cut off pulls back toward its own supply. Skill-gated: a
+   sharp AI saves the formation, an easy AI lets it be encircled. */
+function aiEscape(u){
+  if (aiSkill(u.side) === 0) return null;
+  const adj = adjacentEnemies(u);
+  const danger = adj.length>=3 || u.oos || (u.str<=3 && adj.length>=1) || (u.str<=4 && adj.length>=2);
+  if (!danger) return null;
+  const reach = reachable(u);
+  const net = computeSupply(u.side);
+  let best=null, bestS=-1e9;
+  for (const k of reach.keys()){
+    const [x,y] = k.split(',').map(Number);
+    let s = (net.has(k)?10:0) + (u.side==='G' ? (COLS-x) : x)*0.3;   // home edge & supply
+    let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side!==u.side) e++; }
+    s -= e*3;
+    s += (effTerrain(x,y).def-1)*3;
+    if (s > bestS){ bestS=s; best=[x,y]; }
+  }
+  if (best && (adj.length>=3 || !net.has(keyOf(u.x,u.y))))
+    return {type:'move', u:u.id, x:best[0], y:best[1]};
+  return null;
 }
 
 function logMsg(cls, text){
@@ -3085,8 +3137,10 @@ function bestAttack(u, minRatio){
           || (t.oos && p.ratio >= minRatio-0.2)
           || (noRetreat && p.ratio >= minRatio-0.2);
     if (!ok) continue;
-    let util = p.defLoss*1.6 - p.atkLoss + (wouldDestroy?6:0) + (noRetreat?4:0)
-             + (t.oos?2:0) + (cityAt(t.x,t.y)?1:0) + p.ratio;
+    const sk = aiSkill(u.side);
+    let util = p.defLoss*1.6 - p.atkLoss + (wouldDestroy ? 6+2*sk : 0) + (noRetreat?4:0)
+             + (t.oos?2:0) + (cityAt(t.x,t.y)?1:0) + p.ratio
+             + (t.str<=4 ? sk*1.5 : 0);                 // focus fire: finish off the weakened
     if (util > bestU){ bestU = util; best = t; }
   }
   return best;
@@ -3167,6 +3221,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   for (const f of unitsOf('G')) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=2) friendsNear++;
   for (const [nx,ny] of neighbors(x,y)){ const t = unitAt(nx,ny); if (t && t.side==='S') adjEnemy++; }
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
+  s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
   // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
   // (no adjacent enemy) that gets meaningfully closer to its objective pours
@@ -3222,7 +3277,7 @@ function aiBestCombinedAssault(side){
     const helpers = ready.slice(1, 4);
     const pGroup  = previewGroup([lead, ...helpers], def);
     const pSingle = previewCombat(lead, def);
-    const minR = wx==='snow' ? 1.1 : wx==='mud' ? 1.0 : 0.85;
+    const minR = skillMinR(side, wx==='snow' ? 1.1 : wx==='mud' ? 1.0 : 0.85);
     if (pGroup.ratio < minR) continue;
     // Only bother if combined is noticeably better than going alone
     if (pGroup.ratio < pSingle.ratio * 1.06 && helpers.length < 2) continue;
@@ -3245,10 +3300,13 @@ function aiPlanGerman(){
     if (KINDS[u.kind].hq) return aiPlanHQ(u);
     // 1. attack if a good fight is adjacent
     const wx = weatherFor(G.turn);
-    const minR = wx==='snow' ? 1.45 : wx==='mud' ? 1.3 : 1.05;
+    const minR = skillMinR('G', wx==='snow' ? 1.45 : wx==='mud' ? 1.3 : 1.05);
     const tgt = bestAttack(u, minR);
     if (tgt) return {type:'attack', a:u.id, d:tgt.id};
     if (u.moved){ u.attacked = true; continue; }
+    // 1b. pull a spearhead back before it is encircled (sharper AI saves its army)
+    const esc = aiEscape(u);
+    if (esc) return esc;
     // 2. otherwise move with purpose
     const isArm = KINDS[u.kind].sym==='arm' || KINDS[u.kind].fast;
     const city = gerPickTarget(u);
@@ -3317,6 +3375,7 @@ function sovScoreHex(u, x, y, df, myNet){
   }
   if (adjE >= 3) s -= 10;                                       // don't walk into a pocket
   else if (adjE === 2) s -= 3;
+  s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
   const wx = weatherFor(G.turn);
   if (wx==='snow' && weakest){
@@ -3348,7 +3407,7 @@ function aiPlanSoviet(){
     if (KINDS[u.kind].hq) return aiPlanHQ(u);
     const adj = adjacentEnemies(u);
     // 1. fight: cautious normally, bold in snow or when on the offensive
-    const minR = wx==='snow' ? 0.9 : (sovOffensive ? 1.15 : 1.5);
+    const minR = skillMinR('S', wx==='snow' ? 0.9 : (sovOffensive ? 1.15 : 1.5));
     const tgt = bestAttack(u, minR);
     if (tgt) return {type:'attack', a:u.id, d:tgt.id};
     if (u.moved){ u.attacked = true; continue; }

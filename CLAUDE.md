@@ -43,6 +43,7 @@ deps, runs offline by double-clicking. Keep it that way.
 | `============ TURN FLOW` | startPhase/endPhase (schedules, weather msgs, turnSnap) |
 | `============ VICTORY` | axisVP, checkSuddenDeath (SCN.sudden), endGame |
 | `============ AI` | aiSpend, bestAttack, gerScoreHex/sovScoreHex, aiPlanHQ, posture |
+| `AI SKILL` / `diffCombat` | aiSkill (0/1/2 by difficulty), skillMinR, lineBonus, aiEscape — difficulty changes *play*, not just buffs |
 | `SAVE / LOAD` | serialize/deserialize (loads save's scenario; migrations live here) |
 | `HEADLESS EXPORTS` | module.exports list — add new engine fns here for tests |
 | `function draw()` | canvas: terrain, tint, front-line edges, supply view, weather fx |

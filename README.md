@@ -71,6 +71,10 @@ The whole game is one file (`index.html`) that runs in any browser:
 - **🧠 Smarter AI** — the attacker masses on weak points, pours fast units
   through breakthroughs to exploit a broken front, and reads its posture: it
   drives hard when it has the initiative and digs in when winter turns against it.
+  **Difficulty is skill, not just a handicap:** on *Iron Will* the computer judges
+  its odds more sharply, holds an unbroken line with no gaps to pour through,
+  pulls doomed units out of forming pockets and concentrates its fire to finish
+  the wounded — it plays better, it isn't simply handed bonuses.
 
 **Controls:** click a unit → move/attack · **shift-click** several units → combined assault ·
 `N` next unit · `E` end turn · `U` undo last move · `S` supply view · `Esc` deselect ·
