@@ -307,6 +307,7 @@
     <span class="t-chip" title="Field army strength">🪖 <b id="gw-army">0</b></span>
     <span class="t-chip" id="gw-vp" title="Faction victory points">VP —</span>
     <span class="spacer"></span>
+    <button id="gw-help-btn">How to Play</button>
     <button id="gw-menu-btn">Menu</button>
     <button class="primary" id="gw-end">End Month ▶</button>
   </div>
@@ -317,6 +318,29 @@
     <div class="card" id="gw-log-card"><h3>WAR DIARY</h3><div id="gw-log"></div></div>
   </div>
   <div id="gw-hint" class="hidden"></div>
+</div>
+
+<!-- ============ THE WORLD AT WAR — how to play ============ -->
+<div id="gw-help" class="modal-back hidden">
+  <div class="modal" style="max-width:600px;">
+    <h2>THE WORLD AT WAR — HOW TO PLAY</h2>
+    <ul style="margin:8px 0 8px 18px;line-height:1.6;">
+      <li><b>One month per turn</b>, 1939–1945. Click <b>End Month</b> to advance; the whole war moves at once.</li>
+      <li><b>🏗 Construction.</b> Civilian factories build your <b>queue</b>. Build more <b>civilian factories</b>
+          early — they compound your output. Build <b>military factories</b> to raise armies, and <b>forts</b>
+          to harden a frontline province.</li>
+      <li><b>⚙ Production.</b> Military factories turn out <b>army</b> strength (capped by manpower) and <b>air</b>
+          (a force multiplier — up to +14% in battle). Choose the split.</li>
+      <li><b>⚔ War.</b> Set your <b>posture</b> (Attack / Balanced / Defend) and <b>click a red front</b> on the map
+          to choose where you concentrate your offensive. Capitals fall, nations capitulate, the victor takes the spoils.</li>
+      <li><b>🎯 The hinge of the war.</b> The <b>Axis wins only by holding Moscow, Leningrad AND Stalingrad
+          at the same time</b> — then the USSR collapses. Anything less and the Allies grind it down.
+          <b>Britain can never be invaded</b> — it holds for D-Day.</li>
+      <li><b>The arc.</b> France falls fast through Belgium (the Maginot is impassable). The USSR is caught off
+          guard in 1941 but its fortified depth turns the tide; the Allies land on D-Day in 1944.</li>
+    </ul>
+    <div class="mrow"><button class="primary" id="gw-help-close">Close</button></div>
+  </div>
 </div>
 
 <!-- ============ THE WORLD AT WAR — result ============ -->
@@ -5340,6 +5364,8 @@ $('gw-back').onclick=()=>{ show('gw-select',false); show('mode-select',true); };
 $('gw-begin').onclick=()=>gwStart(gwSelCC);
 $('gw-continue').onclick=gwContinue;
 $('gw-menu-btn').onclick=gwQuit;
+$('gw-help-btn').onclick=()=>show('gw-help',true);
+$('gw-help-close').onclick=()=>show('gw-help',false);
 function gwShowResult(){
   const win = GW.result.result==='victory';
   $('gw-result-date').textContent = gwDateStr(Math.min(GW.turn,GW_END_TURN));
