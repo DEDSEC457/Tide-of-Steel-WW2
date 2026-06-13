@@ -9,11 +9,14 @@ export interface Unit {
   size: UnitSize;
   col: number;
   row: number;
-  str: number;     // strength 1–10
-  mp: number;      // remaining movement points this turn
+  str: number;      // strength 1–10
+  mp: number;       // remaining movement points this turn
   mpMax: number;
   moved: boolean;
   attacked: boolean;
+  oos: boolean;     // out of supply
+  entrench: number; // 0–2 dig-in level
+  xp: number;       // experience points
 }
 
 export const MP_MAX: Record<UnitKind, number> = {
@@ -24,7 +27,8 @@ function u(id: string, name: string, nation: string,
            kind: UnitKind, size: UnitSize,
            col: number, row: number, str: number): Unit {
   const mpMax = MP_MAX[kind];
-  return { id, name, nation, kind, size, col, row, str, mp: mpMax, mpMax, moved: false, attacked: false };
+  return { id, name, nation, kind, size, col, row, str, mp: mpMax, mpMax,
+           moved: false, attacked: false, oos: false, entrench: 0, xp: 0 };
 }
 
 export const STARTING_UNITS: Unit[] = [
