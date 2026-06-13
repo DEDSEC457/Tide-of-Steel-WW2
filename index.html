@@ -2671,6 +2671,7 @@ function terrOwner(x,y){
   return v===1 ? 'G' : v===2 ? 'S' : null;
 }
 function claimTerritory(){
+  if (typeof _tintDirty !== 'undefined') _tintDirty = true;   // front moved → rebuild tint cache
   if (!G.terr) seedTerritory();
   const zoc = {G: computeZOC('G'), S: computeZOC('S')};
   for (const u of G.units){
@@ -5024,6 +5025,107 @@ function hexPath(cx,cy,s){
   ctx.closePath();
 }
 
+/* ---- big-map terrain cache ----
+   On the 3×-scale map, re-drawing ~19,000 hexes (trees, contours, coastlines)
+   every frame is what grinds weak machines. Instead we bake the STATIC terrain
+   to an offscreen canvas once (rebuilt only when the weather changes) and the
+   moving front line to a second one (rebuilt only when territory changes), then
+   blit those two images each frame. Zoom in close and we fall back to the live
+   per-hex draw (few hexes survive the cull) so the detail stays crisp. */
+let _terrCacheCv=null, _tintCacheCv=null, _cacheKey='', _cacheF=1, _tintDirty=true;
+function _bigMap(){ return COLS*ROWS > 6000; }
+function hexPathC(c,cx,cy,s){
+  c.beginPath();
+  for (let i=0;i<6;i++){ const a=Math.PI/180*(60*i-30), px=cx+s*Math.cos(a), py=cy+s*Math.sin(a); i?c.lineTo(px,py):c.moveTo(px,py); }
+  c.closePath();
+}
+function _cacheCtx(prev){
+  const f = Math.min(1, 4096/mapW()); _cacheF = f;
+  const W = Math.max(1,Math.ceil(mapW()*f)), H = Math.max(1,Math.ceil(mapH()*f));
+  const cv = prev || document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d'); c.setTransform(f,0,0,f,0,0);
+  return {cv,c};
+}
+function renderTerrCache(wx){
+  const {cv,c} = _cacheCtx(_terrCacheCv); _terrCacheCv = cv;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t=terrainAt(x,y), [cx,cy]=hexCenter(x,y);
+    hexPathC(c,cx,cy,S-0.6);
+    let col=TERRAIN[t].color;
+    if (wx==='snow'&&t!=='~') col={'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
+    else if (wx==='mud'&&(t==='.'||t==='s')) col=t==='.'?'#54482e':'#463f2e';
+    c.fillStyle=col; c.fill();
+    const hv=(x*2654435761 ^ y*40503)>>>0;
+    c.fillStyle = (t==='~'||t==='o') ? `rgba(255,255,255,${(0.022+0.018*Math.sin(hv)).toFixed(3)})`
+      : (hv&1)?'rgba(255,255,255,0.030)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')';
+    c.fill();
+    c.strokeStyle='#00000033'; c.lineWidth=1; c.stroke();
+    c.save(); c.translate(cx,cy);
+    if (t==='f'){ c.fillStyle = wx==='snow' ? '#4e6052' : '#243520';
+      for (const [dx,dy] of [[-10,2],[2,-7],[10,6]]){ c.beginPath(); c.moveTo(dx,dy+6); c.lineTo(dx+5,dy-6); c.lineTo(dx+10,dy+6); c.closePath(); c.fill(); }
+      if (wx==='snow'){ c.fillStyle='rgba(255,255,255,0.55)';
+        for (const [dx,dy] of [[-10,2],[2,-7],[10,6]]){ c.beginPath(); c.moveTo(dx+1.6,dy-2); c.lineTo(dx+5,dy-6); c.lineTo(dx+8.4,dy-2); c.closePath(); c.fill(); } } }
+    if (t==='h'){ c.strokeStyle='#00000040'; c.lineWidth=2; c.beginPath(); c.moveTo(-12,6); c.quadraticCurveTo(-6,-6,0,6); c.moveTo(2,2); c.quadraticCurveTo(8,-8,14,4); c.stroke(); }
+    if (t==='s'){ c.strokeStyle='#5d7a6a88'; c.lineWidth=1.5;
+      for (const [dx,dy] of [[-10,-4],[0,4],[9,-3]]){ c.beginPath(); c.moveTo(dx-4,dy); c.lineTo(dx+4,dy); c.moveTo(dx,dy); c.lineTo(dx,dy-5); c.stroke(); } }
+    if (t==='r'){ c.strokeStyle='#7db3c977'; c.lineWidth=3; c.beginPath(); c.moveTo(-S*0.7,-4); c.quadraticCurveTo(0,6,S*0.7,-2); c.stroke(); }
+    if (t==='~'){ c.strokeStyle='#3e586e66'; c.lineWidth=1.5; c.beginPath(); c.moveTo(-12,-3); c.quadraticCurveTo(-6,-7,0,-3); c.quadraticCurveTo(6,1,12,-3); c.stroke(); }
+    if (t==='o'){ c.strokeStyle='#48719455'; c.lineWidth=1.2; c.beginPath(); c.moveTo(-10,2); c.quadraticCurveTo(-5,-2,0,2); c.quadraticCurveTo(5,6,10,2); c.stroke(); }
+    const hs=(x*73856093 ^ y*19349663)>>>0;
+    if (wx==='snow'&&t!=='~'&&t!=='r'){ c.fillStyle='rgba(255,255,255,0.30)';
+      if (hs%3===0){ c.beginPath(); c.ellipse(-5+(hs%9),6-(hs%4)*2,9,3.2,0,0,Math.PI*2); c.fill(); }
+      if (hs%4===1){ c.beginPath(); c.ellipse(7-(hs%6),-4+(hs%5),6,2.4,0,0,Math.PI*2); c.fill(); } }
+    if (wx==='mud'&&(t==='.'||t==='s')&&hs%3!==2){
+      c.fillStyle='rgba(26,21,10,0.42)'; c.beginPath(); c.ellipse(-4+(hs%8),4-(hs%5),7+(hs%4),3,0,0,Math.PI*2); c.fill();
+      c.fillStyle='rgba(140,165,185,0.13)'; c.beginPath(); c.ellipse(-4+(hs%8),3-(hs%5),4,1.3,0,0,Math.PI*2); c.fill(); }
+    c.restore();
+  }
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){                   // static coastlines
+    const t1=terrainAt(x,y), [ax,ay]=hexCenter(x,y);
+    for (const [nx,ny] of neighbors(x,y)){
+      if (ny<y||(ny===y&&nx<x)) continue;
+      const t2=terrainAt(nx,ny), w1=t1==='~'||t1==='o', w2=t2==='~'||t2==='o';
+      if (w1===w2) continue;
+      const [bx,by]=hexCenter(nx,ny), mx=(ax+bx)/2, my=(ay+by)/2;
+      let dx=bx-ax, dy=by-ay; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+      const ex=-dy*S*0.5, ey=dx*S*0.5;
+      c.beginPath(); c.moveTo(mx-ex,my-ey); c.lineTo(mx+ex,my+ey);
+      c.strokeStyle='#cdbd8a55'; c.lineWidth=2; c.stroke();
+    }
+  }
+}
+function renderTintCache(){
+  const {cv,c} = _cacheCtx(_tintCacheCv); _tintCacheCv = cv;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t=terrainAt(x,y); if (t==='~'||t==='o') continue;
+    const to=terrOwner(x,y); if (!to) continue;
+    const [cx,cy]=hexCenter(x,y); hexPathC(c,cx,cy,S-0.6); c.fillStyle=SIDES[to].tint; c.fill();
+  }
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){                   // front line
+    const t1=terrainAt(x,y); if (t1==='~') continue;
+    const fa=terrOwner(x,y); if (!fa) continue;
+    const [ax,ay]=hexCenter(x,y);
+    for (const [nx,ny] of neighbors(x,y)){
+      if (ny<y||(ny===y&&nx<x)) continue;
+      const t2=terrainAt(nx,ny); if (t2==='~') continue;
+      const fb=terrOwner(nx,ny); if (!fb||fb===fa) continue;
+      const [bx,by]=hexCenter(nx,ny), mx=(ax+bx)/2, my=(ay+by)/2;
+      let dx=bx-ax, dy=by-ay; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+      const ex=-dy*S*0.5, ey=dx*S*0.5;
+      c.beginPath(); c.moveTo(mx-ex,my-ey); c.lineTo(mx+ex,my+ey);
+      c.strokeStyle='#160d08'; c.lineWidth=4; c.stroke();
+      c.strokeStyle='#c4453a'; c.lineWidth=1.6; c.stroke();
+    }
+  }
+  _tintDirty=false;
+}
+function ensureBigCache(wx){
+  const key = SCN.id+'|'+wx+'|'+COLS+'x'+ROWS;
+  if (key!==_cacheKey || !_terrCacheCv){ _cacheKey=key; renderTerrCache(wx); _tintDirty=true; }
+  if (_tintDirty || !_tintCacheCv) renderTintCache();
+}
+
 /* Style A railhead overlay: a warm wash over the railed corridor, a rail line
    with sleepers tracing from the home edge out to each forward depot, gold
    diamonds on railed depot cities and hollow ones on captured-but-not-yet-railed
@@ -5164,6 +5266,15 @@ function draw(){
   const vL = cam.x - S, vT = cam.y - S,
         vR = cam.x + innerWidth/cam.z + S, vB = cam.y + innerHeight/cam.z + S;
 
+  // big maps: blit the cached terrain + front-line images instead of re-drawing
+  // ~19,000 hexes a frame. Zoomed in close, fall through to the crisp live draw.
+  const useCache = _bigMap() && cam.z <= 1.05;
+  if (useCache){
+    ensureBigCache(wx);
+    ctx.drawImage(_terrCacheCv, 0, 0, mapW(), mapH());
+    ctx.drawImage(_tintCacheCv, 0, 0, mapW(), mapH());
+  } else {
+
   // terrain
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t = terrainAt(x,y), [cx,cy] = hexCenter(x,y);
@@ -5255,6 +5366,7 @@ function draw(){
       }
     }
   }
+  }  // end live terrain/coastline draw (else of useCache)
 
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
 
@@ -5880,18 +5992,40 @@ function gwClickMap(e){
   }
 }
 
-(function loop(){
-  try{ if (typeof GW!=='undefined' && GW && GW.active) gwDraw(); else if (G) draw(); }
-  catch(e){ if (!window.__drawErr){ window.__drawErr = 1; console.error('draw error:', e); } }
+/* render scheduler: cap to ~30fps and only repaint when something is actually
+   moving or has changed. The old loop ran a full repaint 60×/second forever —
+   murder on a weak machine, and on the 3×-scale map it re-drew ~19,000 hexes
+   every frame. Now idle frames are skipped (a slow heartbeat self-heals any
+   missed update), animations run at a capped rate, and input forces a repaint. */
+let _needRender = true, _lastFrameTs = 0;
+function requestRender(){ _needRender = true; }
+function _sceneAnimating(){
+  if (typeof aiRunning !== 'undefined' && aiRunning) return true;
+  if (!G) return false;
+  const wx = weatherFor(G.turn);
+  if (wx === 'mud' || wx === 'snow') return true;                       // falling rain/snow
+  if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
+  return false;
+}
+(function loop(ts){
   requestAnimationFrame(loop);
+  ts = ts || (typeof performance!=='undefined' && performance.now ? performance.now() : Date.now());
+  const gw = (typeof GW!=='undefined' && GW && GW.active);
+  const anim = gw || _sceneAnimating();
+  const elapsed = ts - _lastFrameTs;
+  if (!_needRender && !anim && elapsed < 120) return;                   // idle: ~8fps self-heal
+  if (elapsed < 32) return;                                            // cap ~30fps
+  _lastFrameTs = ts; _needRender = false;
+  try{ if (gw) gwDraw(); else if (G) draw(); }
+  catch(e){ if (!window.__drawErr){ window.__drawErr = 1; console.error('draw error:', e); } }
 })();
 
 /* ---------------- input ---------------- */
 let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
-canvas.addEventListener('mousedown', e=>{ dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); });
-window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); });
+canvas.addEventListener('mousedown', e=>{ dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
+window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); requestRender(); });
 window.addEventListener('mousemove', e=>{
-  if (typeof GW!=='undefined' && GW && GW.active){ gwHover(e); return; }
+  if (typeof GW!=='undefined' && GW && GW.active){ gwHover(e); requestRender(); return; }
   if (dragging){
     const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
     if (Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
@@ -5900,6 +6034,7 @@ window.addEventListener('mousemove', e=>{
   const [wx,wy] = toWorld(e.clientX, e.clientY);
   hover = hexFromPixel(wx,wy);
   updateTerrainCard(); updatePreview();
+  requestRender();
 });
 function gwHover(e){
   if(!gwViewCache){ const t=$('gw-tip'); if(t)t.classList.add('hidden'); return; }
@@ -5924,6 +6059,7 @@ canvas.addEventListener('wheel', e=>{
   const [wx,wy] = toWorld(e.clientX,e.clientY);
   cam.z = Math.max(minZoom(), Math.min(2.2, cam.z*f));
   cam.x = wx - e.clientX/cam.z; cam.y = wy - e.clientY/cam.z;
+  requestRender();
 }, {passive:false});
 
 canvas.addEventListener('click', e=>{
@@ -6023,7 +6159,7 @@ function selectUnit(u){
   reach = (!u.moved) ? reachable(u) : new Map();
   updateUnitCard();
 }
-function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); }
+function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
 function selectNext(){
   const mine = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked);
   if (!mine.length) return;
@@ -6250,7 +6386,7 @@ function updateTop(){
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
   $('pp-chip').innerHTML = `${sideName(side)} production: <b>${G.pp[side]}</b> ⚙`;
 }
-function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); }
+function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); requestRender(); }
 
 /* ---------------- objectives modal ---------------- */
 $('btn-objectives').onclick = ()=>{
