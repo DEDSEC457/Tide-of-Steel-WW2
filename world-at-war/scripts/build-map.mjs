@@ -62,7 +62,12 @@ const RIDGES=[ // [name, [[lon,lat]...], widthDeg]
 ];
 const distLL=(lon,lat,a,b)=>{ const kx=Math.cos(lat*Math.PI/180); const ax=a[0]*kx,ay=a[1],bx=b[0]*kx,by=b[1],px=lon*kx,py=lat;
  const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy||1; let t=((px-ax)*dx+(py-ay)*dy)/l2; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-ax-t*dx,py-ay-t*dy); };
-function noise(lon,lat){ const s=Math.sin(lon*12.9+lat*4.7)*Math.cos(lon*3.1-lat*7.3)+Math.sin(lon*23+lat*19)*0.4; return s; }
+// SMOOTH coherent value noise — terrain forms real regions, not hex-by-hex static
+function vhash(i,j){ let h=(i*374761393+j*668265263)|0; h=Math.imul(h^(h>>>13),1274126177); return ((h^(h>>>16))>>>0)/2147483648-1; }
+function smooth(x,y){ const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=vhash(xi,yi),b=vhash(xi+1,yi),c=vhash(xi,yi+1),d=vhash(xi+1,yi+1);
+  return (a+(b-a)*u)*(1-v)+(c+(d-c)*u)*v; }
+function noise(lon,lat){ return smooth(lon*0.42,lat*0.42) + smooth(lon*1.05,lat*1.05)*0.4; }  // ~ -1.4..1.4, coherent over ~5 hexes
 // terrain ids: 0 sea,1 plains,2 forest,3 hills,4 mountain,5 marsh,6 steppe,7 tundra,8 desert,9 medit
 function terrainAt(lon,lat,isLand){ if(!isLand) return 0;
   let mtn=1e9; for(const r of RIDGES) for(let i=0;i+1<r.length;i++) mtn=Math.min(mtn,distLL(lon,lat,r[i],r[i+1]));
@@ -92,6 +97,15 @@ for(let row=0;row<ROWS;row++){ for(let col=0;col<COLS;col++){ const [lon,lat]=he
   for(const f of EU){ const b=f._bb; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; if(inFeat(lon,lat,f)){ land=true; nm=nationOf(NM(f)); break; } }
   const i=row*COLS+col; if(land){ natIdx[i]=natId(nm); } terr[i]=terrainAt(lon,lat,land); }
   if(row%20===0) process.stdout.write('.'); }
+// despeckle the biome layer (coalesce stray hexes); preserve mountains/hills/marsh/tundra/desert features
+const NBe=[[1,0],[0,-1],[-1,-1],[-1,0],[-1,1],[0,1]], NBo=[[1,0],[1,-1],[0,-1],[-1,0],[0,1],[1,1]];
+const BIOME=new Set([1,2,6,9]); // plains, forest, steppe, mediterranean
+for(let pass=0;pass<2;pass++){ const src=terr.slice();
+  for(let row=0;row<ROWS;row++)for(let col=0;col<COLS;col++){ const i=row*COLS+col; if(natIdx[i]<0||!BIOME.has(src[i]))continue;
+    const cnt={[src[i]]:1}, NB=(row&1)?NBo:NBe;
+    for(const[dc,dr]of NB){ const nc=col+dc,nr=row+dr; if(nc<0||nr<0||nc>=COLS||nr>=ROWS)continue; const j=nr*COLS+nc; if(natIdx[j]<0||!BIOME.has(src[j]))continue; cnt[src[j]]=(cnt[src[j]]||0)+1; }
+    let best=src[i],bc=cnt[best]; for(const k in cnt){ if(cnt[k]>bc){ bc=cnt[k]; best=+k; } }
+    terr[i]=best; } }
 console.log('\nnations:',natList.length,'land hexes:',natIdx.filter(v=>v>=0).length);
 
 // ---- cities (name, lon, lat, capital) ----

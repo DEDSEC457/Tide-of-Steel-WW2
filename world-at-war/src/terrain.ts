@@ -22,7 +22,11 @@ const TERR: Record<number, RGB> = {
 const SEA_SHALLOW: RGB = [96, 142, 178], SEA_DEEP: RGB = [40, 74, 116];
 const nationRgb = nations.map(n => hexToRgb(n.color));
 
-function noise(x: number, y: number) { const s = Math.sin(x*12.9898 + y*78.233)*43758.5453; return (s - Math.floor(s)) - 0.5; }
+// smooth (coherent) value noise so the texture varies gently, not hex-by-hex
+function vhash(i: number, j: number) { let h = (i*374761393 + j*668265263)|0; h = Math.imul(h ^ (h>>>13), 1274126177); return ((h ^ (h>>>16))>>>0)/2147483648 - 1; }
+function noise(x: number, y: number) { const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi, u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  const a=vhash(xi,yi), b=vhash(xi+1,yi), c=vhash(xi,yi+1), d=vhash(xi+1,yi+1);
+  return (a+(b-a)*u)*(1-v) + (c+(d-c)*u)*v; }
 
 // distance (in hexes) from each sea hex to the nearest land — for sea depth
 function seaDepth(): Int16Array {
@@ -63,7 +67,7 @@ export function bakeTerrain(): Baked {
     if (n < 0) { col = lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8)); }
     else {
       const t = terr[i]; col = TERR[t] || TERR[1];
-      const nz = noise(c*0.7, r*0.7) * (t===4 ? 26 : 12);   // texture; mountains rougher
+      const nz = (noise(c*0.35, r*0.35) + noise(c*0.9, r*0.9)*0.5) * (t===4 ? 14 : 7);   // gentle, coherent texture
       col = [col[0]+nz, col[1]+nz, col[2]+nz*0.8];
       col = lerp(col, nationRgb[n], 0.16);                  // subtle nation tint
     }
