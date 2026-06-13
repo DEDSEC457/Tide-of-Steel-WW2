@@ -3796,7 +3796,7 @@ const GW_EVENTS = [
   {turn:9,  text:'📰 May 1940 — the Wehrmacht storms west through the Low Countries, around the Maginot Line.'},
   {turn:27, text:'📰 December 1941 — Pearl Harbor. The United States enters the war; Lend-Lease floods the Allied factories.', lend:true},
   {turn:39, text:'📰 November 1942 — Stalingrad and El Alamein. The tide of the war begins to turn.'},
-  {turn:57, text:'📰 June 1944 — D-Day: the Western Allies return to the continent of Europe.'},
+  {turn:57, text:'📰 June 1944 — D-Day: the Western Allies storm ashore in France from their British springboard.', dday:true},
   {turn:68, text:'📰 May 1945 — the war in Europe draws toward its end.'},
 ];
 const GW_BRIEF = {
@@ -4250,6 +4250,12 @@ function gwEndMonth(){
   for (const cc in GW_POWERS) if (GW_POWERS[cc].join===GW.turn && GW.turn>1) gwLog(`${GW_POWERS[cc].name} enters the war.`);
   for (const ev of GW_EVENTS) if (ev.turn===GW.turn){ gwLog(ev.text);
     if (ev.lend) for (const cc of ['UK','SU','FR']) if (GW.eco[cc] && !GW.capitulated[cc]) GW.eco[cc].mil += 3;  // US industrial aid
+    if (ev.dday && !GW.capitulated.UK && GW.eco.UK){
+      // the second front: land in German-held France/Low Countries from Britain
+      const beach = ['normandy','belgium','nether','paris'].find(id => gwFactionOf(GW.regions[id])==='axis');
+      if (beach){ GW.regions[beach] = 'UK'; GW.eco.UK.army += 35;     // the great Allied invasion force
+        gwLog(`The Western Allies establish a beachhead at ${GW_REGIONS[beach].name} — a second front opens in the west!`); }
+    }
   }
   // every AI power plans; the player too when simulated
   for (const cc in GW_POWERS){ if (GW.capitulated[cc]) continue; if (cc!==GW.player || GW.autoPlayer) gwAIEco(cc); }
