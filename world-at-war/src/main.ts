@@ -4,6 +4,7 @@ import { Application, Container, Graphics, Text } from 'pixi.js';
 import { buildTerrain } from './terrain';
 import { cities, nations, nat, COLS, ROWS, hexCenter, hexW, SIZE } from './mapdata';
 import { buildUnitLayer } from './unitrender';
+import { buildCityLayer } from './cityrender';
 import { drawOverlay } from './hexoverlay';
 import { weatherAt, monthOfTurn, seasonName, SNOW, RAIN } from './weather';
 import {
@@ -95,28 +96,8 @@ async function boot() {
     t.alpha = 0.18; t.anchor.set(0.5); t.x = c.sx/c.n + PAD; t.y = c.sy/c.n + PAD; labelLayer.addChild(t);
   }
 
-  // ── Cities + capitals ─────────────────────────────────────────────────────────
-  const nationColor = (name: string | null) => {
-    const n = nations.find(x => x.name === name); return n ? parseInt(n.color.slice(1), 16) : 0x888888;
-  };
-  const cityLayer = new Container(); world.addChild(cityLayer);
-  for (const ct of cities) {
-    const [x0, y0] = hexCenter(ct.col, ct.row), x = x0+PAD, y = y0+PAD, col = nationColor(ct.nation);
-    const g = new Graphics();
-    if (ct.cap) {
-      g.rect(x-5, y-5, 10, 10).fill({ color: col }).stroke({ color: 0x10140c, width: 1.5 });
-      g.circle(x, y, 8).stroke({ color: 0xe6bc46, width: 2 });
-    } else {
-      g.circle(x, y, 3.2).fill({ color: col }).stroke({ color: 0x10140c, width: 1.2 });
-    }
-    cityLayer.addChild(g);
-    const label = new Text({ text: ct.name, style: {
-      fill: 0xf4f2e8, fontSize: 15, fontFamily: 'Segoe UI, sans-serif',
-      stroke: { color: 0x10140c, width: 3 }, fontWeight: ct.cap ? '700' : '400',
-    }});
-    label.anchor.set(0.5, 0); label.x = x; label.y = y + (ct.cap ? 9 : 5); label.scale.set(0.62);
-    cityLayer.addChild(label);
-  }
+  // ── Cities (detailed building sprites, ported from Realistic drawCity) ────────
+  const cityLayer = buildCityLayer(cities, PAD); world.addChild(cityLayer);
 
   // ── Hex overlay (selection / move / attack highlights) ────────────────────────
   const overlayG = new Graphics(); world.addChild(overlayG);
@@ -135,7 +116,7 @@ async function boot() {
   function rebuildUnits() {
     world.removeChild(unitLayer);
     unitLayer.destroy({ children: true });
-    unitLayer = buildUnitLayer(getG().units, PAD);
+    unitLayer = buildUnitLayer(getG().units, PAD, selectedId);
     world.addChild(unitLayer);
   }
 
@@ -156,10 +137,17 @@ async function boot() {
       attackable = u ? attackableFrom(u) : null;
     }
     updateOverlay();
+    rebuildUnits();        // re-draw so the selected counter gets its gold border
     updateInfoPanel();
   }
 
-  function deselect() { selectedId = null; reachable = null; attackable = null; updateOverlay(); updateInfoPanel(); }
+  function deselect() {
+    const had = selectedId;
+    selectedId = null; reachable = null; attackable = null;
+    updateOverlay();
+    if (had) rebuildUnits();
+    updateInfoPanel();
+  }
 
   // ── Pixel → hex ────────────────────────────────────────────────────────────────
   // Pointy-top odd-r offset: given canvas pixel (px,py) return (col,row)

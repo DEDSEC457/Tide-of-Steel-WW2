@@ -1,144 +1,155 @@
-import { Graphics, Container, Text } from 'pixi.js';
+// NATO unit counters — ported 1:1 from Realistic mode's drawUnit() so the
+// zoomed-in look matches: drop shadow, bevelled body, a PALE symbol box with a
+// bright NATO symbol (infantry X, armour oval, HQ flag, motorised, cavalry,
+// mountain, artillery, airborne), echelon size ticks, a dark strength badge,
+// a strength bar, dig-in pips and veterancy chevrons. All vector (crisp at any
+// zoom); the strength number is a big-font Text scaled down so it stays sharp.
+import { Container, Graphics, Text } from 'pixi.js';
 import { hexCenter, hexW, nations } from './mapdata';
 import type { Unit, UnitKind, UnitSize } from './units';
 
-// Counter dimensions in map pixels (SIZE=8, hexW≈13.86)
-const CW = hexW * 0.82;
-const CH = hexW * 0.72;
+// counter size, proportioned like Realistic (w≈1.34·S, h≈0.72·w)
+const W = hexW * 0.90;
+const H = W * 0.72;
+
+const PALE = 0xe9e5d2;          // NATO symbol ink (bright, high contrast)
+const DARK = 0x101208;
+
+const XP_LEVELS = [5, 14, 28];
+function unitLevel(xp: number) { let l = 0; for (const t of XP_LEVELS) if (xp >= t) l++; return l; }
 
 function natColor(name: string): number {
   const n = nations.find(x => x.name === name);
   return n ? parseInt(n.color.replace('#', ''), 16) : 0x666666;
 }
 
-// NATO milsym inside the counter body
-function drawNatoSymbol(g: Graphics, kind: UnitKind, cx: number, cy: number): void {
-  const sw = CW * 0.29, sh = CH * 0.23;
-  const lw = Math.max(0.7, CW * 0.09);
-  const dk = { color: 0x080810, width: lw };
+const echelonTicks: Record<UnitSize, number> = { bde: 1, div: 2, corps: 3, army: 4 };
 
+function drawSymbol(g: Graphics, kind: UnitKind, bx: number, bw: number, bh: number, lw: number) {
+  const half = bw/2, halfH = bh/2;
+  const stroke = { color: PALE, width: lw } as const;
   switch (kind) {
-    case 'inf':
-      // X cross — infantry
-      g.moveTo(cx - sw, cy - sh).lineTo(cx + sw, cy + sh).stroke(dk);
-      g.moveTo(cx + sw, cy - sh).lineTo(cx - sw, cy + sh).stroke(dk);
+    case 'inf':                                   // diagonal cross
+      g.moveTo(bx-half, -halfH).lineTo(bx+half, halfH);
+      g.moveTo(bx+half, -halfH).lineTo(bx-half, halfH);
+      g.stroke(stroke);
       break;
-
-    case 'arm':
-      // Oval — armour
-      g.ellipse(cx, cy, sw * 0.88, sh * 0.6).stroke(dk);
+    case 'arm':                                   // oval
+      g.ellipse(bx, 0, bw*0.34, bh*0.30).stroke(stroke);
       break;
-
-    case 'mot':
-      // Oval + two wheel circles — motorised infantry
-      g.ellipse(cx, cy - sh * 0.12, sw * 0.82, sh * 0.5).stroke(dk);
-      g.circle(cx - sw * 0.32, cy + sh * 0.55, sh * 0.2).stroke(dk);
-      g.circle(cx + sw * 0.32, cy + sh * 0.55, sh * 0.2).stroke(dk);
+    case 'mot':                                   // oval + cross
+      g.moveTo(bx-half, -halfH).lineTo(bx+half, halfH);
+      g.moveTo(bx+half, -halfH).lineTo(bx-half, halfH);
+      g.stroke(stroke);
+      g.ellipse(bx, 0, bw*0.38, bh*0.22).stroke(stroke);
       break;
-
-    case 'art':
-      // Filled circle — artillery
-      g.circle(cx, cy, sh * 0.55).fill({ color: 0x080810 });
+    case 'cav':                                   // single slash
+      g.moveTo(bx-half, halfH).lineTo(bx+half, -halfH).stroke(stroke);
       break;
-
-    case 'hq':
-      // H — headquarters
-      g.moveTo(cx - sw * 0.44, cy - sh).lineTo(cx - sw * 0.44, cy + sh).stroke(dk);
-      g.moveTo(cx + sw * 0.44, cy - sh).lineTo(cx + sw * 0.44, cy + sh).stroke(dk);
-      g.moveTo(cx - sw * 0.44, cy).lineTo(cx + sw * 0.44, cy).stroke(dk);
+    case 'mtn':                                   // peak ^
+      g.moveTo(bx-half*0.85, halfH*0.8).lineTo(bx, -halfH).lineTo(bx+half*0.85, halfH*0.8).stroke(stroke);
       break;
-
-    case 'cav':
-      // Diagonal slash — cavalry
-      g.moveTo(cx - sw, cy + sh).lineTo(cx + sw, cy - sh).stroke(dk);
+    case 'art':                                   // filled dot
+      g.circle(bx, 0, bh*0.32).fill({ color: PALE });
       break;
-
-    case 'mtn':
-      // Mountain peak (^) — mountain troops
-      g.moveTo(cx, cy - sh).lineTo(cx - sw * 0.65, cy + sh).stroke(dk);
-      g.moveTo(cx, cy - sh).lineTo(cx + sw * 0.65, cy + sh).stroke(dk);
+    case 'para':                                  // arc + cross
+      g.moveTo(bx-half, halfH).lineTo(bx+half, -halfH*0.4);
+      g.moveTo(bx+half, halfH).lineTo(bx-half, -halfH*0.4);
+      g.stroke(stroke);
+      g.arc(bx, -halfH*0.4, bw*0.36, Math.PI, 0).stroke(stroke);
       break;
-
-    case 'para':
-      // X-in-circle — airborne / paratroops
-      g.moveTo(cx - sw, cy - sh).lineTo(cx + sw, cy + sh).stroke(dk);
-      g.moveTo(cx + sw, cy - sh).lineTo(cx - sw, cy + sh).stroke(dk);
-      g.circle(cx, cy, sw * 0.88).stroke({ color: 0x080810, width: Math.max(0.5, lw * 0.65) });
+    case 'hq':                                    // flag on a pole
+      g.rect(bx-half*0.9, -halfH, lw*1.4, bh).fill({ color: PALE });
+      g.moveTo(bx-half*0.9+lw, -halfH)
+       .lineTo(bx+half*0.7, -halfH+bh*0.3)
+       .lineTo(bx-half*0.9+lw, -halfH+bh*0.6)
+       .closePath().fill({ color: PALE });
       break;
   }
 }
 
-// Echelon indicator ticks above the counter top border
-function drawEchelon(g: Graphics, size: UnitSize, cx: number, top: number): void {
-  const counts: Record<UnitSize, number> = { bde: 1, div: 2, corps: 3, army: 4 };
-  const n = counts[size];
-  const lw = Math.max(0.6, CW * 0.07);
-  const tickH = CH * 0.18;
-  const gap = CW * 0.145;
-  const x0 = cx - (n - 1) * gap * 0.5;
-  for (let i = 0; i < n; i++) {
-    const x = x0 + i * gap;
-    g.moveTo(x, top - tickH).lineTo(x, top).stroke({ color: 0x080810, width: lw });
+function drawCounter(parent: Container, u: Unit, selected: boolean) {
+  const g = new Graphics();
+  const body = natColor(u.nation);
+  const r = W*0.11;
+  const done = u.moved && u.attacked;
+
+  // drop shadow + body
+  g.roundRect(-W/2+W*0.045, -H/2+H*0.09, W, H, r).fill({ color: 0x000000, alpha: 0.38 });
+  g.roundRect(-W/2, -H/2, W, H, r).fill({ color: body });
+
+  // bevels (light top, dark bottom)
+  g.moveTo(-W/2+W*0.1, -H/2+H*0.07).lineTo(W/2-W*0.1, -H/2+H*0.07).stroke({ color: 0xffffff, width: Math.max(0.4,W*0.02), alpha: 0.18 });
+  g.moveTo(-W/2+W*0.1,  H/2-H*0.07).lineTo(W/2-W*0.1,  H/2-H*0.07).stroke({ color: 0x000000, width: Math.max(0.4,W*0.02), alpha: 0.30 });
+
+  // outline: gold selected · red OOS · black otherwise
+  g.roundRect(-W/2, -H/2, W, H, r).stroke({
+    color: selected ? 0xffd98a : u.oos ? 0xff5340 : 0x101014,
+    width: selected ? W*0.07 : u.oos ? W*0.055 : W*0.035,
+  });
+
+  // echelon ticks above the symbol box
+  const n = echelonTicks[u.size], gap = W*0.08, tx0 = -(n-1)*gap/2, ty = -H*0.30;
+  for (let i = 0; i < n; i++) g.moveTo(tx0+i*gap, ty-H*0.10).lineTo(tx0+i*gap, ty);
+  g.stroke({ color: PALE, width: Math.max(0.4, W*0.022), alpha: 0.9 });
+
+  // NATO symbol box (bright outline) + symbol
+  const bw = W*0.50, bh = H*0.46, bx = -W*0.10, lw = Math.max(0.5, W*0.05);
+  g.rect(bx-bw/2, -bh/2, bw, bh).stroke({ color: PALE, width: Math.max(0.4, W*0.03) });
+  drawSymbol(g, u.kind, bx, bw, bh, lw);
+
+  // strength badge (bottom-right)
+  const badW = W*0.30, badH = H*0.34, badX = W/2 - badW - W*0.05, badY = H/2 - badH - H*0.05;
+  g.roundRect(badX, badY, badW, badH, W*0.03).fill({ color: DARK });
+
+  // strength bar (bottom edge)
+  const frac = Math.max(0, Math.min(1, u.str/10));
+  const barY = H/2 - H*0.09, barX = -W/2 + W*0.06, barW = W - W*0.12, barH = H*0.07;
+  g.rect(barX, barY, barW, barH).fill({ color: 0x000000, alpha: 0.6 });
+  g.rect(barX, barY, barW*frac, barH).fill({ color: frac>0.55 ? 0x7a9d54 : frac>0.3 ? 0xe8b34b : 0xe2493b });
+
+  // dig-in pips (bottom-left)
+  for (let i = 0; i < u.entrench; i++)
+    g.rect(-W/2+W*0.06+i*W*0.10, H/2-H*0.30, W*0.075, H*0.10).fill({ color: 0xcfe6a8 });
+
+  // veterancy chevrons (top-right)
+  const lvl = unitLevel(u.xp);
+  for (let i = 0; i < lvl; i++) {
+    const yy = -H/2 + H*0.12 + i*H*0.13, cxp = W/2 - W*0.16;
+    g.moveTo(cxp-W*0.07, yy+H*0.07).lineTo(cxp, yy).lineTo(cxp+W*0.07, yy+H*0.07)
+     .stroke({ color: 0xffe27a, width: Math.max(0.4, W*0.025) });
   }
+
+  if (done) g.roundRect(-W/2, -H/2, W, H, r).fill({ color: 0x000000, alpha: 0.33 });
+  parent.addChild(g);
+
+  // strength number — big native font scaled down → crisp at every zoom
+  const t = new Text({ text: String(u.str), style: {
+    fill: u.str <= 3 ? 0xff8d80 : 0xffe9a8, fontSize: 64, fontWeight: '700', fontFamily: 'Segoe UI, sans-serif',
+  }});
+  t.anchor.set(0.5);
+  t.scale.set((badH*0.78)/64);
+  t.x = badX + badW/2; t.y = badY + badH/2;
+  parent.addChild(t);
 }
 
-export function buildUnitLayer(units: Unit[], PAD: number): Container {
+export function buildUnitLayer(units: Unit[], PAD: number, selectedId: string | null = null): Container {
   const layer = new Container();
-
-  for (const unit of units) {
-    const [x0, y0] = hexCenter(unit.col, unit.row);
-    const cx = x0 + PAD, cy = y0 + PAD;
-    const col = natColor(unit.nation);
-    const left = cx - CW / 2, top = cy - CH / 2;
-    const bw = Math.max(0.7, CW * 0.065);
-
-    const g = new Graphics();
-
-    // Counter background
-    g.rect(left, top, CW, CH).fill({ color: col, alpha: 0.94 });
-    // Counter border
-    g.rect(left, top, CW, CH).stroke({ color: 0x050508, width: bw });
-
-    // Echelon ticks (above top edge)
-    drawEchelon(g, unit.size, cx, top);
-
-    // NATO symbol (very slightly below center to leave room for echelon visual weight)
-    drawNatoSymbol(g, unit.kind, cx, cy + CH * 0.05);
-
-    layer.addChild(g);
-
-    // Strength number — bottom-right corner, tiny
-    const fs = Math.max(3, CW * 0.32);
-    const strLabel = new Text({
-      text: String(unit.str),
-      style: {
-        fill: 0xf5f0e0,
-        fontSize: fs,
-        fontFamily: 'Courier New, monospace',
-        fontWeight: '700',
-      },
-    });
-    strLabel.anchor.set(1, 1);
-    strLabel.x = left + CW - bw - 0.5;
-    strLabel.y = top + CH - bw - 0.3;
-    layer.addChild(strLabel);
-
-    // Unit name label — appears below counter (very small; visible when zoomed in)
-    const nameLabel = new Text({
-      text: unit.name,
-      style: {
-        fill: 0xf0ece0,
-        fontSize: Math.max(2.5, CW * 0.28),
-        fontFamily: 'Segoe UI, Arial, sans-serif',
-        fontWeight: '600',
-        stroke: { color: 0x050508, width: Math.max(0.4, CW * 0.04) },
-      },
-    });
-    nameLabel.anchor.set(0.5, 0);
-    nameLabel.x = cx;
-    nameLabel.y = top + CH + bw + 0.4;
-    layer.addChild(nameLabel);
+  for (const u of units) {
+    const [x0, y0] = hexCenter(u.col, u.row);
+    const cont = new Container();
+    cont.x = x0 + PAD; cont.y = y0 + PAD;
+    drawCounter(cont, u, selectedId === u.id);
+    // unit name below the counter (large font, scaled down → sharp)
+    const lbl = new Text({ text: u.name, style: {
+      fill: 0xf0ece0, fontSize: 48, fontWeight: '600', fontFamily: 'Segoe UI, sans-serif',
+      stroke: { color: 0x10140c, width: 6 },
+    }});
+    lbl.anchor.set(0.5, 0);
+    lbl.scale.set((H*0.26)/48);
+    lbl.y = H/2 + H*0.12;
+    cont.addChild(lbl);
+    layer.addChild(cont);
   }
-
   return layer;
 }
