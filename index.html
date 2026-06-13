@@ -3779,6 +3779,13 @@ const GW_EVENTS = [
   {turn:57, text:'📰 June 1944 — D-Day: the Western Allies return to the continent of Europe.'},
   {turn:68, text:'📰 May 1945 — the war in Europe draws toward its end.'},
 ];
+const GW_BRIEF = {
+  GE: 'GERMANY · 1939. Crush Poland, then go west — the Maginot Line is too strong, so sweep through the Low Countries to flank France. Then face the Soviet colossus. History says you lose; build your war economy and rewrite it.',
+  SU: 'SOVIET UNION · 1939. The pact with Hitler buys you time — industrialise hard. When Barbarossa erupts in 1941, trade space for time behind your fortified cities, then bury the invader under your factories.',
+  UK: 'BRITAIN · 1939. Hold behind the Channel, out-build the Axis, and grind it down with your allies. The sea is your wall — the Wehrmacht cannot cross it.',
+  FR: 'FRANCE · 1939. You are the weak link — the blitzkrieg is coming through Belgium and 1940 may be your last spring. Build feverishly and pray your allies hold.',
+  IT: 'ITALY · 1939. Seize the Mediterranean for the Axis. But your fate is chained to Germany’s — when it falls, so do you.',
+};
 
 /* Europe & the Med as a region graph. [id]: {name, owner, x, y, ind, vp, port}.
    x,y are layout coords (0–100). Adjacency is computed from proximity with a
@@ -4131,10 +4138,15 @@ function gwSideVP(){ const v=gwFactionVP(); return { axis:v.axis, allied:v.allie
 function gwCheckVictory(){
   if (GW.capitulated[GW.player]){ gwEndCampaign('defeat','DEFEAT', `${GW_POWERS[GW.player].name} has been conquered.`); return; }
   const mySide = gwSideOf(GW.player);
-  const foes = Object.keys(GW_POWERS).filter(cc => gwSideOf(cc)!==mySide && gwSideOf(cc)!=='neutral');
+  // a decisive win means knocking out the enemy's CONTINENTAL powers — an
+  // isolated island bastion (Britain) holding out doesn't stop the conquest
+  const foes = Object.keys(GW_POWERS).filter(cc => {
+    if (gwSideOf(cc)===mySide || gwSideOf(cc)==='neutral') return false;
+    return !GW_ISLAND.has(GW_POWERS[cc].cap);            // Britain (cap=london, an island) is exempt
+  });
   if (foes.length && GW.turn>3 && foes.every(cc => GW.capitulated[cc]))
     gwEndCampaign('victory','DECISIVE VICTORY',
-      mySide==='axis' ? 'The Axis stands triumphant over all of Europe.' : 'The Axis is utterly crushed — the war is won.');
+      mySide==='axis' ? 'The Axis stands triumphant over the continent of Europe.' : 'The Axis is utterly crushed — the war is won.');
 }
 function gwScoreEnd(){
   const sv = gwSideVP(), mySide = gwSideOf(GW.player);
@@ -5179,7 +5191,10 @@ function gwEnter(){
   show('gw-select',false); show('mode-select',false); show('topbar',false); show('side',false);
   show('gw-game',true); gwUpdateUI();
 }
-function gwStart(cc){ gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced'; gwSave(); gwEnter(); }
+function gwStart(cc){ gwNewGame(cc); GW.active=true; GW.eco[cc].posture='balanced'; gwSave(); gwEnter();
+  $('gw-hint').innerHTML = (GW_BRIEF[cc]||'') + '<br><span style="color:var(--dim)">🏗 queue factories · ⚙ set production · click a <b style="color:var(--redL)">red front</b> to attack · End Month to advance</span>';
+  show('gw-hint', true);
+}
 function gwContinue(){ if(gwLoad()) gwEnter(); }
 function gwQuit(){ if(GW) GW.active=false; show('gw-game',false); showModeSelect(); }
 function gwOpenSelect(){
