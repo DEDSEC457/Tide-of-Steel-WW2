@@ -309,6 +309,7 @@
     <span class="t-chip" title="Field army strength">🪖 <b id="gw-army">0</b></span>
     <span class="t-chip" id="gw-vp" title="Faction victory points">VP —</span>
     <span class="spacer"></span>
+    <button id="gw-diplo-btn">🤝 Diplomacy</button>
     <button id="gw-help-btn">How to Play</button>
     <button id="gw-menu-btn">Menu</button>
     <button class="primary" id="gw-end">End Month ▶</button>
@@ -321,6 +322,15 @@
   </div>
   <div id="gw-hint" class="hidden"></div>
   <div id="gw-tip" class="hidden"></div>
+</div>
+
+<!-- ============ THE WORLD AT WAR — diplomacy ============ -->
+<div id="gw-diplo" class="modal-back hidden">
+  <div class="modal" style="max-width:560px;">
+    <h2>🤝 DIPLOMACY</h2>
+    <div id="gw-diplo-body"></div>
+    <div class="mrow"><button class="primary" id="gw-diplo-close">Close</button></div>
+  </div>
 </div>
 
 <!-- ============ THE WORLD AT WAR — how to play ============ -->
@@ -3919,7 +3929,20 @@ function gwNeighbors(id){ return [...gwAdjacency()[id]]; }
 let GW = null;
 function gwPowerOf(cc){ return GW_POWERS[cc] || null; }
 function gwIsPower(cc){ return !!GW_POWERS[cc]; }
-function gwFactionOf(cc){ const p=GW_POWERS[cc]; return p ? p.faction : 'neutral'; }
+/* which way the neutral minors lean — who you can court into your faction */
+const GW_NEUTRAL_LEAN = {
+  romania:'axis', hungary:'axis', finland:'axis',          // the Axis minors
+  yugo:'allies', greece:'allies', baltics:'allies',        // Allied / Soviet sphere
+  // the rest stay strictly neutral until someone invades them
+  spain:'none', portugal:'none', sweden:'none', turkey:'none', ireland:'none',
+  belgium:'none', nether:'none', denmark:'none', norway:'none',
+};
+function gwFactionOf(cc){
+  const p=GW_POWERS[cc]; if (p) return p.faction;
+  if (GW && GW.aligned && GW.aligned[cc]) return GW.aligned[cc];   // a neutral that joined a faction
+  return 'neutral';
+}
+function gwFactionsAtWar(a,b){ return !!GW && GW.factionWar.some(([x,y]) => (x===a&&y===b)||(x===b&&y===a)); }
 /* two regions' owners are at war? */
 function gwAtWar(ccA, ccB){
   if (ccA===ccB || !GW) return false;
@@ -3930,7 +3953,37 @@ function gwAtWar(ccA, ccB){
   const pa=GW_POWERS[ccA], pb=GW_POWERS[ccB];
   if (pa && GW.turn < pa.join) return false;
   if (pb && GW.turn < pb.join) return false;
-  return GW.factionWar.some(([x,y]) => (x===fa&&y===fb)||(x===fb&&y===fa));
+  return gwFactionsAtWar(fa,fb);
+}
+/* ---- diplomacy: declare wars and court neutrals ---- */
+function gwDeclareWar(facA, facB){
+  if (facA===facB || facA==='neutral' || facB==='neutral' || gwFactionsAtWar(facA,facB)) return false;
+  GW.factionWar.push([facA,facB]);
+  // the Axis–Soviet war, however it starts, brings the encirclements of 1941
+  if (((facA==='axis'&&facB==='comintern')||(facA==='comintern'&&facB==='axis')) && !GW.barbarossa){
+    GW.barbarossa = true;
+    if (GW.eco.SU) GW.eco.SU.army *= 0.38;
+    gwLog(`${gwDateStr(GW.turn)} — Operation Barbarossa: the Axis invades the Soviet Union. Whole Soviet armies are encircled in the opening blow.`);
+  } else {
+    gwLog(`${gwDateStr(GW.turn)} — the ${GW_FACT_NAME[facA]} and the ${GW_FACT_NAME[facB]} are now at war.`);
+  }
+  return true;
+}
+function gwSideForLean(lean){ return lean==='axis' ? 'axis' : lean==='allies' ? 'allied' : 'none'; }
+function gwSideForFaction(fac){ return fac==='axis' ? 'axis' : fac==='neutral' ? 'neutral' : 'allied'; }
+/* a faction may court a neutral that leans toward its SIDE (the USSR and the
+   Western Allies are one side here) */
+function gwCanCourt(faction, neutralId){
+  if (!GW || GW.aligned[neutralId] || gwFactionOf(neutralId)!=='neutral') return false;
+  const lean = GW_NEUTRAL_LEAN[neutralId] || 'none';
+  if (lean==='none') return false;
+  return gwSideForLean(lean) === gwSideForFaction(faction);
+}
+function gwCourtNeutral(faction, neutralId){
+  if (!gwCanCourt(faction, neutralId)) return false;
+  GW.aligned[neutralId] = faction;
+  gwLog(`${GW_REGIONS[neutralId] ? GW_REGIONS[neutralId].name : neutralId} joins the ${GW_FACT_NAME[faction]}.`);
+  return true;
 }
 
 const GW_DIFF_MUL = { easy:1.3, normal:1.0, hard:0.82 };   // scales YOUR war-economy output
@@ -3944,7 +3997,7 @@ function gwNewGame(playerCC, diff){
     factionWar: [['axis','allies']],          // comintern joins at Barbarossa
     regions: {},                               // id -> owner (mutable)
     eco: {},                                   // cc -> {civ, mil, army, mp, build:[], milAlloc:{army,air}, air, cp}
-    capitulated: {},
+    capitulated: {}, aligned: {}, barbarossa: false,
   };
   for (const id in GW_REGIONS) GW.regions[id] = GW_REGIONS[id].owner;
   for (const cc in GW_POWERS){
@@ -4083,8 +4136,8 @@ function gwRegionDefense(id){
       d += e.army / gwOwnFrontCount(o) * 0.45 * gwAirMul(o) * gwDiffCombat(o);   // army + air + difficulty
       if (e.posture==='defend') d *= 1.7;            // dug in — holding a line is a real strategy
     }
-  } else if (gwFactionOf(o)==='neutral'){
-    d += 8;                                          // a neutral nation's standing garrison
+  } else if (!gwIsPower(o)){
+    d += 8;                                          // a minor nation's standing garrison (neutral or aligned)
   }
   if (GW_REGIONS[id].cap) d *= 1.4;                  // capitals are fortified — but not impregnable
   else if ((r.vp||0) >= 4) d *= 1.3;                 // and the great cities are stubborn
@@ -4274,14 +4327,19 @@ function gwScoreEnd(){
 }
 function gwEndMonth(){
   if (!GW || GW.over) return;
-  // war-entry triggers
-  if (GW.turn===GW_BARBAROSSA &&
-      !GW.factionWar.some(([a,b]) => (a==='axis'&&b==='comintern')||(a==='comintern'&&b==='axis'))){
-    GW.factionWar.push(['axis','comintern']);
-    if (GW.eco.SU) GW.eco.SU.army *= 0.38;     // the catastrophic encirclements of 1941 — millions lost
-    gwLog(`${gwDateStr(GW.turn)} — Operation Barbarossa: the Axis invades the Soviet Union. Whole Soviet armies are encircled in the opening blow.`);
-  }
+  // war-entry trigger: the AI Axis launches Barbarossa ~June 1941 on schedule —
+  // but if YOU lead Germany, the timing is yours (declare it from Diplomacy)
+  if (GW.turn>=GW_BARBAROSSA && GW.player!=='GE' && !gwFactionsAtWar('axis','comintern'))
+    gwDeclareWar('axis','comintern');
   for (const cc in GW_POWERS) if (GW_POWERS[cc].join===GW.turn && GW.turn>1) gwLog(`${GW_POWERS[cc].name} enters the war.`);
+  // the AI blocs draw in their natural partners over the early years — but leave
+  // YOUR side's leaning neutrals for you to court yourself (Diplomacy)
+  if (GW.turn>=4 && GW.turn%2===0){
+    const playerSide = gwSideOf(GW.player);
+    const id = Object.keys(GW_NEUTRAL_LEAN).find(n => { const lean=GW_NEUTRAL_LEAN[n];
+      return lean!=='none' && gwSideForLean(lean)!==playerSide && !GW.aligned[n] && gwFactionOf(n)==='neutral'; });
+    if (id) gwCourtNeutral(gwSideForLean(GW_NEUTRAL_LEAN[id])==='axis'?'axis':'allies', id);
+  }
   for (const ev of GW_EVENTS) if (ev.turn===GW.turn){ gwLog(ev.text);
     if (ev.lend) for (const cc of ['UK','SU','FR']) if (GW.eco[cc] && !GW.capitulated[cc]) GW.eco[cc].mil += 3;  // US industrial aid
     if (ev.dday && !GW.capitulated.UK && GW.eco.UK){
@@ -5376,6 +5434,66 @@ $('gw-continue').onclick=gwContinue;
 $('gw-menu-btn').onclick=gwQuit;
 $('gw-help-btn').onclick=()=>show('gw-help',true);
 $('gw-help-close').onclick=()=>show('gw-help',false);
+$('gw-diplo-btn').onclick=()=>gwShowDiplomacy();
+$('gw-diplo-close').onclick=()=>show('gw-diplo',false);
+function gwShowDiplomacy(){
+  if(!GW) return;
+  const p=GW.player, fac=gwFactionOf(p), col=GW_POWERS[p].color;
+  const sec=(t,inner)=>'<div style="margin:0 0 14px;"><h4 style="margin:0 0 6px;letter-spacing:1px;">'+t+'</h4>'+inner+'</div>';
+  const dim='color:var(--dim);font-size:13px;margin:2px 0;';
+  const row='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);';
+  let h='<p style="margin:0 0 12px;">You lead <b style="color:'+col+'">'+GW_POWERS[p].name
+       +'</b> of the <b>'+GW_FACT_NAME[fac]+'</b>.</p>';
+
+  // ---- Operation Barbarossa: a German player chooses the moment ----
+  if (fac==='axis'){
+    if (!GW.barbarossa){
+      h+=sec('⚔ Operation Barbarossa',
+        '<p style="'+dim+'">The Soviet Union will not strike first — Stalin trusts the pact. '
+        +'The choice of when to invade the USSR is yours. History launched it in June 1941 '
+        +'(month '+GW_BARBAROSSA+'); strike too early and you fight unprepared, too late and winter looms.</p>'
+        +'<button class="primary" id="gw-barb">Invade the Soviet Union now ('+gwDateStr(GW.turn)+')</button>');
+    } else {
+      h+=sec('⚔ Operation Barbarossa','<p style="'+dim+'">The war in the East is underway. Drive on Moscow, Leningrad and Stalingrad.</p>');
+    }
+  }
+
+  // ---- court neutrals that lean to your side ----
+  const courtable=Object.keys(GW_NEUTRAL_LEAN).filter(id=>gwCanCourt(fac,id));
+  let ci='<p style="'+dim+'">Bring a sympathetic nation into the war on your side — you gain its territory, industry and manpower.</p>';
+  if (courtable.length){
+    for (const id of courtable){ const r=GW_REGIONS[id];
+      ci+='<div style="'+row+'"><span><b>'+r.name+'</b> <span style="color:var(--dim)">'
+         +(r.ind?(' · 🏭'+r.ind):'')+(r.vp?(' · ★'+r.vp):'')+'</span></span>'
+         +'<button data-court="'+id+'">Join the '+GW_FACT_NAME[fac]+'</button></div>';
+    }
+  } else ci+='<p style="'+dim+'">No nation is ready to be courted to your side right now.</p>';
+  h+=sec('🤝 Court a neutral nation', ci);
+
+  // ---- aligned partners ----
+  const aligned=Object.keys(GW.aligned||{});
+  if (aligned.length){
+    let ai='';
+    for (const id of aligned){ const r=GW_REGIONS[id];
+      ai+='<div style="'+row+'"><span>'+(r?r.name:id)+'</span><span style="color:var(--dim)">'+GW_FACT_NAME[GW.aligned[id]]+'</span></div>'; }
+    h+=sec('📜 Aligned with you', ai);
+  }
+
+  // ---- active wars ----
+  let wi='';
+  for (const [a,b] of GW.factionWar){
+    if ((a==='comintern'||b==='comintern') && !GW.barbarossa) continue;   // not yet a shooting war
+    wi+='<div style="'+row+'"><span>'+GW_FACT_NAME[a]+'</span><span style="color:var(--dim)">at war with</span><span>'+GW_FACT_NAME[b]+'</span></div>';
+  }
+  h+=sec('🔥 The war', wi||'<p style="'+dim+'">No major power is at war yet.</p>');
+
+  $('gw-diplo-body').innerHTML=h;
+  $('gw-diplo-body').querySelectorAll('[data-court]').forEach(b=>b.onclick=()=>{
+    gwCourtNeutral(fac, b.dataset.court); gwUpdateUI(); gwShowDiplomacy(); });
+  const barb=$('gw-barb');
+  if (barb) barb.onclick=()=>{ gwDeclareWar('axis','comintern'); gwUpdateUI(); gwShowDiplomacy(); };
+  show('gw-diplo', true);
+}
 function gwShowResult(){
   const win = GW.result.result==='victory';
   $('gw-result-date').textContent = gwDateStr(Math.min(GW.turn,GW_END_TURN));
@@ -6086,7 +6204,8 @@ if (typeof module !== 'undefined' && module.exports){
     GW_POWERS, GW_REGIONS, gwAdjacency, gwNeighbors, gwNewGame, gwEcoTick, gwAtWar,
     gwQueueBuild, gwCancelBuild, gwSetMilAlloc, gwRegionsOf, gwDateStr, gwGetState: () => GW,
     gwEndMonth, gwFrontTargets, gwFactionVP, gwAIEco, gwRegionDefense, gwMostThreatenedRegion,
-    gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo,
+    gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo, gwFactionOf, gwSideOf,
+    gwDeclareWar, gwCourtNeutral, gwCanCourt, gwFactionsAtWar, GW_NEUTRAL_LEAN,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };

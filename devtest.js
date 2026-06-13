@@ -739,6 +739,12 @@ function uiSmoke(side){
     if ($('gw-back').onclick){ $('gw-back').onclick(); $('mc-grand').onclick(); }
     $('gw-begin').onclick(); drain();                       // start as Germany (default)
     grandOk = !!(UI.gwGetState && UI.gwGetState() && UI.gwGetState().active);
+    // diplomacy: open the modal, launch Barbarossa from its button, close
+    if ($('gw-diplo-btn').onclick){
+      $('gw-diplo-btn').onclick();                          // renders the diplomacy modal
+      if ($('gw-barb') && $('gw-barb').onclick) $('gw-barb').onclick();  // open the Eastern Front
+      if ($('gw-diplo-close').onclick) $('gw-diplo-close').onclick();
+    }
     if ($('gw-bc').onclick) $('gw-bc').onclick();           // queue a civil factory
     if ($('gw-bm').onclick) $('gw-bm').onclick();           // queue a military factory
     if ($('gw-end').onclick) for (let i=0;i<8;i++) $('gw-end').onclick();   // run 8 months
@@ -747,6 +753,43 @@ function uiSmoke(side){
   }
   return {over: arcadeOver, realisticOk, grandOk, result: arcadeResult, uiErrors};
 }
+// ---- The World at War: diplomacy engine ----
+say('— grand campaign: diplomacy —');
+try {
+  // a German player chooses Barbarossa; the USSR never declares it itself
+  E.gwNewGame('GE','normal');
+  check('USSR not at war with the Axis before Barbarossa',
+    !E.gwFactionsAtWar('axis','comintern'), 'comintern war started early');
+  check('Soviet regions are still Soviet at the start',
+    E.gwFactionOf(E.gwGetState().regions.moscow)==='comintern', 'moscow not comintern');
+  const armyBefore = E.gwGetState().eco.SU.army;
+  E.gwDeclareWar('axis','comintern');                    // the player launches the invasion
+  check('Barbarossa puts the Axis and Comintern at war',
+    E.gwFactionsAtWar('axis','comintern'), 'no comintern war after declare');
+  check('Barbarossa encircles the opening Soviet armies',
+    E.gwGetState().eco.SU.army < armyBefore, 'Soviet army not reduced');
+  check('Barbarossa only fires once',
+    E.gwDeclareWar('axis','comintern')===false, 're-declared the same war');
+
+  // courting: an Axis player can bring a leaning minor in; not a hostile-leaning one
+  E.gwNewGame('GE','normal');
+  const romaniaLean = E.GW_NEUTRAL_LEAN.romania;          // axis-leaning
+  check('a leaning minor is courtable to its side',
+    E.gwCanCourt('axis','romania')===true && romaniaLean==='axis', 'Romania not courtable by Axis');
+  check('an Axis player cannot court an Allied-leaning minor',
+    E.gwCanCourt('axis','yugo')===false, 'Yugoslavia wrongly courtable by Axis');
+  check('a strictly-neutral minor is not courtable',
+    E.gwCanCourt('axis','spain')===false, 'Spain wrongly courtable');
+  const ok = E.gwCourtNeutral('axis','romania');
+  check('courting aligns the minor with the faction',
+    ok===true && E.gwFactionOf('romania')==='axis', 'Romania did not join the Axis');
+  check('an already-aligned minor cannot be courted again',
+    E.gwCourtNeutral('allies','romania')===false, 'Romania re-courted');
+} catch(err){
+  failures++;
+  console.log(`  FAIL diplomacy engine — ${err.message}`);
+}
+
 for (const side of ['G','S']){
   try {
     const r = uiSmoke(side);
