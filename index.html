@@ -313,6 +313,20 @@
   <div id="gw-hint" class="hidden"></div>
 </div>
 
+<!-- ============ THE WORLD AT WAR — result ============ -->
+<div id="gw-result" class="modal-back hidden">
+  <div class="modal" style="max-width:560px;text-align:center;">
+    <div id="gw-result-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
+    <h2 id="gw-result-title" style="font-size:24px;margin:8px 0;"></h2>
+    <p id="gw-result-text"></p>
+    <div id="gw-result-stats" style="color:var(--dim);font-size:13px;margin:12px 0;"></div>
+    <div class="mrow" style="justify-content:center;">
+      <button id="gw-result-menu">Main Menu</button>
+      <button class="primary" id="gw-result-new">New War ▶</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ REALISTIC MODE STUB ============ -->
 <div id="realistic-menu" class="modal-back hidden">
   <div class="modal">
@@ -5282,10 +5296,26 @@ $('gw-back').onclick=()=>{ show('gw-select',false); show('mode-select',true); };
 $('gw-begin').onclick=()=>gwStart(gwSelCC);
 $('gw-continue').onclick=gwContinue;
 $('gw-menu-btn').onclick=gwQuit;
+function gwShowResult(){
+  const win = GW.result.result==='victory';
+  $('gw-result-date').textContent = gwDateStr(Math.min(GW.turn,GW_END_TURN));
+  $('gw-result-title').textContent = GW.result.title;
+  $('gw-result-title').style.color = win ? 'var(--grn)' : 'var(--redL)';
+  $('gw-result-text').textContent = GW.result.text;
+  const KEY=['moscow','leningrad','stalingrad'];
+  const held=KEY.filter(c=>gwFactionOf(GW.regions[c])==='axis').length;
+  const sv=gwSideVP();
+  $('gw-result-stats').innerHTML = 'Playing as <b>'+GW_POWERS[GW.player].name+'</b> · '
+    +'Soviet key cities in Axis hands: <b>'+held+'/3</b><br>Final victory points — Axis <b>'+sv.axis+'</b> · Allies <b>'+sv.allied+'</b>';
+  show('gw-result', true);
+}
+$('gw-result-menu').onclick=()=>{ show('gw-result',false); gwQuit(); };
+$('gw-result-new').onclick=()=>{ show('gw-result',false); gwQuit(); gwOpenSelect(); };
 $('gw-end').onclick=()=>{
   if(!GW||!GW.active) return;
-  if(GW.over){ gwClearSave(); gwQuit(); return; }
-  gwEndMonth(); gwSave(); gwUpdateUI();
+  if(GW.over){ gwClearSave(); show('gw-result',false); gwQuit(); return; }
+  gwEndMonth(); gwUpdateUI();
+  if(GW.over){ gwClearSave(); gwShowResult(); } else gwSave();
 };
 function gwClickMap(e){
   if(!gwViewCache) return;
