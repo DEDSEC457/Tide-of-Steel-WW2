@@ -303,9 +303,9 @@
     <div id="gw-powers" class="pick-row" style="flex-wrap:wrap;gap:10px;margin:16px auto;max-width:680px;"></div>
     <div class="opt-row" id="gw-diff-row" style="display:flex;gap:8px;justify-content:center;margin:8px 0;">
       <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
-      <span class="opt" data-d="easy">Recruit</span>
-      <span class="opt sel" data-d="normal">Field Marshal</span>
-      <span class="opt" data-d="hard">Iron Will</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt sel" data-d="normal">Normal</span>
+      <span class="opt" data-d="hard">Hard</span>
     </div>
     <div class="mrow" style="justify-content:center;">
       <button id="gw-back">← Back</button>
@@ -434,7 +434,13 @@
         <h4>🟥 Soviet Union</h4><p>Trade a continent for time. Hold the rivers, dodge the pockets, counterattack in winter.</p>
       </div>
     </div>
-    <div class="mrow" style="justify-content:center;margin-top:20px;">
+    <div class="opt-row" id="rm-diff-row" style="justify-content:center;margin-top:16px;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt sel" data-d="normal">Normal</span>
+      <span class="opt" data-d="hard">Hard</span>
+    </div>
+    <div class="mrow" style="justify-content:center;margin-top:16px;">
       <button id="btn-back-realistic">← Back</button>
       <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
       <button class="primary" id="btn-play-realistic">PLAY EARLY PREVIEW ▶</button>
@@ -460,10 +466,13 @@
         <h4>🟥 Soviet Union</h4><p>Trade space for time, survive 1941, then bleed the Wehrmacht white and roll it back.</p>
       </div>
     </div>
-    <div class="setrow" style="justify-content:center;gap:10px;margin-top:18px;"><span style="color:var(--dim);font-size:13px;">Difficulty</span>
-      <div class="gfx-seg" id="waw-diff">
-        <button id="waw-diff-normal">Normal</button><button id="waw-diff-hard">Hard</button><button id="waw-diff-brutal">Brutal</button>
-      </div></div>
+    <div class="opt-row" id="waw-diff-row" style="justify-content:center;margin-top:16px;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt" data-d="normal">Normal</span>
+      <span class="opt sel" data-d="hard">Hard</span>
+      <span class="opt" data-d="brutal">Brutal</span>
+    </div>
     <div id="waw-diff-desc" style="color:var(--dim);font-size:12px;margin-top:2px;min-height:16px;"></div>
     <div class="mrow" style="justify-content:center;margin-top:18px;">
       <button id="waw-back">← Back</button>
@@ -499,9 +508,9 @@
     </div>
     <div class="opt-row" id="diff-row">
       <span style="color:var(--dim);padding:6px 0;">Difficulty:</span>
-      <span class="opt" data-d="easy">Recruit</span>
-      <span class="opt sel" data-d="normal">Field Marshal</span>
-      <span class="opt" data-d="hard">Iron Will</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt sel" data-d="normal">Normal</span>
+      <span class="opt" data-d="hard">Hard</span>
     </div>
     <div class="opt-row">
       <span class="opt sel" id="mode-ai">vs Computer</span>
@@ -6614,6 +6623,7 @@ $('mc-hex').onclick = openHexGame;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
 let wawSide = 'G', wawDiff = 'hard';
 const WAW_DIFF_DESC = {
+  easy:   'A gentler war — the AI is cautious and you out-produce it. Good for learning the bigger map.',
   normal: 'A fair fight — the AI plays a solid game with no bonuses.',
   hard:   'The AI plays sharply, holds its line, and out-produces you. A real test.',
   brutal: 'A pitiless enemy: out-produces you heavily, hits harder, and gives no ground. For veterans.',
@@ -6621,7 +6631,7 @@ const WAW_DIFF_DESC = {
 function syncWawUI(){
   $('waw-pick-ger').classList.toggle('sel', wawSide==='G');
   $('waw-pick-sov').classList.toggle('sel', wawSide==='S');
-  for (const d of ['normal','hard','brutal']) $('waw-diff-'+d).classList.toggle('sel', wawDiff===d);
+  document.querySelectorAll('#waw-diff-row .opt').forEach(o=>o.classList.toggle('sel', o.dataset.d===wawDiff));
   $('waw-diff-desc').textContent = WAW_DIFF_DESC[wawDiff] || '';
 }
 $('mc-wawtest').onclick = ()=>{
@@ -6631,7 +6641,7 @@ $('mc-wawtest').onclick = ()=>{
 };
 $('waw-pick-ger').onclick = ()=>{ wawSide='G'; syncWawUI(); };
 $('waw-pick-sov').onclick = ()=>{ wawSide='S'; syncWawUI(); };
-for (const d of ['normal','hard','brutal']) $('waw-diff-'+d).onclick = ()=>{ wawDiff=d; syncWawUI(); };
+for (const el of document.querySelectorAll('#waw-diff-row .opt')) el.onclick = ()=>{ wawDiff=el.dataset.d; syncWawUI(); };
 $('waw-back').onclick = ()=>{ show('waw-menu', false); show('mode-select', true); };
 $('waw-play').onclick = ()=>{
   eventQueue.length = 0;
@@ -6652,9 +6662,11 @@ $('mc-realistic').onclick = ()=>{
   $('btn-continue-realistic').classList.toggle('hidden', !hasSaveSlot('realistic'));
 };
 $('btn-back-realistic').onclick = ()=>{ show('realistic-menu', false); show('mode-select', true); };
-let rmSide = 'G', rmPendingUntil = 0;
+let rmSide = 'G', rmDiff = 'normal', rmPendingUntil = 0;
 $('rm-pick-ger').onclick = ()=>{ rmSide='G'; $('rm-pick-ger').classList.add('sel'); $('rm-pick-sov').classList.remove('sel'); };
 $('rm-pick-sov').onclick = ()=>{ rmSide='S'; $('rm-pick-sov').classList.add('sel'); $('rm-pick-ger').classList.remove('sel'); };
+for (const el of document.querySelectorAll('#rm-diff-row .opt')) el.onclick = ()=>{ rmDiff=el.dataset.d;
+  document.querySelectorAll('#rm-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); };
 $('btn-play-realistic').onclick = ()=>{
   // warn before wiping an unfinished Realistic campaign (the Arcade slot is safe)
   if (hasSaveSlot('realistic') && performance.now() > rmPendingUntil){
@@ -6666,7 +6678,7 @@ $('btn-play-realistic').onclick = ()=>{
   rmPendingUntil = 0;
   $('btn-play-realistic').textContent = 'PLAY EARLY PREVIEW ▶';
   eventQueue.length = 0;
-  newGame(rmSide, 'normal', 'ai', 'realistic');
+  newGame(rmSide, rmDiff, 'ai', 'realistic');
   show('realistic-menu', false);
   startCampaign();
 };
