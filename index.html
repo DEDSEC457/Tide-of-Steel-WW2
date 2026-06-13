@@ -333,6 +333,16 @@
   </div>
 </div>
 
+<!-- ============ THE WORLD AT WAR — strategic decision ============ -->
+<div id="gw-decision" class="modal-back hidden">
+  <div class="modal" style="max-width:600px;">
+    <div id="gw-dec-date" style="color:var(--amber);letter-spacing:2px;font-size:12px;"></div>
+    <h2 id="gw-dec-title" style="margin:4px 0 8px;"></h2>
+    <p id="gw-dec-text" style="color:var(--dim);line-height:1.5;"></p>
+    <div id="gw-dec-options" style="display:flex;flex-direction:column;gap:10px;margin-top:12px;"></div>
+  </div>
+</div>
+
 <!-- ============ THE WORLD AT WAR — how to play ============ -->
 <div id="gw-help" class="modal-back hidden">
   <div class="modal" style="max-width:600px;">
@@ -346,6 +356,10 @@
           (a force multiplier — up to +14% in battle). Choose the split.</li>
       <li><b>⚔ War.</b> Set your <b>posture</b> (Attack / Balanced / Defend) and <b>click a red front</b> on the map
           to choose where you concentrate your offensive. Capitals fall, nations capitulate, the victor takes the spoils.</li>
+      <li><b>⚑ Decisions.</b> At the great crossroads your power faces a <b>strategic fork</b> — the plan to
+          beat France, the opening of Barbarossa, the Battle of Britain. <b>Every option shows exactly what it
+          grants</b> (a timed combat bonus for a few months, factories, manpower) so you always know what you are
+          choosing. The <b>End Month</b> button turns into <b>⚑ Decision</b> when one is waiting.</li>
       <li><b>🤝 Diplomacy.</b> Open the panel (the badge counts your available moves). <b>Court a neutral</b>
           that leans your way — Romania, Hungary and Finland to the Axis; Yugoslavia, Greece and the Baltics to the
           Allies — and its factories and divisions join your war. If you lead <b>Germany</b>, <b>you choose when to
@@ -3915,6 +3929,8 @@ const GW_SEALINK = [['london','normandy'],['london','nether'],['scotland','norwa
 const GW_LANDLINK = [['moscow','stalingrad'],['stalingrad','caucasus'],['caucasus','kiev'],
   ['moscow','leningrad'],['kiev','romania'],['romania','hungary']];
 const GW_ISLAND = new Set(['scotland','london','wales','ireland']);   // the British Isles — reachable only by sea
+const GW_KEY_CITIES = new Set(['moscow','leningrad','stalingrad']);   // the three that decide the war
+function gwIsKeyCity(id){ return GW_KEY_CITIES.has(id); }
 function gwAdjacency(){
   if (GW_ADJ) return GW_ADJ;
   GW_ADJ = {}; const ids = Object.keys(GW_REGIONS);
@@ -4011,6 +4027,160 @@ function gwDiploActions(){
   return n;
 }
 
+/* ====================================================================
+   TEMPORARY WAR MODIFIERS — timed combat buffs granted by decisions/events.
+   kind 'attack'  : multiplies a power's offensive punch (optionally only vs a
+                    given enemy faction — e.g. Barbarossa surprise hits only the
+                    Soviets); 'defense': multiplies the defense of regions it
+                    owns; 'air': folds into its air multiplier (helps attack AND
+                    defense, e.g. the Battle of Britain). All expire after N
+                    months and are logged when they lapse. ================== */
+function gwAddMod(cc, kind, mag, turns, label, vsFac){
+  if (!GW.mods) GW.mods = [];
+  GW.mods.push({ cc, kind, mag, until: GW.turn + turns, label, vsFac: vsFac||null });
+  if (cc===GW.player) gwLog(`🎖 ${label} — in effect for ${turns} month${turns>1?'s':''}.`);
+}
+function gwModFactor(cc, kind, defFac){
+  if (!GW || !GW.mods) return 1;
+  let f = 1;
+  for (const m of GW.mods){
+    if (m.cc!==cc || m.kind!==kind) continue;
+    if (m.vsFac && m.vsFac!==defFac) continue;     // a target-scoped buff only bites the named foe
+    f *= (1 + m.mag);
+  }
+  return f;
+}
+function gwTickMods(){                              // drop the lapsed buffs at the head of each month
+  if (!GW.mods || !GW.mods.length) return;
+  const live = [];
+  for (const m of GW.mods){
+    if (GW.turn >= m.until){ if (m.cc===GW.player) gwLog(`${m.label} has run its course.`); }
+    else live.push(m);
+  }
+  GW.mods = live;
+}
+
+/* ====================================================================
+   STRATEGIC DECISIONS — dated forks, one per playable power (Germany gets the
+   two marquee ones). Every option states its EFFECT in plain numbers so you
+   always know what you are choosing. A decision fires once, when when() is true;
+   the player sees a modal, the AI auto-picks options[ai]. ================== */
+const GW_DECISIONS = [
+  { id:'sichelschnitt', who:'GE', date:'May 1940', badge:'⚔ THE PLAN IN THE WEST',
+    when: g => g.turn>=9 && g.turn<=12 && !g.capitulated.FR && gwFactionOf(g.regions.paris)!=='axis',
+    title:'The Plan in the West',
+    text:'The Maginot Line is impregnable, so France must be beaten through the Low Countries. Two plans sit on the table: Halder’s cautious northern sweep, or Manstein’s audacious armoured thrust through the “impassable” Ardennes — straight at the hinge of the Allied line.',
+    options:[
+      { label:'Sichelschnitt — the Sickle Cut through the Ardennes',
+        effect:'+45% attack vs the Allies for 3 months — a decisive flanking blow that unhinges France',
+        flavor:'Guderian’s panzers race for the Channel and trap the Allied armies in Belgium.',
+        apply:g=>gwAddMod('GE','attack',0.45,3,'Sickle Cut momentum','allies') },
+      { label:'The cautious northern sweep (the old Schlieffen idea)',
+        effect:'+15% attack vs the Allies for 3 months, and bank +4 manpower for a longer fight',
+        flavor:'A safer, slower advance the Allies are expecting — but you husband your reserves.',
+        apply:g=>{ gwAddMod('GE','attack',0.15,3,'Northern advance','allies'); g.eco.GE.mp+=4; } },
+    ], ai:0 },
+
+  { id:'barbarossa_surprise', who:'GE', date:'Operation Barbarossa', badge:'☭ THE EASTERN BLOW',
+    when: g => g.barbarossa===true && gwFactionOf(g.regions.moscow)!=='axis' && (g.eco.SU&&g.eco.SU.army>2),
+    title:'The Opening of Barbarossa',
+    text:'Three million men wait along the frontier. Stalin has ignored every warning — the Red Army is unmobilised and strung along the border. How will you strike?',
+    options:[
+      { label:'Total surprise — strike before dawn, no preliminary barrage',
+        effect:'+40% attack vs the Soviets for 3 months — whole armies are caught and encircled',
+        flavor:'The Luftwaffe destroys the Soviet air force on the ground; the panzers are 100km deep by nightfall.',
+        apply:g=>gwAddMod('GE','attack',0.40,3,'Barbarossa surprise','comintern') },
+      { label:'Methodical assault — full artillery preparation first',
+        effect:'+18% attack vs the Soviets for 4 months, steadier — and +3 military factories mobilised',
+        flavor:'Less shock, but your spearheads are better supplied for the long drive east.',
+        apply:g=>{ gwAddMod('GE','attack',0.18,4,'Methodical offensive','comintern'); g.eco.GE.mil+=3; } },
+    ], ai:0 },
+
+  { id:'battle_of_britain', who:'UK', date:'July 1940', badge:'✈ THE BATTLE OF BRITAIN',
+    when: g => g.turn>=11 && g.turn<=16,
+    title:'The Battle of Britain',
+    text:'France has fallen and the Luftwaffe masses across the Channel. Fighter Command is outnumbered. Dowding must decide where to spend his precious squadrons.',
+    options:[
+      { label:'Defend the skies over the airfields and cities ("The Few")',
+        effect:'+35% air power for 3 months — the RAF wins the air battle and shields the island',
+        flavor:'Sea Lion is shelved for good; Britain’s defence hardens behind the Channel.',
+        apply:g=>{ gwAddMod('UK','air',0.35,3,'Fighter Command ascendant'); } },
+      { label:'Bomber Command strikes back at the invasion barges',
+        effect:'+18% air for 2 months, and +2 military factories from the war-industry surge',
+        flavor:'Less defensive cover, but you blunt the build-up and rally the arsenal.',
+        apply:g=>{ gwAddMod('UK','air',0.18,2,'Bomber offensive'); g.eco.UK.mil+=2; } },
+    ], ai:0 },
+
+  { id:'scorched_earth', who:'SU', date:'Summer 1941', badge:'☭ NOT ONE STEP BACK',
+    when: g => g.barbarossa===true && !g.capitulated.SU,
+    title:'The Soviet Response',
+    text:'The Germans are pouring east. Stavka must choose between a rigid forward defence and trading vast space for time while the factories entrain for the Urals.',
+    options:[
+      { label:'Evacuate the factories beyond the Urals',
+        effect:'+5 civilian factories within months, and +25% defence of the approaches for 4 months (the fortress cities fight on alone)',
+        flavor:'1,500 factories move east on rail; you trade vast space for time while the arsenal rebuilds behind the Urals.',
+        apply:g=>{ gwAddMod('SU','depth',0.25,4,'Defence in depth'); g.eco.SU.civ+=5; } },
+      { label:'Stand and fight for every metre at the border',
+        effect:'+35% defence of the approaches for 2 months — a ferocious forward fight, but no industrial evacuation',
+        flavor:'The border battles bleed the invader, but the unmoved factories are at risk.',
+        apply:g=>gwAddMod('SU','depth',0.35,2,'Border stand') },
+    ], ai:0 },
+
+  { id:'maginot_gamble', who:'FR', date:'May 1940', badge:'⚜ FRANCE AT BAY',
+    when: g => g.turn>=9 && g.turn<=12 && !g.capitulated.FR && gwFactionOf(g.regions.paris)!=='axis',
+    title:'France at Bay',
+    text:'The German blow is coming through Belgium. Gamelin can wheel the best armies north into Belgium, or hold the line and trust the Maginot fortifications.',
+    options:[
+      { label:'Hold a deep defensive line — no rash advance',
+        effect:'+35% defence for 3 months — your one hope of weathering the blitz',
+        flavor:'A grim, dug-in defence. It may not be enough, but nothing else will be.',
+        apply:g=>gwAddMod('FR','defense',0.35,3,'Defensive line') },
+      { label:'Wheel the mobile armies forward into Belgium',
+        effect:'+15% attack for 2 months, but the Germans flank you — no defensive bonus',
+        flavor:'The Dyle Plan — exactly the move the Sickle Cut is praying you make.',
+        apply:g=>gwAddMod('FR','attack',0.15,2,'Forward into Belgium') },
+    ], ai:0 },
+
+  { id:'med_strategy', who:'IT', date:'June 1940', badge:'⚔ MARE NOSTRUM',
+    when: g => g.turn>=9 && g.turn<=14 && !g.capitulated.IT,
+    title:'Italy’s War',
+    text:'Mussolini has joined the war. The Regia Marina rules a sea Britain must cross to reach the East. Where does Italy throw its weight?',
+    options:[
+      { label:'Seize the Mediterranean — press the British hard',
+        effect:'+25% attack for 3 months across the southern front',
+        flavor:'A bid to choke Britain’s lifeline through Suez before America wakes.',
+        apply:g=>gwAddMod('IT','attack',0.25,3,'Mediterranean offensive') },
+      { label:'Consolidate and arm — build the war economy first',
+        effect:'+4 military factories and +20% defence for 3 months',
+        flavor:'A patient build-up — Italy’s industry was never ready for a long war.',
+        apply:g=>{ gwAddMod('IT','defense',0.20,3,'Italian consolidation'); g.eco.IT.mil+=4; } },
+    ], ai:1 },
+];
+/* Decisions are the PLAYER's command agency: only the power YOU lead gets these
+   forks (the AI opponent plays its known-balanced baseline, and the dated events
+   still narrate its history). This guarantees that the special bonuses can never
+   tip the AI into a solo win — the Axis still falls unless YOU drive it. */
+function gwFindDecision(){                          // the first un-taken decision for the player's power
+  for (const d of GW_DECISIONS) if (d.who===GW.player && GW.decided[d.id]===undefined && d.when(GW)) return d;
+  return null;
+}
+function gwPendingDecision(){                       // …one the human must answer in person
+  const d = gwFindDecision();
+  return (d && !GW.autoPlayer) ? d : null;
+}
+function gwResolveDecision(id, idx){
+  const d = GW_DECISIONS.find(x=>x.id===id); if (!d || GW.decided[id]!==undefined) return false;
+  GW.decided[id] = idx;
+  gwLog(`${d.date} — ${d.title}: ${d.options[idx].label}.`);
+  d.options[idx].apply(GW);
+  return true;
+}
+function gwAutoResolveDecisions(){                  // simulated players take their own fork (tests/headless)
+  if (!GW.autoPlayer) return;
+  const d = gwFindDecision();
+  if (d) gwResolveDecision(d.id, d.ai);
+}
+
 const GW_DIFF_MUL = { easy:1.3, normal:1.0, hard:0.82 };   // scales YOUR war-economy output
 const GW_DIFF_COMBAT = { easy:1.15, normal:1.0, hard:0.85 };  // …and your battlefield effectiveness
 function gwDiffCombat(cc){ return cc===GW.player ? (GW_DIFF_COMBAT[GW.diff]||1) : 1; }
@@ -4023,6 +4193,7 @@ function gwNewGame(playerCC, diff){
     regions: {},                               // id -> owner (mutable)
     eco: {},                                   // cc -> {civ, mil, army, mp, build:[], milAlloc:{army,air}, air, cp}
     capitulated: {}, aligned: {}, barbarossa: false,
+    decided: {}, mods: [],                     // resolved decisions; active timed combat buffs
   };
   for (const id in GW_REGIONS) GW.regions[id] = GW_REGIONS[id].owner;
   for (const cc in GW_POWERS){
@@ -4134,7 +4305,7 @@ function gwOwnFrontCount(cc){
 /* air strength is a force multiplier — close air support on the attack, air
    defense on the ground — so building air makes your army hit and hold harder
    even though it never takes ground itself. Up to ~+28%. */
-function gwAirMul(cc){ const e=GW.eco[cc]; return e ? 1 + Math.min(0.14, (e.air||0)*0.004) : 1; }
+function gwAirMul(cc){ const e=GW.eco[cc]; const base = e ? 1 + Math.min(0.14, (e.air||0)*0.004) : 1; return base * gwModFactor(cc,'air'); }
 /* the historical arc of the war as an offensive modifier: the Axis has the
    initiative and doctrine edge early (blitzkrieg, Barbarossa); from 1943 the
    far larger Allied & Soviet economies turn the tide. Without this the war is
@@ -4159,6 +4330,8 @@ function gwRegionDefense(id){
     const e = GW.eco[o];
     if (e){
       d += e.army / gwOwnFrontCount(o) * 0.45 * gwAirMul(o) * gwDiffCombat(o);   // army + air + difficulty
+      d *= gwModFactor(o,'defense');                 // timed defensive buffs (decisions/events)
+      if (!gwIsKeyCity(id)) d *= gwModFactor(o,'depth');   // "trade space for time" hardens the approaches, not the prize cities
       if (e.posture==='defend') d *= 1.7;            // dug in — holding a line is a real strategy
     }
   } else if (!gwIsPower(o)){
@@ -4196,7 +4369,8 @@ function gwResolveFronts(){
       // can break a fortress; other attacks make do with the dispersed front
       let atk = ((id===e.preferredTarget)
         ? e.army * 0.5 * gwOffenseMod(cc, GW.regions[id])
-        : perPush * gwOffenseMod(cc, GW.regions[id])) * gwAirMul(cc) * gwDiffCombat(cc);   // CAS + difficulty
+        : perPush * gwOffenseMod(cc, GW.regions[id])) * gwAirMul(cc) * gwDiffCombat(cc)
+        * gwModFactor(cc, 'attack', gwFactionOf(GW.regions[id]));   // timed offensive buffs (decisions/events)
       if (!landAdj) atk *= 0.18;                       // amphibious assaults are very hard
       if (atk > def * 1.2){                            // real superiority needed to break a front
         const from = GW.regions[id];
@@ -4352,6 +4526,7 @@ function gwScoreEnd(){
 }
 function gwEndMonth(){
   if (!GW || GW.over) return;
+  gwTickMods();                                  // lapse any expired combat buffs first
   // war-entry trigger: the AI Axis launches Barbarossa ~June 1941 on schedule —
   // but if YOU lead Germany, the timing is yours (declare it from Diplomacy)
   if (GW.turn>=GW_BARBAROSSA && GW.player!=='GE' && !gwFactionsAtWar('axis','comintern'))
@@ -4374,6 +4549,7 @@ function gwEndMonth(){
         gwLog(`The Western Allies establish a beachhead at ${GW_REGIONS[beach].name} — a second front opens in the west!`); }
     }
   }
+  gwAutoResolveDecisions();                      // the AI takes its strategic forks before the fighting
   // every AI power plans; the player too when simulated
   for (const cc in GW_POWERS){ if (GW.capitulated[cc]) continue; if (cc!==GW.player || GW.autoPlayer) gwAIEco(cc); }
   for (const cc in GW_POWERS) if (!GW.capitulated[cc]) gwEcoTick(cc);
@@ -5426,7 +5602,9 @@ function gwUpdateUI(){
   if(!GW.over){
     $('gw-war-body').querySelectorAll('[data-pos]').forEach(b=>b.onclick=()=>{ e.posture=b.dataset.pos; gwUpdateUI(); });
   }
-  $('gw-end').textContent = GW.over?'Return to Menu':'End Month ▶';
+  const pend = !GW.over && gwPendingDecision();
+  $('gw-end').textContent = GW.over?'Return to Menu':(pend?'⚑ Decision ▶':'End Month ▶');
+  $('gw-end').style.boxShadow = pend ? '0 0 8px var(--amber)' : '';
   $('gw-log').innerHTML = GW.log.slice(-16).reverse().map(l=>'<div>'+l+'</div>').join('');
 }
 let gwSelCC='GE';
@@ -5541,9 +5719,29 @@ function gwShowResult(){
 }
 $('gw-result-menu').onclick=()=>{ show('gw-result',false); gwQuit(); };
 $('gw-result-new').onclick=()=>{ show('gw-result',false); gwQuit(); gwOpenSelect(); };
+/* a strategic fork — every option shows its concrete effect in plain numbers */
+function gwShowDecision(d){
+  $('gw-dec-date').textContent = (d.badge?d.badge+' · ':'') + (d.date||'');
+  $('gw-dec-title').textContent = d.title;
+  $('gw-dec-text').innerHTML = d.text;
+  const box = $('gw-dec-options'); box.innerHTML='';
+  d.options.forEach((opt,i)=>{
+    const b = document.createElement('button');
+    b.className='primary';
+    b.style.cssText='text-align:left;padding:11px 14px;line-height:1.35;';
+    b.innerHTML='<b>'+opt.label+'</b>'
+      +'<div style="margin-top:5px;font-weight:700;color:#cfe8a8;font-size:12.5px;">→ '+opt.effect+'</div>'
+      +(opt.flavor?'<div style="margin-top:3px;font-weight:400;color:#ffe9b8;font-size:11.5px;">'+opt.flavor+'</div>':'');
+    b.onclick=()=>{ gwResolveDecision(d.id, i); show('gw-decision',false); gwUpdateUI(); gwSave(); };
+    box.appendChild(b);
+  });
+  show('gw-decision', true);
+}
 $('gw-end').onclick=()=>{
   if(!GW||!GW.active) return;
   if(GW.over){ gwClearSave(); show('gw-result',false); gwQuit(); return; }
+  const d = gwPendingDecision();                 // a fork awaits your personal decision — answer it first
+  if (d){ gwShowDecision(d); return; }
   gwEndMonth(); gwUpdateUI();
   if(GW.over){ gwClearSave(); gwShowResult(); } else gwSave();
 };
@@ -6239,6 +6437,8 @@ if (typeof module !== 'undefined' && module.exports){
     gwSave, gwLoad, gwHasSave, gwClearSave, gwSaveInfo, gwFactionOf, gwSideOf,
     gwDeclareWar, gwCourtNeutral, gwCanCourt, gwFactionsAtWar, GW_NEUTRAL_LEAN,
     gwDiploActions, gwLeadPower, gwAxisHoldsKeyCities,
+    GW_DECISIONS, gwFindDecision, gwPendingDecision, gwResolveDecision, gwAutoResolveDecisions,
+    gwAddMod, gwModFactor, gwTickMods,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     getState: () => G,
   };

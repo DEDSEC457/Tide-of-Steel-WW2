@@ -747,7 +747,13 @@ function uiSmoke(side){
     }
     if ($('gw-bc').onclick) $('gw-bc').onclick();           // queue a civil factory
     if ($('gw-bm').onclick) $('gw-bm').onclick();           // queue a military factory
-    if ($('gw-end').onclick) for (let i=0;i<8;i++) $('gw-end').onclick();   // run 8 months
+    // run months; if a strategic decision blocks the turn, the modal opens —
+    // pick the first option (fake-DOM can't click it, so resolve through the API)
+    if ($('gw-end').onclick) for (let i=0;i<10;i++){
+      $('gw-end').onclick();
+      const pd = UI.gwPendingDecision && UI.gwPendingDecision();
+      if (pd){ UI.gwResolveDecision(pd.id, 0); $('gw-end').onclick(); }
+    }
     drain();
     $('gw-menu-btn').onclick && $('gw-menu-btn').onclick(); // back to menu
   }
@@ -795,6 +801,50 @@ try {
 } catch(err){
   failures++;
   console.log(`  FAIL diplomacy engine — ${err.message}`);
+}
+
+// ---- The World at War: strategic decisions & timed buffs ----
+say('— grand campaign: decisions —');
+try {
+  // every option of every decision states a concrete effect, and every playable
+  // power has at least one fork to make
+  let allHaveEffect = true; const owners = new Set();
+  for (const d of E.GW_DECISIONS){ owners.add(d.who);
+    for (const o of d.options) if (!o.effect || !o.apply) allHaveEffect = false; }
+  check('every decision option spells out a concrete effect', allHaveEffect, 'an option had no effect/apply');
+  check('each playable power gets a decision', ['GE','SU','UK','FR','IT'].every(cc=>owners.has(cc)), 'a power has no decision');
+
+  // a player decision surfaces for the player's power only — not the AI's
+  E.gwNewGame('GE','normal'); let g = E.gwGetState(); g.turn = 10; g.active = true;
+  const d = E.gwPendingDecision();
+  check('the player\'s power is offered its fork', d && d.who==='GE', 'no GE decision at the western-plan window');
+  // resolving applies a real, time-limited combat buff
+  const atkBefore = E.gwModFactor('GE','attack','allies');
+  E.gwResolveDecision(d.id, 0);                       // the Sickle Cut → big attack buff vs the Allies
+  check('a decision applies a temporary combat buff',
+    E.gwModFactor('GE','attack','allies') > atkBefore, 'no attack buff after the Sickle Cut');
+  check('the buff is target-scoped (Allies, not the Soviets)',
+    E.gwModFactor('GE','attack','comintern') === 1, 'the buff leaked onto the wrong enemy');
+  check('a decision fires only once', E.gwPendingDecision()===null || E.gwPendingDecision().id!==d.id, 'same decision re-offered');
+
+  // the buff expires after its run; key cities are immune to the Soviet depth buff
+  E.gwNewGame('SU','normal'); g = E.gwGetState(); g.barbarossa = true;
+  E.gwAddMod('SU','depth',0.3,2,'test depth');
+  check('the depth buff hardens the approaches but not the fortress cities',
+    E.gwModFactor('SU','depth') > 1, 'depth buff missing');
+  E.gwAddMod('GE','attack',0.5,1,'one-month buff');
+  g.turn += 2; E.gwTickMods();
+  check('a timed buff lapses when its months run out',
+    E.gwModFactor('GE','attack','comintern') === 1, 'buff outlived its duration');
+
+  // AI opponents never take these forks — so they can't tip the Axis into a solo win
+  E.gwNewGame('SU','normal'); g = E.gwGetState(); g.turn = 10; g.autoPlayer = false;
+  // Germany is the AI here; its western-plan fork must NOT be pending for the SU player
+  check('AI opponents are not handed the player\'s decisions',
+    !E.gwPendingDecision() || E.gwPendingDecision().who==='SU', 'an AI power\'s fork surfaced to the player');
+} catch(err){
+  failures++;
+  console.log(`  FAIL decisions engine — ${err.message}`);
 }
 
 for (const side of ['G','S']){

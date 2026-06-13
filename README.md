@@ -38,6 +38,12 @@ the entire war across Europe and the Mediterranean, **one month per turn**.
 - **Fight a multi-front war** on a strategic map — set each front's posture and
   pick where to concentrate your offensive; capitals fall, nations capitulate,
   the victor seizes the loser's industry
+- **Make the great decisions** — at history's crossroads your power faces a
+  **strategic fork**: the Sickle Cut through the Ardennes, the opening shock of
+  Barbarossa, the Battle of Britain, the evacuation of the Soviet factories.
+  **Each option spells out exactly what it grants** — a timed combat bonus for a
+  few months, extra factories, manpower — so you always know what you are
+  choosing before you commit
 - **Play the politics** — open the 🤝 Diplomacy panel (a badge counts the moves
   you can make) to **court a leaning neutral** into your faction — Romania,
   Hungary and Finland to the Axis; Yugoslavia, Greece and the Baltics to the
