@@ -184,7 +184,9 @@
   .gw-seg .gw-opt.sel{border-color:var(--amber);color:var(--amber);background:#242a1b;}
   #gw-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
     background:#14180fcc;border:1px solid var(--line);border-radius:8px;padding:6px 16px;
-    font-size:13px;color:var(--dim);}
+    font-size:13px;color:var(--dim);max-width:70%;text-align:center;}
+  #gw-tip{position:fixed;z-index:30;pointer-events:none;background:#11150ef0;border:1px solid var(--line);
+    border-radius:6px;padding:5px 9px;font-size:12px;color:var(--ink);box-shadow:0 4px 14px #000a;}
 </style>
 </head>
 <body>
@@ -318,6 +320,7 @@
     <div class="card" id="gw-log-card"><h3>WAR DIARY</h3><div id="gw-log"></div></div>
   </div>
   <div id="gw-hint" class="hidden"></div>
+  <div id="gw-tip" class="hidden"></div>
 </div>
 
 <!-- ============ THE WORLD AT WAR — how to play ============ -->
@@ -5415,6 +5418,7 @@ let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
 canvas.addEventListener('mousedown', e=>{ dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); });
 window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); });
 window.addEventListener('mousemove', e=>{
+  if (typeof GW!=='undefined' && GW && GW.active){ gwHover(e); return; }
   if (dragging){
     const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
     if (Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
@@ -5424,6 +5428,23 @@ window.addEventListener('mousemove', e=>{
   hover = hexFromPixel(wx,wy);
   updateTerrainCard(); updatePreview();
 });
+function gwHover(e){
+  if(!gwViewCache){ const t=$('gw-tip'); if(t)t.classList.add('hidden'); return; }
+  let best=null,bd=1e9;
+  for(const id in GW_REGIONS){ const [x,y]=gwPos(id); const d=Math.hypot(e.clientX-x,e.clientY-y); if(d<bd){bd=d;best=id;} }
+  const tip=$('gw-tip');
+  if(best && bd<26){
+    const r=GW_REGIONS[best], o=GW.regions[best];
+    const owner=gwIsPower(o)?GW_POWERS[o].name:(o.charAt(0).toUpperCase()+o.slice(1)+' (neutral)');
+    const ft=(GW.forts&&GW.forts[best])||0;
+    const key=(best==='moscow'||best==='leningrad'||best==='stalingrad')?' · 🎯 war-objective':'';
+    const cap=r.cap?' · capital':'';
+    tip.innerHTML='<b>'+r.name+'</b>'+key+cap+'<br><span style="color:var(--dim)">'+owner+' · VP '+(r.vp||0)
+      +(ft?' · 🛡'+ft:'')+' · def '+Math.round(gwRegionDefense(best))+'</span>';
+    tip.style.left=Math.min(innerWidth-180,e.clientX+14)+'px'; tip.style.top=(e.clientY+14)+'px';
+    tip.classList.remove('hidden');
+  } else tip.classList.add('hidden');
+}
 canvas.addEventListener('wheel', e=>{
   e.preventDefault();
   const f = e.deltaY < 0 ? 1.12 : 1/1.12;
