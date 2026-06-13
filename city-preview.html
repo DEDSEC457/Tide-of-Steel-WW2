@@ -1,0 +1,87 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>City skyline preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:"Segoe UI",sans-serif;user-select:none;}
+html,body{background:#0d0f0c;color:#d8d4c0;height:100%;overflow:hidden;}
+#bar{position:fixed;top:0;left:0;right:0;height:64px;z-index:5;padding:9px 16px;
+  background:linear-gradient(#161a12f0,#0e110bf0);border-bottom:1px solid #3a4430;}
+h1{color:#e8b34b;font-size:15px;letter-spacing:3px;}
+p{color:#8d8a76;font-size:12px;margin-top:3px;}
+.btns{margin-top:7px;display:flex;gap:8px;}
+button{background:linear-gradient(#262c1d,#181d12);color:#d8d4c0;border:1px solid #3a4430;
+  border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;}
+button.on{border-color:#e8b34b;color:#e8b34b;box-shadow:0 0 10px #e8b34b33;}
+canvas{position:fixed;inset:0;top:64px;}
+</style></head><body>
+<div id="bar"><h1>⌂ CITY SKYLINES — BEFORE / AFTER</h1>
+<p>Each tier shown large (top row Soviet-held, bottom row Axis-held). Cosmetic only. In-game these scale down onto the map; the VP star and name label are unchanged.</p>
+<div class="btns"><button id="b0">OLD</button><button id="b1" class="on">NEW</button></div></div>
+<canvas id="c"></canvas>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let MODE=1;
+function star(cx,cy,r){ctx.beginPath();for(let i=0;i<10;i++){const a=Math.PI/5*i-Math.PI/2,rr=i%2?r*0.45:r;const x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.fill();}
+
+/* OLD city (current in-game) */
+function oldCity(owner,vp){
+  ctx.fillStyle=owner==='G'?'#3b414b':'#6e2620';ctx.strokeStyle='#000a';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.rect(-9,-2,7,9);ctx.rect(-1,-8,8,15);ctx.rect(8,1,6,6);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#ffd98a66';ctx.fillRect(-7,0,2,2);ctx.fillRect(1,-5,2,2);ctx.fillRect(3,1,2,2);ctx.fillRect(9,2,2,2);
+  if(vp>0){ctx.fillStyle='#ffd34d2e';star(0,-14,9.5);ctx.fillStyle='#ffd34d';star(0,-14,5);}
+}
+/* NEW city — scaled by importance, fortress walls + dome for the great capitals */
+function newCity(owner,vp){
+  const dark=owner==='G'?'#363c46':'#5a221c', body=owner==='G'?'#454c57':'#6e2a24', lite=owner==='G'?'#4a5159':'#7a322a';
+  ctx.strokeStyle='#000a';ctx.lineWidth=1.1;
+  if(vp>=3){
+    // fortress wall with battlements
+    ctx.fillStyle=body;ctx.beginPath();ctx.rect(-14,-2,28,11);ctx.fill();ctx.stroke();
+    ctx.fillStyle=dark;for(let i=-13;i<=10;i+=4)ctx.fillRect(i,-5,2.6,3);
+    // corner towers
+    ctx.fillStyle=lite;
+    for(const tx of [-15,11]){ctx.beginPath();ctx.rect(tx,-10,4.5,17);ctx.fill();ctx.stroke();
+      ctx.fillStyle=dark;ctx.fillRect(tx,-13,4.5,3);ctx.fillStyle=lite;}
+    // central keep
+    ctx.fillStyle=body;ctx.beginPath();ctx.rect(-4,-15,8,14);ctx.fill();ctx.stroke();
+    // dome/spire (Kremlin flavour for the biggest)
+    ctx.fillStyle=vp>=5?'#c9a23e':lite;
+    if(vp>=5){ctx.beginPath();ctx.moveTo(-4,-15);ctx.quadraticCurveTo(0,-26,4,-15);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#ffd34d';ctx.fillRect(-0.6,-29,1.2,4);}
+    else{ctx.beginPath();ctx.moveTo(-4,-15);ctx.lineTo(0,-22);ctx.lineTo(4,-15);ctx.closePath();ctx.fill();ctx.stroke();}
+    // lit windows
+    ctx.fillStyle='#ffd98a88';
+    ctx.fillRect(-2,-11,1.6,2);ctx.fillRect(1,-7,1.6,2);ctx.fillRect(-13,-0,1.6,2);ctx.fillRect(11,0,1.6,2);ctx.fillRect(-9,2,1.6,2);ctx.fillRect(6,2,1.6,2);
+  } else {
+    // a cluster of rooftops; a church spire for a proper town (vp>=1)
+    ctx.fillStyle=body;
+    ctx.beginPath();ctx.rect(-10,-1,7,9);ctx.rect(-2,-7,8,15);ctx.rect(7,2,6,6);ctx.fill();ctx.stroke();
+    if(vp>=1){ctx.fillStyle=lite;ctx.beginPath();ctx.moveTo(-2,-7);ctx.lineTo(2,-15);ctx.lineTo(6,-7);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#ffd34d';ctx.fillRect(1.4,-18,1.2,3);}
+    ctx.fillStyle='#ffd98a88';ctx.fillRect(-8,1,1.6,2);ctx.fillRect(0,-3,1.6,2);ctx.fillRect(3,2,1.6,2);ctx.fillRect(9,4,1.6,2);
+  }
+  if(vp>0){const sy=vp>=3?-30:-21;ctx.fillStyle='#ffd34d2e';star(0,sy,10);ctx.fillStyle='#ffd34d';star(0,sy,5);}
+}
+const TIERS=[['minor town','vp 0',0],['town','vp 1',1],['city','vp 2',2],['fortress','vp 3',3],['capital','Moscow (vp 5)',5]];
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cols=TIERS.length, cw=cv.width/cols, scale=2.4;
+  for(let r=0;r<2;r++){const owner=r===0?'S':'G';const cy=110+r*((cv.height-130)/2)+60;
+    for(let i=0;i<cols;i++){const cx=cw*(i+0.5);
+      // hex tile bg
+      ctx.save();ctx.translate(cx,cy);
+      ctx.beginPath();const R=48;for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-90);k?ctx.lineTo(R*Math.cos(a),R*Math.sin(a)):ctx.moveTo(R*Math.cos(a),R*Math.sin(a));}ctx.closePath();
+      ctx.fillStyle='#4a5234';ctx.fill();ctx.strokeStyle='#0d0f0c';ctx.lineWidth=1;ctx.stroke();
+      ctx.save();ctx.scale(scale,scale);
+      (MODE===0?oldCity:newCity)(owner,TIERS[i][2]);
+      ctx.restore();
+      ctx.fillStyle='#cfccba';ctx.font='12px Segoe UI';ctx.textAlign='center';
+      ctx.fillText(TIERS[i][1],0,72);ctx.fillStyle='#8d8a76';ctx.font='11px Segoe UI';ctx.fillText(TIERS[i][0],0,87);
+      ctx.restore();
+    }
+    ctx.fillStyle='#8d8a76';ctx.font='11px Segoe UI';ctx.textAlign='left';ctx.fillText(owner==='S'?'◼ Soviet-held':'◼ Axis-held',14,cy-66);
+  }
+}
+b0.onclick=()=>{MODE=0;b0.classList.add('on');b1.classList.remove('on');draw();};
+b1.onclick=()=>{MODE=1;b1.classList.add('on');b0.classList.remove('on');draw();};
+function fit(){cv.width=innerWidth;cv.height=innerHeight-64;draw();}
+addEventListener('resize',fit);fit();
+</script></body></html>
