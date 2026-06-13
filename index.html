@@ -3298,6 +3298,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   for (const [nx,ny] of neighbors(x,y)){ const t = unitAt(nx,ny); if (t && t.side==='S') adjEnemy++; }
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
+  s += gangSetup(u, x, y);                                      // converge force on a shared target
   s -= threatPenalty(u, x, y, offensive);                      // don't step where the enemy can punish you
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
   // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
@@ -3337,6 +3338,25 @@ function cutoffValue(u, x, y){
   return cut;
 }
 
+/* proactive gang-up: moving next to an enemy a comrade is already beside sets up
+   a combined assault — this is how the AI gathers force on a point like a human
+   does, instead of only ganging up when units happen to already be in range. */
+function gangSetup(u, x, y){
+  const sk = aiSkill(u.side);
+  if (sk === 0) return 0;
+  const foe = enemyOf(u.side);
+  let bonus = 0;
+  for (const [nx,ny] of neighbors(x,y)){
+    const t = unitAt(nx,ny);
+    if (!t || t.side!==foe || KINDS[t.kind].hq) continue;
+    for (const [mx,my] of neighbors(t.x,t.y)){          // a friend already on this target?
+      const f = unitAt(mx,my);
+      if (f && f.side===u.side && f.id!==u.id){ bonus += 1.2*sk; break; }
+    }
+  }
+  return bonus;
+}
+
 /* ---- combined assault planner (shared by both sides) ----
    When 2+ friendly units are already in range of the same enemy, coordinate a
    pile-on. Returns the best {type:'combined', ...} action or null. */
@@ -3356,10 +3376,13 @@ function aiBestCombinedAssault(side){
     const pSingle = previewCombat(lead, def);
     const minR = skillMinR(side, wx==='snow' ? 1.1 : wx==='mud' ? 1.0 : 0.85);
     if (pGroup.ratio < minR) continue;
-    // Only bother if combined is noticeably better than going alone
-    if (pGroup.ratio < pSingle.ratio * 1.06 && helpers.length < 2) continue;
-    const wouldKill = pGroup.defLoss >= def.str;
-    const score = pGroup.ratio*2 + (wouldKill?5:0) + (pGroup.combinedArms?2:0) + helpers.length;
+    const wouldKill   = pGroup.defLoss >= def.str;
+    const singleKills = pSingle.defLoss >= def.str;
+    // pile on whenever it's clearly better than going alone — and ALWAYS when the
+    // group secures a kill a single unit can't (the human's concentrate-to-destroy)
+    if (!(wouldKill && !singleKills) && pGroup.ratio < pSingle.ratio * 1.06 && helpers.length < 2) continue;
+    const score = pGroup.ratio*2 + (wouldKill?5:0) + (wouldKill&&!singleKills?4:0)
+                + (pGroup.combinedArms?2:0) + helpers.length;
     if (score > bestScore){ bestScore=score; bestAction={type:'combined', lead:lead.id, helpers:helpers.map(h=>h.id), d:def.id}; }
   }
   return bestAction;
@@ -3453,6 +3476,7 @@ function sovScoreHex(u, x, y, df, myNet){
   if (adjE >= 3) s -= 10;                                       // don't walk into a pocket
   else if (adjE === 2) s -= 3;
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
+  s += gangSetup(u, x, y);                                      // converge force on a shared target
   s -= threatPenalty(u, x, y, SCN.sovAI==='attack');          // don't step where the enemy can punish you
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
   const wx = weatherFor(G.turn);
