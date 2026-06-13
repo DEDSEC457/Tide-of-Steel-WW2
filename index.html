@@ -487,6 +487,7 @@
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
       <span class="opt" data-s="dday">🟦 D-Day 1944</span>
+      <span class="opt" data-s="bulge">🎄 The Bulge 1944</span>
     </div>
     <div class="pick-row">
       <div class="pick p-ger sel" id="pick-ger">
@@ -1737,6 +1738,200 @@ SCENARIOS.dday = {
       : 'The invasion has come — and not at Calais. Contain the beachhead while the panzers arrive, and drive it into the sea.',
   ]; },
 };
+
+/* ---------- Scenario 6: The Battle of the Bulge, December 1944 ----------
+   Hitler's last gamble in the West. Germany (side G) attacks WEST out of the
+   Eifel through the snowbound Ardennes — Sepp Dietrich's 6th Panzer Army in the
+   north, Manteuffel's 5th in the centre toward Bastogne and the Meuse, 7th Army
+   guarding the southern flank. The objective: cross the Meuse and take Antwerp,
+   splitting the Allied armies in two. The thin US VIII Corps is caught by
+   surprise; the 101st digs in at Bastogne; and when the skies clear, Patton
+   wheels north and Allied air falls on the columns. `reversed:true` bases the
+   attacker in the east. A short, sharp seven-turn race against the thaw. */
+SCENARIOS.bulge = (function buildBulge(){
+  const C = 32, R = 20;
+  const box = (x,y,a,b,c,d)=> x>=a && x<=c && y>=b && y<=d;
+  const map = [];
+  for (let y=0; y<R; y++){
+    let row = '';
+    for (let x=0; x<C; x++){
+      let t = '.';
+      if (x===8 && y>=2 && y<=16) t='r';                              // the Meuse (objective line)
+      else if (x===25 && y>=4 && y<=16) t='r';                        // the Our / Sauer (German border)
+      if (t==='.' && box(x,y,11,5,23,15) && (x*3+y*5)%5!==0) t='f';   // the Ardennes forest
+      if (t==='.' && box(x,y,14,7,22,13) && (x*y)%5===0) t='h';       // the high Ardennes
+      if (t==='.' && box(x,y,24,4,28,16) && (x+y)%3===0) t='h';       // the Eifel (German side)
+      if (t==='.' && box(x,y,20,14,26,18) && (x*y)%4===0) t='h';      // the southern hills
+      row += t;
+    }
+    map.push(row);
+  }
+  return {
+  id: 'bulge', reversed: true,
+  title: 'THE BATTLE OF THE BULGE', short: 'THE BULGE',
+  sub: 'THE ARDENNES · 16 DECEMBER 1944 — JANUARY 1945',
+  sides: {
+    G: {name:'German', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+    S: {name:'US',     flag:'🟦', color:'#2e4d6b', tint:'rgba(70,110,170,0.22)'},
+  },
+  supplyRange: 8,
+  menu: {
+    ger: {h:'⬛ Germany (Wacht am Rhein)', p:'The last reserves of the Reich, massed in secret. Punch through the surprised Ardennes front, race the panzers to the Meuse, take Bastogne and drive for Antwerp — before the skies clear and Patton turns north.'},
+    sov: {h:'🟦 United States', p:'Your front is paper-thin and the storm has fallen on it. Hold the shoulders, dig in at Bastogne and St. Vith, trade ground for time — and when the weather breaks, throw the bulge back into the snow.'},
+  },
+  kinds: {
+    g_inf:  {side:'G', label:'Volksgrenadier',  atk:5, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    g_pz:   {side:'G', label:'Panzer-Division', atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+    g_ss:   {side:'G', label:'SS-Panzer',       atk:9, def:6, mp:6, maxStr:10, cost:22, sym:'arm', color:'#23262b'},
+    g_para: {side:'G', label:'Fallschirmjäger', atk:6, def:6, mp:3, maxStr:8,  cost:12, sym:'para'},
+    s_inf:  {side:'S', label:'US Infantry Div', atk:5, def:6, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    s_tank: {side:'S', label:'US Armored Div',  atk:7, def:5, mp:5, maxStr:10, cost:15, sym:'arm'},
+    s_guard:{side:'S', label:'Airborne Div',    atk:6, def:7, mp:3, maxStr:9,  cost:14, sym:'para', color:'#3f5d40'},
+    s_mil:  {side:'S', label:'Green Regiment',  atk:3, def:4, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#5a5244'},
+    g_hq:   {side:'G', label:'Panzer Army HQ',  atk:1, def:4, mp:4, maxStr:6,  cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+    s_hq:   {side:'S', label:'Army Group HQ',   atk:1, def:4, mp:4, maxStr:6,  cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#3f5d40'},
+  },
+  deployNames: {g_inf:'Volksgrenadier Reserve', g_pz:'Panzer Reserve', g_ss:'SS Reserve',
+    s_inf:'Reinforcement Div', s_tank:'Armored Reserve', s_guard:'Airborne Reserve'},
+  cols: C, rows: R, map,
+  cities: [
+    {x:3,  y:2,  name:'Antwerp',    vp:5, owner:'S'},
+    {x:4,  y:7,  name:'Brussels',   vp:3, owner:'S'},
+    {x:12, y:3,  name:'Liège',      vp:2, owner:'S'},
+    {x:9,  y:6,  name:'Namur',      vp:2, owner:'S'},
+    {x:9,  y:11, name:'Dinant',     vp:2, owner:'S'},
+    {x:13, y:9,  name:'Marche',     vp:1, owner:'S'},
+    {x:16, y:12, name:'Bastogne',   vp:2, owner:'S'},
+    {x:21, y:7,  name:'St. Vith',   vp:1, owner:'S'},
+    {x:18, y:9,  name:'Houffalize', vp:0, owner:'S'},
+    {x:19, y:5,  name:'Malmedy',    vp:0, owner:'S'},
+    {x:24, y:16, name:'Luxembourg', vp:1, owner:'S'},
+    {x:30, y:5,  name:'Köln',       vp:0, owner:'G'},
+    {x:28, y:15, name:'Trier',      vp:0, owner:'G'},
+    {x:27, y:9,  name:'Prüm',       vp:0, owner:'G'},
+  ],
+  gerSpawns: [[31,3],[31,8],[31,12],[31,16],[30,6]],
+  sovSpawns: [[0,4],[0,8],[0,12],[1,6],[2,15]],
+  /* 16 December 1944, 05:30 — three German armies burst from the Eifel into a
+     fog-bound Ardennes held by four tired American divisions. */
+  startUnits: [
+    // 6. Panzerarmee (Dietrich) — the northern Schwerpunkt
+    ['g_hq', '6.Panzerarmee',     30, 3],
+    ['g_ss', '1.SS Leibstandarte',23, 4],
+    ['g_ss', '12.SS Hitlerjugend',24, 5],
+    ['g_para','3.Fallschirmjäger',24, 3],
+    ['g_inf','277.Volksgrenadier',25, 4],
+    // 5. Panzerarmee (Manteuffel) — the centre, toward Bastogne and the Meuse
+    ['g_hq', '5.Panzerarmee',     30, 10],
+    ['g_pz', '2.Panzer',          23, 10],
+    ['g_pz', '116.Panzer',        24, 8],
+    ['g_pz', 'Panzer Lehr',       23, 12],
+    ['g_inf','26.Volksgrenadier', 25, 11],
+    ['g_inf','18.Volksgrenadier', 25, 8],
+    // 7. Armee — the southern flank guard
+    ['g_hq', '7.Armee',           29, 16],
+    ['g_inf','5.Fallschirmjäger', 24, 15],
+    ['g_inf','352.Volksgrenadier',26, 16],
+    // ---- United States (S) ----
+    // VIII Corps — the thin, surprised front
+    ['s_inf','106th Division',    22, 7, 5],
+    ['s_inf','28th Division',     21, 12, 5],
+    ['s_mil','14th Cavalry',      22, 6, 4],
+    ['s_inf','4th Division',      23, 16, 6],
+    // V Corps — the firm northern shoulder
+    ['s_inf','99th Division',     22, 4, 6],
+    ['s_inf','2nd Division',      21, 3, 7],
+    ['s_tank','7th Armored',      20, 7, 7],
+    // the reserves rushing in
+    ['s_guard','101st Airborne',  16, 12, 8],
+    ['s_guard','82nd Airborne',   15, 5, 8],
+    ['s_tank','3rd Armored',      13, 4, 7],
+    ['s_inf','30th Division',     14, 3, 6],
+    ['s_inf','1st Division',      13, 6, 6],
+    // the Meuse blocking line and the rear
+    ['s_guard','XXX Corps (Br)',   8, 4, 8],
+    ['s_mil','Brussels Garrison',  5, 7, 5],
+    ['s_hq','12th Army Group',     6, 9],
+    ['s_hq','First Army',         11, 5],
+  ],
+  generals: [
+    {side:'G', unit:'1.SS Leibstandarte', name:'Peiper', atk:1.18,
+     bio:'Kampfgruppe Peiper — the armoured spearhead of the SS, racing for the Meuse, and the dark name of Malmedy.'},
+    {side:'G', unit:'2.Panzer', name:'von Manteuffel', atk:1.14,
+     bio:'His 5th Panzer Army drives the deepest thrust of the offensive — to within sight of the Meuse at Dinant.'},
+    {side:'G', unit:'12.SS Hitlerjugend', name:'Dietrich', atk:1.08,
+     bio:'"Sepp" Dietrich and the 6th Panzer Army carry the main effort on the northern shoulder.'},
+    {side:'S', unit:'101st Airborne', name:'McAuliffe', def:1.22,
+     bio:'"NUTS!" — his one-word answer to the German surrender demand at Bastogne becomes a legend.'},
+    {side:'S', unit:'4th Armored (Patton)', name:'Patton', atk:1.20,
+     bio:'Wheels the Third Army ninety degrees in the snow and drives north to relieve Bastogne — the finest hour of his career.'},
+    {side:'S', unit:'7th Armored', name:'Clarke', def:1.12,
+     bio:'Holds the vital road junction at St. Vith for six days against everything Manteuffel can throw at it.'},
+  ],
+  sovSchedule: [
+    [2,'s_tank','4th Armored (Patton)'], [2,'g_inf','Volksgrenadier Reserve'],
+    [3,'s_inf','80th Division'],         [3,'s_tank','2nd Armored'],
+    [4,'s_guard','XVIII Airborne'],      [4,'s_inf','35th Division'],
+    [5,'s_tank','11th Armored'],         [6,'s_inf','83rd Division'],
+  ],
+  events: [
+    {turn:1, date:'16 December 1944', title:'WACHT AM RHEIN',
+     text:'In freezing fog before dawn, a thousand guns open along the Ardennes and three German armies pour out of the Eifel — exactly where the Americans thought the front quiet enough to rest tired divisions. Total surprise. The Battle of the Bulge has begun.'},
+    {turn:2, date:'18 December 1944', title:'KAMPFGRUPPE PEIPER',
+     text:'Peiper\'s SS spearhead races west, overrunning depots and crossroads — and at Malmedy machine-guns its prisoners in the snow. But the fuel dumps it was counting on are blown or driven off, and the column burns gasoline it cannot replace.'},
+    {turn:3, date:'21 December 1944', title:'"NUTS!"',
+     text:'The crossroads town of Bastogne is surrounded, the 101st Airborne ringed inside it. The German envoy delivers a demand to surrender; General McAuliffe\'s written reply is a single word: "NUTS!" The garrison holds.'},
+    {turn:4, date:'23 December 1944', title:'THE SKIES CLEAR', pp:{S:3},
+     text:'A high-pressure front sweeps the fog away. For the first time the Allied air forces rise in their thousands — and fall on the German columns jammed nose-to-tail on the icy Ardennes roads. To the south, Patton\'s tanks are already driving north.'},
+    {turn:5, date:'25 December 1944', title:'THE HIGH-WATER MARK',
+     text:'On Christmas Day the 2nd Panzer reaches Celles, four miles short of the Meuse — and there it stops, out of fuel, and is torn apart by the US 2nd Armored. The tide of the offensive has crested. It will never come this far again.'},
+    {turn:6, date:'26 December 1944', title:'BASTOGNE RELIEVED', pp:{S:2},
+     text:'Patton\'s 4th Armored punches a corridor into Bastogne. The siege is broken; the most dangerous point of the German line is now an American sally-port. From here the bulge can only shrink.'},
+    {turn:7, date:'3 January 1945', title:'REDUCING THE BULGE',
+     text:'The Allied counteroffensive grinds in from north and south to pinch off the salient. The last reserves of the West are spent — and behind them, the road to the Rhine lies open.'},
+  ],
+  maxTurn: 7,
+  startDate: Date.UTC(1944,11,16),
+  weather(turn){ return turn<=3 ? 'freeze' : 'clear'; },   // fog grounds Allied air, then it clears
+  pp(side, turn){ return side==='G' ? (turn<=2 ? 10 : turn<=4 ? 6 : 3) : (turn<=3 ? 5 : 8); },
+  // German objective points held at the end (19 total). History ≈ 3.
+  victoryTiers: [
+    [14,'DECISIVE GERMAN VICTORY','The Meuse is crossed and Antwerp falls — the western alliance is cut in two, exactly as Hitler gambled. A victory history never allowed.'],
+    [9, 'GERMAN VICTORY','The panzers reach the Meuse and hold Bastogne — a far deeper and more dangerous bulge than the real Ardennes ever became.'],
+    [5, 'A DEEPER SALIENT','Ground is taken and the front bent back hard, but the great objectives hold — a costly bulge, like the real one, that buys nothing but a little time.'],
+    [0, 'WACHT AM RHEIN FAILS','The offensive is stopped short in the snow, the last reserves of the West spent for nothing — and the road to the Rhine lies open.'],
+  ],
+  sudden: {
+    axisCities: ['Antwerp','Brussels'], minAxisUnits: 3,
+    axisTitle: 'THE ALLIES SPLIT',
+    axisText:  'Antwerp and Brussels are taken — the British and American army groups are severed and the great port is lost. The gamble has paid off.',
+    sovTitle:  'THE BULGE BROKEN',
+    sovText:   'The German spearheads are destroyed in the snow far short of the Meuse. The Wehrmacht has shot its last bolt in the West.',
+  },
+  airInit: [
+    ['S','US Ninth Air Force', 9],
+    ['S','RAF 2nd TAF',        8],
+    ['G','Luftwaffe (West)',   4],
+  ],
+  sovAirSchedule: [ [4,'IX Tactical Air Command', 8], [5,'Allied Heavy Bombers', 7] ],
+  setup(st){
+    // the defenders that held: Bastogne, St. Vith and the northern shoulder dig in
+    for (const name of ['101st Airborne','7th Armored','2nd Division','99th Division']){
+      const u = st.units.find(t=>t.name===name); if (u) u.entrench = 2;
+    }
+    // the surprised front line is caught in the open
+    for (const name of ['106th Division','28th Division','14th Cavalry']){
+      const u = st.units.find(t=>t.name===name); if (u) u.entrench = 0;
+    }
+  },
+  opening(playerSide){ return [
+    '16 December 1944 — Wacht am Rhein. Out of the fog of the Ardennes, the last panzer reserves of the Reich fall on a sleeping front.',
+    playerSide==='G'
+      ? 'You have surprise, armour and a week before the skies clear. Reach the Meuse and take Bastogne — then drive for Antwerp.'
+      : 'You are surprised and outnumbered at the point of attack. Hold the shoulders, hold Bastogne, and wait for the weather to turn.',
+  ]; },
+  };
+})();
 
 /* ---------- Scenario 5: The Battle of Midway, June 1942 ----------
    The Pacific. One turn = ONE DAY. Almost the whole map is navigable
