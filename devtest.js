@@ -493,6 +493,27 @@ say('— decisions —');
     JSON.stringify(G2.decisions));
 }
 
+// ---- bypassed empty pockets get absorbed into the surrounding side ----
+say('— territory: bypassed pockets —');
+{
+  E.newGame('G','normal','hotseat','barbarossa');
+  const G3 = E.getState(), W = E.COLS, H = E.ROWS;
+  const keep = E.unitsOf('S')[0];                       // a real Soviet army anchors its ground
+  const nearSov = (x,y)=> E.unitsOf('S').some(u=>Math.abs(u.x-x)<=2 && Math.abs(u.y-y)<=2);
+  let pocket = null;                                    // a German-rear hex with no Soviet nearby
+  for (let y=2;y<H-2 && !pocket;y++) for (let x=2;x<W-2;x++){
+    if (E.terrOwner(x,y)==='G' && !nearSov(x,y) && !E.unitAt(x,y) && !E.cityAt(x,y)){ pocket=[x,y]; break; }
+  }
+  check('found a German-rear test hex', !!pocket, 'none found');
+  G3.terr[pocket[1]*W+pocket[0]] = 2;                   // paint a stranded island of enemy colour
+  const keepBefore = E.terrOwner(keep.x, keep.y);
+  E.absorbPockets();
+  check('a cut-off empty enemy pocket flips to the surrounding side',
+    E.terrOwner(pocket[0],pocket[1])==='G', 'pocket survived at '+pocket);
+  check('ground held by an enemy unit is NOT absorbed',
+    keepBefore==='S' && E.terrOwner(keep.x,keep.y)==='S', 'an anchored hex was eaten ('+keepBefore+')');
+}
+
 /* historical events & the winter question */
 say('— events & winter gear —');
 {

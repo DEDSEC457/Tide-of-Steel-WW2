@@ -2624,6 +2624,35 @@ function claimTerritory(){
     }
   }
   for (const c of G.cities) G.terr[c.y*COLS+c.x] = c.owner==='G' ? 1 : 2;
+  absorbPockets();
+}
+/* A bypassed enemy pocket with no troops in it — ground the front has simply
+   flowed around — flips to the side that surrounds it, so the map shows the real
+   front line instead of stranded islands of colour you'd have to march back
+   through to recolour. An enemy hex survives only if it can trace a path, through
+   enemy-held ground, back to an enemy unit or an enemy-held city. An encircled
+   enemy UNIT is its own anchor, so a real pocket keeps its ground (and the colour
+   warning) until the defender is destroyed — only empty, cut-off land is absorbed. */
+function absorbPockets(){
+  if (!G.terr) return;
+  for (const [foeVal, mineVal, foeSide] of [[2,1,'S'],[1,2,'G']]){
+    const connected = new Set(), stack = [];
+    const anchor = (x,y)=>{ const k=y*COLS+x; if (G.terr[k]===foeVal && !connected.has(k)){ connected.add(k); stack.push(x,y); } };
+    for (const u of unitsOf(foeSide)) anchor(u.x,u.y);          // every enemy unit anchors its ground
+    for (const c of G.cities) if (c.owner===foeSide) anchor(c.x,c.y);   // and every enemy-held city
+    while (stack.length){
+      const y = stack.pop(), x = stack.pop();
+      for (const [nx,ny] of neighbors(x,y)){
+        if (!passable(nx,ny)) continue;
+        const k = ny*COLS+nx;
+        if (G.terr[k]===foeVal && !connected.has(k)){ connected.add(k); stack.push(nx,ny); }
+      }
+    }
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      const k = y*COLS+x;
+      if (G.terr[k]===foeVal && !connected.has(k)) G.terr[k] = mineVal;   // cut-off & empty → absorbed
+    }
+  }
 }
 
 /* ============================ MOVEMENT ============================ */
@@ -6451,7 +6480,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
     GENERALS, generalOf, zhukovDefends,
-    EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner,
+    EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
