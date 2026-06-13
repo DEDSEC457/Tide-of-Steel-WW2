@@ -5,6 +5,7 @@ import { buildTerrain } from './terrain';
 import { cities, nations, nat, COLS, ROWS, hexCenter, hexW, SIZE } from './mapdata';
 import { buildUnitLayer } from './unitrender';
 import { drawOverlay } from './hexoverlay';
+import { weatherAt, monthOfTurn, seasonName, SNOW, RAIN } from './weather';
 import {
   initGame, getG, endTurn,
   unitAt, unitSide, keyOf, passable,
@@ -25,9 +26,18 @@ async function boot() {
   document.getElementById('app')!.appendChild(app.canvas);
 
   // ── Vector terrain (crisp at any zoom) ───────────────────────────────────────
-  const { layer: terrainLayer, mapW, mapH } = buildTerrain();
+  // Layer order (back→front): ground · control tint · weather tint · decorations
+  const { ground, decor, mapW, mapH } = buildTerrain();
   const world = new Container(); app.stage.addChild(world);
-  world.addChild(terrainLayer);
+  world.addChild(ground);
+
+  // helper: trace a hex outline into a Graphics (shared by tint layers)
+  function hexInto(g: Graphics, c: number, r: number) {
+    const [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
+    g.moveTo(cx, cy - SIZE);
+    for (let k = 1; k < 6; k++) { const a = (-90+60*k)*Math.PI/180; g.lineTo(cx+SIZE*Math.cos(a), cy+SIZE*Math.sin(a)); }
+    g.closePath();
+  }
 
   // ── Territory-control tint (War-in-the-East front line) ──────────────────────
   const tintLayer = new Graphics(); world.addChild(tintLayer);
@@ -37,14 +47,33 @@ async function boot() {
     tintLayer.clear();
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const v = own[r*COLS+c]; if (v === 0) continue;
-      const [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
-      tintLayer.moveTo(cx, cy - SIZE);
-      for (let k = 1; k < 6; k++) { const a = (-90+60*k)*Math.PI/180; tintLayer.lineTo(cx+SIZE*Math.cos(a), cy+SIZE*Math.sin(a)); }
-      tintLayer.closePath();
-      tintLayer.fill({ color: v === 1 ? AXIS_TINT : ALLIED_TINT, alpha: 0.22 });
+      hexInto(tintLayer, c, r);
+      tintLayer.fill({ color: v === 1 ? AXIS_TINT : ALLIED_TINT, alpha: 0.16 });
     }
   }
   refreshTint();
+
+  // ── Weather ground tint (snow blanket / wet sheen by season & latitude) ──────
+  const weatherLayer = new Graphics(); world.addChild(weatherLayer);
+  function refreshWeather() {
+    const month = monthOfTurn(getG().turn);
+    weatherLayer.clear();
+    // snow first (white), then rain (cool wash) — batch each into one fill
+    for (let pass = 0; pass < 2; pass++) {
+      const want = pass === 0 ? SNOW : RAIN;
+      let any = false;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (nat[r*COLS+c] < 0) continue;
+        if (weatherAt(r, month) !== want) continue;
+        hexInto(weatherLayer, c, r); any = true;
+      }
+      if (any) weatherLayer.fill(want === SNOW ? { color: 0xffffff, alpha: 0.58 } : { color: 0x4a5a68, alpha: 0.20 });
+    }
+  }
+  refreshWeather();
+
+  // decorations sit on top of the weather wash → trees/peaks stay visible on snow
+  world.addChild(decor);
 
   // ── Nation labels ─────────────────────────────────────────────────────────────
   const cent: Record<string, { sx: number; sy: number; n: number }> = {};
@@ -254,11 +283,45 @@ async function boot() {
     world.x = sw <= vw ? (vw-sw)/2 : Math.max(vw-sw, Math.min(0, world.x));
     world.y = sh <= vh ? (vh-sh)/2 : Math.max(vh-sh, Math.min(0, world.y));
     cityLayer.alpha = scale < minScale * 1.6 ? 0.0 : 1.0;
+    // terrain detail (trees/peaks/reeds) only when zoomed in enough to read it
+    decor.visible = scale > minScale * 1.5;
   }
   world.scale.set(scale);
   world.x = (window.innerWidth - mapW * scale) / 2;
   world.y = (window.innerHeight - mapH * scale) / 2;
   clamp();
+
+  // ── Falling weather particles (screen space, like Realistic mode) ────────────
+  const fx = new Graphics(); fx.eventMode = 'none'; app.stage.addChild(fx);
+  function viewCenterWeather(): number {
+    const wcx = (window.innerWidth/2 - world.x) / scale;
+    const wcy = (window.innerHeight/2 - world.y) / scale;
+    const [, r] = pixelToHex(wcx, wcy);
+    if (r < 0 || r >= ROWS) return 0;
+    return weatherAt(r, monthOfTurn(getG().turn));
+  }
+  app.ticker.add(() => {
+    fx.clear();
+    if (scale < minScale * 1.8) return;          // only show when zoomed in
+    const w = viewCenterWeather();
+    if (w === 0) return;
+    const now = performance.now(), VW = window.innerWidth, VH = window.innerHeight;
+    if (w === RAIN) {
+      for (let i = 0; i < 70; i++) {
+        const px = ((i*131 + now*0.18*(1+(i%5)*0.12)) % (VW+60)) - 30;
+        const py = ((i*97 + now*(0.30+(i%7)*0.05)) % (VH+40)) - 20;
+        fx.moveTo(px, py).lineTo(px-3, py+11);
+      }
+      fx.stroke({ color: 0x9ab0c8, width: 1, alpha: 0.30 });
+    } else {
+      for (let i = 0; i < 90; i++) {
+        const px = ((i*149 + Math.sin(now*0.0007+i)*16 + now*0.02*((i%3)+1)) % (VW+40)) - 20;
+        const py = ((i*83 + now*(0.05+(i%6)*0.013)) % (VH+30)) - 15;
+        fx.circle(px, py, 1 + (i%3)*0.7);
+      }
+      fx.fill({ color: 0xffffff, alpha: 0.55 });
+    }
+  });
 
   // ── HTML UI (turn bar, info panel, end-turn button) ──────────────────────────
   const ui = document.createElement('div');
@@ -296,7 +359,8 @@ async function boot() {
     const side = G.phase;
     const label = document.getElementById('turn-label')!;
     const sideLabel = side === 'G' ? '⚔ AXIS TURN' : '🛡 ALLIED TURN';
-    label.textContent = `${sideLabel} — ${turnDate(G.turn)} — Turn ${G.turn}`;
+    const season = seasonName(monthOfTurn(G.turn));
+    label.textContent = `${sideLabel} — ${turnDate(G.turn)} — ${season} — Turn ${G.turn}`;
     label.style.color = side === 'G' ? '#d0c080' : '#80c0d0';
   }
 
@@ -318,6 +382,7 @@ async function boot() {
     endTurn(getG().phase);
     rebuildUnits();
     refreshTint();
+    refreshWeather();
     updateTurnUI();
   });
 

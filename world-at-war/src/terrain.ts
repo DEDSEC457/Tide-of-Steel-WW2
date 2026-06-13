@@ -1,8 +1,8 @@
 // Build the 1938 Europe hex map as VECTOR geometry (PixiJS Graphics) so it stays
-// razor-sharp at any zoom — every hex is a real filled polygon, not a baked image.
-// Same War-in-the-East colour treatment as before (per-biome colour + gentle
-// coherent-noise variation + seam softening + depth-graded sea + nation tint),
-// just painted as polygons instead of onto a canvas.
+// razor-sharp at any zoom. Ground = hex fills + grid + borders + rivers. Decor =
+// per-hex War-in-the-East detail (forest trees, mountain peaks, hill contours,
+// marsh reeds) — the same decorations Realistic mode draws, ported 1:1 and scaled
+// to the European hex size, so zooming in reveals real terrain instead of a blur.
 import { Container, Graphics } from 'pixi.js';
 import { COLS, ROWS, SIZE, nat, terr, nations, rivers, hexCenter,
          mapW as MAPW, mapH as MAPH, NB_EVEN, NB_ODD, hexToRgb } from './mapdata';
@@ -10,7 +10,6 @@ import { COLS, ROWS, SIZE, nat, terr, nations, rivers, hexCenter,
 type RGB = [number, number, number];
 const lerp = (a: RGB, b: RGB, t: number): RGB => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
 
-// terrain palette (id → colour), muted/realistic like War in the East
 const TERR: Record<number, RGB> = {
   1: [168, 180, 102],  // plains
   2: [82, 124, 66],    // forest
@@ -27,13 +26,11 @@ const TERR: Record<number, RGB> = {
 const SEA_SHALLOW: RGB = [96, 142, 178], SEA_DEEP: RGB = [40, 74, 116];
 const nationRgb = nations.map(n => hexToRgb(n.color));
 
-// smooth (coherent) value noise so the texture varies gently, not hex-by-hex
 function vhash(i: number, j: number) { let h = (i*374761393 + j*668265263)|0; h = Math.imul(h ^ (h>>>13), 1274126177); return ((h ^ (h>>>16))>>>0)/2147483648 - 1; }
 function noise(x: number, y: number) { const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi, u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
   const a=vhash(xi,yi), b=vhash(xi+1,yi), c=vhash(xi,yi+1), d=vhash(xi+1,yi+1);
   return (a+(b-a)*u)*(1-v) + (c+(d-c)*u)*v; }
 
-// distance (in hexes) from each sea hex to nearest land — for sea depth shading
 function seaDepth(): Int16Array {
   const d = new Int16Array(COLS*ROWS).fill(9999);
   const qx: number[] = [], qy: number[] = [];
@@ -52,7 +49,7 @@ const toHex = (c: RGB) => (clamp255(c[0])<<16) | (clamp255(c[1])<<8) | clamp255(
 
 export const PAD = 2;
 
-export interface BuiltMap { layer: Container; mapW: number; mapH: number; }
+export interface BuiltMap { ground: Container; decor: Container; mapW: number; mapH: number; }
 
 export function buildTerrain(): BuiltMap {
   const W = Math.ceil(MAPW) + PAD*2, H = Math.ceil(MAPH) + PAD*2;
@@ -67,7 +64,7 @@ export function buildTerrain(): BuiltMap {
     const hf = noise(c*0.62, r*0.62) * (t===4 ? 10 : 4);
     base[i] = [tc[0]+lf+hf, tc[1]+lf+hf, tc[2]+(lf+hf)*0.85];
   }
-  // 2) soften ONLY the seams between different terrain types — interiors stay crisp
+  // 2) soften ONLY the seams between different terrain types
   {
     const src = base.map(c => c ? [c[0], c[1], c[2]] as RGB : null);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
@@ -83,13 +80,12 @@ export function buildTerrain(): BuiltMap {
     ? lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8))
     : lerp(base[i]!, nationRgb[nat[i]], 0.16);
 
-  // pre-compute the 6 corner offsets of a hex (pointy-top)
   const corner: [number, number][] = [];
   for (let k = 0; k < 6; k++) { const a = (-90 + 60*k) * Math.PI/180; corner.push([SIZE*Math.cos(a), SIZE*Math.sin(a)]); }
 
-  const layer = new Container();
+  const ground = new Container();
 
-  // 3) terrain fills — one Graphics per row-band keeps each GraphicsContext light
+  // 3) terrain fills — one Graphics per row-band
   const BANDS = 10, rowsPerBand = Math.ceil(ROWS / BANDS);
   for (let b = 0; b < BANDS; b++) {
     const r0 = b*rowsPerBand, r1 = Math.min(ROWS, r0+rowsPerBand);
@@ -103,10 +99,10 @@ export function buildTerrain(): BuiltMap {
       g.closePath();
       g.fill({ color: toHex(colorOf(i)) });
     }
-    layer.addChild(g);
+    ground.addChild(g);
   }
 
-  // 4) subtle hex grid (land only) — crisp cell lines that appear as you zoom in
+  // 4) subtle hex grid (land only)
   const grid = new Graphics();
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     if (nat[r*COLS+c] < 0) continue;
@@ -116,9 +112,9 @@ export function buildTerrain(): BuiltMap {
     grid.closePath();
   }
   grid.stroke({ color: 0x000000, width: 0.35, alpha: 0.10 });
-  layer.addChild(grid);
+  ground.addChild(grid);
 
-  // 5) national borders (land vs different land) — dark, one stroke pass
+  // 5) national borders
   const borders = new Graphics();
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const n = nat[r*COLS+c]; if (n < 0) continue;
@@ -133,7 +129,7 @@ export function buildTerrain(): BuiltMap {
     }
   }
   borders.stroke({ color: 0x22222a, width: 1.0, alpha: 0.85 });
-  layer.addChild(borders);
+  ground.addChild(borders);
 
   // 6) rivers
   const riv = new Graphics();
@@ -141,7 +137,95 @@ export function buildTerrain(): BuiltMap {
     line.forEach(([c, r], k) => { const [x, y] = hexCenter(c, r); k ? riv.lineTo(x+PAD, y+PAD) : riv.moveTo(x+PAD, y+PAD); });
   }
   riv.stroke({ color: 0x4678aa, width: Math.max(1.4, SIZE*0.28), alpha: 0.95, join: 'round', cap: 'round' });
-  layer.addChild(riv);
+  ground.addChild(riv);
 
-  return { layer, mapW: W, mapH: H };
+  // 7) terrain decorations (ported from Realistic mode's draw(), scaled to SIZE)
+  const decor = buildDecor();
+
+  return { ground, decor, mapW: W, mapH: H };
+}
+
+// Per-hex terrain detail — trees, peaks, contours, reeds. Built once as vector
+// geometry, batched into row-bands; one fill/stroke per style per band keeps it
+// cheap. sc scales Realistic's S=34 artwork down to our hex size.
+function buildDecor(): Container {
+  const decor = new Container();
+  const sc = SIZE / 34;
+  const BANDS = 10, rowsPerBand = Math.ceil(ROWS / BANDS);
+
+  const TREES_F = [[-10,2],[2,-7],[10,6]] as const;   // forest: three firs
+  const tri = (g: Graphics, X: number, Y: number, d: number) => {  // fir at (X,Y), half-width d
+    g.moveTo(X-d, Y+d).lineTo(X, Y-d*1.6).lineTo(X+d, Y+d).closePath();
+  };
+
+  for (let b = 0; b < BANDS; b++) {
+    const r0 = b*rowsPerBand, r1 = Math.min(ROWS, r0+rowsPerBand);
+    if (r0 >= ROWS) break;
+    const g = new Graphics();
+
+    // — forest firs (id 2) —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 2) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      for (const [dx, dy] of TREES_F) tri(g, cx+dx*sc, cy+dy*sc, 5*sc);
+    }
+    g.fill({ color: 0x243520, alpha: 0.92 });
+
+    // — taiga firs (id 11), darker & a touch sparser —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 11) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      tri(g, cx-7*sc, cy+3*sc, 4.5*sc); tri(g, cx+6*sc, cy-2*sc, 4.5*sc);
+    }
+    g.fill({ color: 0x2c4636, alpha: 0.9 });
+
+    // — wooded-steppe (id 10): a single small grove —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 10) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      tri(g, cx+2*sc, cy, 4*sc);
+    }
+    g.fill({ color: 0x4a5a30, alpha: 0.8 });
+
+    // — mountain bodies (id 4) —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 4) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      g.moveTo(cx-10*sc, cy+8*sc).lineTo(cx-2*sc, cy-9*sc).lineTo(cx+5*sc, cy+8*sc).closePath();
+      g.moveTo(cx+2*sc, cy+8*sc).lineTo(cx+8*sc, cy-3*sc).lineTo(cx+13*sc, cy+8*sc).closePath();
+    }
+    g.fill({ color: 0x726152, alpha: 0.95 });
+    // — mountain snow caps —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 4) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      g.moveTo(cx-4.5*sc, cy-2.5*sc).lineTo(cx-2*sc, cy-9*sc).lineTo(cx+0.5*sc, cy-2.5*sc).closePath();
+      g.moveTo(cx+5.5*sc, cy+1*sc).lineTo(cx+8*sc, cy-3*sc).lineTo(cx+10.5*sc, cy+1*sc).closePath();
+    }
+    g.fill({ color: 0xeef2f4, alpha: 0.85 });
+
+    // — hill contours (id 3) —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 3) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      g.moveTo(cx-12*sc, cy+6*sc).quadraticCurveTo(cx-6*sc, cy-6*sc, cx, cy+6*sc);
+      g.moveTo(cx+2*sc, cy+2*sc).quadraticCurveTo(cx+8*sc, cy-8*sc, cx+14*sc, cy+4*sc);
+    }
+    g.stroke({ color: 0x000000, width: Math.max(0.5, 1.4*sc), alpha: 0.30 });
+
+    // — marsh reeds (id 5) —
+    for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) {
+      if (terr[r*COLS+c] !== 5) continue;
+      const [cx0, cy0] = hexCenter(c, r); const cx = cx0+PAD, cy = cy0+PAD;
+      for (const [dx, dy] of [[-10,-4],[0,4],[9,-3]] as const) {
+        const X = cx+dx*sc, Y = cy+dy*sc;
+        g.moveTo(X-4*sc, Y).lineTo(X+4*sc, Y);
+        g.moveTo(X, Y).lineTo(X, Y-5*sc);
+      }
+    }
+    g.stroke({ color: 0x5d7a6a, width: Math.max(0.5, 1.2*sc), alpha: 0.55 });
+
+    decor.addChild(g);
+  }
+  return decor;
 }
