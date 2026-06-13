@@ -58,19 +58,31 @@ export function bakeTerrain(): Baked {
   };
   const rgb = (c: RGB) => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
 
-  // fill every hex (sea first via background)
+  // 1) base terrain colour per land hex, with coherent light/dark variation
+  const base: (RGB | null)[] = new Array(COLS*ROWS).fill(null);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const i = r*COLS+c; if (nat[i] < 0) continue;
+    const t = terr[i], tc = TERR[t] || TERR[1];
+    const lf = noise(c*0.16, r*0.16) * 18;                 // light/dark across a biome
+    const hf = noise(c*0.5, r*0.5) * (t===4 ? 12 : 6);     // fine grain
+    base[i] = [tc[0]+lf+hf, tc[1]+lf+hf, tc[2]+(lf+hf)*0.85];
+  }
+  // 2) blur the terrain colours over land so biomes BLEND, not hard patches
+  for (let pass = 0; pass < 2; pass++) {
+    const src = base.map(c => c ? [c[0], c[1], c[2]] as RGB : null);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const i = r*COLS+c, s = src[i]; if (!s) continue;
+      let sr = s[0]*2, sg = s[1]*2, sb = s[2]*2, w = 2;     // self-weight keeps features from washing out
+      const NB = (r&1) ? NB_ODD : NB_EVEN;
+      for (const [dc, dr] of NB) { const nc=c+dc, nr=r+dr; if(nc<0||nr<0||nc>=COLS||nr>=ROWS) continue; const ns = src[nr*COLS+nc]; if(!ns) continue; sr+=ns[0]; sg+=ns[1]; sb+=ns[2]; w++; }
+      base[i] = [sr/w, sg/w, sb/w];
+    }
+  }
+  // 3) paint: sea by depth, land = blended terrain + subtle nation tint
   ctx.fillStyle = rgb(SEA_DEEP); ctx.fillRect(0, 0, W, H);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const i = r*COLS+c, [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD;
-    let col: RGB;
-    const n = nat[i];
-    if (n < 0) { col = lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8)); }
-    else {
-      const t = terr[i]; col = TERR[t] || TERR[1];
-      const nz = (noise(c*0.35, r*0.35) + noise(c*0.9, r*0.9)*0.5) * (t===4 ? 14 : 7);   // gentle, coherent texture
-      col = [col[0]+nz, col[1]+nz, col[2]+nz*0.8];
-      col = lerp(col, nationRgb[n], 0.16);                  // subtle nation tint
-    }
+    const i = r*COLS+c, [cx0, cy0] = hexCenter(c, r), cx = cx0+PAD, cy = cy0+PAD, n = nat[i];
+    const col: RGB = n < 0 ? lerp(SEA_SHALLOW, SEA_DEEP, Math.min(1, depth[i]/8)) : lerp(base[i]!, nationRgb[n], 0.16);
     hexPath(cx, cy); ctx.fillStyle = rgb(col); ctx.fill();
   }
 
