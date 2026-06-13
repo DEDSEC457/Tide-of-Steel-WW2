@@ -458,6 +458,10 @@ say('— decisions —');
       d.options.every(o=>o.label && typeof o.apply==='function') &&
       typeof d.ai==='function'),
       ds.map(d=>d.id).join(','));
+    // the player must be told what each option DOES — every option needs an effect line
+    check(`[${id}] every decision option states its effect`,
+      ds.every(d=>d.options.every(o=>typeof o.effect==='string' && o.effect.length>4)),
+      ds.flatMap(d=>d.options.filter(o=>!o.effect).map(o=>d.id+':'+o.label)).join(', ') || 'missing effect');
   }
   // the Kiev Turn fires on turn 10 (headless auto-resolves via the AI choice)
   E.newGame('G','normal','hotseat');

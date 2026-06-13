@@ -621,8 +621,10 @@
        still be placed on credit — your balance goes negative, and future income pays it off
        (you can't reinforce or deploy until you're out of debt).</p>
     <div class="mrow">
-      <button class="primary" id="btn-gear-buy">Divert the trains — winter equipment (10 ⚙)</button>
-      <button id="btn-gear-front">"Home before the snow" — everything to the front</button>
+      <button class="primary" id="btn-gear-buy" style="text-align:left;line-height:1.35;padding:10px 14px;">Divert the trains — winter equipment (10 ⚙)
+        <div style="margin-top:5px;font-weight:700;color:#cfe8a8;font-size:12px;">→ In deep snow: your line holds far better (−10% defense instead of −20%), infantry keeps moving, winter attacks sting less. Costs 10⚙ now (credit allowed). Panzers still freeze.</div></button>
+      <button id="btn-gear-front" style="text-align:left;line-height:1.35;padding:10px 14px;">"Home before the snow" — everything to the front
+        <div style="margin-top:5px;font-weight:700;color:#e8c79a;font-size:12px;">→ Keep all 10⚙ for the offensive now — gamble on winning before December. If the war drags into snow, your troops barely hold (−20% defense) and the infantry bog down.</div></button>
     </div>
   </div>
 </div>
@@ -830,6 +832,7 @@ SCENARIOS.barbarossa = {
       text:'Against the protests of nearly every general, Hitler wants the panzers to wheel <b>south</b> toward Kiev — “My generals understand nothing of the economic aspects of war.” Guderian and Halder beg to keep driving on <b>Moscow</b> while the autumn roads still hold. The most argued-over order of the war. Here, the choice is yours.',
       options:[
         {label:'Wheel south — close the Kiev pocket',
+         effect:'+2 strength to your 4 divisions nearest Kiev, +3⚙ now — but the delay hands the Soviets +4⚙ to fortify Moscow',
          blurb:'Reinforce Army Group South for the largest encirclement in history. The Red Army loses a fortune in the south — but Moscow gains weeks to dig in.',
          log:'⬛ The panzers turn south. The Kiev pocket begins to close — Moscow will have to wait.',
          apply(G){
@@ -840,6 +843,7 @@ SCENARIOS.barbarossa = {
            G.pp.S = Math.min(40, G.pp.S+4);     // the delay lets the Soviets prepare the capital
          }},
         {label:'Drive on Moscow — defy the directive',
+         effect:'+2 strength to your 3 divisions nearest Moscow, and +5⚙ now — but no help in the south',
          blurb:'Throw the spearheads straight at the capital while the weather holds. The flanks stay exposed and the south is left hanging — but the prize is the prize.',
          log:'⬛ “The objective is Moscow.” The central panzers roll east — flanks be damned.',
          apply(G){
@@ -857,6 +861,7 @@ SCENARIOS.barbarossa = {
       text:'From Tokyo, Richard Sorge has radioed: <b>Japan will strike south</b>, not into Siberia. If you believe him, the divisions watching Manchuria can entrain for Moscow <i>now</i> — weeks before winter. If he is wrong, the Far East lies naked. Stalin has been burned by intelligence before.',
       options:[
         {label:'Trust Sorge — bring the Siberians west',
+         effect:'2 fresh Siberian Guards armies deploy at your reinforcement spawn immediately',
          blurb:'Two fresh Siberian Guards divisions arrive immediately, ahead of the winter timetable. If Japan strikes north after all… that is next year\'s problem.',
          log:'🟥 The Trans-Siberian thunders west — the Siberians will be at Moscow before the snow.',
          apply(G){
@@ -866,6 +871,7 @@ SCENARIOS.barbarossa = {
            }
          }},
         {label:'Keep watching Japan — hedge the bet',
+         effect:'+6⚙ production now (no new divisions arrive)',
          blurb:'The Far East stays garrisoned. STAVKA banks the production it saves on rail movement and raises new formations the careful way.',
          log:'🟥 The Siberian divisions stay east of the Urals. Moscow must hold with what it has.',
          apply(G){ G.pp.S = Math.min(40, G.pp.S+6); }},
@@ -1064,6 +1070,7 @@ SCENARIOS.winter41 = {
       text:'The generals beg permission to withdraw to a defensible winter line. The Führer\'s answer is the <b>Haltbefehl</b>: "Stand fast, not one step back — fanatical resistance in place." Brauchitsch is finished; Hitler takes personal command of the army. Obey, or trade ground for the army\'s life?',
       options:[
         {label:'Stand fast — fanatical resistance',
+         effect:'Every German division digs in +1 entrenchment immediately (a tougher defense everywhere)',
          blurb:'Every division digs in where it stands. The line hardens immediately — but rigid defense bleeds production that flexible withdrawal would have saved.',
          log:'⬛ The Haltbefehl: the army freezes in place and digs. There will be no retreat.',
          apply(G){
@@ -1071,6 +1078,7 @@ SCENARIOS.winter41 = {
              u.entrench = Math.min(effTerrain(u.x,u.y).dig, u.entrench+1);
          }},
         {label:'Fighting withdrawal to a winter line',
+         effect:'All German units lose their entrenchment (must re-dig), but you gain +7⚙ and save the army',
          blurb:'Disengage and fall back in good order. Prepared positions are abandoned — every man starts digging anew — but the army saves its strength and its supply trains.',
          log:'⬛ Against orders, the army leapfrogs back toward a shorter winter line.',
          apply(G){
@@ -1086,6 +1094,7 @@ SCENARIOS.winter41 = {
       text:'Moscow is saved — and Stalin smells total victory. He orders an offensive <b>along the entire front</b>, nine armies attacking everywhere at once. Zhukov protests: concentrate on Army Group Center and destroy it, or the attacks will everywhere be too weak. Stalin: "We must grind the Germans down with all speed."',
       options:[
         {label:'Attack everywhere — grind them down',
+         effect:'+1 strength to EVERY Soviet army (a broad but shallow surge)',
          blurb:'Every army joins the offensive. The whole front surges — a little stronger everywhere, decisive nowhere.',
          log:'🟥 The general offensive: nine armies attack from Leningrad to the Crimea.',
          apply(G){
@@ -1093,6 +1102,7 @@ SCENARIOS.winter41 = {
              u.str = Math.min(KINDS[u.kind].maxStr, u.str+1);
          }},
         {label:'Concentrate on Army Group Center — Zhukov\'s way',
+         effect:'+2 strength to your 4 armies nearest the strongest Axis-held city, +2⚙ (a concentrated punch)',
          blurb:'Mass the shock armies against the frozen Wehrmacht before Moscow. The spearhead units are heavily reinforced; the rest of the front holds.',
          log:'🟥 Zhukov masses the Guards. One target: Army Group Center.',
          apply(G){
@@ -1291,10 +1301,12 @@ SCENARIOS.stalingrad = {
       text:'The summer drive is rolling and the Führer wants <b>everything at once</b>: Army Group A wheels south for the Caucasus oil while Army Group B takes Stalingrad — two offensives, diverging across a thousand kilometres of steppe. Halder calls it madness. Concentrate on one objective, or reach for both?',
       options:[
         {label:'Split the drive — Stalingrad AND the oil',
+         effect:'+7⚙ now (the captured south pays off) — but no reinforcement to your spearheads',
          blurb:'Both prizes at once. The captured economy of the south pays dividends now — but the spearheads thin with every kilometre they diverge.',
          log:'⬛ Directive 45: the army groups part ways across the steppe. The maps look magnificent.',
          apply(G){ G.pp.G = Math.min(40, G.pp.G+7); }},
         {label:'Concentrate on Stalingrad — Halder\'s way',
+         effect:'+2 strength to your 4 divisions nearest Stalingrad (a massed punch, no extra ⚙)',
          blurb:'One schwerpunkt. The divisions nearest the Volga are massed and reinforced; the oil can wait until the city of Stalin falls.',
          log:'⬛ The panzers concentrate. One objective: the city on the Volga.',
          apply(G){
@@ -1311,6 +1323,7 @@ SCENARIOS.stalingrad = {
       text:'Chuikov\'s 62nd Army is bleeding to death in the rubble, and every division STAVKA owns could be fed across the river into the furnace. Zhukov and Vasilevsky urge the opposite: send the <b>minimum</b> to hold the city, hoard everything else for the counterblow forming on the flanks. The city — or the encirclement?',
       options:[
         {label:'Feed the furnace — hold every street',
+         effect:'+2 strength AND +1 entrenchment to your 3 armies nearest Stalingrad — but no ⚙ saved for the flanks',
          blurb:'Divisions cross the burning river by night. The defenders of Stalingrad are heavily reinforced and dig into the rubble — but the great counteroffensive is weakened before it begins.',
          log:'🟥 Across the Volga by night ferry — into the city of fire. Not one step back.',
          apply(G){
@@ -1322,6 +1335,7 @@ SCENARIOS.stalingrad = {
              });
          }},
         {label:'Hoard for Uranus — Zhukov\'s way',
+         effect:'+7⚙ banked for the counteroffensive (Stalingrad holds with what it has)',
          blurb:'Chuikov gets just enough to keep a foothold. Everything else goes to the quiet flanks, where the Romanian lines are thin and November is coming.',
          log:'🟥 STAVKA\'s answer is cold: the city must hold with what it has. The reserves ride north into the silence.',
          apply(G){ G.pp.S = Math.min(40, G.pp.S+7); }},
@@ -1554,6 +1568,7 @@ SCENARIOS.dday = {
       text:'With the Americans pouring through Avranches, Hitler orders the panzers to attack <b>west</b> and cut the breakout at the coast. Kluge warns it will only push the army deeper into a sack the Allies are closing around Falaise. Drive for the sea — or save the army?',
       options:[
         {label:'Attack west to Avranches — the Führer\'s order',
+         effect:'+2 strength to your 3 panzer divisions nearest Avranches — but the exposed attack hands the Allies +4⚙',
          blurb:'Mass the panzers for a thrust to the coast. They hit hard now — but driving west, under total Allied air power, only deepens the trap forming behind them.',
          log:'⬛ The panzers wheel west toward Avranches. Above them, the fighter-bombers are already circling.',
          apply(G){
@@ -1564,6 +1579,7 @@ SCENARIOS.dday = {
            G.pp.G = Math.min(40, G.pp.G+4);   // the Allies feast on the exposed columns
          }},
         {label:'Pull back toward the Seine — save the army',
+         effect:'+1 strength to your 4 divisions nearest Paris, and +5⚙ — the army survives to fight on',
          blurb:'Defy the order and begin the withdrawal. You give up ground, but the army lives to fight on the next river line instead of dying in the Falaise pocket.',
          log:'⬛ “The army must not be destroyed for nothing.” The panzers disengage and fall back east.',
          apply(G){
@@ -1581,6 +1597,7 @@ SCENARIOS.dday = {
       text:'The invasion is ashore — and the panzer reserves that could throw it back into the sea sit idle, because <b>only the Führer can release them</b>, and no one at Berchtesgaden will wake him. Rommel: "If we don\'t throw the invaders into the sea within 24 hours, the war is lost." Von Rundstedt demands their release. The OKW hesitates: what if Normandy is the diversion, and the real blow falls at Calais?',
       options:[
         {label:'Release them now — Rommel\'s 24 hours',
+         effect:'+2 strength to 3 of your panzer divisions immediately (they reach the beaches battle-ready)',
          blurb:'The armoured reserve rolls for the beaches at once, under the fighter-bombers, before the Allies are dug in. The panzer divisions arrive battle-ready.',
          log:'⬛ The reserve is released. Panzer columns roll north under a sky that belongs to the enemy.',
          apply(G){
@@ -1588,6 +1605,7 @@ SCENARIOS.dday = {
              .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
          }},
         {label:'Hold for Calais — it may be a feint',
+         effect:'+6⚙ banked (the reserve waits at Calais; the men on the beaches fight alone)',
          blurb:'Fortitude has worked: the OKW keeps the reserve watching the Pas-de-Calais. The army husbands its strength — and the men on the beaches fight alone.',
          log:'⬛ "Normandy may be the diversion." The panzers wait for an invasion that will never come.',
          apply(G){ G.pp.S = Math.min(40, G.pp.S+6); }},
@@ -1761,6 +1779,7 @@ SCENARIOS.midway = {
       text:'The first wave reports Midway needs a <b>second strike</b> — and your reserve aircraft sit armed with anti-ship torpedoes for a fleet that scouts say isn\'t there. Re-arm them with land bombs for the island? Or keep them ready in case the Americans <i>are</i> out there? This is the decision the whole battle turned on.',
       options:[
         {label:'Re-arm for a second strike on Midway',
+         effect:'Midway’s garrison −2 strength and your air groups +1 — but your carriers −1 strength, caught mid-rearm (decks full of fuel and bombs)',
          blurb:'Commit the reserve to crushing the atoll. The island\'s defenses crumble — but your flight decks fill with fuel and bombs, and a carrier caught mid-rearm is a tinderbox.',
          log:'🟥 The order goes out: re-arm with land bombs. Hangar crews race to swap ordnance — decks crowded, hoses everywhere.',
          apply(G){
@@ -1769,6 +1788,7 @@ SCENARIOS.midway = {
            unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str = Math.max(1, c.str-1); }); // caught rearming
          }},
         {label:'Hold the reserve armed against the fleet',
+         effect:'Your air groups +1 strength AND your carriers +1 strength (decks clear, ready to strike first) — Midway stays dangerous',
          blurb:'Trust the warning and keep the torpedo planes ready. If the enemy carriers appear, you strike first — the only thing that matters in carrier war. Midway stays dangerous.',
          log:'🟥 “Hold them armed for ships.” The reserve stays ready on the hangar deck — and the scouts are sent out again.',
          apply(G){
@@ -4810,7 +4830,9 @@ function maybeShowDecision(){
     const b = document.createElement('button');
     b.className = 'primary';
     b.style.cssText = 'text-align:left;padding:10px 14px;';
-    b.innerHTML = `<b>${opt.label}</b>${opt.blurb?`<br><span style="font-weight:400;color:#ffe9b8;font-size:12px;">${opt.blurb}</span>`:''}`;
+    b.innerHTML = `<b>${opt.label}</b>`
+      + (opt.effect?`<div style="margin-top:5px;font-weight:700;color:#cfe8a8;font-size:12px;">→ ${opt.effect}</div>`:'')
+      + (opt.blurb?`<div style="margin-top:3px;font-weight:400;color:#ffe9b8;font-size:12px;">${opt.blurb}</div>`:'');
     b.onclick = ()=>{
       resolveDecision(d.id, i); clearUndo(); sCity();
       show('decision-modal', false);
