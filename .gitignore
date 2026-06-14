@@ -4,3 +4,7 @@
 # node tooling (map generator deps)
 node_modules/
 package-lock.json
+
+# generated map intermediate — canonical copy is embedded in index.html as WW_DATA
+ww_data.js
+eu_grid.json

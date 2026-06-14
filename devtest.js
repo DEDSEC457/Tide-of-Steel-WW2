@@ -572,6 +572,42 @@ say('— events & winter gear —');
   check('unanswered offer expires', G3.winterGear === false, String(G3.winterGear));
 }
 
+/* ---------------- The World at War (native Europe strategic layer) ---------------- */
+say('— The World at War —');
+{
+  const D = E.WW_DATA;
+  check('WW map is '+D.rows+' rows', D.terr.length===D.rows && D.owner.length===D.rows);
+  check('WW terr rows all '+D.cols+' chars', D.terr.every(r=>r.length===D.cols),
+    D.terr.map((r,i)=>r.length!==D.cols?i:null).filter(x=>x!==null).join(','));
+  check('WW owner rows all '+D.cols+' chars', D.owner.every(r=>r.length===D.cols));
+  check('WW terrain chars legal', D.terr.every(r=>/^[.fh~]+$/.test(r)));
+  const chars = new Set(D.nations.map(n=>n.c));
+  check('WW owner chars map to nations', D.owner.every(r=>[...r].every(c=>c==='.'||chars.has(c))));
+  check('WW nation chars unique', chars.size===D.nations.length);
+  check('WW nation keys unique', new Set(D.nations.map(n=>n.key)).size===D.nations.length);
+
+  const W = E.wwBuildState();
+  check('WW state own grid size', W.own.length===D.cols*D.rows);
+  let land=0; for(const r of D.owner) for(const c of r) if(c!=='.') land++;
+  let owned=0; for(let i=0;i<W.own.length;i++) if(W.own[i]>=0) owned++;
+  check('WW owned hexes == land hexes', owned===land, owned+' vs '+land);
+  const sum = W.nat.reduce((a,n)=>a+n.hexes,0);
+  check('WW nation hexes sum to land', sum===land, sum+' vs '+land);
+  check('WW cities on land', W.cities.every(c=>!E.wwSea(c.x,c.y)),
+    W.cities.filter(c=>E.wwSea(c.x,c.y)).map(c=>c.name).join(','));
+  for (const k of ['GER','SOV','ENG','FRA','ITA','POL']){
+    const n = W.byKey[k];
+    check('WW '+k+' present w/ capital + industry',
+      !!n && !!E.wwCapitalHex(k) && n.civ>0 && n.hexes>0);
+  }
+  const f = E.wwFactions();
+  check('WW factions populated',
+    f.axis.length>0 && f.allies.length>0 && f.comintern.length>0 && f.neutral.length>0);
+  check('WW neighbours in-bounds at corners',
+    E.wwNb(0,0).every(([x,y])=>x>=0&&x<D.cols&&y>=0&&y<D.rows) &&
+    E.wwNb(D.cols-1,D.rows-1).every(([x,y])=>x>=0&&x<D.cols&&y>=0&&y<D.rows));
+}
+
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
 const results = {};
@@ -754,6 +790,13 @@ function uiSmoke(side){
   for (const lv of ['low','high','medium']) if ($('gfx-'+lv).onclick){ $('gfx-'+lv).onclick(); drain(); }
   if ($('btn-settings-close').onclick) $('btn-settings-close').onclick();
   drain();
+  // The World at War — open the native Europe strategic screen, then leave via the back button
+  let wawOk = true;
+  if ($('mc-hex').onclick){
+    $('mc-hex').onclick(); drain();
+    wawOk = !!(UI.WW && UI.WW.on === true);
+    if ($('ww-back').onclick) $('ww-back').onclick();
+  }
   const arcadeOver = UI.getState().over, arcadeResult = UI.getState().result;
   // realistic-mode routing: mode select → preview screen → launch → one enemy phase
   let realisticOk = true;
@@ -767,7 +810,7 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk};
 }
 
 for (const side of ['G','S']){
@@ -777,6 +820,7 @@ for (const side of ['G','S']){
       r.over && r.uiErrors===0,
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
+    check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
   } catch(err){
     failures++;
     console.log(`  FAIL UI smoke (${side}) — ${err.message}`);
