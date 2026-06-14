@@ -6631,22 +6631,17 @@ function gwFrontReport(){
   const tgts = gwFrontTargets(p).filter(id => gwCanAttack(p, GW.regions[id]));
   if(!tgts.length) return '<div style="color:var(--dim);font-size:11px;margin-top:7px;">No active front yet — advance to a border or court a neutral.</div>';
   const airMul=gwAirMul(p), dc=gwDiffCombat(p);
-  const isAmphib = id => !gwNeighbors(id).some(n => GW.regions[n]===p && !gwIsSeaLink(id,n));   // only a sea crossing reaches it
   const odds = id => { const owner=GW.regions[id], def=gwRegionDefense(id);
     const mod=gwOffenseMod(p,owner)*gwModFactor(p,'attack',gwFactionOf(owner));
-    let atk = e.army*0.5*mod*airMul*dc;
-    if (isAmphib(id)) atk *= 0.18;                          // amphibious assaults are very hard
-    return atk/Math.max(0.1,def*1.2); };
+    return (e.army*0.5*mod*airMul*dc)/Math.max(0.1,def*1.2); };
   tgts.sort((a,b)=> odds(b)-odds(a));
   let rows='<div style="color:var(--dim);font-size:11px;margin-top:7px;">⚔ Fronts — click to focus your offensive:</div>';
   for(const id of tgts.slice(0,7)){
-    const r=GW_REGIONS[id], def=gwRegionDefense(id), amph=isAmphib(id);
-    const locked = amph && GW_ISLAND.has(id);              // the British Isles cannot be invaded — they hold for D-Day
-    const o=odds(id);
-    const lab = locked?['Cannot invade','#8a8f80'] : o>=1.5?['Favourable','#7a9d54'] : o>=1?['Even','#d8b24a'] : ['Costly','#e06a5f'];
+    const r=GW_REGIONS[id], def=gwRegionDefense(id), o=odds(id);
+    const lab = o>=1.5?['Favourable','#7a9d54'] : o>=1?['Even','#d8b24a'] : ['Costly','#e06a5f'];
     const isF=id===e.preferredTarget;
     rows+='<div class="qrow" data-front="'+id+'" style="cursor:pointer;'+(isF?'border-left:3px solid var(--amber);padding-left:5px;background:#1a1f12;':'')+'">'
-      +'<span>'+(isF?'🎯 ':'')+(amph?'⚓ ':'')+r.name+' <span style="color:var(--dim);font-size:11px;">def '+Math.round(def)+(r.vp?' · ★'+r.vp:'')+'</span></span>'
+      +'<span>'+(isF?'🎯 ':'')+r.name+' <span style="color:var(--dim);font-size:11px;">def '+Math.round(def)+(r.vp?' · ★'+r.vp:'')+'</span></span>'
       +'<span style="color:'+lab[1]+';font-size:11px;font-weight:700;">'+lab[0]+'</span></div>';
   }
   return rows;
@@ -6674,12 +6669,10 @@ function gwUpdateUI(){
   e.build.forEach((it,i)=>{ const lbl = it.type==='civ'?'🏭 Civilian factory':it.type==='mil'?'⚙ Military factory':'🛡 Fort · '+(GW_REGIONS[it.region]?GW_REGIONS[it.region].name:'?');
     h+='<div class="qrow"><span>'+lbl+'</span><button class="gw-btn" data-cancel="'+i+'">✕</button></div>'; });
   if(!e.build.length) h+='<div style="color:var(--dim);font-size:11px;">— idle, nothing building —</div>';
-  const fortR = gwMostThreatenedRegion(p);
-  const fortLbl = fortR && GW_REGIONS[fortR] ? '🛡 Fort · '+GW_REGIONS[fortR].name : '🛡 Fort';
   h+='<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
     +'<button class="gw-btn" id="gw-bc">+ Civ ('+GW_FACT_COST.civ+')</button>'
     +'<button class="gw-btn" id="gw-bm">+ Mil ('+GW_FACT_COST.mil+')</button>'
-    +'<button class="gw-btn" id="gw-bf"'+(fortR?'':' disabled')+' title="Fortify your most threatened frontline province">'+fortLbl+' ('+GW_FACT_COST.fort+')</button></div>';
+    +'<button class="gw-btn" id="gw-bf" title="Fortify your most important frontline province">+ Fort ('+GW_FACT_COST.fort+')</button></div>';
   $('gw-con-body').innerHTML=h;
   $('gw-bc').onclick=()=>{ gwQueueBuild(p,'civ'); gwUpdateUI(); };
   $('gw-bm').onclick=()=>{ gwQueueBuild(p,'mil'); gwUpdateUI(); };
