@@ -794,6 +794,20 @@ say('— The World at War —');
   check('WW campaign is playable after loading', R.turn===tBefore+1);
   E.wwClearSave();
   check('WW save slot can be cleared', !E.wwHasSave());
+
+  // --- Phase 10: combat forecast ---
+  const Gfc = E.wwSetup('GER','normal');
+  const pc = E.wwCapitalHex('POL'), pn = E.wwNb(pc[0],pc[1])[0];
+  const atk = {nat:'GER',x:pn[0],y:pn[1],kind:'arm',str:12,maxStr:12,org:12,maxOrg:12,mp:4,moved:false};
+  Gfc.armies = Gfc.armies.filter(a=>!(a.x===pc[0]&&a.y===pc[1]));
+  Gfc.armies.push(atk);
+  Gfc.armies.push({nat:'POL',x:pc[0],y:pc[1],kind:'inf',str:10,maxStr:10,org:12,maxOrg:12,mp:2,moved:false});
+  E.wwRecomputeSupply();
+  const fc = E.wwForecast(atk, pc[0], pc[1]);
+  check('WW combat forecast gives bounded odds, both powers & air factor',
+    fc.winPct>=3 && fc.winPct<=97 && fc.ap>0 && fc.dp>0 && fc.air>1);
+  const opn = E.wwNb(pn[0],pn[1]).find(([x,y])=>!E.wwArmyAt(x,y)&&!E.wwSea(x,y)&&E.wwOwnerAt(x,y)&&E.wwOwnerAt(x,y).key==='POL');
+  if(opn) check('WW forecast vs an undefended hex reads a certain capture', E.wwForecast(atk,opn[0],opn[1]).winPct===100);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */

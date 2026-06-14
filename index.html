@@ -4645,6 +4645,17 @@ function wwReachable(a){
   }
   return out;
 }
+function wwForecast(a, tx, ty){
+  const d=wwArmyAt(tx,ty), oi=WW.own[ty*WW.cols+tx], owner=oi>=0?WW.nat[oi]:null;
+  const foeKey = d ? d.nat : (owner?owner.key:null);
+  const amphibious = !wwNb(a.x,a.y).some(p=>p[0]===tx&&p[1]===ty);
+  let ap=wwAtkPower(a,tx,ty); if(amphibious) ap*=0.55; ap*=wwAirFactor(a.nat, foeKey||a.nat);
+  const dp = d ? wwDefPower(d,tx,ty)*wwAirFactor(d.nat,a.nat) : 0;
+  const winPct = dp<=0 ? 100 : Math.max(3, Math.min(97, Math.round(100*ap/(ap+dp))));
+  return { a, d, tx, ty, foeKey, ap, dp, winPct, amphibious,
+    aSup:wwSupport(a,tx,ty), dSup:d?wwSupport(d,tx,ty):0, terr:wwTerrDef(tx,ty),
+    air:wwAirFactor(a.nat, foeKey||a.nat), aSupply:wwInSupply(a), dSupply:d?wwInSupply(d):true };
+}
 function wwForeignAdj(a, includeNeutral){
   const out=[];
   for(const [nx,ny] of wwNb(a.x,a.y)){
@@ -6879,6 +6890,7 @@ function wwAfterAction(r){
   wwComputeStats();
   // the acting army has used its turn → drop the selection, refresh
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
+  wwRenderCombat(null);
   if(r && r.result==='taken') wwToast('Position captured');
   else if(r && r.result==='landed') wwToast('Troops landed ashore');
   else if(r && r.result==='repelled') wwToast('The landing was thrown back');
@@ -6970,6 +6982,37 @@ function wwTogglePanel(id, render){ wwClosePanels(id); const e=$(id); if(!e) ret
 function wwToggleFocus(){ wwTogglePanel('ww-focus', wwRenderFocus); }
 function wwToggleResearch(){ wwTogglePanel('ww-research', wwRenderResearch); }
 function wwToggleDiplo(){ wwTogglePanel('ww-diplo', wwRenderDiplo); }
+function wwRenderCombat(fc){
+  const el=$('ww-combat'); if(!el) return;
+  if(!fc){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const aKind=fc.a.kind==='arm'?'Armour':'Infantry';
+  const dName=fc.d?(fc.d.kind==='arm'?'Armoured division':'Infantry division'):((WW.byKey[fc.foeKey]?WW.byKey[fc.foeKey].name:'Enemy')+' — undefended');
+  const col=fc.winPct>=60?'#7fd08a':fc.winPct>=42?'#ffd34d':'#e0856a';
+  const fx=[];
+  fx.push(fc.amphibious?'amphibious −45%':'frontal assault');
+  if(fc.terr>1.01) fx.push('terrain +'+Math.round((fc.terr-1)*100)+'% def');
+  if(fc.aSup>0) fx.push('your support +'+(fc.aSup*30)+'%');
+  if(fc.dSup>0) fx.push('enemy line +'+(fc.dSup*20)+'% def');
+  if(fc.air>1.02) fx.push('air superiority +'+Math.round((fc.air-1)*100)+'%');
+  else if(fc.air<0.98) fx.push('enemy air −'+Math.round((1-fc.air)*100)+'%');
+  if(!fc.aSupply) fx.push('you cut off −40%');
+  if(fc.d && !fc.dSupply) fx.push('enemy cut off −40%');
+  el.innerHTML='<div class="wc-head">'+aKind+' &nbsp;▸&nbsp; '+dName+'</div>'+
+    '<div class="wc-bars"><div class="wc-side"><span>YOU</span><b>'+fc.ap.toFixed(0)+'</b></div>'+
+    '<div class="wc-odds" style="color:'+col+'">'+fc.winPct+'%</div>'+
+    '<div class="wc-side"><span>ENEMY</span><b>'+(fc.d?fc.dp.toFixed(0):'—')+'</b></div></div>'+
+    '<div class="wc-meter"><i style="width:'+fc.winPct+'%;background:'+col+'"></i></div>'+
+    '<div class="wc-fx">'+fx.join(' · ')+'</div>';
+}
+function wwHoverForecast(sx,sy){
+  if(!(WW.started && wwSelArmy && !wwSelArmy.moved)){ wwRenderCombat(null); return; }
+  const hit=wwPick(sx,sy); if(!hit){ wwRenderCombat(null); return; }
+  const key=hit[0]+','+hit[1];
+  if((wwTargetSet&&wwTargetSet.has(key))||(wwDeclareSet&&wwDeclareSet.has(key))||(wwInvadeSet&&wwInvadeSet.has(key)))
+    wwRenderCombat(wwForecast(wwSelArmy, hit[0], hit[1]));
+  else wwRenderCombat(null);
+}
 function wwUpdateInfo(){
   const info=$('ww-info'); if(!info) return;
   if(wwSelArmy){ const a=wwSelArmy, n=WW.byKey[a.nat];
@@ -7023,8 +7066,10 @@ function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove
 function wwBindInput(){
   if(wwBound) return; wwBound=true; const cv=$('wwCanvas');
   cv.addEventListener('mousedown',e=>{ if(!WW.on) return; wwDrag=true; wwDragMoved=false; wwLMx=e.clientX; wwLMy=e.clientY; cv.classList.add('drag'); });
-  window.addEventListener('mousemove',e=>{ if(!WW.on||!wwDrag) return; const dx=e.clientX-wwLMx, dy=e.clientY-wwLMy;
-    if(Math.abs(dx)+Math.abs(dy)>3) wwDragMoved=true; WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); });
+  window.addEventListener('mousemove',e=>{ if(!WW.on) return;
+    if(wwDrag){ const dx=e.clientX-wwLMx, dy=e.clientY-wwLMy;
+      if(Math.abs(dx)+Math.abs(dy)>3) wwDragMoved=true; WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); return; }
+    const r=cv.getBoundingClientRect(); wwHoverForecast(e.clientX-r.left, e.clientY-r.top); });
   window.addEventListener('mouseup',e=>{ if(!WW.on){ wwDrag=false; return; }
     if(wwDrag && !wwDragMoved){ const r=cv.getBoundingClientRect(); wwClickHex(wwPick(e.clientX-r.left, e.clientY-r.top)); }
     wwDrag=false; cv.classList.remove('drag'); });
@@ -7356,7 +7401,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
-    wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir,
+    wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
     wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
@@ -7417,6 +7462,17 @@ if (typeof module !== 'undefined' && module.exports){
       flex-direction:column;gap:6px;align-items:center;pointer-events:none;}
     .ww-toast-msg{background:#1a1020e8;border:1px solid #6a3a4a;color:#ffd9c2;font-size:13px;font-weight:600;
       padding:8px 16px;border-radius:7px;box-shadow:0 4px 16px #000a;}
+    #ww-combat{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;background:#0d1826f6;
+      border:1px solid #2c4a6e;border-radius:11px;padding:10px 18px;min-width:248px;
+      text-align:center;box-shadow:0 8px 32px #000b;}
+    #ww-combat.hidden{display:none;}
+    .wc-head{font-size:12px;font-weight:700;letter-spacing:1px;color:#cfe0f2;margin-bottom:7px;}
+    .wc-bars{display:flex;align-items:center;justify-content:center;gap:18px;}
+    .wc-side{font-size:11px;color:#90a6bb;} .wc-side b{display:block;font-size:18px;color:#eaf2fb;line-height:1.1;}
+    .wc-odds{font-size:23px;font-weight:800;}
+    .wc-meter{height:6px;border-radius:4px;background:#22344a;overflow:hidden;margin:7px 0 5px;}
+    .wc-meter>i{display:block;height:100%;}
+    .wc-fx{font-size:10.5px;color:#8ba2b8;line-height:1.4;}
     /* nation pick */
     #ww-pick{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;align-items:center;
       justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#10202fe0,#070b11f4);}
@@ -7486,6 +7542,7 @@ if (typeof module !== 'undefined' && module.exports){
   <div id="ww-research" class="ww-panel hidden"></div>
   <div id="ww-diplo" class="ww-panel hidden"></div>
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
+  <div id="ww-combat" class="hidden"></div>
   <div id="ww-toast"></div>
   <div id="ww-pick">
     <h2>THE WORLD AT WAR</h2>
