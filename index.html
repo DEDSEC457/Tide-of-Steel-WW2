@@ -238,11 +238,11 @@
         <button class="primary mc-btn">LAUNCH ▶</button>
       </div>
       <div class="mode-card" id="mc-hex">
-        <span class="mc-badge wip">NEW · WIP</span>
+        <span class="mc-badge wip">WIP</span>
         <div class="mc-icon">🌍</div>
         <h2>THE WORLD AT WAR</h2>
-        <p class="mc-desc">All of Europe, 1939 — the Axis against the Grand Alliance (France, Britain, the USSR and Poland) on one hex map. Beat France, then break the Soviet colossus. A first build.</p>
-        <button class="primary mc-btn">PLAY THE AXIS ▶</button>
+        <p class="mc-desc">All of Europe on a full hex map with NATO counters and real 1938 borders — the grand strategic theatre. A work in progress.</p>
+        <button class="mc-btn">LAUNCH ▶</button>
       </div>
     </div>
     <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
@@ -2716,149 +2716,6 @@ function loadScenario(id){
   SIDES = SCN.sides || DEFAULT_SIDES;
   return SCN;
 }
-/* ============================================================
-   THE WORLD AT WAR — all of Europe, 1939. The Axis (G) against the
-   Grand Alliance (S: France, Britain, the USSR and Poland). A full-engine
-   strategic-scale scenario on a generated Europe hex map. A first build —
-   the order of battle and balance will be tuned. */
-SCENARIOS.europe = (function buildEurope(){
-  const C=56, R=36;
-  const g=[]; for(let y=0;y<R;y++) g.push(new Array(C).fill('~'));
-  const box=(x0,x1,y0,y1,ch)=>{ for(let y=Math.max(0,y0);y<=Math.min(R-1,y1);y++) for(let x=Math.max(0,x0);x<=Math.min(C-1,x1);x++) g[y][x]=ch; };
-  // ---- landmasses (plains) ----
-  box(5,9,4,6,'.'); box(4,9,6,11,'.'); box(1,3,8,11,'.');                 // British Isles + Ireland
-  box(7,17,18,25,'.'); box(11,20,11,18,'.'); box(18,21,9,11,'.'); box(11,14,12,16,'.'); // Iberia, France, Low Countries
-  box(19,28,8,17,'.');                                                     // Germany & central
-  box(22,27,1,8,'.'); box(27,31,2,9,'.'); box(24,27,8,9,'.'); box(31,36,1,7,'.'); // Scandinavia, Finland
-  box(22,27,16,19,'.'); box(24,28,19,24,'.'); box(26,27,24,25,'.');        // Italy + Sicily
-  box(28,36,8,18,'.'); box(33,37,8,11,'.');                               // Poland, Czech/Hungary, Baltics
-  box(30,39,18,23,'.'); box(33,38,23,26,'.'); box(38,50,24,28,'.');        // Balkans, Greece, Turkey
-  box(35,55,4,22,'.');                                                     // the USSR
-  box(8,46,30,33,'.');                                                     // North Africa
-  // ---- carve the seas ----
-  box(0,4,0,7,'~'); box(9,12,8,11,'~'); box(21,27,4,7,'~'); box(28,33,6,7,'~'); box(30,33,7,8,'~');
-  box(18,24,25,29,'~'); box(25,40,26,29,'~'); box(40,47,22,24,'~'); box(28,32,24,26,'~');
-  // ---- terrain features (only over existing land) ----
-  const feat=(x0,x1,y0,y1,ch)=>{ for(let y=Math.max(0,y0);y<=Math.min(R-1,y1);y++) for(let x=Math.max(0,x0);x<=Math.min(C-1,x1);x++) if(g[y][x]==='.') g[y][x]=ch; };
-  feat(22,26,16,17,'h'); feat(13,16,17,18,'h'); feat(23,26,2,6,'h'); feat(25,26,19,23,'h');  // Alps, Pyrenees, Scandes, Apennines
-  feat(32,36,16,18,'h'); feat(50,54,20,21,'h'); feat(34,37,20,23,'h');                        // Carpathians, Caucasus, Dinarics
-  feat(20,26,10,12,'f'); feat(29,34,10,13,'f'); feat(40,50,8,15,'f');                          // German, Polish, Russian forests
-  feat(37,41,13,15,'s');                                                                       // Pripyat marshes
-  feat(20,20,9,16,'r'); feat(41,41,15,20,'r'); feat(53,53,12,18,'r');                          // Rhine, Dnieper, Volga
-  const map=g.map(r=>r.join('').slice(0,C).padEnd(C,'~'));
-  return {
-    id:'europe',
-    title:'THE WORLD AT WAR', short:'WORLD AT WAR',
-    sub:'EUROPE 1939 · THE AXIS AGAINST THE GRAND ALLIANCE',
-    cols:C, rows:R, map,
-    sides:{
-      G:{name:'Axis',   flag:'⬛', color:'#5a5346', tint:'rgba(120,110,80,0.28)'},
-      S:{name:'Allies', flag:'🟦', color:'#3a6ea5', tint:'rgba(70,120,180,0.24)'},
-    },
-    kinds:{
-      g_pz:  {side:'G', label:'Panzer Corps',  atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
-      g_inf: {side:'G', label:'German Army',    atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
-      g_it:  {side:'G', label:'Italian Army',   atk:4, def:4, mp:3, maxStr:8,  cost:8,  sym:'inf', color:'#6b7a4a'},
-      g_hq:  {side:'G', label:'OKW',            atk:1, def:2, mp:4, maxStr:6,  cost:0,  sym:'hq', noBuy:true, hq:true, noCapture:true},
-      s_inf: {side:'S', label:'Allied Army',    atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
-      s_arm: {side:'S', label:'Allied Armour',  atk:7, def:5, mp:5, maxStr:10, cost:15, sym:'arm'},
-      s_sov: {side:'S', label:'Soviet Army',    atk:5, def:6, mp:3, maxStr:12, cost:9,  sym:'inf', color:'#9c2e22'},
-      s_hq:  {side:'S', label:'Allied HQ',      atk:1, def:2, mp:4, maxStr:6,  cost:0,  sym:'hq', noBuy:true, hq:true, noCapture:true},
-    },
-    cities:[
-      {name:'London',     x:6,  y:9,  vp:5, owner:'S'},
-      {name:'Paris',      x:15, y:14, vp:4, owner:'S'},
-      {name:'Madrid',     x:11, y:22, vp:2, owner:'S'},
-      {name:'Warsaw',     x:31, y:12, vp:3, owner:'S'},
-      {name:'Moscow',     x:48, y:11, vp:6, owner:'S'},
-      {name:'Leningrad',  x:42, y:8,  vp:4, owner:'S'},
-      {name:'Stalingrad', x:52, y:17, vp:4, owner:'S'},
-      {name:'Kiev',       x:40, y:16, vp:3, owner:'S'},
-      {name:'Cairo',      x:39, y:31, vp:3, owner:'S'},
-      {name:'Berlin',     x:23, y:11, vp:5, owner:'G'},
-      {name:'Hamburg',    x:21, y:9,  vp:2, owner:'G'},
-      {name:'Munich',     x:23, y:15, vp:2, owner:'G'},
-      {name:'Vienna',     x:26, y:16, vp:2, owner:'G'},
-      {name:'Rome',       x:26, y:22, vp:5, owner:'G'},
-      {name:'Milan',      x:25, y:18, vp:3, owner:'G'},
-      {name:'Tripoli',    x:26, y:31, vp:2, owner:'G'},
-    ],
-    startUnits:[
-      // ---- Axis ----
-      ['g_hq', 'OKW',          23, 12, 'G'],
-      ['g_pz', '2.Panzer',     20, 13, 'G'],
-      ['g_pz', '7.Panzer',     19, 14, 'G'],
-      ['g_pz', '1.Panzer',     19, 12, 'G'],
-      ['g_inf','6.Armee',      21, 15, 'G'],
-      ['g_inf','4.Armee',      22, 13, 'G'],
-      ['g_inf','18.Armee',     24, 10, 'G'],
-      ['g_pz', '3.Panzer',     28, 12, 'G'],
-      ['g_inf','8.Armee',      27, 13, 'G'],
-      ['g_inf','9.Armee',      25, 13, 'G'],
-      ['g_inf','12.Armee',     26, 14, 'G'],
-      ['g_it', '8.Armata',     25, 20, 'G'],
-      ['g_it', '6.Armata',     27, 22, 'G'],
-      ['g_it', '10.Armata',    28, 31, 'G'],
-      // ---- Allies ----
-      ['s_hq', 'GQG',          15, 15, 'S'],
-      ['s_inf','1re Armée',    16, 14, 'S'],
-      ['s_inf','7e Armée',     17, 13, 'S'],
-      ['s_inf','9e Armée',     14, 13, 'S'],
-      ['s_arm','BEF',          13, 12, 'S'],
-      ['s_inf','2e Armée',     16, 16, 'S'],
-      ['s_arm','UK Home Forces',6, 8, 'S'],
-      ['s_inf','8th Army',     39, 32, 'S'],
-      ['s_inf','Polish Army',  31, 13, 'S'],
-      ['s_hq', 'STAVKA',       46, 12, 'S'],
-      ['s_sov','Western Front',38, 12, 'S'],
-      ['s_sov','Southwest Front',40,15, 'S'],
-      ['s_sov','Northwest Front',43,9, 'S'],
-      ['s_sov','Reserve Front',48, 13, 'S'],
-      ['s_sov','Southern Front',50,16, 'S'],
-    ],
-    generals:[
-      {side:'G', unit:'2.Panzer', name:'Guderian', atk:1.15, bio:'Father of the panzer arm — the spearhead of the blitzkrieg.'},
-      {side:'G', unit:'7.Panzer', name:'Rommel',   atk:1.12, bio:'The Ghost Division’s commander; later the Desert Fox.'},
-      {side:'S', unit:'Reserve Front', name:'Zhukov', def:1.18, bio:'Stalin’s firefighter — wherever the front breaks, he is sent.'},
-      {side:'S', unit:'8th Army', name:'Montgomery', def:1.10, bio:'Methodical, set-piece commander of the British in the desert.'},
-    ],
-    sovSchedule:[],
-    events:[
-      {turn:1,  date:'1 September 1939', title:'THE WORLD AT WAR',
-       text:'At dawn the Wehrmacht crosses into Poland; two days later Britain and France declare war. The Second World War has begun, and the fate of Europe is in your hands.'},
-      {turn:6,  date:'May 1940', title:'FALL GELB — THE BLOW IN THE WEST',
-       text:'The panzers mass on the Western frontier. The Maginot Line is too strong to assault — the decision falls through Belgium and the Ardennes, at the hinge of the Allied line.'},
-      {turn:14, date:'1941', title:'THE EASTERN COLOSSUS',
-       text:'Whatever has happened in the west, the vast spaces and endless armies of the Soviet Union loom in the east — the war’s true graveyard of armies.'},
-      {turn:24, date:'Winter', title:'GENERAL WINTER',
-       text:'The cold clamps down across the continent. Offensives bog down, the mud freezes hard, and the side with the deeper reserves endures.'},
-    ],
-    victoryTiers:[
-      [40,'AXIS TRIUMPH','From the Atlantic to the Volga the swastika flies — a victory history never allowed, and the Old World remade.'],
-      [32,'AXIS VICTORY','The Reich dominates the continent; the Grand Alliance is broken back to its islands and its steppe.'],
-      [24,'A WIDER REICH','The Axis wins more than history granted it, but the Alliance still holds its great capitals.'],
-      [0, 'THE ALLIANCE HOLDS','The Axis tide is checked and turned — Europe will be liberated.'],
-    ],
-    sudden:{},
-    capitalDefense:undefined,
-    airInit:[], sovAirSchedule:[],
-    sovSpawns:[[46,12],[15,15],[6,9],[44,13]],
-    gerSpawns:[[23,12],[26,21],[24,11]],
-    edgeSupply:{G:false, S:false},
-    supplyRange:16,
-    supplySeeds:{G:[[23,12],[26,21]], S:[[6,9],[15,15],[48,12],[39,31]]},
-    maxTurn:36,
-    startDate:Date.UTC(1939,8,1),
-    weather(turn){ return (turn>=24 && turn<=30) ? 'freeze' : (turn>=10 && turn<=13 ? 'mud' : 'clear'); },
-    pp(side, turn){ return side==='G' ? 12 : 13; },
-    opening(playerSide){ return [
-      '1 September 1939 — the Second World War erupts across Europe.',
-      playerSide==='G'
-        ? 'You command the Axis. Beat France in the west, then turn east and break the Soviet colossus before its industry buries you.'
-        : 'You command the Grand Alliance. Hold the line in the west, trade space for time in the east, and grind the Axis down with the weight of the world.',
-    ]; },
-  };
-})();
 loadScenario('barbarossa');
 
 /* ---- scenario-driven helpers ---- */
@@ -4558,9 +4415,9 @@ function aiFullPhase(side){
 /* Two independent slots — Arcade and Realistic — so starting (or autosaving)
    a game in one mode never clobbers the other's campaign. A pre-slots save is
    migrated into the slot matching its own scenario. */
-const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', europe:'hoi5-save-europe-v1' };
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
-function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'europe' ? 'europe' : 'arcade'; }
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : 'arcade'; }
 function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
@@ -6287,12 +6144,8 @@ function openHexGame(){
   sClick();
 }
 window.addEventListener('message',e=>{ if(e.data==='waw-back'){ document.getElementById('waw-frame').style.display='none'; showModeSelect(); } });
-// THE WORLD AT WAR — launch the all-of-Europe scenario (you command the Axis).
-$('mc-hex').onclick = ()=>{
-  eventQueue.length = 0;
-  newGame('G', 'normal', 'ai', 'europe');
-  startCampaign();
-};
+// THE WORLD AT WAR — the full Europe hex map (the embedded HOI4-style game).
+$('mc-hex').onclick = openHexGame;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
 let wawSide = 'G', wawDiff = 'hard';
 const WAW_DIFF_DESC = {
