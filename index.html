@@ -4538,6 +4538,7 @@ function wwComputeStats(){
       n.mp  = Math.max(50000, n.hexes*8000 + n.cityList.length*40000);
     }
     n.civ += n.bonusCiv||0; n.mil += n.bonusMil||0;
+    if(n.warDmg>0){ n.civ=Math.max(1,Math.round(n.civ*(1-n.warDmg))); n.mil=Math.max(0,Math.round(n.mil*(1-n.warDmg))); }
   }
 }
 
@@ -4622,7 +4623,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.bombTarget=null; n.warDmg=0; wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -4876,10 +4877,36 @@ function wwFocusTick(n){
 // air power: a national air force that grows from industry and tips battles via air superiority
 const WW_AIR = { GER:240, ENG:200, SOV:185, FRA:140, ITA:120, POL:40 };
 function wwBaseAir(nat){ return WW_AIR[nat.key] || Math.round((nat.hexes||0)/35 + (nat.cityList?nat.cityList.length:0)*4); }
+const WW_BOMB_COMMIT=0.5;   // half a bombing nation's air is committed to the strategic campaign
+function wwFrontAir(nat){ return (nat.air||0) * (nat.bombTarget ? (1-WW_BOMB_COMMIT) : 1); }
 function wwAirFactor(meKey, foeKey){
   const me=WW.byKey[meKey], foe=WW.byKey[foeKey]; if(!me||!foe) return 1;
-  const ma=me.air||0, fa=foe.air||0; if(ma+fa<=0) return 1;
+  const ma=wwFrontAir(me), fa=wwFrontAir(foe); if(ma+fa<=0) return 1;   // bombers aren't over the front
   return 1 + 0.22*Math.max(-1, Math.min(1, (ma-fa)/(ma+fa)));
+}
+function wwSetBombing(natKey, targetKey){ const nn=WW.byKey[natKey]; if(!nn) return;
+  if(!targetKey || nn.bombTarget===targetKey){ nn.bombTarget=null; return; }
+  if(wwAtWar(natKey,targetKey)) nn.bombTarget=targetKey; }
+function wwAIBombing(nn){
+  if((nn.air||0) < 80){ nn.bombTarget=null; return; }
+  if(nn.bombTarget){ const t=WW.byKey[nn.bombTarget]; if(t && !t.capitulated && wwAtWar(nn.key,t.key)) return; nn.bombTarget=null; }
+  let best=null, bv=-1;
+  for(const m of WW.nat){ if(m.capitulated||!wwAtWar(nn.key,m.key)) continue; const v=(m.mil||0)+(m.civ||0)*0.5; if(v>bv){ bv=v; best=m; } }
+  if(best) nn.bombTarget=best.key;
+}
+function wwBombingTick(){
+  for(const nn of WW.nat){ if(nn.capitulated||!nn.bombTarget) continue;
+    const t=WW.byKey[nn.bombTarget];
+    if(!t||t.capitulated||!wwAtWar(nn.key,t.key)){ nn.bombTarget=null; continue; }
+    const bombers=(nn.air||0)*WW_BOMB_COMMIT; if(bombers<5) continue;
+    const interceptors=(t.air||0)*0.6;
+    const eff=bombers*bombers/(bombers+interceptors+1);          // net tonnage on target
+    t.warDmg=Math.min(0.6, (t.warDmg||0)+eff*0.0008);            // industry knocked out
+    nn.air=Math.max(10, (nn.air||0)-interceptors*0.020);         // bombers lost to fighters/flak
+    t.air =Math.max(5,  (t.air||0)-bombers*0.010);               // interceptors lost defending
+    if(WW.log && Math.random()<0.12) WW.log.push(nn.name+' bombs '+t.name+'’s industry');
+  }
+  for(const nn of WW.nat){ if(nn.warDmg>0) nn.warDmg=Math.max(0, nn.warDmg-0.015); }   // repair
 }
 function wwCoastal(x,y){ if(wwSea(x,y)) return false; for(const [nx,ny] of wwNb(x,y)) if(wwSea(nx,ny)) return true; return false; }
 // every coastal land hex reachable by sea from an army on the coast (amphibious targets)
@@ -4980,7 +5007,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air||0,atWar:[...(nn.atWar||[])],
       tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
-      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null})) };
+      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -4994,7 +5021,7 @@ function wwDeserialize(s){
     nn.capitulated=ns.capitulated; nn.prod=ns.prod; nn.air=ns.air; nn.atWar=new Set(ns.atWar||[]);
     nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
-    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; }
+    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
   return WW;
@@ -5008,6 +5035,9 @@ function wwEndTurn(){
   WW.log=WW.log||[];
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAINation(n); }
+  for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAIBombing(n); }
+  wwBombingTick();
+  wwComputeStats();
   wwProduction();
   for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue; wwResearchTick(n); wwFocusTick(n); }
   wwRecomputeSupply();
@@ -6923,7 +6953,8 @@ function wwUpdateHUD(){
       const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key)).length;
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
-        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Air wings: '+Math.round(me.air||0)+
+        '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
+        '<br>Air wings: '+Math.round(me.air||0)+(me.bombTarget?' <span style="color:#8ba2b8">(bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+')</span>':'')+
         '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching||'—')+' L'+((me.tech&&me.tech[me.researching])||0)+
         '<br>Enemies left: '+enemies;
     } else ps.classList.add('hidden'); }
@@ -7043,7 +7074,14 @@ function wwUpdateInfo(){
       '<tr><td>Mil. factories</td><td>'+n.mil+'</td></tr>'+
       '<tr><td>Air wings</td><td>'+Math.round(n.air||0)+'</td></tr>'+
       '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
-      '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'; return; }
+      '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'+
+      (WW.started && n.key!==WW.player && wwAtWar(WW.player,n.key) && !n.capitulated ?
+        '<div style="margin-top:9px">'+
+        (n.warDmg>0.01?'<div style="font-size:11px;color:#e0a06a;margin-bottom:6px">Industry crippled: '+Math.round(n.warDmg*100)+'%</div>':'')+
+        '<button class="ww-pbtn" id="ww-bomb-btn" style="margin-top:0;background:'+(WW.byKey[WW.player].bombTarget===n.key?'#7a3030':'#234a8a')+'">'+
+        (WW.byKey[WW.player].bombTarget===n.key?'■ Halt bombing':'✈ Bomb industry')+'</button></div>' : '');
+    { const bb=$('ww-bomb-btn'); if(bb) bb.onclick=()=>{ wwSetBombing(WW.player, n.key); wwUpdateInfo(); wwUpdateHUD(); }; }
+    return; }
   info.classList.add('hidden');
 }
 function wwFillLegend(){ const el=$('ww-legend'); if(!el) return;
@@ -7402,6 +7440,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
+    wwFrontAir, wwSetBombing, wwAIBombing, wwBombingTick,
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
     wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,

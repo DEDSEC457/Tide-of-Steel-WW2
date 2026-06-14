@@ -808,6 +808,37 @@ say('— The World at War —');
     fc.winPct>=3 && fc.winPct<=97 && fc.ap>0 && fc.dp>0 && fc.air>1);
   const opn = E.wwNb(pn[0],pn[1]).find(([x,y])=>!E.wwArmyAt(x,y)&&!E.wwSea(x,y)&&E.wwOwnerAt(x,y)&&E.wwOwnerAt(x,y).key==='POL');
   if(opn) check('WW forecast vs an undefended hex reads a certain capture', E.wwForecast(atk,opn[0],opn[1]).winPct===100);
+
+  // --- Phase 11: strategic bombing ---  (bomb the USSR: too vast to be overrun mid-test)
+  const Gb = E.wwSetup('GER','normal');
+  E.wwDeclareWar('GER','SOV');
+  const sovMil0 = Gb.byKey.SOV.mil;
+  E.wwSetBombing('GER','SOV');
+  check('WW you can order a strategic bombing campaign', Gb.byKey.GER.bombTarget==='SOV');
+  check('WW committing bombers cuts your front-line air', E.wwFrontAir(Gb.byKey.GER) < Gb.byKey.GER.air);
+  const flips = (()=>{ E.wwSetup('GER','normal'); const f0=E.wwAirFactor('GER','FRA'); E.wwSetBombing('GER','FRA'); return E.wwAirFactor('GER','FRA') < f0; })();
+  check('WW bombing trades away air superiority over the front', flips);
+  // a single resolution costs both the bombers and the interceptors (air battle)
+  const Gi = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
+  const gAir0=Gi.byKey.GER.air, sAir0=Gi.byKey.SOV.air; E.wwBombingTick();
+  check('WW interception costs both bombers and defenders', Gi.byKey.GER.air<gAir0 && Gi.byKey.SOV.air<sAir0);
+  for(let t=0;t<10;t++) E.wwEndTurn();
+  check('WW sustained bombing cripples enemy industry', Gb.byKey.SOV.warDmg>0.15 && !Gb.byKey.SOV.capitulated);
+  check('WW effective enemy industry is suppressed', Gb.byKey.SOV.mil < sovMil0);
+  const peak = Gb.byKey.SOV.warDmg; E.wwSetBombing('GER','SOV');   // halt the campaign
+  for(let t=0;t<8;t++) E.wwEndTurn();
+  check('WW industry repairs once the bombing stops', Gb.byKey.SOV.warDmg < peak);
+  // the AI runs its own bombing campaigns
+  const Gba = E.wwSetup('POL','normal');
+  for(let t=0;t<4;t++) E.wwEndTurn();
+  check('WW the AI mounts strategic bombing of its own', Gba.nat.some(nn=>nn.key!=='POL' && nn.bombTarget));
+  // save/load preserves bombing state
+  E.wwClearSave();
+  const Gbs = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV'); Gbs.byKey.SOV.warDmg=0.3; E.wwSave();
+  E.wwSetup('FRA','easy'); E.wwDeserialize(E.wwLoadSave());
+  check('WW save/load preserves bombing campaigns',
+    E.WW.byKey.GER.bombTarget==='SOV' && Math.abs((E.WW.byKey.SOV.warDmg||0)-0.3)<0.001);
+  E.wwClearSave();
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
@@ -1003,7 +1034,9 @@ function uiSmoke(side){
       // open the focus & research panels and begin a national focus
       if ($('ww-btn-focus').onclick) $('ww-btn-focus').onclick();
       if ($('ww-btn-research').onclick) $('ww-btn-research').onclick();
+      if ($('ww-btn-diplo').onclick) $('ww-btn-diplo').onclick();
       if (UI.wwStartFocus) UI.wwStartFocus('GER');
+      if (UI.wwSetBombing){ const foe = UI.WW.nat.find(nn=>UI.wwAtWar('GER',nn.key)); if(foe) UI.wwSetBombing('GER', foe.key); }
       const t0 = UI.WW.turn;
       if (sb.wwDoEndTurn){ sb.wwDoEndTurn(); drain(); }
       ok = ok && UI.WW.turn === t0 + 1 && !!UI.WW.byKey.GER.focusProg;
