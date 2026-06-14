@@ -721,6 +721,39 @@ say('— The World at War —');
   const air0 = Gair.byKey.GER.air;
   for(let i=0;i<8;i++) E.wwProduction();
   check('WW air force grows from industry', Gair.byKey.GER.air > air0);
+
+  // --- Phase 7: research & national focus ---
+  const Gr7 = E.wwSetup('GER','normal');
+  check('WW nations init tech & a focus tree', Gr7.byKey.GER.tech && E.wwFocusList('GER').length===5 && Gr7.byKey.GER.researching==='land');
+  check('WW AI auto-starts a focus, player does not',
+    !!Gr7.byKey.SOV.focusProg && !Gr7.byKey.GER.focusProg);
+  check('WW land doctrine starts neutral', E.wwLandBonus('GER')===1);
+  // research compounds: levelling land raises the combat bonus
+  const lb0=E.wwLandBonus('GER'); E.wwApplyTech(Gr7.byKey.GER,'land');
+  check('WW researching land doctrine raises combat power', E.wwLandBonus('GER') > lb0);
+  // industry tech adds factories (via computeStats bonus)
+  E.wwApplyTech(Gr7.byKey.GER,'ind'); E.wwComputeStats();
+  check('WW industry research adds factories', Gr7.byKey.GER.civ >= 38+2 && Gr7.byKey.GER.mil >= 24+1);
+  // logistics tech extends supply range
+  const baseRange = E.wwSupplyField('GER'); // computed at log 0
+  Gr7.byKey.GER.tech.log = 3; const farRange = E.wwSupplyField('GER');
+  let base=0, far=0; for(let i=0;i<baseRange.length;i++){ base+=baseRange[i]; far+=farRange[i]; }
+  check('WW logistics research widens supply', far > base);
+  // a focus completes and applies its effect (army focus spawns divisions)
+  const Gf = E.wwSetup('GER','normal');
+  const army0 = E.wwArmiesOf('GER').length;
+  Gf.byKey.GER.focusIdx = 2; // "Wehrmacht Buildup" (+4 divisions)
+  E.wwStartFocus('GER');
+  const wk = Gf.byKey.GER.focusProg.turnsLeft;
+  for(let i=0;i<wk;i++) E.wwFocusTick(Gf.byKey.GER);
+  check('WW completing an army focus spawns divisions',
+    E.wwArmiesOf('GER').length > army0 && Gf.byKey.GER.focusIdx===3);
+  // a war-goal focus declares war when it completes
+  const Gwg = E.wwSetup('GER','normal');
+  Gwg.byKey.GER.focusIdx = 4; // "Generalplan Ost" -> war on USSR
+  E.wwStartFocus('GER'); const wk2=Gwg.byKey.GER.focusProg.turnsLeft;
+  for(let i=0;i<wk2;i++) E.wwFocusTick(Gwg.byKey.GER);
+  check('WW a war-goal focus declares war on completion', E.wwAtWar('GER','SOV'));
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
@@ -913,9 +946,13 @@ function uiSmoke(side){
     if (sb.wwStart){
       sb.wwStart('GER'); drain();
       ok = ok && UI.WW.started === true && UI.wwArmiesOf('GER').length > 0;
+      // open the focus & research panels and begin a national focus
+      if ($('ww-btn-focus').onclick) $('ww-btn-focus').onclick();
+      if ($('ww-btn-research').onclick) $('ww-btn-research').onclick();
+      if (UI.wwStartFocus) UI.wwStartFocus('GER');
       const t0 = UI.WW.turn;
       if (sb.wwDoEndTurn){ sb.wwDoEndTurn(); drain(); }
-      ok = ok && UI.WW.turn === t0 + 1;
+      ok = ok && UI.WW.turn === t0 + 1 && !!UI.WW.byKey.GER.focusProg;
     }
     wawOk = ok;
     if ($('ww-back').onclick) $('ww-back').onclick();

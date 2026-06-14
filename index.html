@@ -4537,6 +4537,7 @@ function wwComputeStats(){
       n.mil = Math.max(0, Math.round(n.hexes/55));
       n.mp  = Math.max(50000, n.hexes*8000 + n.cityList.length*40000);
     }
+    n.civ += n.bonusCiv||0; n.mil += n.bonusMil||0;
   }
 }
 
@@ -4616,9 +4617,10 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
+  for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
   WW.result=null;
   return WW;
 }
@@ -4673,7 +4675,7 @@ function wwCapitulate(fallenKey, byKey){
 
 // supply: BFS from a nation's owned cities across friendly-owned land, limited range.
 function wwSupplyField(natKey){
-  const me=WW.byKey[natKey], cols=WW.cols, RANGE=12;
+  const me=WW.byKey[natKey], cols=WW.cols, RANGE=12 + (((me&&me.tech&&me.tech.log)||0)*3);
   const sup=new Uint8Array(cols*WW.rows), q=[]; let qi=0;
   for(const c of WW.cities){ const idx=c.y*cols+c.x; if(WW.own[idx]===me.i && !sup[idx]){ sup[idx]=1; q.push([c.x,c.y,0]); } }
   while(qi<q.length){ const [x,y,d]=q[qi++]; if(d>=RANGE) continue;
@@ -4691,9 +4693,9 @@ function wwSupport(of, tx, ty){ let s=0;
   for(const [nx,ny] of wwNb(tx,ty)){ const u=wwArmyAt(nx,ny); if(u&&u!==of&&(u.nat===of.nat||wwAllied(u.nat,of.nat))) s++; }
   return Math.min(3,s); }
 function wwAtkPower(a,tx,ty){ let p=a.str*(1+0.30*wwSupport(a,tx,ty));
-  if(!wwInSupply(a)) p*=0.6; if(a.nat!==WW.player) p*=(WW.aiPow||1); return p; }
+  if(!wwInSupply(a)) p*=0.6; p*=wwLandBonus(a.nat); if(a.nat!==WW.player) p*=(WW.aiPow||1); return p; }
 function wwDefPower(d,tx,ty){ let p=d.str*(1+0.20*wwSupport(d,tx,ty))*wwTerrDef(tx,ty);
-  if(!wwInSupply(d)) p*=0.6; if(d.nat!==WW.player) p*=(WW.aiPow||1); return p; }
+  if(!wwInSupply(d)) p*=0.6; p*=wwLandBonus(d.nat); if(d.nat!==WW.player) p*=(WW.aiPow||1); return p; }
 
 function wwRetreat(d, fromX, fromY){
   let best=null, bd=-1;
@@ -4766,6 +4768,80 @@ function wwAIStep2(a){
   }
   return best;
 }
+// ---- research: tech levels that compound a nation's war effort ----
+function wwTechInit(n){ n.tech={land:0,ind:0,air:0,log:0}; n.research=0; n.researching='land'; n.bonusCiv=0; n.bonusMil=0; n.bonusLand=0; }
+function wwLandBonus(natKey){ const n=WW.byKey[natKey]; if(!n) return 1; return 1 + 0.04*((n.tech&&n.tech.land)||0) + (n.bonusLand||0); }
+function wwResearchOutput(n){ return (n.civ||1)*0.6; }
+function wwResearchCost(level){ return 60 + level*45; }
+function wwApplyTech(n,cat){ if(!n.tech) wwTechInit(n); n.tech[cat]=(n.tech[cat]||0)+1;
+  if(cat==='ind'){ n.bonusCiv=(n.bonusCiv||0)+2; n.bonusMil=(n.bonusMil||0)+1; }
+  else if(cat==='air'){ n.air=(n.air||0)+15; } }
+function wwAIResearchPick(n){ const order=['land','ind','land','air','log','ind'];
+  return order[((n.tech.land||0)+(n.tech.ind||0)+(n.tech.air||0)+(n.tech.log||0))%order.length]; }
+function wwResearchTick(n){ if(!n.tech) wwTechInit(n);
+  n.research += wwResearchOutput(n);
+  const cost=wwResearchCost(n.tech[n.researching]||0);
+  if(n.research>=cost){ n.research-=cost; wwApplyTech(n,n.researching);
+    if(n.key!==WW.player) n.researching=wwAIResearchPick(n); } }
+
+// ---- national focus: a short scripted tree of historical decisions per major ----
+const WW_FOCUS = {
+  GER:[ {id:'rhein',name:'Remilitarise the Rhineland',days:35,fx:['land',0.05]},
+        {id:'4yr',name:'Four Year Plan',days:70,fx:['factory',4,2]},
+        {id:'wehr',name:'Wehrmacht Buildup',days:70,fx:['army',4]},
+        {id:'luft',name:'Luftwaffe Doctrine',days:70,fx:['air',80]},
+        {id:'ost',name:'Generalplan Ost',days:105,fx:['wargoal','SOV']} ],
+  ENG:[ {id:'rearm',name:'Rearmament',days:60,fx:['factory',3,2]},
+        {id:'raf',name:'RAF Expansion',days:70,fx:['air',90]},
+        {id:'shadow',name:'Shadow Factories',days:60,fx:['factory',3,1]},
+        {id:'imp',name:'Imperial Conscription',days:70,fx:['army',4]},
+        {id:'cont',name:'Continental Commitment',days:70,fx:['army',3]} ],
+  FRA:[ {id:'maginot',name:'The Maginot Line',days:60,fx:['land',0.08]},
+        {id:'entente',name:'The Little Entente',days:60,fx:['army',3]},
+        {id:'mech',name:'Mechanise the Army',days:70,fx:['research',120]},
+        {id:'charb',name:'Char B Production',days:60,fx:['army',3]},
+        {id:'levee',name:'Levée en Masse',days:70,fx:['army',4]} ],
+  SOV:[ {id:'fyp',name:'First Five Year Plan',days:70,fx:['factory',5,2]},
+        {id:'collect',name:'Collectivisation',days:70,fx:['factory',4,1]},
+        {id:'doctrine',name:'Deep Battle Doctrine',days:70,fx:['land',0.06]},
+        {id:'avia',name:'Aviation Industry',days:70,fx:['air',90]},
+        {id:'army',name:'Mass Mobilisation',days:90,fx:['army',5]} ],
+  ITA:[ {id:'autarky',name:'Autarky',days:60,fx:['factory',3,1]},
+        {id:'regia',name:'Regia Aeronautica',days:70,fx:['air',70]},
+        {id:'mare',name:'Mare Nostrum',days:70,fx:['army',3]},
+        {id:'black',name:'Blackshirt Legions',days:60,fx:['army',3]},
+        {id:'empire',name:'A New Roman Empire',days:105,fx:['wargoal','YUG']} ],
+  POL:[ {id:'fort',name:'Fortify the Frontier',days:60,fx:['land',0.07]},
+        {id:'modern',name:'Modernise the Army',days:70,fx:['research',100]},
+        {id:'inter',name:'Intermarium',days:70,fx:['army',3]},
+        {id:'cor',name:'Central Industrial Region',days:70,fx:['factory',3,2]},
+        {id:'defence',name:'National Defence',days:60,fx:['army',3]} ],
+};
+function wwFocusInit(n){ n.focusIdx=0; n.focusProg=null; }
+function wwFocusList(natKey){ return WW_FOCUS[natKey] || []; }
+function wwStartFocus(natKey){ const n=WW.byKey[natKey], list=wwFocusList(natKey);
+  if(!n || n.focusProg || n.focusIdx>=list.length || n.capitulated) return false;
+  const f=list[n.focusIdx]; n.focusProg={ idx:n.focusIdx, turnsLeft:Math.max(1,Math.round(f.days/7)) }; return true; }
+function wwSpawnDivisions(n,count){ const cap=wwCapitalHex(n.key); if(!cap) return;
+  let placed=0, id=(WW.armies.reduce((m,a)=>Math.max(m,a.id),0)||0)+1;
+  for(const [x,y] of [cap, ...wwNb(cap[0],cap[1])]){ if(placed>=count) break;
+    if(wwSea(x,y)||wwArmyAt(x,y)||WW.own[y*WW.cols+x]!==n.i) continue;
+    WW.armies.push(wwMakeArmy(id++, n.key, x, y, placed%2?'arm':'inf')); placed++; } }
+function wwApplyFocus(n,fx){ const t=fx[0];
+  if(t==='factory'){ n.bonusCiv=(n.bonusCiv||0)+fx[1]; n.bonusMil=(n.bonusMil||0)+(fx[2]||0); }
+  else if(t==='air'){ n.air=(n.air||0)+fx[1]; }
+  else if(t==='research'){ n.research=(n.research||0)+fx[1]; }
+  else if(t==='land'){ n.bonusLand=(n.bonusLand||0)+fx[1]; }
+  else if(t==='army'){ wwSpawnDivisions(n,fx[1]); }
+  else if(t==='wargoal'){ wwDeclareWar(n.key,fx[1]); } }
+function wwFocusTick(n){
+  if(!n.focusProg){ if(n.key!==WW.player) wwStartFocus(n.key); return; }
+  n.focusProg.turnsLeft--;
+  if(n.focusProg.turnsLeft<=0){ const f=wwFocusList(n.key)[n.focusProg.idx];
+    if(f){ wwApplyFocus(n,f.fx); if(WW.log) WW.log.push(n.name+' completes focus: '+f.name); }
+    n.focusIdx=n.focusProg.idx+1; n.focusProg=null;
+    if(n.key!==WW.player) wwStartFocus(n.key); } }
+
 // air power: a national air force that grows from industry and tips battles via air superiority
 const WW_AIR = { GER:240, ENG:200, SOV:185, FRA:140, ITA:120, POL:40 };
 function wwBaseAir(nat){ return WW_AIR[nat.key] || Math.round((nat.hexes||0)/35 + (nat.cityList?nat.cityList.length:0)*4); }
@@ -4871,6 +4947,7 @@ function wwEndTurn(){
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAINation(n); }
   wwProduction();
+  for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue; wwResearchTick(n); wwFocusTick(n); }
   wwRecomputeSupply();
   for(const a of WW.armies){ const sup=wwInSupply(a);
     if(!a.moved){ if(sup){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.30); a.str=Math.min(a.maxStr,a.str+0.6); }
@@ -6571,6 +6648,8 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden');
+  $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
   $('ww-playerflag').style.display='none'; $('ww-playername').textContent=''; $('ww-turn').textContent='';
@@ -6601,6 +6680,7 @@ function wwStart(key){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden');
   const n=WW.byKey[key];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
@@ -6760,6 +6840,8 @@ function wwDoEndTurn(){
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
+  if(!$('ww-focus').classList.contains('hidden')) wwRenderFocus();
+  if(!$('ww-research').classList.contains('hidden')) wwRenderResearch();
   if(v.over) wwShowEnd(v);
 }
 function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ wwToast(WW.log.shift()); } }
@@ -6774,9 +6856,51 @@ function wwUpdateHUD(){
       const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key)).length;
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
-        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Air wings: '+Math.round(me.air||0)+'<br>Enemies left: '+enemies;
+        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Air wings: '+Math.round(me.air||0)+
+        '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching||'—')+' L'+((me.tech&&me.tech[me.researching])||0)+
+        '<br>Enemies left: '+enemies;
     } else ps.classList.add('hidden'); }
 }
+function wwFocusStatus(me){
+  if(me.focusProg){ const f=wwFocusList(WW.player)[me.focusProg.idx]; return (f?f.name:'?')+' ('+me.focusProg.turnsLeft+'w)'; }
+  if(me.focusIdx<wwFocusList(WW.player).length) return '<i style="color:#9fb4c9">choose one</i>';
+  return 'complete';
+}
+function wwFocusDesc(fx){ const t=fx[0];
+  return t==='factory'?('+'+fx[1]+' civ / +'+(fx[2]||0)+' mil factories')
+    : t==='air'?('+'+fx[1]+' air wings') : t==='army'?('+'+fx[1]+' divisions')
+    : t==='land'?('+'+Math.round(fx[1]*100)+'% land combat') : t==='research'?('+'+fx[1]+' research')
+    : t==='wargoal'?('war goal: '+(WW.byKey[fx[1]]?WW.byKey[fx[1]].name:fx[1])) : ''; }
+function wwRenderFocus(){
+  const el=$('ww-focus'); if(!el) return; const me=WW.byKey[WW.player], list=wwFocusList(WW.player);
+  let html='<h3>NATIONAL FOCUS</h3>';
+  if(!list.length){ el.innerHTML=html+'<div style="color:#90a6bb;font-size:12px">No focus tree for this nation.</div>'; return; }
+  list.forEach((f,i)=>{ const done=i<me.focusIdx, active=me.focusProg&&me.focusProg.idx===i;
+    const cls=done?'done':active?'active':'', icon=done?'✓':active?'◷':(i===me.focusIdx?'▸':'·');
+    const sub=active?('in progress — '+me.focusProg.turnsLeft+' wk'):wwFocusDesc(f.fx);
+    html+='<div class="ww-foc '+cls+'"><div class="fi">'+icon+'</div><div><div class="fn">'+f.name+'</div><div class="fd">'+sub+'</div></div></div>'; });
+  const canStart=!me.focusProg && me.focusIdx<list.length;
+  html+='<button class="ww-pbtn" id="ww-focus-start"'+(canStart?'':' disabled')+'>'+
+    (me.focusIdx>=list.length?'All focuses complete':(canStart?('Begin: '+list[me.focusIdx].name):'Focus in progress…'))+'</button>';
+  el.innerHTML=html;
+  const b=$('ww-focus-start'); if(b&&canStart) b.onclick=()=>{ wwStartFocus(WW.player); wwRenderFocus(); wwUpdateHUD(); };
+}
+function wwRenderResearch(){
+  const el=$('ww-research'); if(!el) return; const me=WW.byKey[WW.player]; if(!me.tech){ el.innerHTML=''; return; }
+  const cats=[['land','Land Doctrine','combat'],['ind','Industry','factories'],['air','Aircraft','air'],['log','Logistics','supply']];
+  let html='<h3>RESEARCH</h3>';
+  for(const [k,name,desc] of cats) html+='<div class="ww-tech"><span class="tl">'+name+' <span style="color:#7d93ab;font-size:11px">'+desc+'</span></span><span class="tv">Lv '+(me.tech[k]||0)+'</span></div>';
+  const cost=wwResearchCost(me.tech[me.researching]||0), pct=Math.min(100,100*(me.research||0)/cost);
+  html+='<div style="margin-top:9px;font-size:11px;color:#9fb4c9">Researching: <b style="color:#eaf2fb">'+me.researching+'</b></div>';
+  html+='<div class="ww-bar" style="margin-top:4px"><i style="width:'+pct+'%;background:#6fb0e0"></i></div><div style="margin-top:8px">';
+  for(const [k,name] of cats) html+='<span class="ww-rbtn'+(me.researching===k?' sel':'')+'" data-cat="'+k+'">'+name+'</span>';
+  el.innerHTML=html+'</div>';
+  for(const b of el.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ me.researching=b.dataset.cat; wwRenderResearch(); wwUpdateHUD(); };
+}
+function wwToggleFocus(){ const f=$('ww-focus'), r=$('ww-research'); if(r) r.classList.add('hidden');
+  if(f){ const show=f.classList.contains('hidden'); f.classList.toggle('hidden', !show); if(show) wwRenderFocus(); } }
+function wwToggleResearch(){ const f=$('ww-focus'), r=$('ww-research'); if(f) f.classList.add('hidden');
+  if(r){ const show=r.classList.contains('hidden'); r.classList.toggle('hidden', !show); if(show) wwRenderResearch(); } }
 function wwUpdateInfo(){
   const info=$('ww-info'); if(!info) return;
   if(wwSelArmy){ const a=wwSelArmy, n=WW.byKey[a.nat];
@@ -6844,6 +6968,8 @@ function wwBindInput(){
     else if(e.key==='-'||e.key==='_'){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1/1.15); } });
   const bk=$('ww-back'); if(bk) bk.onclick=()=>{ wwClose(); showModeSelect(); };
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
+  const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwToggleFocus;
+  const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
 }
 // expose a few entry points on window for debugging / headless rendering (no-op in tests)
 if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; }
@@ -7161,6 +7287,8 @@ if (typeof module !== 'undefined' && module.exports){
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir,
+    WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
+    wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
     getState: () => G,
   };
 }
@@ -7237,6 +7365,26 @@ if (typeof module !== 'undefined' && module.exports){
       border-radius:14px;padding:5px 16px;cursor:pointer;background:#0e1c2c;}
     .ww-diff:hover{border-color:#4f8fce;}
     .ww-diff.sel{background:#1d3553;color:#eaf2fb;border-color:#5a9fde;}
+    .ww-hbtn{background:#142338;border:1px solid #2c486a;color:#cfe2f7;font:700 11px 'Segoe UI',sans-serif;
+      letter-spacing:1px;padding:6px 11px;border-radius:6px;cursor:pointer;}
+    .ww-hbtn:hover{background:#1d3553;border-color:#4f8fce;} .ww-hbtn.hidden{display:none;}
+    .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
+      border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
+    .ww-panel.hidden{display:none;}
+    .ww-panel h3{margin:0 0 9px;font-size:14px;letter-spacing:1.5px;color:#dfe9f5;}
+    .ww-foc{display:flex;gap:8px;align-items:flex-start;padding:7px;border-radius:7px;margin:5px 0;border:1px solid #1c2c40;font-size:12px;}
+    .ww-foc .fi{width:18px;text-align:center;font-size:13px;flex:0 0 auto;}
+    .ww-foc.done{background:#10241a;border-color:#2c5a3a;} .ww-foc.done .fi{color:#7fd08a;}
+    .ww-foc.active{background:#1a2740;border-color:#4f7fce;} .ww-foc.active .fi{color:#ffd34d;}
+    .ww-foc .fn{font-weight:600;color:#e6eef7;} .ww-foc .fd{color:#90a6bb;font-size:11px;margin-top:1px;}
+    .ww-pbtn{width:100%;margin-top:8px;background:#234a8a;border:1px solid #4f7fce;color:#eaf2fb;
+      font:700 12px 'Segoe UI',sans-serif;letter-spacing:1px;padding:9px;border-radius:7px;cursor:pointer;}
+    .ww-pbtn:hover{background:#2c5aa6;} .ww-pbtn:disabled{opacity:.45;cursor:default;}
+    .ww-tech{display:flex;justify-content:space-between;align-items:center;margin:6px 0;font-size:12.5px;}
+    .ww-tech .tl{color:#cfe0f2;} .ww-tech .tv{color:#ffe9a8;font-weight:700;}
+    .ww-rbtn{font-size:11px;font-weight:700;letter-spacing:.5px;color:#9fb4c9;border:1px solid #2c486a;
+      border-radius:13px;padding:4px 11px;cursor:pointer;background:#0e1c2c;margin:2px 3px 2px 0;display:inline-block;}
+    .ww-rbtn:hover{border-color:#4f8fce;} .ww-rbtn.sel{background:#1d3553;color:#eaf2fb;border-color:#5a9fde;}
     /* win/lose */
     #ww-end{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;
       justify-content:center;gap:14px;background:#060a10ee;}
@@ -7254,12 +7402,16 @@ if (typeof module !== 'undefined' && module.exports){
     <div id="ww-playername"></div>
     <div id="ww-date">1 September 1939</div>
     <div id="ww-turn"></div>
+    <button id="ww-btn-focus" class="ww-hbtn hidden">★ FOCUS</button>
+    <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>
   <div id="ww-legend"></div>
   <div id="ww-info" class="hidden"></div>
   <div id="ww-pstat" class="hidden"></div>
+  <div id="ww-focus" class="ww-panel hidden"></div>
+  <div id="ww-research" class="ww-panel hidden"></div>
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-toast"></div>
   <div id="ww-pick">
