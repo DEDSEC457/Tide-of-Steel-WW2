@@ -4766,6 +4766,38 @@ function wwAIStep2(a){
   }
   return best;
 }
+function wwCoastal(x,y){ if(wwSea(x,y)) return false; for(const [nx,ny] of wwNb(x,y)) if(wwSea(nx,ny)) return true; return false; }
+// every coastal land hex reachable by sea from an army on the coast (amphibious targets)
+function wwInvadeTargets(a){
+  if(!a || !wwCoastal(a.x,a.y)) return [];
+  const RANGE=20, cols=WW.cols, seen=new Uint8Array(cols*WW.rows), q=[]; let qi=0;
+  for(const [nx,ny] of wwNb(a.x,a.y)) if(wwSea(nx,ny)){ const idx=ny*cols+nx; if(!seen[idx]){ seen[idx]=1; q.push([nx,ny,1]); } }
+  const land=new Set();
+  while(qi<q.length){ const [x,y,d]=q[qi++];
+    for(const [nx,ny] of wwNb(x,y)){
+      if(wwSea(nx,ny)){ if(d<RANGE){ const idx=ny*cols+nx; if(!seen[idx]){ seen[idx]=1; q.push([nx,ny,d+1]); } } }
+      else { if(nx===a.x&&ny===a.y) continue; const u=wwArmyAt(nx,ny);
+        if(u && (u.nat===a.nat||wwAllied(u.nat,a.nat))) continue; land.add(nx+','+ny); } } }
+  return [...land].map(k=>{ const p=k.split(','); return [+p[0],+p[1]]; });
+}
+function wwInvade(a,tx,ty){
+  const d=wwArmyAt(tx,ty), oi=WW.own[ty*WW.cols+tx], owner=oi>=0?WW.nat[oi]:null;
+  const friendlyDest = owner && (owner.key===a.nat||wwAllied(owner.key,a.nat)) && !d;
+  const foeKey = d ? d.nat : (owner?owner.key:null);
+  if(!friendlyDest && foeKey && !wwAtWar(a.nat,foeKey)) wwDeclareWar(a.nat,foeKey);
+  a.moved=true; a.org=Math.max(1,a.org-a.maxOrg*0.22);   // the sea crossing costs organization
+  if(friendlyDest){ a.x=tx; a.y=ty; return {result:'landed'}; }
+  if(d){
+    const atk=wwAtkPower(a,tx,ty)*0.55*(0.55+Math.random()*0.45);   // amphibious assault penalty
+    const def=wwDefPower(d,tx,ty)*(0.60+Math.random()*0.40);
+    d.org-=atk*0.85; d.str-=atk*0.20; a.org-=def*0.9; a.str-=def*0.22;
+    if(a.str<=1.0){ wwRemoveArmy(a); return {result:'invasion-lost'}; }
+    if(d.str<=1.0){ wwRemoveArmy(d); }
+    else if(d.org<=0){ if(!wwRetreat(d,a.x,a.y)) wwRemoveArmy(d); }
+    else return {result:'repelled'};   // the beach held — landing thrown back
+  }
+  wwCaptureHex(tx,ty,a.nat); if(!wwArmyAt(tx,ty)){ a.x=tx; a.y=ty; } return {result:'landed'};
+}
 function wwAINation(n){
   const cap=wwCapitalHex(n.key), mine=wwArmiesOf(n.key);
   // 1) press attacks where the odds are good (concentration emerges from combined-arms power)
@@ -4784,6 +4816,16 @@ function wwAINation(n){
       const threat=wwNb(a.x,a.y).some(([x,y])=>{ const o=WW.own[y*WW.cols+x]; return o>=0 && wwAtWar(n.key,WW.nat[o].key); });
       if(!threat) continue; }
     const dest=wwAIStep2(a); if(dest) wwMoveArmy(a,dest[0],dest[1]); }
+  // 3) opportunistic amphibious assault (island & coastal powers reach the enemy)
+  let inv=0;
+  for(const a of mine){ if(a.moved||inv>=1) continue; if(!wwCoastal(a.x,a.y)||a.org<a.maxOrg*0.55) continue;
+    const beaches=wwInvadeTargets(a).filter(([x,y])=>{ const o=WW.own[y*WW.cols+x]; return o>=0 && wwAtWar(n.key,WW.nat[o].key); });
+    if(!beaches.length) continue;
+    const obj=wwAIObjective(n.key,a.x,a.y);
+    beaches.sort((p,q)=>{ const dp=wwArmyAt(p[0],p[1]), dq=wwArmyAt(q[0],q[1]); const sp=dp?dp.str:0, sq=dq?dq.str:0;
+      if(sp!==sq) return sp-sq; if(!obj) return 0; return Math.hypot(p[0]-obj[0],p[1]-obj[1])-Math.hypot(q[0]-obj[0],q[1]-obj[1]); });
+    const [tx,ty]=beaches[0], d=wwArmyAt(tx,ty);
+    if(!d || a.str>=d.str*0.95){ wwInvade(a,tx,ty); inv++; } }
 }
 
 function wwProduction(){
@@ -6509,13 +6551,13 @@ function wwHexPath(g,cx,cy,s){ g.beginPath();
 function wwW2S(wx,wy){ const c=WW.cam; return [wx*c.z+c.x, wy*c.z+c.y]; }
 
 let wwRAFpending=false, wwDrag=false, wwDragMoved=false, wwLMx=0, wwLMy=0;
-let wwSelNat=null, wwSelHexes=null, wwSelArmy=null, wwReachSet=null, wwTargetSet=null, wwDeclareSet=null, wwBound=false;
+let wwSelNat=null, wwSelHexes=null, wwSelArmy=null, wwReachSet=null, wwTargetSet=null, wwDeclareSet=null, wwInvadeSet=null, wwBound=false;
 
 function wwOpen(){
   show('mode-select', false);
   wwBuildState();
   WW.started=false; WW._mapDirty=true; WW.mapCanvas=null;
-  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null;
+  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
@@ -6545,7 +6587,7 @@ function wwFillPick(){
 function wwStart(key){
   wwSetup(key, WW._pickDiff||'normal');
   WW.started=true; WW._mapDirty=true; WW.mapCanvas=null;
-  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null;
+  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
@@ -6620,6 +6662,8 @@ function wwRender(){
     for(const k of wwTargetSet){ const [x,y]=k.split(',').map(Number); const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.6); ctx.fill(); ctx.stroke(); } }
   if(wwSelArmy && wwDeclareSet){ ctx.fillStyle='rgba(235,170,60,0.38)'; ctx.lineWidth=1.5/cam.z; ctx.strokeStyle='rgba(255,200,90,0.9)';
     for(const k of wwDeclareSet){ const [x,y]=k.split(',').map(Number); const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.6); ctx.fill(); ctx.stroke(); } }
+  if(wwSelArmy && wwInvadeSet){ ctx.fillStyle='rgba(70,200,215,0.26)'; ctx.lineWidth=1.3/cam.z; ctx.strokeStyle='rgba(120,230,240,0.85)';
+    for(const k of wwInvadeSet){ const [x,y]=k.split(',').map(Number); const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.6); ctx.fill(); ctx.stroke(); } }
   if(wwSelArmy){ const [cx,cy]=wwHexCenter(wwSelArmy.x,wwSelArmy.y); ctx.lineWidth=2.6/cam.z; ctx.strokeStyle='#ffe9a8'; wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.stroke(); }
   // armies (screen space, fixed-ish readable size)
   if(WW.started && WW.armies){ ctx.setTransform(dpr,0,0,dpr,0,0); wwDrawArmies(ctx); }
@@ -6662,11 +6706,15 @@ function wwSelectArmy(a){
     const enemyT=new Set(wwAttackTargets(a).map(p=>p[0]+','+p[1]));
     const allT=wwAttackTargetsPlayer(a).map(p=>p[0]+','+p[1]);
     wwTargetSet=enemyT; wwDeclareSet=new Set(allT.filter(k=>!enemyT.has(k)));
-  } else { wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; }
+    if(wwCoastal(a.x,a.y)){
+      const closer=new Set([...wwReachSet, ...wwTargetSet, ...wwDeclareSet]);
+      wwInvadeSet=new Set(wwInvadeTargets(a).map(p=>p[0]+','+p[1]).filter(k=>!closer.has(k)));
+    } else wwInvadeSet=null;
+  } else { wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null; }
   wwUpdateInfo(); wwRequest();
 }
 function wwSelectNation(hit){
-  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null;
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   if(!hit||wwSea(hit[0],hit[1])){ wwSelNat=null; wwSelHexes=null; }
   else { const n=wwOwnerAt(hit[0],hit[1]); wwSelNat=n||null; wwSelHexes=null;
     if(n){ wwSelHexes=[]; for(let y=0;y<WW.rows;y++) for(let x=0;x<WW.cols;x++) if(WW.own[y*WW.cols+x]===n.i) wwSelHexes.push([x,y]); } }
@@ -6678,6 +6726,7 @@ function wwClickHex(hit){
   if(WW.started && wwSelArmy && !wwSelArmy.moved){
     if((wwTargetSet&&wwTargetSet.has(key))||(wwDeclareSet&&wwDeclareSet.has(key))){ const r=wwAttack(wwSelArmy, x, y); WW._mapDirty=true; wwAfterAction(r); return; }
     if(wwReachSet && wwReachSet.has(key)){ wwMoveArmy(wwSelArmy, x, y); wwAfterAction({result:'moved'}); return; }
+    if(wwInvadeSet && wwInvadeSet.has(key)){ const r=wwInvade(wwSelArmy, x, y); WW._mapDirty=true; wwAfterAction(r); return; }
   }
   if(WW.started && army && army.nat===WW.player){ wwSelectArmy(army); return; }
   wwSelectNation(hit);
@@ -6685,8 +6734,11 @@ function wwClickHex(hit){
 function wwAfterAction(r){
   wwComputeStats();
   // the acting army has used its turn → drop the selection, refresh
-  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null;
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   if(r && r.result==='taken') wwToast('Position captured');
+  else if(r && r.result==='landed') wwToast('Troops landed ashore');
+  else if(r && r.result==='repelled') wwToast('The landing was thrown back');
+  else if(r && r.result==='invasion-lost') wwToast('The invasion force was lost at sea');
   // surface any capitulations the action triggered
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
@@ -6695,7 +6747,7 @@ function wwAfterAction(r){
 function wwDoEndTurn(){
   if(!WW.started || (WW.result&&WW.result.over)) return;
   const v=wwEndTurn(); WW._mapDirty=true;
-  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null;
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if(v.over) wwShowEnd(v);
@@ -6729,7 +6781,8 @@ function wwUpdateInfo(){
       '<table class="ww-stats"><tr><td>Movement</td><td>'+a.mp+'</td></tr>'+
       '<tr><td>Supply</td><td>'+(wwInSupply(a)?'in supply':'<span style="color:#e0856a">cut off</span>')+'</td></tr>'+
       '<tr><td>Orders</td><td>'+(a.moved?'used':'ready')+'</td></tr></table>'+
-      (a.nat===WW.player && !a.moved ? '<div style="font-size:11px;color:#8fb4d8;margin-top:8px">Click a blue hex to move, a red hex to attack.</div>' : '');
+      (a.nat===WW.player && !a.moved ? '<div style="font-size:11px;color:#8fb4d8;margin-top:8px">Blue = move · red = attack · amber = declare war'+
+        (wwCoastal(a.x,a.y)?' · <span style="color:#7be0ee">teal = invade by sea</span>':'')+'.</div>' : '');
     return; }
   if(wwSelNat){ const n=wwSelNat; info.classList.remove('hidden');
     const facName={axis:'Axis',allies:'Allies',comintern:'Comintern',neutral:'Neutral'}[n.fac]||'Neutral';
@@ -7096,6 +7149,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
+    wwCoastal, wwInvadeTargets, wwInvade,
     getState: () => G,
   };
 }

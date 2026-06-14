@@ -692,6 +692,25 @@ say('— The World at War —');
   const iso={nat:'GER',x:ix,y:iy,str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false};
   Ga.armies.push(iso); const org0=iso.org; E.wwEndTurn();
   check('WW out-of-supply armies suffer attrition', iso.org < org0);
+
+  // --- Phase 5: naval invasions ---
+  const Gv = E.wwSetup('ENG','normal');
+  let pair=null;
+  for(const a of E.wwArmiesOf('ENG')){ if(!E.wwCoastal(a.x,a.y)) continue;
+    const beach=E.wwInvadeTargets(a).find(([x,y])=>{ const o=Gv.own[y*Gv.cols+x]; return o>=0 && E.wwAtWar('ENG', Gv.nat[o].key); });
+    if(beach){ pair={a,beach}; break; } }
+  check('WW the UK can reach an enemy beach by sea', !!pair);
+  if(pair){ pair.a.str=40; pair.a.org=40; pair.a.maxStr=40; pair.a.maxOrg=40;
+    const r=E.wwInvade(pair.a, pair.beach[0], pair.beach[1]);
+    check('WW amphibious assault lands a beachhead & seizes the coast',
+      r.result==='landed' && E.wwOwnerAt(pair.beach[0],pair.beach[1]).key==='ENG'); }
+  // AI island powers actually cross to the continent over a campaign
+  const Gv2 = E.wwSetup('GER','normal');
+  for(let t=0;t<30;t++){ for(const nn of Gv2.nat){ if(!nn.capitulated&&nn.key!=='XXX') E.wwAINation(nn);} E.wwProduction(); E.wwRecomputeSupply(); for(const a of Gv2.armies) a.moved=false; }
+  check('WW AI mounts amphibious operations (UK reaches the continent)',
+    E.wwArmiesOf('ENG').some(a=>a.x>22));
+  let ov=0; for(let i=0;i<Gv2.own.length;i++) if(Gv2.own[i]>=0) ov++;
+  check('WW ownership invariant survives a naval war', ov===owned);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
