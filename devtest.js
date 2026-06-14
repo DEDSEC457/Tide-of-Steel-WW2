@@ -743,6 +743,7 @@ function uiSmoke(side){
   if ($('wx-chip').onclick){ $('wx-chip').onclick(); $('btn-clock-close').onclick(); }
   if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();
   if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
+  if ($('btn-next').onclick) $('btn-next').onclick();   // cycle to next unit with orders
   if ($('btn-undo').onclick) $('btn-undo').onclick();
   $('btn-sound').onclick();                  // opens the settings modal
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }

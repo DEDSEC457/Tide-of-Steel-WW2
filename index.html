@@ -213,10 +213,11 @@
   <span class="spacer"></span>
   <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚 Supply</button>
   <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
-  <button id="btn-objectives">Objectives</button>
-  <button id="btn-help2">Help</button>
-  <button id="btn-sound">🔊</button>
-  <button id="btn-menu">Menu</button>
+  <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
+  <button id="btn-help2" title="How to play">Help</button>
+  <button id="btn-sound" title="Sound & graphics settings">🔊</button>
+  <button id="btn-menu" title="Save and return to the menu">Menu</button>
+  <button id="btn-next" class="hidden" title="Jump to your next unit with orders left (N / Space / Tab)">⏭ Next</button>
   <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩ Undo</button>
   <button id="btn-endturn" class="primary">End Turn ▶</button>
 </div>
@@ -571,6 +572,12 @@
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
           speed (normal / fast / instant). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
+      <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
+          give. <b>N</b> / <b>Space</b> / <b>Tab</b> (or the <b>⏭ Next</b> button) jumps to the
+          next one and centres it; the button also shows how many are left. <b>Arrow keys</b> pan,
+          <b>+</b> / <b>−</b> (and the scroll wheel) zoom, and <b>C</b> recentres
+          on your selected unit. <b>Right-click</b> cancels a deploy, an air strike or a selection;
+          <b>double-click</b> recentres the map. <b>E</b> ends the turn, <b>Esc</b> clears everything.</li>
       <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
           plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields) or of
           a friendly <b>aircraft carrier</b> in naval scenarios, or fly <b>Patrol</b> to intercept enemy
@@ -5654,6 +5661,11 @@ $('btn-undo').onclick = ()=>{
   sel = null; reach = null; deployKind = null; airTarget = null;
   sMove(); updateAll(); saveGame();
 };
+$('btn-next').onclick = ()=>{
+  if (!G || G.over || aiRunning) return;
+  if (!(G.mode==='hotseat' || G.phase===G.playerSide)) return;
+  sClick(); selectNext();
+};
 
 function refreshSupplyView(){
   supplyView = (showSupply && G && !G.over)
@@ -6165,6 +6177,8 @@ function draw(){
   }
 
   // units
+  const showReady = !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
+  const readyPulse = 0.5 + 0.5*Math.sin(now*0.005);
   for (const u of G.units){
     let [cx,cy] = hexCenter(u.x,u.y);
     if (moveAnim && moveAnim.unit.id===u.id){
@@ -6174,6 +6188,15 @@ function draw(){
       if (p>=1) moveAnim = null;
     }
     drawUnit(u, cx, cy);
+    // amber "still has orders" pip, top-right of the counter — only your side, your turn
+    if (showReady && u.side===G.phase && u.id!==sel && isActionable(u)){
+      const px = cx + S*0.52, py = cy - S*0.58;
+      ctx.globalAlpha = 0.35 + 0.45*readyPulse;
+      ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#5a4410'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // floating texts & explosions
@@ -6817,6 +6840,27 @@ canvas.addEventListener('click', e=>{
   deselect();
 });
 
+// right-click cancels whatever you're in the middle of (deploy / air target /
+// assault group / selection) without committing anything
+canvas.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  if (typeof GW!=='undefined' && GW && GW.active) return;
+  if (!G || G.over) return;
+  if (deployKind || airTarget || advanceChoice || selSet.length || sel){
+    deselect(); deployKind=null; airTarget=null; advanceChoice=null; selSet=[];
+    $('hint').innerHTML = defaultHint(); updateAll();
+  }
+});
+
+// double-click recenters the map on that spot (handy on the big maps)
+canvas.addEventListener('dblclick', e=>{
+  if (typeof GW!=='undefined' && GW && GW.active) return;
+  if (!G || dragMoved) return;
+  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  const h = hexFromPixel(wx,wy);
+  if (h) centerOn(h[0],h[1]);
+});
+
 /* which currently-selected units can actually reach this enemy */
 function combinedAttackers(target){
   const ids = selSet.length ? selSet : (sel ? [sel] : []);
@@ -6851,13 +6895,31 @@ function finishAdvance(u){
   advanceChoice = null; deselect(); updateAll();
 }
 function cancelAdvance(){ advanceChoice = null; deselect(); updateAll(); }
+function zoomAt(cx, cy, f){            // zoom keeping the given screen point fixed
+  const [wx,wy] = toWorld(cx,cy);
+  cam.z = Math.max(minZoom(), Math.min(2.2, cam.z*f));
+  cam.x = wx - cx/cam.z; cam.y = wy - cy/cam.z;
+  requestRender();
+}
 window.addEventListener('keydown', e=>{
   if (!G || G.over) return;
-  if (e.key==='Escape'){ deselect(); deployKind=null; airTarget=null; selSet=[]; advanceChoice=null; updateAll(); }
-  if (e.key==='n' || e.key==='N') selectNext();
-  if (e.key==='e' || e.key==='E') $('btn-endturn').click();
-  if (e.key==='u' || e.key==='U') $('btn-undo').onclick();
-  if (e.key==='s' || e.key==='S') $('btn-supply').onclick();
+  // don't hijack typing or keys meant for an open dialog
+  if (document.querySelector('.modal-back:not(.hidden)')) return;
+  const k = e.key;
+  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
+  // map navigation — arrow keys pan, +/- (and scroll wheel) zoom
+  const pan = 90/cam.z;
+  if (k==='ArrowLeft'){  cam.x-=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowRight'){ cam.x+=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowUp'){    cam.y-=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowDown'){  cam.y+=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='+' || k==='='){ zoomAt(innerWidth/2, innerHeight/2, 1.15); return; }
+  if (k==='-' || k==='_'){ zoomAt(innerWidth/2, innerHeight/2, 1/1.15); return; }
+  if (k==='n' || k==='N' || k===' ' || k==='Tab'){ selectNext(); e.preventDefault(); return; }
+  if (k==='c' || k==='C'){ const su=sel&&G.units.find(t=>t.id===sel); if (su) centerOn(su.x,su.y); else selectNext(); return; }
+  if (k==='e' || k==='E') $('btn-endturn').click();
+  if (k==='u' || k==='U'){ if (!$('btn-undo').classList.contains('hidden')) $('btn-undo').onclick(); }
+  if (k==='s' || k==='S') $('btn-supply').onclick();
 });
 
 function selectUnit(u){
@@ -6866,14 +6928,21 @@ function selectUnit(u){
   updateUnitCard();
 }
 function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
-function selectNext(){
-  const mine = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked);
-  if (!mine.length) return;
-  const i = mine.findIndex(u=>u.id===sel);
-  const u = mine[(i+1) % mine.length];
-  selectUnit(u);
-  const [cx,cy] = hexCenter(u.x,u.y);
+/* a unit still has orders to give if it can move, or can still attack something */
+function isActionable(u){ return !u.moved || (!u.attacked && enemiesInRange(u).length>0); }
+function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
+function centerOn(x,y){
+  const [cx,cy] = hexCenter(x,y);
   cam.x = cx - innerWidth/cam.z/2; cam.y = cy - innerHeight/cam.z/2;
+  requestRender();
+}
+function selectNext(){
+  const mine = actionableUnits(G.phase);
+  if (!mine.length){ $('hint').innerHTML = '<b>All units have their orders.</b> Press <b>E</b> to end the turn.'; return; }
+  const i = mine.findIndex(u=>u.id===sel);
+  const u = mine[(i+1) % mine.length];        // stable cycle through everyone with orders left
+  selectUnit(u); sClick();
+  centerOn(u.x,u.y);
 }
 
 function playerMove(u,x,y){
@@ -7099,8 +7168,10 @@ function updatePreview(){
 function defaultHint(){
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!human) return 'Enemy is moving…';
-  const left = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
-  return `<b>${sideName(G.phase)} turn</b> — ${left} unit${left===1?'':'s'} ready · drag to pan, scroll to zoom`;
+  const left = actionableUnits(G.phase).length;
+  return left
+    ? `<b>${sideName(G.phase)} turn</b> — ${left} unit${left===1?'':'s'} with orders left · <b>N</b>/Space cycles them · drag to pan`
+    : `<b>${sideName(G.phase)} turn</b> — all units have orders · press <b>E</b> to end the turn`;
 }
 
 function updateTop(){
@@ -7112,6 +7183,12 @@ function updateTop(){
   $('vp-chip').innerHTML = `${sideName('G')} objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
   $('pp-chip').innerHTML = `${sideName(side)} production: <b>${G.pp[side]}</b> ⚙`;
+  // "Next" button: shows how many of the active human's units still have orders
+  const human = !G.over && !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
+  const ready = human ? actionableUnits(G.phase).length : 0;
+  const nb = $('btn-next');
+  nb.classList.toggle('hidden', ready===0);
+  nb.textContent = `⏭ Next · ${ready}`;
 }
 function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); requestRender(); }
 
@@ -7294,11 +7371,11 @@ $('btn-endturn').onclick = ()=>{
   if (!human) return;
   // a strategic decision must be answered before the turn can end
   if (maybeShowDecision()) return;
-  // safeguard: units still ready? ask for a second click
-  const ready = unitsOf(G.phase).filter(u=>!u.moved && !u.attacked).length;
+  // safeguard: units still have orders? ask for a second click
+  const ready = actionableUnits(G.phase).length;
   if (ready > 0 && performance.now() > endPendingUntil){
     endPendingUntil = performance.now() + 2500;
-    $('btn-endturn').textContent = `⚠ ${ready} ready — end anyway?`;
+    $('btn-endturn').textContent = `⚠ ${ready} still ready — end anyway?`;
     setTimeout(()=>{ if (performance.now() >= endPendingUntil) $('btn-endturn').textContent = 'End Turn ▶'; }, 2600);
     return;
   }
