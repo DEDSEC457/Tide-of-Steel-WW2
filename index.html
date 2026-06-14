@@ -269,12 +269,12 @@
         <p class="mc-desc">Realistic mode doubled in scale — 120×72 hexes, continuous front, a long campaign grinding from 1941 to 1943.</p>
         <button class="primary mc-btn">LAUNCH ▶</button>
       </div>
-      <div class="mode-card" id="mc-grand">
-        <span class="mc-badge ready">GRAND STRATEGY</span>
-        <div class="mc-icon">🌍</div>
-        <h2>THE WORLD AT WAR</h2>
-        <p class="mc-desc">Lead a great power, 1939–45: build a war economy, court allies, choose your offensives and fight a multi-front war across Europe — one month per turn.</p>
-        <button class="primary mc-btn">PLAY ▶</button>
+      <div class="mode-card" id="mc-hex">
+        <span class="mc-badge wip">WEBGL · WIP</span>
+        <div class="mc-icon">🌐</div>
+        <h2>EUROPE 1939</h2>
+        <p class="mc-desc">Experimental WebGL hex wargame — all of Europe on 150×149 hexes with NATO counters and real 1938 borders.</p>
+        <button class="mc-btn">LAUNCH ▶</button>
       </div>
     </div>
     <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
@@ -360,10 +360,8 @@
           to harden a frontline province.</li>
       <li><b>⚙ Production.</b> Military factories turn out <b>army</b> strength (capped by manpower) and <b>air</b>
           (a force multiplier — up to +14% in battle). Choose the split.</li>
-      <li><b>⚔ War.</b> Set your <b>posture</b> (Attack / Balanced / Defend) and choose where you concentrate your
-          offensive — <b>click a red front</b> on the map, or pick from the <b>front list</b> in the WAR panel, which
-          rates each front from <span style="color:#7a9d54">Favourable</span> to <span style="color:#e06a5f">Costly</span>.
-          Capitals fall, nations capitulate, the victor takes the spoils.</li>
+      <li><b>⚔ War.</b> Set your <b>posture</b> (Attack / Balanced / Defend) and <b>click a red front</b> on the map
+          to choose where you concentrate your offensive. Capitals fall, nations capitulate, the victor takes the spoils.</li>
       <li><b>⚑ Decisions.</b> At the great crossroads your power faces a <b>strategic fork</b> — the plan to
           beat France, the opening of Barbarossa, the Battle of Britain. <b>Every option shows exactly what it
           grants</b> (a timed combat bonus for a few months, factories, manpower) so you always know what you are
@@ -4952,51 +4950,6 @@ const GW_DECISIONS = [
         flavor:'A patient build-up — Italy’s industry was never ready for a long war.',
         apply:g=>{ gwAddMod('IT','defense',0.20,3,'Italian consolidation'); g.eco.IT.mil+=4; } },
     ], ai:1 },
-
-  { id:'case_blue', who:'GE', date:'Summer 1942', badge:'⚔ FALL BLAU',
-    when: g => g.barbarossa===true && g.turn>=33 && g.turn<=42 && !g.capitulated.SU && gwFactionOf(g.regions.moscow)!=='axis',
-    title:'The 1942 Offensive',
-    text:'The front has stabilised after the winter. The Reich lacks the strength to attack everywhere — the generals want Moscow, but the Führer wants the Caucasus oil that fuels the whole war.',
-    options:[
-      { label:'Fall Blau — drive south for the Caucasus oilfields',
-        effect:'+30% attack vs the Soviets for 4 months, and +3 military factories from the captured oil',
-        flavor:'The panzers race for Stalingrad and Baku — the deepest German advance of the war.',
-        apply:g=>{ gwAddMod('GE','attack',0.30,4,'Fall Blau','comintern'); g.eco.GE.mil+=3; } },
-      { label:'Concentrate everything on Moscow',
-        effect:'+38% attack vs the Soviets for 3 months — a single hammer-blow at the capital',
-        flavor:'No diversions south — the whole weight of the Ostheer aimed at the one city that matters.',
-        apply:g=>gwAddMod('GE','attack',0.38,3,'Drive on Moscow','comintern') },
-    ], ai:0 },
-
-  { id:'uranus', who:'SU', date:'November 1942', badge:'☭ OPERATION URANUS',
-    when: g => g.barbarossa===true && g.turn>=39 && g.turn<=52 && !g.capitulated.SU,
-    title:'The Soviet Counterstroke',
-    text:'The Wehrmacht is overextended deep in the south. Zhukov has massed reserves in secret. The moment to strike back has come — but where, and how hard?',
-    options:[
-      { label:'Operation Uranus — encircle the southern spearheads',
-        effect:'+35% attack vs the Axis for 4 months — a war-turning counteroffensive',
-        flavor:'The pincers close behind the German Sixth Army; the front in the south collapses.',
-        apply:g=>gwAddMod('SU','attack',0.35,4,'Uranus counteroffensive','axis') },
-      { label:'Hold and rebuild for the decisive year',
-        effect:'+6 military factories and +20 manpower — an overwhelming Red Army in 1943',
-        flavor:'No gamble now; husband the reserves and bury them under steel next year.',
-        apply:g=>{ g.eco.SU.mil+=6; g.eco.SU.mp+=20; } },
-    ], ai:0 },
-
-  { id:'second_front', who:'UK', date:'1944', badge:'⚓ THE SECOND FRONT',
-    when: g => g.turn>=52 && g.turn<=60 && !g.capitulated.UK,
-    title:'Opening the Second Front',
-    text:'Stalin demands a western front; the Americans are ready at last. The great cross-Channel invasion can be thrown at France now, or the Mediterranean “soft underbelly” pressed first.',
-    options:[
-      { label:'Overlord — the cross-Channel invasion of France',
-        effect:'+40% attack vs the Axis for 4 months — the liberation of Western Europe begins',
-        flavor:'The largest amphibious assault in history storms the Normandy beaches.',
-        apply:g=>gwAddMod('UK','attack',0.40,4,'Operation Overlord','axis') },
-      { label:'Press the Mediterranean first (Italy and the Balkans)',
-        effect:'+22% attack vs the Axis for 3 months, and +3 military factories',
-        flavor:'Knock Italy out and tie down German divisions before the great blow in the west.',
-        apply:g=>{ gwAddMod('UK','attack',0.22,3,'Mediterranean strategy','axis'); g.eco.UK.mil+=3; } },
-    ], ai:0 },
 ];
 /* Decisions are the PLAYER's command agency: only the power YOU lead gets these
    forks (the AI opponent plays its known-balanced baseline, and the dated events
@@ -6623,29 +6576,6 @@ function gwDraw(){
 }
 function gwSeg(opts, cur, attr){ return '<div class="gw-seg">'+opts.map(o=>
   '<div class="gw-opt'+(cur===o[0]?' sel':'')+'" '+attr+'="'+o[0]+'">'+o[1]+'</div>').join('')+'</div>'; }
-/* the active fronts as a clickable readout: each enemy province you can reach,
-   its defence, and how your concentrated offensive would fare there. Clicking a
-   row sets your offensive focus — far easier than hunting tiny dots on the map. */
-function gwFrontReport(){
-  const p=GW.player, e=GW.eco[p]; if(!e) return '';
-  const tgts = gwFrontTargets(p).filter(id => gwCanAttack(p, GW.regions[id]));
-  if(!tgts.length) return '<div style="color:var(--dim);font-size:11px;margin-top:7px;">No active front yet — advance to a border or court a neutral.</div>';
-  const airMul=gwAirMul(p), dc=gwDiffCombat(p);
-  const odds = id => { const owner=GW.regions[id], def=gwRegionDefense(id);
-    const mod=gwOffenseMod(p,owner)*gwModFactor(p,'attack',gwFactionOf(owner));
-    return (e.army*0.5*mod*airMul*dc)/Math.max(0.1,def*1.2); };
-  tgts.sort((a,b)=> odds(b)-odds(a));
-  let rows='<div style="color:var(--dim);font-size:11px;margin-top:7px;">⚔ Fronts — click to focus your offensive:</div>';
-  for(const id of tgts.slice(0,7)){
-    const r=GW_REGIONS[id], def=gwRegionDefense(id), o=odds(id);
-    const lab = o>=1.5?['Favourable','#7a9d54'] : o>=1?['Even','#d8b24a'] : ['Costly','#e06a5f'];
-    const isF=id===e.preferredTarget;
-    rows+='<div class="qrow" data-front="'+id+'" style="cursor:pointer;'+(isF?'border-left:3px solid var(--amber);padding-left:5px;background:#1a1f12;':'')+'">'
-      +'<span>'+(isF?'🎯 ':'')+r.name+' <span style="color:var(--dim);font-size:11px;">def '+Math.round(def)+(r.vp?' · ★'+r.vp:'')+'</span></span>'
-      +'<span style="color:'+lab[1]+';font-size:11px;font-weight:700;">'+lab[0]+'</span></div>';
-  }
-  return rows;
-}
 function gwUpdateUI(){
   if(!GW) return;
   const p=GW.player, e=GW.eco[p], pw=GW_POWERS[p];
@@ -6710,13 +6640,11 @@ function gwUpdateUI(){
         return mine.length ? '<div style="font-size:11px;color:var(--dim);margin:2px 0 5px;">Co-belligerents: '+mine.join(', ')+'</div>' : ''; })()
     +'<div style="color:var(--dim);font-size:11px;">Posture:</div>'
     +gwSeg([['attack','Attack'],['balanced','Balanced'],['defend','Defend']], e.posture||'balanced','data-pos')
-    +'<div style="color:var(--dim);font-size:11px;margin-top:5px;">Offensive focus: <b style="color:var(--ink)">'+tgt+'</b></div>'
-    + gwFrontReport();
+    +'<div style="color:var(--dim);font-size:11px;margin-top:5px;">Offensive focus: <b style="color:var(--ink)">'+tgt+'</b></div>';
   if(GW.over) wh='<div class="big" style="color:'+(GW.result.result==='victory'?'var(--grn)':'var(--redL)')+'">'+GW.result.title+'</div><div style="font-size:12px;color:var(--dim);margin-top:4px;">'+GW.result.text+'</div>';
   $('gw-war-body').innerHTML=wh;
   if(!GW.over){
     $('gw-war-body').querySelectorAll('[data-pos]').forEach(b=>b.onclick=()=>{ e.posture=b.dataset.pos; gwUpdateUI(); });
-    $('gw-war-body').querySelectorAll('[data-front]').forEach(b=>b.onclick=()=>{ e.preferredTarget=b.dataset.front; gwUpdateUI(); });
   }
   const pend = !GW.over && gwPendingDecision();
   $('gw-end').textContent = GW.over?'Return to Menu':(pend?'⚑ Decision ▶':'End Month ▶');
@@ -7425,7 +7353,7 @@ function openHexGame(){
   sClick();
 }
 window.addEventListener('message',e=>{ if(e.data==='waw-back'){ document.getElementById('waw-frame').style.display='none'; showModeSelect(); } });
-$('mc-grand').onclick = gwOpenSelect;          // the playable strategic World at War
+$('mc-hex').onclick = openHexGame;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
 let wawSide = 'G', wawDiff = 'hard';
 const WAW_DIFF_DESC = {
