@@ -1887,6 +1887,11 @@ SCENARIOS.bulge = (function buildBulge(){
     [3,'s_inf','80th Division'],         [3,'s_tank','2nd Armored'],
     [4,'s_guard','XVIII Airborne'],      [4,'s_inf','35th Division'],
     [5,'s_tank','11th Armored'],         [6,'s_inf','83rd Division'],
+    // the reduction of the bulge: a steady US stream, one last German scrape
+    [8,'s_inf','75th Division'],         [8,'g_inf','Volksgrenadier (last reserve)'],
+    [9,'s_tank','6th Armored'],          [10,'s_inf','87th Division'],
+    [11,'s_guard','17th Airborne'],      [12,'s_inf','90th Division'],
+    [14,'s_inf','5th Division'],
   ],
   events: [
     {turn:1, date:'16 December 1944', title:'WACHT AM RHEIN',
@@ -1903,11 +1908,19 @@ SCENARIOS.bulge = (function buildBulge(){
      text:'Patton\'s 4th Armored punches a corridor into Bastogne. The siege is broken; the most dangerous point of the German line is now an American sally-port. From here the bulge can only shrink.'},
     {turn:7, date:'3 January 1945', title:'REDUCING THE BULGE',
      text:'The Allied counteroffensive grinds in from north and south to pinch off the salient. The last reserves of the West are spent — and behind them, the road to the Rhine lies open.'},
+    {turn:9, date:'9 January 1945', title:'SQUEEZING THE SALIENT',
+     text:'First Army drives south from the shoulder while Patton presses north out of Bastogne. The bulge the panzers took a week to carve is being pinched shut from both flanks, in waist-deep snow and killing cold.'},
+    {turn:12, date:'16 January 1945', title:'JUNCTION AT HOUFFALIZE',
+     text:'At the ruined crossroads of Houffalize the US First and Third Armies finally meet. The salient is severed; whatever German armour is still west of the town must run the gauntlet east or be abandoned in the snow.'},
+    {turn:16, date:'28 January 1945', title:'THE LINE RESTORED', pp:{S:2},
+     text:'The front stands where it stood on 16 December — the bulge erased. The Reich has spent its last mobile reserves in the West for six weeks of borrowed time, and ahead lies only the Rhine.'},
   ],
-  maxTurn: 7,
+  maxTurn: 16, turnDays: 3,                 // 16 Dec 1944 → 30 Jan 1945, ~3 days a turn
   startDate: Date.UTC(1944,11,16),
-  weather(turn){ return turn<=3 ? 'freeze' : 'clear'; },   // fog grounds Allied air, then it clears
-  pp(side, turn){ return side==='G' ? (turn<=2 ? 10 : turn<=4 ? 6 : 3) : (turn<=3 ? 5 : 8); },
+  // freezing fog grounds Allied air through the opening; it clears for the
+  // great air days of late December, then a hard January cold snap returns.
+  weather(turn){ return turn<=3 ? 'freeze' : turn>=10 ? 'freeze' : 'clear'; },
+  pp(side, turn){ return side==='G' ? (turn<=2 ? 10 : turn<=4 ? 6 : turn<=8 ? 3 : 2) : (turn<=3 ? 5 : 8); },
   // German objective points held at the end (19 total). History ≈ 3.
   victoryTiers: [
     [14,'DECISIVE GERMAN VICTORY','The Meuse is crossed and Antwerp falls — the western alliance is cut in two, exactly as Hitler gambled. A victory history never allowed.'],
@@ -3075,7 +3088,8 @@ function lineBonus(u, x, y){
     else if (d === 1) adj++;
   }
   if (!nearFoe) return 0;
-  return (adj===0 ? -3 : Math.min(adj,2)*1.4) * sk;   // isolation = a gap; flanks = a line
+  const isoPen = sk >= 2 ? -5 : -3;                     // Hard AI never leaves a 1-hex gap
+  return (adj===0 ? isoPen : Math.min(adj,2)*1.4) * sk;
 }
 /* a unit about to be cut off pulls back toward its own supply. Skill-gated: a
    sharp AI saves the formation, an easy AI lets it be encircled. */
@@ -3089,7 +3103,7 @@ function aiEscape(u){
   let best=null, bestS=-1e9;
   for (const k of reach.keys()){
     const [x,y] = k.split(',').map(Number);
-    let s = (net.has(k)?10:0) + (u.side==='G' ? (COLS-x) : x)*0.3;   // home edge & supply
+    let s = (net.has(k)?10:0) + (rearDir(u.side)>0 ? x : COLS-x)*0.3;  // toward home edge & supply
     let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side!==u.side) e++; }
     s -= e*3;
     s += (effTerrain(x,y).def-1)*3;
@@ -3253,46 +3267,51 @@ function refreshSupply(){
 
 /* ============================ TERRITORY ============================ */
 /* Every land hex remembers who holds it, and the map is tinted to match —
-   grey ground behind the German advance, red behind Soviet lines. Units
-   claim the hex they stand on plus adjacent hexes outside enemy ZOC;
-   cities always anchor their owner's color. */
-function seedTerritory(){
-  G.terr = new Array(COLS*ROWS).fill(0);          // 0 none · 1 German · 2 Soviet
-  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-    if (!passable(x,y)) continue;
-    let dG=99, dS=99;
-    for (const u of G.units){
-      const d = hexDist(x,y,u.x,u.y);
-      if (u.side==='G') dG=Math.min(dG,d); else dS=Math.min(dS,d);
-    }
-    for (const c of G.cities){
-      const d = hexDist(x,y,c.x,c.y);
-      if (c.owner==='G') dG=Math.min(dG,d); else dS=Math.min(dS,d);
-    }
-    G.terr[y*COLS+x] = dG===dS ? (x < COLS/2 ? 1 : 2) : (dG<dS ? 1 : 2);
-  }
-}
+   grey ground behind the German advance, red behind Soviet lines.
+   Territory is rebuilt from scratch on every call via a simultaneous
+   multi-source BFS from all unit + city anchors, so the whole map
+   updates correctly even when units advance many hexes at once. */
+function seedTerritory(){ claimTerritory(); }   // legacy alias — BFS handles this now
 function terrOwner(x,y){
   if (!G || !G.terr) return null;
   const v = G.terr[y*COLS+x];
   return v===1 ? 'G' : v===2 ? 'S' : null;
 }
 function claimTerritory(){
-  if (typeof _tintDirty !== 'undefined') _tintDirty = true;   // front moved → rebuild tint cache
-  if (!G.terr) seedTerritory();
-  const zoc = {G: computeZOC('G'), S: computeZOC('S')};
+  if (typeof _tintDirty !== 'undefined') _tintDirty = true;
+  const n = COLS*ROWS;
+  if (!G.terr || G.terr.length !== n) G.terr = new Array(n).fill(0);
+  else G.terr.fill(0);
+  // Collect seeds for each side, then interleave so both BFS fronts expand
+  // at the same rate — the territory frontier ends up equidistant (Voronoi).
+  const qG = [], qS = [];
   for (const u of G.units){
-    const me = u.side==='G' ? 1 : 2, foe = enemyOf(u.side);
-    G.terr[u.y*COLS+u.x] = me;
-    for (const [nx,ny] of neighbors(u.x,u.y)){
+    if (u.side==='G') qG.push(u.x,u.y,1); else qS.push(u.x,u.y,2);
+  }
+  for (const c of G.cities){
+    if (c.owner==='G') qG.push(c.x,c.y,1); else qS.push(c.x,c.y,2);
+  }
+  const q = [];
+  let gi=0, si=0;
+  while (gi<qG.length || si<qS.length){
+    if (gi<qG.length){ q.push(qG[gi],qG[gi+1],qG[gi+2]); gi+=3; }
+    if (si<qS.length){ q.push(qS[si],qS[si+1],qS[si+2]); si+=3; }
+  }
+  // Mark seed hexes, then BFS-expand into unclaimed passable land
+  for (let i=0;i<q.length;i+=3){
+    const x=q[i],y=q[i+1],me=q[i+2];
+    if (passable(x,y)) G.terr[y*COLS+x]=me;
+  }
+  let head=0;
+  while (head<q.length){
+    const x=q[head],y=q[head+1],me=q[head+2]; head+=3;
+    for (const [nx,ny] of neighbors(x,y)){
       if (!passable(nx,ny)) continue;
-      const t = unitAt(nx,ny);
-      if (t && t.side!==u.side) continue;                          // enemy stands there
-      if (zoc[foe].has(keyOf(nx,ny)) && !(t && t.side===u.side)) continue;  // contested ground
-      G.terr[ny*COLS+nx] = me;
+      const k=ny*COLS+nx;
+      if (G.terr[k]) continue;
+      G.terr[k]=me; q.push(nx,ny,me);
     }
   }
-  for (const c of G.cities) G.terr[c.y*COLS+c.x] = c.owner==='G' ? 1 : 2;
   absorbPockets();
 }
 /* A bypassed enemy pocket with no troops in it — ground the front has simply
@@ -5685,7 +5704,8 @@ function buildClock(){
     : G.winterGear===false ? '✗ No winter equipment — December will be brutal for the Wehrmacht.'
     : G.winterGear==='pending' ? '⚠ The winter question awaits an answer at German headquarters.'
     : `The winter question reaches German headquarters in mid-August (turn ${SCN.winterQuestion.turn}).`;
-  html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is one ${(SCN.turnDays||7)===7?'week':'day'}.
+  const _td = SCN.turnDays||7, _tdesc = _td===7 ? 'one week' : _td===1 ? 'one day' : _td+' days';
+  html += `<div style="margin-top:10px;color:var(--dim);font-size:13px;">Each turn is ${_tdesc}.
     The campaign ends after turn ${MAX_TURN} (${dateStr(MAX_TURN)}).${gearNote?'<br>'+gearNote:''}</div>`;
   $('clock-body').innerHTML = html;
 }
@@ -7389,7 +7409,7 @@ function showEnd(){
     <div class="statrow"><span>${sideName('G')} objective points</span><span>${r.vp} / ${TOTAL_VP}</span></div>
     <div class="statrow"><span>${flag('G')} ${sideName('G')} losses</span><span>${G.stats.G.lost} strength</span></div>
     <div class="statrow"><span>${flag('S')} ${sideName('S')} losses</span><span>${G.stats.S.lost} strength</span></div>
-    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${(SCN.turnDays||7)===7?'weeks':'days'}</span></div>`;
+    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${(SCN.turnDays||7)===7?'weeks':(SCN.turnDays||7)===1?'days':'turns'}</span></div>`;
   show('end-modal', true);
   if (cls==='win') sCity(); else sBoom();
   clearSave();
