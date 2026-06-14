@@ -4562,11 +4562,16 @@ function wwAtWar(aKey,bKey){
 }
 function wwDeclareWar(aKey,bKey){
   const a=WW.byKey[aKey], b=WW.byKey[bKey]; if(!a||!b||aKey===bKey) return;
-  a.atWar=a.atWar||new Set(); b.atWar=b.atWar||new Set();
-  if(a.atWar.has(bKey)) return; a.atWar.add(bKey); b.atWar.add(aKey);
-  if(WW.log) WW.log.push(a.name+' declares war on '+b.name+'!');
+  if(a.atWar && a.atWar.has(bKey)) return;
+  const blocs={axis:1,allies:1,comintern:1};
+  const aSide = blocs[a.fac] ? WW.nat.filter(m=>m.fac===a.fac && !m.capitulated) : [a];
+  const bSide = blocs[b.fac] ? WW.nat.filter(m=>m.fac===b.fac && !m.capitulated) : [b];
+  for(const x of aSide){ x.atWar=x.atWar||new Set();
+    for(const y of bSide){ y.atWar=y.atWar||new Set(); if(x.key!==y.key){ x.atWar.add(y.key); y.atWar.add(x.key); } } }
+  if(WW.log) WW.log.push(a.name+' declares war on '+b.name+'!'+((aSide.length>1||bSide.length>1)?' Allies are drawn in.':''));
 }
-function wwAllied(aKey,bKey){ const a=WW.byKey[aKey], b=WW.byKey[bKey]; return !!(a&&b&&a.fac===b.fac); }
+function wwAllied(aKey,bKey){ const a=WW.byKey[aKey], b=WW.byKey[bKey]; return !!(a&&b&&a.fac===b.fac && a.fac!=='neutral'); }
+function wwRelation(aKey,bKey){ if(aKey===bKey) return 'self'; if(wwAtWar(aKey,bKey)) return 'war'; if(wwAllied(aKey,bKey)) return 'ally'; return 'peace'; }
 
 function wwArmyAt(x,y){ for(const a of WW.armies) if(a.x===x&&a.y===y) return a; return null; }
 function wwArmiesOf(natKey){ return WW.armies.filter(a=>a.nat===natKey); }
@@ -4665,12 +4670,27 @@ function wwCaptureHex(x,y,natKey){
     if(fallen && fallen.key===city.nat && !fallen.capitulated) wwCapitulate(fallen.key, natKey); }
 }
 function wwCapitulate(fallenKey, byKey){
-  const f=WW.byKey[fallenKey], by=WW.byKey[byKey]; if(!f||f.capitulated) return;
-  f.capitulated=true;
-  for(let i=0;i<WW.own.length;i++) if(WW.own[i]===f.i) WW.own[i]=by.i;
+  const f=WW.byKey[fallenKey]; if(!f||f.capitulated) return;
+  const by=WW.byKey[byKey];
+  // the peace conference: everyone still at war with the fallen power shares the spoils
+  const victors=WW.nat.filter(m=>!m.capitulated && m.key!==fallenKey && wwAtWar(m.key,fallenKey));
+  if(by && !by.capitulated && by.key!==fallenKey && victors.indexOf(by)<0) victors.push(by);
+  f.capitulated=true; f.focusProg=null;
+  const caps=victors.map(v=>({v,cap:wwCapitalHex(v.key)})).filter(o=>o.cap);
+  const assign=(x,y)=>{ if(!caps.length) return by||victors[0]||f; let best=caps[0].v, bd=1e18;
+    for(const o of caps){ const dd=(o.cap[0]-x)*(o.cap[0]-x)+(o.cap[1]-y)*(o.cap[1]-y); if(dd<bd){ bd=dd; best=o.v; } } return best; };
+  if(victors.length<=1){ const w=victors[0]||by; if(w){ for(let i=0;i<WW.own.length;i++) if(WW.own[i]===f.i) WW.own[i]=w.i;
+      for(const c of WW.cities) if(c.nat===fallenKey) c.nat=w.key; } }
+  else { // territorial partition: each fallen hex goes to the nearest victor land (multi-source BFS)
+    const label=new Int16Array(WW.own.length).fill(-1); const q=[]; let qi=0;
+    for(let i=0;i<WW.own.length;i++){ const v=WW.own[i]; if(v>=0 && victors.indexOf(WW.nat[v])>=0){ label[i]=v; q.push(i); } }
+    while(qi<q.length){ const i=q[qi++], x=i%WW.cols, y=(i/WW.cols)|0;
+      for(const [nx,ny] of wwNb(x,y)){ const j=ny*WW.cols+nx; if(label[j]>=0 || WW.own[j]!==f.i) continue; label[j]=label[i]; q.push(j); } }
+    for(let i=0;i<WW.own.length;i++){ if(WW.own[i]!==f.i) continue;
+      if(label[i]>=0) WW.own[i]=label[i]; else { const x=i%WW.cols, y=(i/WW.cols)|0; WW.own[i]=assign(x,y).i; } }
+    for(const c of WW.cities) if(c.nat===fallenKey){ const o=WW.own[c.y*WW.cols+c.x]; c.nat = o>=0?WW.nat[o].key:(by||victors[0]).key; } }
   WW.armies=WW.armies.filter(ar=>ar.nat!==fallenKey);
-  for(const c of WW.cities) if(c.nat===fallenKey) c.nat=byKey;
-  if(WW.log) WW.log.push(f.name+' has capitulated to '+by.name+'!');
+  if(WW.log) WW.log.push(f.name+(victors.length>1?' is partitioned among the victors at the peace table!':' capitulates to '+((by||victors[0])?(by||victors[0]).name:'the enemy')+'!'));
 }
 
 // supply: BFS from a nation's owned cities across friendly-owned land, limited range.
@@ -6648,8 +6668,8 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden');
-  $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden');
+  $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
   $('ww-playerflag').style.display='none'; $('ww-playername').textContent=''; $('ww-turn').textContent='';
@@ -6680,7 +6700,7 @@ function wwStart(key){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden');
   const n=WW.byKey[key];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
@@ -6842,6 +6862,7 @@ function wwDoEndTurn(){
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if(!$('ww-focus').classList.contains('hidden')) wwRenderFocus();
   if(!$('ww-research').classList.contains('hidden')) wwRenderResearch();
+  if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
   if(v.over) wwShowEnd(v);
 }
 function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ wwToast(WW.log.shift()); } }
@@ -6897,10 +6918,24 @@ function wwRenderResearch(){
   el.innerHTML=html+'</div>';
   for(const b of el.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ me.researching=b.dataset.cat; wwRenderResearch(); wwUpdateHUD(); };
 }
-function wwToggleFocus(){ const f=$('ww-focus'), r=$('ww-research'); if(r) r.classList.add('hidden');
-  if(f){ const show=f.classList.contains('hidden'); f.classList.toggle('hidden', !show); if(show) wwRenderFocus(); } }
-function wwToggleResearch(){ const f=$('ww-focus'), r=$('ww-research'); if(f) f.classList.add('hidden');
-  if(r){ const show=r.classList.contains('hidden'); r.classList.toggle('hidden', !show); if(show) wwRenderResearch(); } }
+function wwRenderDiplo(){
+  const el=$('ww-diplo'); if(!el) return;
+  let html='<h3>DIPLOMACY</h3>';
+  for(const [fac,label] of [['axis','Axis'],['allies','Allies'],['comintern','Comintern'],['neutral','Neutral']]){
+    const mem=WW.nat.filter(n=>n.fac===fac && n.key!=='XXX'); if(!mem.length) continue;
+    html+='<div style="margin:8px 0 3px;font-weight:700;color:#cfe0f2;font-size:11px;letter-spacing:1.5px">'+label.toUpperCase()+'</div>';
+    for(const n of mem){ const rel=wwRelation(WW.player,n.key);
+      const tag=rel==='self'?'<span style="color:#ffd34d">you</span>':rel==='war'?'<span style="color:#e0856a">at war</span>':rel==='ally'?'<span style="color:#7fb0e8">ally</span>':'<span style="color:#90a6bb">peace</span>';
+      html+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0'+(n.capitulated?';opacity:.42':'')+'">'+
+        '<span class="ww-sw" style="background:'+n.col+'"></span><span style="flex:1">'+n.name+(n.capitulated?' ✝':'')+'</span>'+tag+'</div>'; } }
+  el.innerHTML=html;
+}
+function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
+function wwTogglePanel(id, render){ wwClosePanels(id); const e=$(id); if(!e) return;
+  const show=e.classList.contains('hidden'); e.classList.toggle('hidden', !show); if(show) render(); }
+function wwToggleFocus(){ wwTogglePanel('ww-focus', wwRenderFocus); }
+function wwToggleResearch(){ wwTogglePanel('ww-research', wwRenderResearch); }
+function wwToggleDiplo(){ wwTogglePanel('ww-diplo', wwRenderDiplo); }
 function wwUpdateInfo(){
   const info=$('ww-info'); if(!info) return;
   if(wwSelArmy){ const a=wwSelArmy, n=WW.byKey[a.nat];
@@ -6970,6 +7005,7 @@ function wwBindInput(){
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
   const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwToggleFocus;
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
+  const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
 }
 // expose a few entry points on window for debugging / headless rendering (no-op in tests)
 if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; }
@@ -7284,7 +7320,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwSetup, wwAtWar, wwAllied, wwArmyAt, wwArmiesOf, wwReachable, wwAttackTargets, wwMoveArmy,
     wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwProduction, wwAINation,
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
-    wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective,
+    wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
@@ -7404,6 +7440,7 @@ if (typeof module !== 'undefined' && module.exports){
     <div id="ww-turn"></div>
     <button id="ww-btn-focus" class="ww-hbtn hidden">★ FOCUS</button>
     <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
+    <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>
@@ -7412,6 +7449,7 @@ if (typeof module !== 'undefined' && module.exports){
   <div id="ww-pstat" class="hidden"></div>
   <div id="ww-focus" class="ww-panel hidden"></div>
   <div id="ww-research" class="ww-panel hidden"></div>
+  <div id="ww-diplo" class="ww-panel hidden"></div>
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-toast"></div>
   <div id="ww-pick">

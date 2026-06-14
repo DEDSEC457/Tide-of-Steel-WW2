@@ -627,7 +627,7 @@ say('— The World at War —');
   for(let i=0;i<10 && !G.byKey.POL.capitulated;i++) E.wwAttack(blitz, cap[0], cap[1]);
   E.wwComputeStats();
   check('WW capturing capital capitulates nation', G.byKey.POL.capitulated===true);
-  check('WW capitulation transfers territory', G.byKey.POL.hexes===0 && G.byKey.GER.hexes>=gerHexes+polHexes-1);
+  check('WW capitulation transfers territory to the victors', G.byKey.POL.hexes===0 && G.byKey.GER.hexes>gerHexes);
   check('WW capitulation removes the nation’s armies', E.wwArmiesOf('POL').length===0);
   check('WW ownership stays consistent after conquest',
     (()=>{ let o=0; for(let i=0;i<G.own.length;i++) if(G.own[i]>=0) o++; let land=0;
@@ -754,6 +754,23 @@ say('— The World at War —');
   E.wwStartFocus('GER'); const wk2=Gwg.byKey.GER.focusProg.turnsLeft;
   for(let i=0;i<wk2;i++) E.wwFocusTick(Gwg.byKey.GER);
   check('WW a war-goal focus declares war on completion', E.wwAtWar('GER','SOV'));
+
+  // --- Phase 8: diplomacy & peace conference ---
+  const Gd = E.wwSetup('GER','normal');
+  check('WW neutrals are not auto-allied (real blocs are)', !E.wwAllied('SWE','SWI') && E.wwAllied('ENG','FRA'));
+  check('WW relation helper reports war / ally / peace',
+    E.wwRelation('GER','FRA')==='war' && E.wwRelation('GER','ITA')==='ally' && E.wwRelation('GER','SWE')==='peace');
+  E.wwDeclareWar('GER','SWE');
+  check('WW declaring war pulls in faction allies', E.wwAtWar('ITA','SWE'));
+  // peace conference partitions a defeated nation among the victors (Molotov–Ribbentrop)
+  const Gp = E.wwSetup('GER','normal');
+  E.wwDeclareWar('SOV','POL');
+  const gh0=Gp.byKey.GER.hexes, sh0=Gp.byKey.SOV.hexes, wc=E.wwCapitalHex('POL'), wn=E.wwNb(wc[0],wc[1])[0];
+  Gp.armies.push({id:7777,nat:'GER',x:wn[0],y:wn[1],kind:'arm',str:300,maxStr:300,org:300,maxOrg:300,mp:4,moved:false});
+  for(let i=0;i<10 && !Gp.byKey.POL.capitulated;i++) E.wwAttack(Gp.armies[Gp.armies.length-1], wc[0], wc[1]);
+  E.wwComputeStats();
+  check('WW peace conference partitions a nation among multiple victors',
+    Gp.byKey.POL.hexes===0 && Gp.byKey.GER.hexes>gh0 && Gp.byKey.SOV.hexes>sh0);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
