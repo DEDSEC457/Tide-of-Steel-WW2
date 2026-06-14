@@ -633,13 +633,19 @@ if (!FAST){
 say('— scenario campaigns —');
 for (const id of Object.keys(E.SCENARIOS)){
   if (id === 'barbarossa') continue;                  // covered by the main sims above
+  // Oversized maps (the 120×72 Grand Eastern Front) cost ~7s/phase — a full
+  // 90-phase × 3 sim is ~30 min. They're already registry-validated and UI
+  // smoke-tested via the grand campaign, so here we just crash-smoke them
+  // once, briefly, to keep the suite tractable.
+  const big = (E.SCENARIOS[id].cols * E.SCENARIOS[id].rows) > 6000;
+  const runs = big ? 1 : 3;
   const res = {};
   let bad = 0;
-  for (let i=0;i<3;i++){
+  for (let i=0;i<runs;i++){
     try {
       E.newGame('G','normal','hotseat', id);
       const G = E.getState();
-      const cap = E.SCENARIOS[id].maxTurn*2 + 10;
+      const cap = big ? 16 : E.SCENARIOS[id].maxTurn*2 + 10;
       let phases = 0;
       while (!G.over && phases++ < cap){
         E.aiFullPhase(G.phase);
