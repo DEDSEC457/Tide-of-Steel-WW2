@@ -771,6 +771,29 @@ say('— The World at War —');
   E.wwComputeStats();
   check('WW peace conference partitions a nation among multiple victors',
     Gp.byKey.POL.hexes===0 && Gp.byKey.GER.hexes>gh0 && Gp.byKey.SOV.hexes>sh0);
+
+  // --- Phase 9: save / load ---
+  E.wwClearSave();
+  const Gsl = E.wwSetup('FRA','hard');
+  E.wwApplyTech(Gsl.byKey.FRA,'land'); Gsl.byKey.FRA.focusIdx=1; E.wwStartFocus('FRA');
+  for(let i=0;i<5;i++) E.wwEndTurn();
+  check('WW no save slot before saving', !E.wwHasSave());
+  E.wwSave();
+  check('WW save slot is written', E.wwHasSave());
+  const hash = own => Array.from(own).reduce((a,b,i)=>(a+(b+2)*(i%7+1))>>>0,0);
+  const want = {turn:Gsl.turn, player:Gsl.player, diff:Gsl.difficulty, armies:Gsl.armies.length,
+    fraLand:Gsl.byKey.FRA.tech.land, gerHexes:Gsl.byKey.GER.hexes, ownHash:hash(Gsl.own)};
+  E.wwSetup('GER','easy');                       // corrupt with a different game
+  E.wwDeserialize(E.wwLoadSave());               // restore
+  const R = E.WW;
+  const got = {turn:R.turn, player:R.player, diff:R.difficulty, armies:R.armies.length,
+    fraLand:R.byKey.FRA.tech.land, gerHexes:R.byKey.GER.hexes, ownHash:hash(R.own)};
+  check('WW save/load round-trips the full campaign',
+    JSON.stringify(want)===JSON.stringify(got), JSON.stringify(want)+' vs '+JSON.stringify(got));
+  const tBefore = R.turn; E.wwEndTurn();
+  check('WW campaign is playable after loading', R.turn===tBefore+1);
+  E.wwClearSave();
+  check('WW save slot can be cleared', !E.wwHasSave());
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */

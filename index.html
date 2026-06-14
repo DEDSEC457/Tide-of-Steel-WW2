@@ -4962,6 +4962,37 @@ function wwCheckVictory(){
   if(enemies.length===0){ WW.result={over:true,win:true}; return WW.result; }
   return {over:false};
 }
+function wwSerialize(){
+  return { v:1, player:WW.player, difficulty:WW.difficulty, aiPow:WW.aiPow, warOn:WW.warOn,
+    date:WW.date, turn:WW.turn, result:WW.result, own:Array.from(WW.own),
+    armies:WW.armies.map(a=>({id:a.id,nat:a.nat,x:a.x,y:a.y,kind:a.kind,str:a.str,maxStr:a.maxStr,org:a.org,maxOrg:a.maxOrg,mp:a.mp,moved:a.moved})),
+    cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
+    nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air||0,atWar:[...(nn.atWar||[])],
+      tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
+      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null})) };
+}
+function wwDeserialize(s){
+  if(!s||s.v!==1) return null;
+  wwBuildState();
+  WW.player=s.player; WW.difficulty=s.difficulty||'normal'; WW.aiPow=s.aiPow||1; WW.warOn=!!s.warOn;
+  WW.date=s.date; WW.turn=s.turn||0; WW.result=s.result||null;
+  WW.own=Int16Array.from(s.own);
+  WW.armies=(s.armies||[]).map(a=>Object.assign({},a));
+  if(s.cities) WW.cities=s.cities.map(c=>Object.assign({},c));
+  for(const ns of (s.nat||[])){ const nn=WW.byKey[ns.key]; if(!nn) continue;
+    nn.capitulated=ns.capitulated; nn.prod=ns.prod; nn.air=ns.air; nn.atWar=new Set(ns.atWar||[]);
+    nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
+    nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
+    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; }
+  WW.started=true; WW.on=true; WW._mapDirty=true;
+  wwComputeStats(); wwRecomputeSupply();
+  return WW;
+}
+function wwSave(){ try{ if(typeof localStorage!=='undefined'){ localStorage.setItem('ww-save-v1', JSON.stringify(wwSerialize())); return true; } }catch(e){} return false; }
+function wwLoadSave(){ try{ if(typeof localStorage==='undefined') return null; const s=localStorage.getItem('ww-save-v1'); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function wwHasSave(){ try{ return typeof localStorage!=='undefined' && !!localStorage.getItem('ww-save-v1'); }catch(e){ return false; } }
+function wwClearSave(){ try{ if(typeof localStorage!=='undefined') localStorage.removeItem('ww-save-v1'); }catch(e){} }
+
 function wwEndTurn(){
   WW.log=WW.log||[];
   wwRecomputeSupply();
@@ -6692,21 +6723,24 @@ function wwFillPick(){
   const dr=$('ww-diff-row');
   if(dr){ for(const el of dr.querySelectorAll('.ww-diff')){ el.onclick=()=>{ WW._pickDiff=el.dataset.diff;
     for(const e2 of dr.querySelectorAll('.ww-diff')) e2.classList.toggle('sel', e2===el); }; } }
+  const cont=$('ww-continue');
+  if(cont){ cont.classList.toggle('hidden', !wwHasSave()); cont.onclick=wwContinue; }
 }
-function wwStart(key){
-  wwSetup(key, WW._pickDiff||'normal');
+function wwEnterGameUI(){
   WW.started=true; WW._mapDirty=true; WW.mapCanvas=null;
   wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
   $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden');
-  const n=WW.byKey[key];
+  const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
   wwFit(); wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if (typeof sClick==='function') sClick();
 }
+function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); wwSave(); }
+function wwContinue(){ const s=wwLoadSave(); if(!s||!wwDeserialize(s)) return; wwEnterGameUI(); }
 
 function wwWorldSize(){ return [WW_HX*(WW.cols+0.5)+WW_PAD*2, WW_VY*(WW.rows-1)+2*WW_S+WW_PAD*2]; }
 function wwResize(){ const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1,2);
@@ -6856,7 +6890,7 @@ function wwAfterAction(r){
 }
 function wwDoEndTurn(){
   if(!WW.started || (WW.result&&WW.result.over)) return;
-  const v=wwEndTurn(); WW._mapDirty=true;
+  const v=wwEndTurn(); WW._mapDirty=true; wwSave();
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
@@ -7001,7 +7035,7 @@ function wwBindInput(){
     else if((e.key===' '||e.key==='Enter') && WW.started){ e.preventDefault(); wwDoEndTurn(); }
     else if(e.key==='+'||e.key==='='){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1.15); }
     else if(e.key==='-'||e.key==='_'){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1/1.15); } });
-  const bk=$('ww-back'); if(bk) bk.onclick=()=>{ wwClose(); showModeSelect(); };
+  const bk=$('ww-back'); if(bk) bk.onclick=()=>{ if(WW.started && !(WW.result&&WW.result.over)) wwSave(); wwClose(); showModeSelect(); };
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
   const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwToggleFocus;
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
@@ -7323,6 +7357,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir,
+    wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
     wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
     getState: () => G,
@@ -7461,6 +7496,7 @@ if (typeof module !== 'undefined' && module.exports){
       <span class="ww-diff" data-diff="hard">HARD</span>
     </div>
     <div class="ww-pick-row" id="ww-pick-row"></div>
+    <button id="ww-continue" class="ww-pbtn hidden" style="max-width:262px;margin-top:16px">▶ CONTINUE SAVED CAMPAIGN</button>
   </div>
   <div id="ww-end" class="hidden"></div>
 </div>
