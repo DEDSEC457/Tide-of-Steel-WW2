@@ -606,6 +606,37 @@ say('— The World at War —');
   check('WW neighbours in-bounds at corners',
     E.wwNb(0,0).every(([x,y])=>x>=0&&x<D.cols&&y>=0&&y<D.rows) &&
     E.wwNb(D.cols-1,D.rows-1).every(([x,y])=>x>=0&&x<D.cols&&y>=0&&y<D.rows));
+
+  // --- game logic: setup, war state, movement, conquest, turns, victory ---
+  const G = E.wwSetup('GER');
+  check('WW setup places armies', G.armies.length>40 && E.wwArmiesOf('GER').length>0);
+  check('WW 1939 war: Axis vs Allies', E.wwAtWar('GER','POL') && E.wwAtWar('GER','FRA'));
+  check('WW USSR neutral at start', !E.wwAtWar('GER','SOV') && !E.wwAtWar('GER','ENG')===false);
+  check('WW allies are not at war with each other', !E.wwAtWar('ENG','FRA') && E.wwAllied('ENG','FRA'));
+  // an army has legal reachable moves and they are passable, unoccupied land
+  const ga = E.wwArmiesOf('GER')[0];
+  const reach = E.wwReachable(ga);
+  check('WW army has reachable moves', reach.length>0 &&
+    reach.every(([x,y])=>!E.wwSea(x,y) && E.wwPassableFor('GER',x,y) && !E.wwArmyAt(x,y)));
+  // conquest: an overwhelming stack storms Warsaw and Poland capitulates
+  const cap = E.wwCapitalHex('POL');
+  const polHexes = G.byKey.POL.hexes, gerHexes = G.byKey.GER.hexes;
+  const nb0 = E.wwNb(cap[0],cap[1])[0];
+  const blitz = {id:9999,nat:'GER',x:nb0[0],y:nb0[1],kind:'arm',str:300,maxStr:300,org:300,maxOrg:300,mp:4,moved:false};
+  G.armies.push(blitz);
+  for(let i=0;i<10 && !G.byKey.POL.capitulated;i++) E.wwAttack(blitz, cap[0], cap[1]);
+  E.wwComputeStats();
+  check('WW capturing capital capitulates nation', G.byKey.POL.capitulated===true);
+  check('WW capitulation transfers territory', G.byKey.POL.hexes===0 && G.byKey.GER.hexes>=gerHexes+polHexes-1);
+  check('WW capitulation removes the nation’s armies', E.wwArmiesOf('POL').length===0);
+  check('WW ownership stays consistent after conquest',
+    (()=>{ let o=0; for(let i=0;i<G.own.length;i++) if(G.own[i]>=0) o++; let land=0;
+      for(const r of D.owner) for(const c of r) if(c!=='.') land++; return o===land; })());
+  // run many AI turns without crashing; the calendar advances correctly
+  const G2 = E.wwSetup('GER'); const y0=G2.date.y, startTurn=G2.turn;
+  let vr; for(let t=0;t<30;t++){ vr=E.wwEndTurn(); if(vr.over) break; }
+  check('WW end-turn loop is stable & advances the calendar',
+    G2.turn>startTurn && (G2.date.y>y0 || G2.date.m>9) && G2.armies.length>0);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
@@ -790,11 +821,19 @@ function uiSmoke(side){
   for (const lv of ['low','high','medium']) if ($('gfx-'+lv).onclick){ $('gfx-'+lv).onclick(); drain(); }
   if ($('btn-settings-close').onclick) $('btn-settings-close').onclick();
   drain();
-  // The World at War — open the native Europe strategic screen, then leave via the back button
+  // The World at War — open it, start a game as Germany, fight a turn, then leave
   let wawOk = true;
   if ($('mc-hex').onclick){
     $('mc-hex').onclick(); drain();
-    wawOk = !!(UI.WW && UI.WW.on === true);
+    let ok = !!(UI.WW && UI.WW.on === true);
+    if (sb.wwStart){
+      sb.wwStart('GER'); drain();
+      ok = ok && UI.WW.started === true && UI.wwArmiesOf('GER').length > 0;
+      const t0 = UI.WW.turn;
+      if (sb.wwDoEndTurn){ sb.wwDoEndTurn(); drain(); }
+      ok = ok && UI.WW.turn === t0 + 1;
+    }
+    wawOk = ok;
     if ($('ww-back').onclick) $('ww-back').onclick();
   }
   const arcadeOver = UI.getState().over, arcadeResult = UI.getState().result;

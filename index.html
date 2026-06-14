@@ -4548,6 +4548,199 @@ function wwFactions(){
 }
 
 
+/* ---- The World at War: game logic (armies, movement, combat, conquest, AI, turns) ---- */
+
+const WW_ENEMY = { axis:{allies:1}, allies:{axis:1}, comintern:{} };  // 1939: Axis vs Allies; USSR neutral until provoked
+function wwAtWar(aKey,bKey){
+  const a=WW.byKey[aKey], b=WW.byKey[bKey];
+  if(!a||!b||a.fac===b.fac||a.capitulated||b.capitulated) return false;
+  return !!(WW.warOn && WW_ENEMY[a.fac] && WW_ENEMY[a.fac][b.fac]);
+}
+function wwAllied(aKey,bKey){ const a=WW.byKey[aKey], b=WW.byKey[bKey]; return !!(a&&b&&a.fac===b.fac); }
+
+function wwArmyAt(x,y){ for(const a of WW.armies) if(a.x===x&&a.y===y) return a; return null; }
+function wwArmiesOf(natKey){ return WW.armies.filter(a=>a.nat===natKey); }
+function wwRemoveArmy(a){ const i=WW.armies.indexOf(a); if(i>=0) WW.armies.splice(i,1); }
+function wwMakeArmy(id,nat,x,y,kind){ const arm=kind==='arm';
+  return {id,nat,x,y,kind, str:arm?8:10, maxStr:arm?8:10, org:arm?8:12, maxOrg:arm?8:12, mp:arm?4:2, moved:false}; }
+
+function wwTerrCost(x,y){ const t=WW.terr[y][x]; return (t==='h'||t==='f')?2:1; }
+function wwTerrDef(x,y){ const t=WW.terr[y][x]; return t==='h'?1.5 : t==='f'?1.3 : 1.0; }
+function wwPassableFor(natKey,x,y){
+  if(wwSea(x,y)) return false;
+  const o=WW.own[y*WW.cols+x]; if(o<0) return false;
+  const owner=WW.nat[o]; return owner.key===natKey || wwAllied(owner.key,natKey);
+}
+
+// even-spread pick of up to n entries from a list
+function wwSpread(list,n){ if(list.length<=n) return list.slice();
+  const out=[], step=list.length/n; for(let i=0;i<n;i++) out.push(list[Math.floor(i*step)]); return out; }
+
+function wwFrontier(natIdx){
+  const out=[];
+  for(let y=0;y<WW.rows;y++) for(let x=0;x<WW.cols;x++){
+    if(WW.own[y*WW.cols+x]!==natIdx) continue;
+    for(const [nx,ny] of wwNb(x,y)){ if(WW.own[ny*WW.cols+nx]!==natIdx){ out.push([x,y]); break; } }
+  }
+  return out;
+}
+
+function wwPlaceArmies(){
+  WW.armies=[]; let id=1; const occupied=new Set();
+  for(const n of WW.nat){
+    if(n.key==='XXX'||!n.hexes) continue;
+    const front=wwFrontier(n.i);
+    const count=Math.max(2, Math.min(14, Math.round((n.mil||1)/2)+2));
+    const picks=wwSpread(front, count);
+    for(const [x,y] of picks){ const k=x+','+y; if(occupied.has(k)) continue; occupied.add(k);
+      WW.armies.push(wwMakeArmy(id++, n.key, x, y, 'inf')); }
+    const cap=wwCapitalHex(n.key);
+    if(cap && WW_POWER[n.key]){ const k=cap[0]+','+cap[1];
+      if(!occupied.has(k)){ occupied.add(k); WW.armies.push(wwMakeArmy(id++, n.key, cap[0], cap[1], 'arm')); } }
+  }
+}
+
+// set the 1939 war: Axis vs Allies (Comintern neutral until provoked)
+function wwSetup(playerKey){
+  wwBuildState();
+  WW.player = playerKey || 'GER';
+  WW.warOn = true;
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; }
+  wwPlaceArmies();
+  WW.result=null;
+  return WW;
+}
+
+function wwReachable(a){
+  const out=[], best={}, sk=a.x+','+a.y; best[sk]=0;
+  const pq=[[0,a.x,a.y]];
+  while(pq.length){
+    let bi=0; for(let i=1;i<pq.length;i++) if(pq[i][0]<pq[bi][0]) bi=i;
+    const [c,x,y]=pq.splice(bi,1)[0];
+    if(c>(best[x+','+y]??1e9)) continue;
+    for(const [nx,ny] of wwNb(x,y)){
+      if(!wwPassableFor(a.nat,nx,ny) || wwArmyAt(nx,ny)) continue;
+      const nc=c+wwTerrCost(nx,ny);
+      if(nc<=a.mp && nc<(best[nx+','+ny]??1e9)){ best[nx+','+ny]=nc; pq.push([nc,nx,ny]); out.push([nx,ny]); }
+    }
+  }
+  return out;
+}
+function wwAttackTargets(a){
+  const out=[];
+  for(const [nx,ny] of wwNb(a.x,a.y)){
+    if(wwSea(nx,ny)) continue;
+    const o=WW.own[ny*WW.cols+nx]; const owner=o>=0?WW.nat[o]:null; const d=wwArmyAt(nx,ny);
+    if((d && wwAtWar(a.nat,d.nat)) || (owner && wwAtWar(a.nat,owner.key))) out.push([nx,ny]);
+  }
+  return out;
+}
+function wwMoveArmy(a,x,y){ a.x=x; a.y=y; a.moved=true; }
+
+function wwCaptureHex(x,y,natKey){
+  const me=WW.byKey[natKey]; const prev=WW.own[y*WW.cols+x];
+  WW.own[y*WW.cols+x]=me.i;
+  const city=WW.cities.find(c=>c.x===x&&c.y===y);
+  if(city && city.cap && prev>=0){ const fallen=WW.nat[prev];
+    if(fallen && fallen.key===city.nat && !fallen.capitulated) wwCapitulate(fallen.key, natKey); }
+}
+function wwCapitulate(fallenKey, byKey){
+  const f=WW.byKey[fallenKey], by=WW.byKey[byKey]; if(!f||f.capitulated) return;
+  f.capitulated=true;
+  for(let i=0;i<WW.own.length;i++) if(WW.own[i]===f.i) WW.own[i]=by.i;
+  WW.armies=WW.armies.filter(ar=>ar.nat!==fallenKey);
+  for(const c of WW.cities) if(c.nat===fallenKey) c.nat=byKey;
+  if(WW.log) WW.log.push(f.name+' has capitulated to '+by.name+'!');
+}
+
+function wwAttack(a,tx,ty){
+  const d=wwArmyAt(tx,ty), tdef=wwTerrDef(tx,ty);
+  let took=false;
+  if(d){
+    const atk=a.str*(0.55+Math.random()*0.5);
+    const def=d.str*(0.40+Math.random()*0.45)*tdef;
+    d.org-=atk*0.7; d.str-=atk*0.30;
+    a.org-=def*0.7; a.str-=def*0.30;
+    if(d.str<=1.0 || d.org<=0){ wwRemoveArmy(d); took=true; }
+    if(a.str<=1.0){ wwRemoveArmy(a); return {result:'attacker-lost'}; }
+  } else took=true;
+  a.moved=true;
+  if(took){ wwCaptureHex(tx,ty,a.nat); if(!wwArmyAt(tx,ty)){ a.x=tx; a.y=ty; } return {result:'taken'}; }
+  return {result:'held'};
+}
+
+// nearest enemy-owned hex to (x,y), measured by lightweight ring scan
+function wwNearestEnemyHex(natKey,x,y,maxR){
+  for(let r=1;r<=(maxR||30);r++){
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const nx=x+dx, ny=y+dy; if(nx<0||nx>=WW.cols||ny<0||ny>=WW.rows) continue;
+      if(wwSea(nx,ny)) continue; const o=WW.own[ny*WW.cols+nx];
+      if(o>=0 && wwAtWar(natKey, WW.nat[o].key)) return [nx,ny];
+    }
+  }
+  return null;
+}
+function wwAIStep(a){
+  const tgt=wwNearestEnemyHex(a.nat,a.x,a.y,24); if(!tgt) return null;
+  const reach=wwReachable(a); if(!reach.length) return null;
+  let best=null, bd=1e9;
+  for(const [x,y] of reach){ const d=(x-tgt[0])*(x-tgt[0])+(y-tgt[1])*(y-tgt[1]); if(d<bd){ bd=d; best=[x,y]; } }
+  const cur=(a.x-tgt[0])*(a.x-tgt[0])+(a.y-tgt[1])*(a.y-tgt[1]);
+  return (best && bd<cur) ? best : null;
+}
+function wwAINation(n){
+  for(const a of wwArmiesOf(n.key)){
+    if(a.moved) continue;
+    const tg=wwAttackTargets(a);
+    if(tg.length){ // hit the softest target
+      tg.sort((p,q)=>{ const dp=wwArmyAt(p[0],p[1]), dq=wwArmyAt(q[0],q[1]);
+        return (dp?dp.str:0)-(dq?dq.str:0); });
+      wwAttack(a,tg[0][0],tg[0][1]); continue;
+    }
+    const dest=wwAIStep(a); if(dest) wwMoveArmy(a,dest[0],dest[1]);
+  }
+}
+
+function wwProduction(){
+  for(const n of WW.nat){
+    if(n.capitulated||n.key==='XXX'||!n.mil) continue;
+    n.prod=(n.prod||0)+n.mil;
+    if(n.prod>=120){ n.prod-=120;
+      const cap=wwCapitalHex(n.key);
+      let spot=null;
+      if(cap && WW.own[cap[1]*WW.cols+cap[0]]===n.i && !wwArmyAt(cap[0],cap[1])) spot=cap;
+      else { const fr=wwFrontier(n.i); for(const [x,y] of fr) if(!wwArmyAt(x,y)){ spot=[x,y]; break; } }
+      if(spot){ const id=(WW.armies.reduce((m,a)=>Math.max(m,a.id),0)||0)+1;
+        WW.armies.push(wwMakeArmy(id, n.key, spot[0], spot[1], (n.prod%2?'arm':'inf'))); }
+    }
+  }
+}
+
+const WW_MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
+function wwAdvanceDate(days){
+  const d=WW.date; d.d+=days;
+  while(true){ const md=WW_MDAYS[d.m-1]+((d.m===2 && d.y%4===0)?1:0);
+    if(d.d<=md) break; d.d-=md; d.m++; if(d.m>12){ d.m=1; d.y++; } }
+}
+function wwCheckVictory(){
+  const me=WW.byKey[WW.player];
+  if(me.capitulated){ WW.result={over:true,win:false}; return WW.result; }
+  const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key));
+  if(enemies.length===0){ WW.result={over:true,win:true}; return WW.result; }
+  return {over:false};
+}
+function wwEndTurn(){
+  WW.log=WW.log||[];
+  for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAINation(n); }
+  wwProduction();
+  wwAdvanceDate(7);
+  for(const a of WW.armies) a.moved=false;
+  WW.turn++;
+  wwComputeStats();
+  return wwCheckVictory();
+}
+
 /* ====================================================================
    Everything below is browser-only: rendering, input, UI, sound.
    The game engine above runs headless too (used by the test harness).
@@ -6211,74 +6404,100 @@ for (const l of ['low','medium','high'])
 syncGfxUI();
 /* ============ THE WORLD AT WAR — native render / input / UI (browser only) ============ */
 const WW_S=14, WW_HX=Math.sqrt(3)*WW_S, WW_VY=1.5*WW_S, WW_PAD=20;
+const WW_MAJORS=[
+  ['GER','Germany','Forge the Axis: smash Poland, then turn west on France.'],
+  ['ENG','United Kingdom','Hold the Channel and the seas; bleed the Axis white.'],
+  ['FRA','France','Man the line, hold the Ardennes, save the Republic.'],
+  ['SOV','Soviet Union','Neutral colossus — arm, expand, and bide your time.'],
+  ['ITA','Italy','Mare Nostrum: the Mediterranean and the Balkans beckon.'],
+  ['POL','Poland','Defy the giants on both flanks and survive 1939.'],
+];
 function wwHexCenter(x,y){ return [WW_PAD + WW_HX*(x+0.5*(y&1)) + WW_HX/2, WW_PAD + WW_VY*y + WW_S]; }
 function wwHexPath(g,cx,cy,s){ g.beginPath();
   for(let i=0;i<6;i++){ const a=Math.PI/180*(60*i-30), px=cx+s*Math.cos(a), py=cy+s*Math.sin(a); i?g.lineTo(px,py):g.moveTo(px,py); }
   g.closePath(); }
+function wwW2S(wx,wy){ const c=WW.cam; return [wx*c.z+c.x, wy*c.z+c.y]; }
 
-let wwRAFpending=false, wwDrag=false, wwDragMoved=false, wwLMx=0, wwLMy=0, wwSelNat=null, wwSelHexes=null, wwBound=false;
+let wwRAFpending=false, wwDrag=false, wwDragMoved=false, wwLMx=0, wwLMy=0;
+let wwSelNat=null, wwSelHexes=null, wwSelArmy=null, wwReachSet=null, wwTargetSet=null, wwBound=false;
 
 function wwOpen(){
   show('mode-select', false);
   wwBuildState();
-  WW._mapDirty=true; WW.mapCanvas=null;
-  wwSelNat=null; wwSelHexes=null;
+  WW.started=false; WW._mapDirty=true; WW.mapCanvas=null;
+  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null;
   $('ww-screen').classList.remove('hidden');
-  wwBindInput();
-  wwResize(); wwFit();
-  wwFillLegend(); wwUpdatePanel();
+  $('ww-info').classList.add('hidden');
+  $('ww-endturn').classList.add('hidden');
+  $('ww-pstat').classList.add('hidden');
+  $('ww-end').classList.add('hidden');
+  $('ww-playerflag').style.display='none'; $('ww-playername').textContent=''; $('ww-turn').textContent='';
+  wwBindInput(); wwResize(); wwFit(); wwFillLegend(); wwFillPick(); wwUpdateHUD();
+  $('ww-pick').classList.remove('hidden');
   wwRequest();
   if (typeof sClick==='function') sClick();
 }
-function wwClose(){
-  WW.on=false;
-  const sc=$('ww-screen'); if(sc) sc.classList.add('hidden');
+function wwClose(){ WW.on=false; const sc=$('ww-screen'); if(sc) sc.classList.add('hidden'); }
+
+function wwFillPick(){
+  const row=$('ww-pick-row'); if(!row) return; let html='';
+  for(const [key,name,desc] of WW_MAJORS){ const n=WW.byKey[key]; if(!n) continue;
+    html+='<div class="ww-pick-card" data-key="'+key+'">'+
+      '<div class="ph"><span class="pf" style="background:'+n.col+'"></span><span class="pn">'+name+'</span></div>'+
+      '<div class="pd">'+desc+'</div></div>'; }
+  row.innerHTML=html;
+  for(const el of row.querySelectorAll('.ww-pick-card')) el.onclick=()=>wwStart(el.dataset.key);
 }
+function wwStart(key){
+  wwSetup(key);
+  WW.started=true; WW._mapDirty=true; WW.mapCanvas=null;
+  wwSelNat=null; wwSelHexes=null; wwSelArmy=null; wwReachSet=null; wwTargetSet=null;
+  $('ww-pick').classList.add('hidden');
+  $('ww-endturn').classList.remove('hidden');
+  $('ww-pstat').classList.remove('hidden');
+  const n=WW.byKey[key];
+  $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
+  $('ww-playername').textContent=n.name;
+  wwFit(); wwUpdateHUD(); wwUpdateInfo(); wwRequest();
+  if (typeof sClick==='function') sClick();
+}
+
 function wwWorldSize(){ return [WW_HX*(WW.cols+0.5)+WW_PAD*2, WW_VY*(WW.rows-1)+2*WW_S+WW_PAD*2]; }
-function wwResize(){
-  const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1, 2);
-  cv.width=Math.max(1,Math.floor(cv.clientWidth*dpr)); cv.height=Math.max(1,Math.floor(cv.clientHeight*dpr));
-  WW._dpr=dpr;
-}
-function wwFit(){
-  const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
+function wwResize(){ const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1,2);
+  const cw=cv.clientWidth||window.innerWidth||1600, ch=cv.clientHeight||window.innerHeight||900;
+  cv.width=Math.max(1,Math.floor(cw*dpr)); cv.height=Math.max(1,Math.floor(ch*dpr)); WW._dpr=dpr; }
+function wwFit(){ const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
   const vw=cv.clientWidth||window.innerWidth, vh=cv.clientHeight||window.innerHeight;
-  const z=Math.min(vw/wW, vh/wH)*0.98;
-  WW.cam={ z, x:(vw-wW*z)/2, y:(vh-wH*z)/2 };
-}
-function wwZoomAt(mx,my,f){ const cam=WW.cam; const nz=Math.max(0.18, Math.min(4.5, cam.z*f)); const k=nz/cam.z;
-  cam.x = mx-(mx-cam.x)*k; cam.y = my-(my-cam.y)*k; cam.z=nz; wwRequest(); }
+  let z=Math.min(vw/wW,vh/wH)*0.98;
+  // when a player nation is chosen, frame a bit tighter on their capital
+  const cap = WW.started && wwCapitalHex(WW.player);
+  if(cap){ z=Math.min(2.0, z*2.1); const [wx,wy]=wwHexCenter(cap[0],cap[1]);
+    WW.cam={ z, x:vw/2-wx*z, y:vh/2-wy*z };
+  } else { WW.cam={ z, x:(vw-wW*z)/2, y:(vh-wH*z)/2 }; } }
+function wwZoomAt(mx,my,f){ const cam=WW.cam, nz=Math.max(0.18,Math.min(4.5,cam.z*f)), k=nz/cam.z;
+  cam.x=mx-(mx-cam.x)*k; cam.y=my-(my-cam.y)*k; cam.z=nz; wwRequest(); }
 
 function wwBuildMapCache(){
-  const W=WW; const [wW,wH]=wwWorldSize();
+  const W=WW, [wW,wH]=wwWorldSize();
   const mc=document.createElement('canvas'); mc.width=Math.ceil(wW); mc.height=Math.ceil(wH);
-  const g=mc.getContext('2d');
-  g.fillStyle='#0c1622'; g.fillRect(0,0,mc.width,mc.height);
-  for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){
-    const t=W.terr[y][x]; const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3);
-    if(t==='~'){ g.fillStyle='#16293b'; g.fill();
-      const hv=(x*2654435761 ^ y*40503)>>>0; if(hv&3){ g.fillStyle='rgba(0,0,0,0.05)'; g.fill(); } continue; }
-    const n=wwOwnerAt(x,y); g.fillStyle = n? n.col : '#5b5b5b'; g.fill();
-    if(t==='h'){ g.fillStyle='rgba(0,0,0,0.20)'; g.fill(); }
-    else if(t==='f'){ g.fillStyle='rgba(0,0,0,0.11)'; g.fill(); }
-    const hv=(x*2654435761 ^ y*40503)>>>0;
-    g.fillStyle=(hv&1)?'rgba(255,255,255,0.03)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')'; g.fill();
-  }
-  // light per-hex coastline/land outline
+  const g=mc.getContext('2d'); g.fillStyle='#0c1622'; g.fillRect(0,0,mc.width,mc.height);
+  for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){ const t=W.terr[y][x], [cx,cy]=wwHexCenter(x,y);
+    wwHexPath(g,cx,cy,WW_S-0.3);
+    if(t==='~'){ g.fillStyle='#16293b'; g.fill(); const hv=(x*2654435761^y*40503)>>>0; if(hv&3){ g.fillStyle='rgba(0,0,0,0.05)'; g.fill(); } continue; }
+    const n=wwOwnerAt(x,y); g.fillStyle=n?n.col:'#5b5b5b'; g.fill();
+    if(t==='h'){ g.fillStyle='rgba(0,0,0,0.20)'; g.fill(); } else if(t==='f'){ g.fillStyle='rgba(0,0,0,0.11)'; g.fill(); }
+    const hv=(x*2654435761^y*40503)>>>0; g.fillStyle=(hv&1)?'rgba(255,255,255,0.03)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')'; g.fill(); }
   g.lineWidth=0.4; g.strokeStyle='rgba(0,0,0,0.22)';
   for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){ if(wwSea(x,y)) continue; const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3); g.stroke(); }
-  // national borders (thick)
   g.lineWidth=1.3; g.strokeStyle='rgba(0,0,0,0.62)'; g.lineJoin='round';
   for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){ if(wwSea(x,y)) continue; const o=W.own[y*W.cols+x];
-    let edge=false; for(const [nx,ny] of wwNb(x,y)){ if(wwSea(nx,ny) || W.own[ny*W.cols+nx]!==o){ edge=true; break; } }
+    let edge=false; for(const [nx,ny] of wwNb(x,y)){ if(wwSea(nx,ny)||W.own[ny*W.cols+nx]!==o){ edge=true; break; } }
     if(edge){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3); g.stroke(); } }
-  // cities + capital labels
   g.textAlign='center';
   for(const c of W.cities){ const [cx,cy]=wwHexCenter(c.x,c.y);
-    g.beginPath(); g.arc(cx,cy,c.cap?4.6:2.7,0,Math.PI*2);
-    g.fillStyle=c.cap?'#ffd34d':'#e8edf2'; g.fill(); g.lineWidth=1; g.strokeStyle='#000c'; g.stroke();
-    if(c.cap){ g.font='700 11px "Segoe UI",sans-serif';
-      g.fillStyle='rgba(0,0,0,0.75)'; g.fillText(c.name,cx+0.6,cy-6.4);
+    g.beginPath(); g.arc(cx,cy,c.cap?4.6:2.7,0,Math.PI*2); g.fillStyle=c.cap?'#ffd34d':'#e8edf2'; g.fill();
+    g.lineWidth=1; g.strokeStyle='#000c'; g.stroke();
+    if(c.cap){ g.font='700 11px "Segoe UI",sans-serif'; g.fillStyle='rgba(0,0,0,0.75)'; g.fillText(c.name,cx+0.6,cy-6.4);
       g.fillStyle='#ffe9a8'; g.fillText(c.name,cx,cy-7); } }
   WW.mapCanvas=mc; WW._mapDirty=false;
 }
@@ -6287,92 +6506,179 @@ function wwRequest(){ if(wwRAFpending||!WW.on) return; wwRAFpending=true;
   requestAnimationFrame(()=>{ wwRAFpending=false; wwRender(); }); }
 function wwRender(){
   if(!WW.on) return;
-  const cv=$('wwCanvas'); const ctx=cv.getContext('2d'); const dpr=WW._dpr||1; const cam=WW.cam;
-  if(WW._mapDirty || !WW.mapCanvas) wwBuildMapCache();
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle='#0a0f16'; ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
+  const cv=$('wwCanvas'), ctx=cv.getContext('2d'), dpr=WW._dpr||1, cam=WW.cam;
+  if(WW._mapDirty||!WW.mapCanvas) wwBuildMapCache();
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#0a0f16'; ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
   ctx.translate(cam.x,cam.y); ctx.scale(cam.z,cam.z);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   ctx.drawImage(WW.mapCanvas,0,0);
-  if(wwSelHexes){
-    ctx.fillStyle='rgba(255,255,255,0.13)';
+  // selected nation glow
+  if(wwSelHexes && !wwSelArmy){ ctx.fillStyle='rgba(255,255,255,0.13)';
     for(const [x,y] of wwSelHexes){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.fill(); }
-    ctx.lineWidth=2.2/cam.z; ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.lineJoin='round';
+    ctx.lineWidth=2.2/cam.z; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineJoin='round';
     for(const [x,y] of wwSelHexes){ const o=WW.own[y*WW.cols+x]; let edge=false;
       for(const [nx,ny] of wwNb(x,y)){ if(WW.own[ny*WW.cols+nx]!==o){ edge=true; break; } }
-      if(edge){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.stroke(); } }
+      if(edge){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.stroke(); } } }
+  // move/attack highlights for a selected army
+  if(wwSelArmy && wwReachSet){ ctx.fillStyle='rgba(90,160,255,0.30)';
+    for(const k of wwReachSet){ const [x,y]=k.split(',').map(Number); const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.6); ctx.fill(); } }
+  if(wwSelArmy && wwTargetSet){ ctx.fillStyle='rgba(230,70,60,0.42)'; ctx.lineWidth=1.6/cam.z; ctx.strokeStyle='rgba(255,90,80,0.9)';
+    for(const k of wwTargetSet){ const [x,y]=k.split(',').map(Number); const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.6); ctx.fill(); ctx.stroke(); } }
+  if(wwSelArmy){ const [cx,cy]=wwHexCenter(wwSelArmy.x,wwSelArmy.y); ctx.lineWidth=2.6/cam.z; ctx.strokeStyle='#ffe9a8'; wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.stroke(); }
+  // armies (screen space, fixed-ish readable size)
+  if(WW.started && WW.armies){ ctx.setTransform(dpr,0,0,dpr,0,0); wwDrawArmies(ctx); }
+}
+function wwDrawArmies(ctx){
+  const z=WW.cam.z, sz=Math.max(9, Math.min(26, WW_S*z*1.5));
+  ctx.lineJoin='round';
+  for(const a of WW.armies){
+    const [wx,wy]=wwHexCenter(a.x,a.y); const [sx,sy]=wwW2S(wx,wy); const n=WW.byKey[a.nat];
+    if(sx< -30||sy< -30||sx>ctx.canvas.width+30||sy>ctx.canvas.height+30) continue;
+    const w=sz*1.25, h=sz*0.82;
+    ctx.fillStyle=n?n.col:'#888'; ctx.strokeStyle=a.moved?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.8)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.rect(sx-w/2,sy-h/2,w,h); ctx.fill(); ctx.stroke();
+    if(sz>13){ // NATO-ish symbol
+      ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1.1; ctx.beginPath();
+      if(a.kind==='inf'){ ctx.moveTo(sx-w/2+2,sy-h/2+2); ctx.lineTo(sx+w/2-2,sy+h/2-2); ctx.moveTo(sx+w/2-2,sy-h/2+2); ctx.lineTo(sx-w/2+2,sy+h/2-2); ctx.stroke(); }
+      else { ctx.save(); ctx.translate(sx,sy); ctx.scale(1,0.6); ctx.beginPath(); ctx.arc(0,0,w*0.34,0,Math.PI*2); ctx.restore(); ctx.stroke(); }
+    }
+    // org/str pip bars under the counter when big enough
+    if(sz>15){ const bw=w, bx=sx-w/2, by=sy+h/2+1.5;
+      ctx.fillStyle='#0008'; ctx.fillRect(bx,by,bw,2.4);
+      ctx.fillStyle='#7fd08a'; ctx.fillRect(bx,by,bw*Math.max(0,a.str/a.maxStr),2.4);
+      ctx.fillStyle='#0008'; ctx.fillRect(bx,by+3,bw,2.4);
+      ctx.fillStyle='#76b6ff'; ctx.fillRect(bx,by+3,bw*Math.max(0,a.org/a.maxOrg),2.4); }
   }
 }
 
-function wwPick(sx,sy){
-  const cam=WW.cam; const wx=(sx-cam.x)/cam.z, wy=(sy-cam.y)/cam.z;
-  const ry=Math.round((wy-WW_PAD-WW_S)/WW_VY);
-  let best=null,bd=1e9;
-  for(let y=Math.max(0,ry-1); y<=Math.min(WW.rows-1,ry+1); y++){
-    const rx=Math.round((wx-WW_PAD-WW_HX/2)/WW_HX - 0.5*(y&1));
-    for(let x=Math.max(0,rx-1); x<=Math.min(WW.cols-1,rx+1); x++){
-      const [cx,cy]=wwHexCenter(x,y); const d=(cx-wx)*(cx-wx)+(cy-wy)*(cy-wy);
-      if(d<bd){ bd=d; best=[x,y]; } } }
-  return (best && bd<=WW_S*WW_S*1.25) ? best : null;
+function wwPick(sx,sy){ const cam=WW.cam, wx=(sx-cam.x)/cam.z, wy=(sy-cam.y)/cam.z;
+  const ry=Math.round((wy-WW_PAD-WW_S)/WW_VY); let best=null,bd=1e9;
+  for(let y=Math.max(0,ry-1);y<=Math.min(WW.rows-1,ry+1);y++){ const rx=Math.round((wx-WW_PAD-WW_HX/2)/WW_HX-0.5*(y&1));
+    for(let x=Math.max(0,rx-1);x<=Math.min(WW.cols-1,rx+1);x++){ const [cx,cy]=wwHexCenter(x,y); const d=(cx-wx)*(cx-wx)+(cy-wy)*(cy-wy); if(d<bd){ bd=d; best=[x,y]; } } }
+  return (best && bd<=WW_S*WW_S*1.25)?best:null; }
+
+function wwSelectArmy(a){
+  wwSelArmy=a; wwSelNat=null; wwSelHexes=null;
+  if(a && !a.moved){ wwReachSet=new Set(wwReachable(a).map(p=>p[0]+','+p[1])); wwTargetSet=new Set(wwAttackTargets(a).map(p=>p[0]+','+p[1])); }
+  else { wwReachSet=null; wwTargetSet=null; }
+  wwUpdateInfo(); wwRequest();
 }
-function wwSelect(hit){
-  if(!hit || wwSea(hit[0],hit[1])){ wwSelNat=null; wwSelHexes=null; }
+function wwSelectNation(hit){
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null;
+  if(!hit||wwSea(hit[0],hit[1])){ wwSelNat=null; wwSelHexes=null; }
   else { const n=wwOwnerAt(hit[0],hit[1]); wwSelNat=n||null; wwSelHexes=null;
     if(n){ wwSelHexes=[]; for(let y=0;y<WW.rows;y++) for(let x=0;x<WW.cols;x++) if(WW.own[y*WW.cols+x]===n.i) wwSelHexes.push([x,y]); } }
-  wwUpdatePanel(); wwRequest();
+  wwUpdateInfo(); wwRequest();
 }
+function wwClickHex(hit){
+  if(!hit){ wwSelectNation(null); return; }
+  const [x,y]=hit, key=x+','+y, army=wwArmyAt(x,y);
+  if(WW.started && wwSelArmy && !wwSelArmy.moved){
+    if(wwTargetSet && wwTargetSet.has(key)){ const r=wwAttack(wwSelArmy, x, y); WW._mapDirty=true; wwAfterAction(r); return; }
+    if(wwReachSet && wwReachSet.has(key)){ wwMoveArmy(wwSelArmy, x, y); wwAfterAction({result:'moved'}); return; }
+  }
+  if(WW.started && army && army.nat===WW.player){ wwSelectArmy(army); return; }
+  wwSelectNation(hit);
+}
+function wwAfterAction(r){
+  wwComputeStats();
+  // the acting army has used its turn → drop the selection, refresh
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null;
+  if(r && r.result==='taken') wwToast('Position captured');
+  // surface any capitulations the action triggered
+  wwDrainLog();
+  wwUpdateHUD(); wwUpdateInfo(); wwRequest();
+  const v=wwCheckVictory(); if(v.over) wwShowEnd(v);
+}
+function wwDoEndTurn(){
+  if(!WW.started || (WW.result&&WW.result.over)) return;
+  const v=wwEndTurn(); WW._mapDirty=true;
+  wwSelArmy=null; wwReachSet=null; wwTargetSet=null;
+  wwDrainLog();
+  wwUpdateHUD(); wwUpdateInfo(); wwRequest();
+  if(v.over) wwShowEnd(v);
+}
+function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ wwToast(WW.log.shift()); } }
 
 function wwDateStr(){ const M=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const d=WW.date; return d.d+' '+M[d.m-1]+' '+d.y; }
-function wwUpdatePanel(){
-  const dt=$('ww-date'); if(dt) dt.textContent = wwDateStr();
-  const info=$('ww-info'); if(!info) return;
-  if(!wwSelNat){ info.classList.add('hidden'); return; }
-  const n=wwSelNat; info.classList.remove('hidden');
-  const facName={axis:'Axis',allies:'Allies',comintern:'Comintern',neutral:'Neutral'}[n.fac]||'Neutral';
-  info.innerHTML =
-    '<div class="ww-card-head"><span class="ww-flag" style="background:'+n.col+'"></span>'+
-    '<div><div class="ww-name">'+n.name+'</div><div class="ww-fac ww-'+n.fac+'">'+facName+'</div></div></div>'+
-    '<table class="ww-stats">'+
-    '<tr><td>Capital</td><td>'+(n.cap||'—')+'</td></tr>'+
-    '<tr><td>Territory</td><td>'+n.hexes+' hexes</td></tr>'+
-    '<tr><td>Cities</td><td>'+n.cityList.length+'</td></tr>'+
-    '<tr><td>Civ. factories</td><td>'+n.civ+'</td></tr>'+
-    '<tr><td>Mil. factories</td><td>'+n.mil+'</td></tr>'+
-    '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
-    '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr>'+
-    '</table>';
+function wwUpdateHUD(){
+  const dt=$('ww-date'); if(dt) dt.textContent=wwDateStr();
+  const tn=$('ww-turn'); if(tn) tn.textContent = WW.started ? ('Week '+(WW.turn+1)) : '';
+  const ps=$('ww-pstat');
+  if(ps){ if(WW.started){ const me=WW.byKey[WW.player];
+      const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key)).length;
+      ps.innerHTML='<b>'+me.name+'</b><br>Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
+        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Enemies left: '+enemies;
+    } else ps.classList.add('hidden'); }
 }
-function wwFillLegend(){
-  const el=$('ww-legend'); if(!el) return;
-  const f=wwFactions(); const order=[['axis','Axis'],['allies','Allies'],['comintern','Comintern'],['neutral','Neutral']];
-  let html='';
+function wwUpdateInfo(){
+  const info=$('ww-info'); if(!info) return;
+  if(wwSelArmy){ const a=wwSelArmy, n=WW.byKey[a.nat];
+    info.classList.remove('hidden');
+    info.innerHTML='<div class="ww-card-head"><span class="ww-flag" style="background:'+n.col+'"></span>'+
+      '<div><div class="ww-name">'+(a.kind==='arm'?'Armoured Division':'Infantry Division')+'</div>'+
+      '<div class="ww-fac ww-'+n.fac+'">'+n.name+'</div></div></div>'+
+      '<table class="ww-stats"><tr><td>Strength</td><td>'+a.str.toFixed(1)+' / '+a.maxStr+'</td></tr></table>'+
+      '<div class="ww-bar"><i style="width:'+(100*Math.max(0,a.str/a.maxStr))+'%;background:#7fd08a"></i></div>'+
+      '<table class="ww-stats"><tr><td>Organization</td><td>'+a.org.toFixed(1)+' / '+a.maxOrg+'</td></tr></table>'+
+      '<div class="ww-bar"><i style="width:'+(100*Math.max(0,a.org/a.maxOrg))+'%;background:#76b6ff"></i></div>'+
+      '<table class="ww-stats"><tr><td>Movement</td><td>'+a.mp+'</td></tr>'+
+      '<tr><td>Orders</td><td>'+(a.moved?'used':'ready')+'</td></tr></table>'+
+      (a.nat===WW.player && !a.moved ? '<div style="font-size:11px;color:#8fb4d8;margin-top:8px">Click a blue hex to move, a red hex to attack.</div>' : '');
+    return; }
+  if(wwSelNat){ const n=wwSelNat; info.classList.remove('hidden');
+    const facName={axis:'Axis',allies:'Allies',comintern:'Comintern',neutral:'Neutral'}[n.fac]||'Neutral';
+    const rel = WW.started ? (n.key===WW.player?'— You —': n.capitulated?'Capitulated': wwAtWar(WW.player,n.key)?'At war': wwAllied(WW.player,n.key)?'Ally':'Neutral') : '';
+    info.innerHTML='<div class="ww-card-head"><span class="ww-flag" style="background:'+n.col+'"></span>'+
+      '<div><div class="ww-name">'+n.name+'</div><div class="ww-fac ww-'+n.fac+'">'+facName+(rel?' · '+rel:'')+'</div></div></div>'+
+      '<table class="ww-stats">'+
+      '<tr><td>Capital</td><td>'+(n.cap||'—')+'</td></tr>'+
+      '<tr><td>Territory</td><td>'+n.hexes+' hexes</td></tr>'+
+      '<tr><td>Cities</td><td>'+n.cityList.length+'</td></tr>'+
+      '<tr><td>Civ. factories</td><td>'+n.civ+'</td></tr>'+
+      '<tr><td>Mil. factories</td><td>'+n.mil+'</td></tr>'+
+      '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
+      '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'; return; }
+  info.classList.add('hidden');
+}
+function wwFillLegend(){ const el=$('ww-legend'); if(!el) return;
+  const f=wwFactions(), order=[['axis','Axis'],['allies','Allies'],['comintern','Comintern'],['neutral','Neutral']]; let html='';
   for(const [k,label] of order){ if(!f[k].length) continue;
     html+='<div class="ww-leg-row"><span class="ww-leg-label">'+label+'</span>';
-    html+=f[k].slice(0,10).map(n=>'<span class="ww-sw" style="background:'+n.col+'" title="'+n.name+'"></span>').join('');
-    html+='</div>'; }
-  el.innerHTML=html;
-}
+    html+=f[k].slice(0,10).map(n=>'<span class="ww-sw" style="background:'+n.col+'" title="'+n.name+'"></span>').join(''); html+='</div>'; }
+  el.innerHTML=html; }
+
+function wwToast(msg){ const box=$('ww-toast'); if(!box) return;
+  const el=document.createElement('div'); el.className='ww-toast-msg'; el.textContent=msg; box.appendChild(el);
+  setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, 3600); }
+function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove('hidden');
+  const me=WW.byKey[WW.player];
+  el.innerHTML = v.win
+    ? '<h1 style="color:#ffe08a">VICTORY</h1><p>'+me.name+' stands triumphant over Europe. Every enemy that took up arms against you has been brought to capitulation.</p>'
+    : '<h1 style="color:#e08a7a">DEFEAT</h1><p>'+me.name+' has capitulated. The war is lost.</p>';
+  const b=document.createElement('button'); b.textContent='RETURN TO MENU'; b.onclick=()=>{ wwClose(); showModeSelect(); }; el.appendChild(b); }
 
 function wwBindInput(){
-  if(wwBound) return; wwBound=true;
-  const cv=$('wwCanvas');
+  if(wwBound) return; wwBound=true; const cv=$('wwCanvas');
   cv.addEventListener('mousedown',e=>{ if(!WW.on) return; wwDrag=true; wwDragMoved=false; wwLMx=e.clientX; wwLMy=e.clientY; cv.classList.add('drag'); });
-  window.addEventListener('mousemove',e=>{ if(!WW.on||!wwDrag) return;
-    const dx=e.clientX-wwLMx, dy=e.clientY-wwLMy; if(Math.abs(dx)+Math.abs(dy)>3) wwDragMoved=true;
-    WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); });
+  window.addEventListener('mousemove',e=>{ if(!WW.on||!wwDrag) return; const dx=e.clientX-wwLMx, dy=e.clientY-wwLMy;
+    if(Math.abs(dx)+Math.abs(dy)>3) wwDragMoved=true; WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); });
   window.addEventListener('mouseup',e=>{ if(!WW.on){ wwDrag=false; return; }
-    if(wwDrag && !wwDragMoved){ const r=cv.getBoundingClientRect(); wwSelect(wwPick(e.clientX-r.left, e.clientY-r.top)); }
+    if(wwDrag && !wwDragMoved){ const r=cv.getBoundingClientRect(); wwClickHex(wwPick(e.clientX-r.left, e.clientY-r.top)); }
     wwDrag=false; cv.classList.remove('drag'); });
-  cv.addEventListener('wheel',e=>{ if(!WW.on) return; e.preventDefault();
-    const r=cv.getBoundingClientRect(); wwZoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:1/1.12); }, {passive:false});
+  cv.addEventListener('wheel',e=>{ if(!WW.on) return; e.preventDefault(); const r=cv.getBoundingClientRect(); wwZoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:1/1.12); }, {passive:false});
   window.addEventListener('resize',()=>{ if(WW.on){ wwResize(); wwRequest(); } });
   window.addEventListener('keydown',e=>{ if(!WW.on) return;
     if(e.key==='Escape'){ wwClose(); showModeSelect(); }
-    else if(e.key==='+'||e.key==='='){ const cv2=$('wwCanvas'); wwZoomAt(cv2.clientWidth/2, cv2.clientHeight/2, 1.15); }
-    else if(e.key==='-'||e.key==='_'){ const cv2=$('wwCanvas'); wwZoomAt(cv2.clientWidth/2, cv2.clientHeight/2, 1/1.15); } });
+    else if((e.key===' '||e.key==='Enter') && WW.started){ e.preventDefault(); wwDoEndTurn(); }
+    else if(e.key==='+'||e.key==='='){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1.15); }
+    else if(e.key==='-'||e.key==='_'){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1/1.15); } });
   const bk=$('ww-back'); if(bk) bk.onclick=()=>{ wwClose(); showModeSelect(); };
+  const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
 }
+// expose a few entry points on window for debugging / headless rendering (no-op in tests)
+if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; }
 
 /* mode-select routing — each sub-menu shows its own Continue button only if that
    slot actually holds a saved campaign */
@@ -6681,6 +6987,9 @@ if (typeof module !== 'undefined' && module.exports){
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
+    wwSetup, wwAtWar, wwAllied, wwArmyAt, wwArmiesOf, wwReachable, wwAttackTargets, wwMoveArmy,
+    wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwProduction, wwAINation,
+    wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     getState: () => G,
   };
 }
@@ -6692,24 +7001,29 @@ if (typeof module !== 'undefined' && module.exports){
     #ww-screen.hidden{display:none;}
     #wwCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;}
     #wwCanvas.drag{cursor:grabbing;}
-    #ww-top{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:16px;
-      padding:0 14px;background:linear-gradient(#0b1420f2,#0b142000);pointer-events:none;z-index:3;}
+    #ww-top{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:14px;
+      padding:0 14px;background:linear-gradient(#0b1420f5,#0b142000);pointer-events:none;z-index:4;}
     #ww-top>*{pointer-events:auto;}
     #ww-back{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:600 13px 'Segoe UI',sans-serif;
-      padding:7px 14px;border-radius:6px;cursor:pointer;letter-spacing:.5px;}
+      padding:7px 13px;border-radius:6px;cursor:pointer;letter-spacing:.5px;}
     #ww-back:hover{background:#1d3553;border-color:#3d6ea0;}
-    #ww-title{font-weight:800;letter-spacing:3px;font-size:15px;color:#dfe9f5;text-shadow:0 1px 3px #000;}
+    #ww-title{font-weight:800;letter-spacing:3px;font-size:14px;color:#dfe9f5;text-shadow:0 1px 3px #000;}
+    #ww-playerflag{width:24px;height:16px;border-radius:3px;border:1px solid #0009;}
+    #ww-playername{font-size:13px;font-weight:700;color:#eaf1f8;}
     #ww-date{font-size:13px;color:#ffe9a8;font-weight:600;letter-spacing:.5px;}
-    #ww-hint{font-size:11px;color:#7d93ab;letter-spacing:.5px;}
+    #ww-turn{font-size:11px;color:#8ba2b8;}
+    #ww-hint{font-size:11px;color:#7d93ab;letter-spacing:.3px;}
+    /* faction legend */
     #ww-legend{position:absolute;left:12px;bottom:12px;background:#0d1826e0;border:1px solid #22364d;
-      border-radius:8px;padding:9px 11px;z-index:3;backdrop-filter:blur(3px);max-width:340px;}
+      border-radius:8px;padding:8px 10px;z-index:4;max-width:330px;}
     .ww-leg-row{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:11px;}
     .ww-leg-label{width:74px;color:#9fb4c9;font-weight:600;letter-spacing:.5px;}
     .ww-sw{width:13px;height:13px;border-radius:3px;border:1px solid #0008;display:inline-block;}
-    #ww-info{position:absolute;right:12px;top:62px;width:236px;background:#0d1826ee;border:1px solid #25405e;
-      border-radius:10px;padding:14px;z-index:3;box-shadow:0 8px 30px #000a;backdrop-filter:blur(3px);}
+    /* info card */
+    #ww-info{position:absolute;right:12px;top:60px;width:238px;background:#0d1826ee;border:1px solid #25405e;
+      border-radius:10px;padding:13px;z-index:4;box-shadow:0 8px 30px #000a;}
     #ww-info.hidden{display:none;}
-    .ww-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+    .ww-card-head{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
     .ww-flag{width:30px;height:20px;border-radius:3px;border:1px solid #0009;box-shadow:0 1px 3px #0007;flex:0 0 auto;}
     .ww-name{font-weight:700;font-size:15px;letter-spacing:.3px;}
     .ww-fac{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
@@ -6717,17 +7031,67 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-stats{width:100%;border-collapse:collapse;font-size:12.5px;}
     .ww-stats td{padding:3px 2px;border-bottom:1px solid #1c2c40;}
     .ww-stats td:first-child{color:#8ba2b8;} .ww-stats td:last-child{text-align:right;font-weight:600;color:#eaf1f8;}
+    .ww-bar{height:7px;border-radius:4px;background:#22344a;overflow:hidden;margin-top:2px;}
+    .ww-bar>i{display:block;height:100%;}
+    /* end-turn + status */
+    #ww-endturn{position:absolute;right:14px;bottom:16px;z-index:4;background:linear-gradient(#2a6e3a,#1f5a2e);
+      border:1px solid #3f9a52;color:#eafce9;font:800 15px 'Segoe UI',sans-serif;letter-spacing:1.5px;
+      padding:12px 22px;border-radius:9px;cursor:pointer;box-shadow:0 6px 20px #0009;}
+    #ww-endturn:hover{background:linear-gradient(#338046,#246a36);}
+    #ww-endturn.hidden{display:none;}
+    #ww-pstat{position:absolute;right:14px;bottom:64px;z-index:4;background:#0d1826e6;border:1px solid #22364d;
+      border-radius:8px;padding:7px 11px;font-size:12px;color:#cfe0f2;min-width:150px;}
+    #ww-pstat.hidden{display:none;} #ww-pstat b{color:#ffe9a8;}
+    /* toast */
+    #ww-toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:6;display:flex;
+      flex-direction:column;gap:6px;align-items:center;pointer-events:none;}
+    .ww-toast-msg{background:#1a1020e8;border:1px solid #6a3a4a;color:#ffd9c2;font-size:13px;font-weight:600;
+      padding:8px 16px;border-radius:7px;box-shadow:0 4px 16px #000a;}
+    /* nation pick */
+    #ww-pick{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#10202fe0,#070b11f4);}
+    #ww-pick.hidden{display:none;}
+    #ww-pick h2{font-weight:800;letter-spacing:4px;font-size:22px;color:#eaf2fb;text-shadow:0 2px 8px #000;margin:0;}
+    #ww-pick .sub{color:#9fb4c9;font-size:12px;letter-spacing:2px;margin-top:-8px;}
+    .ww-pick-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:680px;}
+    .ww-pick-card{width:150px;background:#0e1c2c;border:1px solid #284562;border-radius:10px;padding:12px;
+      cursor:pointer;transition:.12s;text-align:left;}
+    .ww-pick-card:hover{border-color:#4f8fce;background:#13283c;transform:translateY(-2px);}
+    .ww-pick-card .ph{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+    .ww-pick-card .pf{width:26px;height:17px;border-radius:3px;border:1px solid #0009;}
+    .ww-pick-card .pn{font-weight:700;font-size:14px;}
+    .ww-pick-card .pd{font-size:11px;color:#90a6bb;line-height:1.35;}
+    /* win/lose */
+    #ww-end{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:14px;background:#060a10ee;}
+    #ww-end.hidden{display:none;}
+    #ww-end h1{font-size:40px;font-weight:900;letter-spacing:6px;margin:0;}
+    #ww-end p{color:#a9bccf;font-size:14px;max-width:440px;text-align:center;}
+    #ww-end button{margin-top:8px;background:#1d3553;border:1px solid #3d6ea0;color:#dceaf8;
+      font:700 14px 'Segoe UI',sans-serif;letter-spacing:1px;padding:11px 24px;border-radius:8px;cursor:pointer;}
   </style>
   <canvas id="wwCanvas"></canvas>
   <div id="ww-top">
     <button id="ww-back">◀ MENU</button>
     <div id="ww-title">THE WORLD AT WAR</div>
+    <div id="ww-playerflag" style="display:none"></div>
+    <div id="ww-playername"></div>
     <div id="ww-date">1 September 1939</div>
+    <div id="ww-turn"></div>
     <div style="flex:1"></div>
-    <div id="ww-hint">drag to pan · scroll to zoom · click a nation</div>
+    <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>
   <div id="ww-legend"></div>
   <div id="ww-info" class="hidden"></div>
+  <div id="ww-pstat" class="hidden"></div>
+  <button id="ww-endturn" class="hidden">END TURN ▶</button>
+  <div id="ww-toast"></div>
+  <div id="ww-pick">
+    <h2>THE WORLD AT WAR</h2>
+    <div class="sub">EUROPE · SEPTEMBER 1939 — CHOOSE YOUR NATION</div>
+    <div class="ww-pick-row" id="ww-pick-row"></div>
+  </div>
+  <div id="ww-end" class="hidden"></div>
 </div>
 </body>
 </html>
