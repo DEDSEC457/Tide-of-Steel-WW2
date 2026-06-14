@@ -666,6 +666,32 @@ say('— The World at War —');
     Gl.nat.some(n=>n.capitulated), Gl.nat.filter(n=>n.capitulated).map(n=>n.key).join(',')||'none fell');
   let ol=0; for(let i=0;i<Gl.own.length;i++) if(Gl.own[i]>=0) ol++;
   check('WW ownership invariant survives a long campaign', ol===owned);
+
+  // --- Phase 4: supply, combined arms, difficulty ---
+  check('WW difficulty scales AI power',
+    E.wwSetup('GER','easy').aiPow < 1 && E.wwSetup('GER','hard').aiPow > 1 && E.wwSetup('GER','normal').aiPow===1);
+  const Gs = E.wwSetup('GER','normal');
+  const gcap = E.wwCapitalHex('GER');
+  const homeArmy = {nat:'GER',x:gcap[0],y:gcap[1],str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false};
+  check('WW army on home soil is in supply', E.wwInSupply(homeArmy));
+  let dx=-1,dy=-1; const sovI=Gs.byKey.SOV.i;
+  for(let y=0;y<Gs.rows && dx<0;y++) for(let x=Gs.cols-1;x>=0;x--) if(Gs.own[y*Gs.cols+x]===sovI){ dx=x; dy=y; break; }
+  const deep = {nat:'GER',x:dx,y:dy,str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false};
+  Gs.armies.push(deep); E.wwRecomputeSupply();
+  check('WW army deep in enemy land is cut off from supply', !E.wwInSupply(deep));
+  // combined arms: friendly support raises attack power
+  const tgt=[gcap[0], gcap[1]-2];
+  const lead={nat:'GER',x:gcap[0],y:gcap[1],str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false};
+  const lonePow=E.wwAtkPower(lead, tgt[0], tgt[1]);
+  for(const [x,y] of E.wwNb(tgt[0],tgt[1]).slice(0,2)) Gs.armies.push({nat:'GER',x,y,str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false});
+  check('WW combined arms: supported attack is stronger', E.wwAtkPower(lead, tgt[0], tgt[1]) > lonePow + 1);
+  // out-of-supply attrition: an isolated army loses organization over a turn
+  const Ga = E.wwSetup('GER','normal');
+  let ix=-1,iy=-1; const sovI2=Ga.byKey.SOV.i;
+  for(let y=0;y<Ga.rows && ix<0;y++) for(let x=Ga.cols-1;x>=0;x--) if(Ga.own[y*Ga.cols+x]===sovI2){ ix=x; iy=y; break; }
+  const iso={nat:'GER',x:ix,y:iy,str:10,maxStr:10,org:10,maxOrg:10,kind:'inf',mp:2,moved:false};
+  Ga.armies.push(iso); const org0=iso.org; E.wwEndTurn();
+  check('WW out-of-supply armies suffer attrition', iso.org < org0);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
