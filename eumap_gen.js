@@ -4,15 +4,12 @@ const fs=require('fs');
 const {createCanvas}=require('@napi-rs/canvas');
 const topojson=require('topojson-client');
 
-// ---- land polygons (coastline) ----
-const landTopo=require('world-atlas/land-50m.json');
-const landGeo=topojson.feature(landTopo, landTopo.objects.land);
-const landFeats=landGeo.type==='FeatureCollection'?landGeo.features:[landGeo];
-const polys=[];
-for(const f of landFeats){ const g=f.geometry; if(!g) continue;
-  if(g.type==='Polygon') polys.push(g.coordinates);
-  else if(g.type==='MultiPolygon') for(const p of g.coordinates) polys.push(p); }
-console.error('land polygons:', polys.length);
+// Land detection AND nation assignment both come from the country polygons
+// (countries-50m). We do NOT use the world land-50m polygon: it spans the whole
+// globe (lon -180..180) and, like Russia's antimeridian-crossing ring, breaks
+// horizontal point-in-polygon at high latitude — that produced phantom "Soviet"
+// land bands across the Arctic Ocean. Fix: unwrap antimeridian vertices and drop
+// any polygon still spanning >180° of longitude (the world blob / far-side bits).
 
 // ---- country polygons (borders) ----
 const cTopo=require('world-atlas/countries-50m.json');
@@ -62,15 +59,21 @@ const NATIONS={
   LIT:['Lithuania','#b0a050','neutral','Kaunas'],
   SLO:['Slovakia','#8a8a4a','axis','Bratislava'],
 };
-// collect country polygons we care about, with bounding boxes for fast reject
-const countryPolys=[]; // {nat, rings:[[ [lon,lat],.. ], ..], bbox:[w,s,e,n]}
-for(const f of cFeats){ const nm=f.properties&&f.properties.name; const nat=NAT_OF[nm]; if(!nat) continue;
-  const g=f.geometry; if(!g) continue;
+// ALL country polygons near our theatre (full set so non-European land is still
+// land), unwrapped at the antimeridian and span-filtered. nat=null for countries
+// outside our WW2 roster (their hexes become '???' and get BFS-filled later).
+const UW = lo => lo < -90 ? lo+360 : lo;   // unwrap antimeridian (Chukotka, etc.)
+const countryPolys=[]; // {nat|null, rings, bbox:[w,s,e,n]}
+for(const f of cFeats){ const nm=f.properties&&f.properties.name; const g=f.geometry; if(!g) continue;
+  const nat=NAT_OF[nm]||null;
   const mps = g.type==='Polygon'?[g.coordinates] : g.type==='MultiPolygon'?g.coordinates : [];
-  for(const poly of mps){ let w=180,s=90,e=-180,n=-90;
-    for(const ring of poly) for(const [lo,la] of ring){ if(lo<w)w=lo; if(lo>e)e=lo; if(la<s)s=la; if(la>n)n=la; }
-    countryPolys.push({nat, rings:poly, bbox:[w,s,e,n]}); } }
-console.error('country polygons (europe set):', countryPolys.length);
+  for(const poly of mps){ const rings=poly.map(r=>r.map(([lo,la])=>[UW(lo),la]));
+    let w=999,s=90,e=-999,n=-90;
+    for(const ring of rings) for(const [lo,la] of ring){ if(lo<w)w=lo; if(lo>e)e=lo; if(la<s)s=la; if(la>n)n=la; }
+    if((e-w)>180) continue;                          // drop world-blob / fragmented far-side polygons
+    if(e< -40 || w>95 || n<25 || s>82) continue;     // keep only the European/Mediterranean theatre
+    countryPolys.push({nat, rings, bbox:[w,s,e,n]}); } }
+console.error('country polygons (theatre set):', countryPolys.length);
 
 // ---- map window (WW2 European theatre), Mercator latitude ----
 const LON_W=-12, LON_E=58, LAT_N=71, LAT_S=32;
@@ -81,20 +84,17 @@ const YN=mercY(LAT_N), YS=mercY(LAT_S);
 function inRing(lon,lat,r){ let c=false;
   for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
     if(((yi>lat)!==(yj>lat)) && (lon<(xj-xi)*(lat-yi)/(yj-yi)+xi)) c=!c; } return c; }
-function isLand(lon,lat){
-  for(const poly of polys){ if(inRing(lon,lat,poly[0])){ let hole=false;
-    for(let k=1;k<poly.length;k++) if(inRing(lon,lat,poly[k])){hole=true;break;}
-    if(!hole) return true; } }
-  return false;
-}
-function natAt(lon,lat){
+// returns the matching country polygon (or null = open sea)
+function countryAt(lon,lat){
   for(const cp of countryPolys){ const b=cp.bbox;
     if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3]) continue;
     if(inRing(lon,lat,cp.rings[0])){ let hole=false;
       for(let k=1;k<cp.rings.length;k++) if(inRing(lon,lat,cp.rings[k])){hole=true;break;}
-      if(!hole) return cp.nat; } }
+      if(!hole) return cp; } }
   return null;
 }
+function isLand(lon,lat){ return countryAt(lon,lat)!==null; }
+function natAt(lon,lat){ const cp=countryAt(lon,lat); return cp ? cp.nat : null; }
 function cellLonLat(x,y){
   const lon=LON_W + (x+0.5)/W*(LON_E-LON_W);
   const m=YN + (y+0.5)/H*(YS-YN);
@@ -130,8 +130,8 @@ function terr(lon,lat,x,y){
 // ---- build terrain + raw nation grids ----
 const tgrid=[], ngrid=[];
 for(let y=0;y<H;y++){ let trow='', nrow='';
-  for(let x=0;x<W;x++){ const [lon,lat]=cellLonLat(x,y);
-    if(isLand(lon,lat)){ trow+=terr(lon,lat,x,y); const na=natAt(lon,lat); nrow+= na?na:'???'; }
+  for(let x=0;x<W;x++){ const [lon,lat]=cellLonLat(x,y); const cp=countryAt(lon,lat);
+    if(cp){ trow+=terr(lon,lat,x,y); nrow+= cp.nat?cp.nat:'???'; }
     else { trow+='~'; nrow+='~~~'; } }
   tgrid.push(trow); ngrid.push(nrow); }
 // nation grid uses 3-char codes; store as array-of-arrays for the fill pass
