@@ -1,2 +1,6 @@
 # generated preview / diagnostic images — not game assets
 /*.png
+
+# node tooling (map generator deps)
+node_modules/
+package-lock.json
