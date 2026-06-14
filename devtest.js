@@ -749,6 +749,9 @@ function uiSmoke(side){
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }
   if ($('vol-sfx').oninput){ $('vol-sfx').value = 70; $('vol-sfx').oninput(); }
   if ($('btn-mute').onclick){ $('btn-mute').onclick(); $('btn-mute').onclick(); }
+  // cycle graphics quality — High lights up the cinematic pass (cloud shadows,
+  // sun grade, grain, soft counter shadows); make sure those paths render clean
+  for (const lv of ['low','high','medium']) if ($('gfx-'+lv).onclick){ $('gfx-'+lv).onclick(); drain(); }
   if ($('btn-settings-close').onclick) $('btn-settings-close').onclick();
   drain();
   const arcadeOver = UI.getState().over, arcadeResult = UI.getState().result;

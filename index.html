@@ -5372,9 +5372,14 @@ let cam = {x:0, y:0, z:1};
    high-DPI screens), frame-rate cap, per-hex terrain decorations & ground
    dressing, weather particles, and the big-map cache resolution. */
 const GFX_PRESETS = {
-  low:    { dpr:1,   fpsMs:50, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600 },
-  medium: { dpr:1.5, fpsMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096 },
-  high:   { dpr:2,   fpsMs:16, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200 },
+  low:    { dpr:1,   fpsMs:50, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600,
+            lighting:false, clouds:false, grain:false, softShadow:false },
+  medium: { dpr:1.5, fpsMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096,
+            lighting:false, clouds:false, grain:false, softShadow:false },
+  // "high" adds a cinematic pass: drifting cloud shadows, a directional sun
+  // grade, soft blurred counter shadows and a faint film grain.
+  high:   { dpr:2,   fpsMs:16, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
+            lighting:true,  clouds:true,  grain:true,  softShadow:true },
 };
 let GFX = Object.assign({ level:'medium' }, GFX_PRESETS.medium);
 function loadGfx(){ try{ const l = localStorage.getItem('hoi5-gfx'); if (l && GFX_PRESETS[l]) GFX = Object.assign({level:l}, GFX_PRESETS[l]); }catch(e){} }
@@ -5445,6 +5450,65 @@ let showSupply = false, supplyView = null;
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
+let _sunGrad = null, _sunW = 0, _clouds = null, _grainTile = null, _grainTried = false;
+
+/* High-quality cinematic pass — all guarded so the headless fake-DOM (whose
+   canvas methods return undefined) silently skips them. */
+function drawCloudShadows(now, vL, vT, vR, vB){
+  if (!ctx.createRadialGradient) return;                  // no gradients → skip (fake DOM)
+  if (!_clouds){                                          // seed a drifting overcast once
+    _clouds = [];
+    for (let i=0;i<6;i++) _clouds.push({
+      x: ((i*263)%1000)/1000*mapW(), y:((i*457)%1000)/1000*mapH(),
+      r: 200+ (i%3)*120, sp: 5+(i%4)*3, ph: i*1.7, sq: 0.55+(i%2)*0.12 });
+  }
+  const span = mapW()+900;
+  for (const c of _clouds){
+    let cx = (c.x + now*0.001*c.sp) % span; if (cx<0) cx+=span; cx-=450;
+    const cy = c.y + Math.sin(now*0.00018 + c.ph)*36;
+    if (cx+c.r < vL || cx-c.r > vR || cy+c.r < vT || cy-c.r > vB) continue;   // off-screen
+    const g = ctx.createRadialGradient(cx,cy,c.r*0.15, cx,cy,c.r);
+    if (!g || !g.addColorStop) return;
+    g.addColorStop(0,'rgba(18,22,28,0.17)'); g.addColorStop(0.7,'rgba(18,22,28,0.09)'); g.addColorStop(1,'rgba(18,22,28,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx,cy,c.r,c.r*c.sq,0.4,0,Math.PI*2); ctx.fill();
+  }
+}
+function grainTile(){                                      // a small noise tile, built once
+  if (_grainTile || _grainTried) return _grainTile;
+  _grainTried = true;
+  try {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 96;
+    const c = cv.getContext('2d'); if (!c || !c.createImageData) return null;
+    const img = c.createImageData(96,96); if (!img || !img.data) return null;
+    for (let i=0;i<img.data.length;i+=4){ const v=(Math.random()*255)|0;
+      img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=255; }
+    c.putImageData(img,0,0); _grainTile = cv;
+  } catch(e){ _grainTile = null; }
+  return _grainTile;
+}
+function drawPremiumOverlay(){                             // screen-space sun grade + film grain
+  if (GFX.lighting && ctx.createLinearGradient){
+    if (!_sunGrad || _sunW!==innerWidth){
+      const g = ctx.createLinearGradient(0,0,innerWidth*0.85,innerHeight);
+      if (g && g.addColorStop){
+        g.addColorStop(0,'rgba(255,241,206,0.12)'); g.addColorStop(0.5,'rgba(255,241,206,0)');
+        g.addColorStop(1,'rgba(12,22,42,0.16)'); _sunGrad = g; _sunW = innerWidth;
+      }
+    }
+    if (_sunGrad){ ctx.globalCompositeOperation='soft-light'; ctx.fillStyle=_sunGrad;
+      ctx.fillRect(0,0,innerWidth,innerHeight); ctx.globalCompositeOperation='source-over'; }
+  }
+  if (GFX.grain){
+    const g = grainTile();
+    if (g){
+      ctx.globalAlpha = 0.04; ctx.globalCompositeOperation='overlay';
+      const ox=(Math.random()*96)|0, oy=(Math.random()*96)|0;
+      for (let x=-ox; x<innerWidth; x+=96) for (let y=-oy; y<innerHeight; y+=96) ctx.drawImage(g,x,y);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation='source-over';
+    }
+  }
+}
 
 const $ = id => document.getElementById(id);
 const show = (id,on) => $(id).classList.toggle('hidden', !on);
@@ -6086,6 +6150,8 @@ function draw(){
   }
   }  // end live terrain/coastline draw (else of useCache)
 
+  if (GFX.clouds) drawCloudShadows(now, vL, vT, vR, vB);   // high: drifting overcast
+
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
 
   // the railhead: rail line, sleepers, supplied-corridor wash, forward depots
@@ -6254,6 +6320,7 @@ function draw(){
     }
   }
   if (vignette){ ctx.fillStyle = vignette; ctx.fillRect(0,0,innerWidth,innerHeight); }
+  drawPremiumOverlay();                          // high: directional sun grade + film grain
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
 
   // falling weather: autumn rain in the mud, snowfall in winter (screen space)
@@ -6293,11 +6360,21 @@ function star(x,y,r){
 function drawUnit(u, cx, cy){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
-  // drop shadow, counter, bevel
-  ctx.fillStyle = 'rgba(0,0,0,0.38)';
-  roundRect(-w/2+2, -h/2+3, w, h, 5); ctx.fill();
-  ctx.fillStyle = k.color || SIDES[u.side].color;
-  roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+  // drop shadow, counter, bevel — high quality lifts the counter with a soft
+  // blurred shadow; otherwise a cheap hard-offset shadow
+  if (GFX.softShadow && cam.z >= 0.62){
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 7;
+    ctx.shadowOffsetX = 1.5; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = k.color || SIDES[u.side].color;
+    roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    roundRect(-w/2+2, -h/2+3, w, h, 5); ctx.fill();
+    ctx.fillStyle = k.color || SIDES[u.side].color;
+    roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+  }
   ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
   ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.1;
@@ -6731,6 +6808,7 @@ function requestRender(){ _needRender = true; }
 function _sceneAnimating(){
   if (typeof aiRunning !== 'undefined' && aiRunning) return true;
   if (!G) return false;
+  if (GFX.clouds || GFX.grain) return true;                            // high: living overcast/grain
   const wx = weatherFor(G.turn);
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
@@ -7249,7 +7327,7 @@ syncSoundUI();
 const GFX_DESC = {
   low:    'Flat terrain, no decorations or weather effects, 20fps. Best for older / work PCs.',
   medium: 'Trees, contours, weather effects, 30fps, standard pixel density. A good balance.',
-  high:   'Full detail, weather, 60fps and retina rendering. For a strong gaming PC.',
+  high:   'Cinematic: drifting cloud shadows, directional sunlight, soft counter shadows & film grain — plus 60fps and retina rendering. For a strong gaming PC.',
 };
 function syncGfxUI(){
   for (const l of ['low','medium','high']) $('gfx-'+l).classList.toggle('sel', GFX.level===l);
