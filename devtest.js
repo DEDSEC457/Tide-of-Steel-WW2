@@ -711,6 +711,16 @@ say('— The World at War —');
     E.wwArmiesOf('ENG').some(a=>a.x>22));
   let ov=0; for(let i=0;i<Gv2.own.length;i++) if(Gv2.own[i]>=0) ov++;
   check('WW ownership invariant survives a naval war', ov===owned);
+
+  // --- Phase 6: air power ---
+  const Gair = E.wwSetup('GER','normal');
+  check('WW air forces are initialised (Luftwaffe > Polish air)',
+    Gair.byKey.GER.air > Gair.byKey.POL.air && Gair.byKey.ENG.air > 0);
+  check('WW air superiority is asymmetric',
+    E.wwAirFactor('GER','POL') > 1.05 && E.wwAirFactor('POL','GER') < 0.95 && E.wwAirFactor('ITA','ITA')===1);
+  const air0 = Gair.byKey.GER.air;
+  for(let i=0;i<8;i++) E.wwProduction();
+  check('WW air force grows from industry', Gair.byKey.GER.air > air0);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */

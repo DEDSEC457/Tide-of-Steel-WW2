@@ -4616,7 +4616,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   WW.result=null;
@@ -4712,8 +4712,8 @@ function wwAttack(a,tx,ty){
   if(foeKey && !wwAtWar(a.nat,foeKey)) wwDeclareWar(a.nat,foeKey);
   let took=false; a.moved=true;
   if(d){
-    const atk=wwAtkPower(a,tx,ty)*(0.55+Math.random()*0.45);
-    const def=wwDefPower(d,tx,ty)*(0.50+Math.random()*0.35);
+    const atk=wwAtkPower(a,tx,ty)*(0.55+Math.random()*0.45)*wwAirFactor(a.nat,foeKey);
+    const def=wwDefPower(d,tx,ty)*(0.50+Math.random()*0.35)*wwAirFactor(foeKey,a.nat);
     d.org-=atk*0.85; d.str-=atk*0.20;
     a.org-=def*0.80; a.str-=def*0.18;
     if(a.str<=1.0){ wwRemoveArmy(a); return {result:'attacker-lost'}; }
@@ -4766,6 +4766,14 @@ function wwAIStep2(a){
   }
   return best;
 }
+// air power: a national air force that grows from industry and tips battles via air superiority
+const WW_AIR = { GER:240, ENG:200, SOV:185, FRA:140, ITA:120, POL:40 };
+function wwBaseAir(nat){ return WW_AIR[nat.key] || Math.round((nat.hexes||0)/35 + (nat.cityList?nat.cityList.length:0)*4); }
+function wwAirFactor(meKey, foeKey){
+  const me=WW.byKey[meKey], foe=WW.byKey[foeKey]; if(!me||!foe) return 1;
+  const ma=me.air||0, fa=foe.air||0; if(ma+fa<=0) return 1;
+  return 1 + 0.22*Math.max(-1, Math.min(1, (ma-fa)/(ma+fa)));
+}
 function wwCoastal(x,y){ if(wwSea(x,y)) return false; for(const [nx,ny] of wwNb(x,y)) if(wwSea(nx,ny)) return true; return false; }
 // every coastal land hex reachable by sea from an army on the coast (amphibious targets)
 function wwInvadeTargets(a){
@@ -4788,8 +4796,8 @@ function wwInvade(a,tx,ty){
   a.moved=true; a.org=Math.max(1,a.org-a.maxOrg*0.22);   // the sea crossing costs organization
   if(friendlyDest){ a.x=tx; a.y=ty; return {result:'landed'}; }
   if(d){
-    const atk=wwAtkPower(a,tx,ty)*0.55*(0.55+Math.random()*0.45);   // amphibious assault penalty
-    const def=wwDefPower(d,tx,ty)*(0.60+Math.random()*0.40);
+    const atk=wwAtkPower(a,tx,ty)*0.55*(0.55+Math.random()*0.45)*wwAirFactor(a.nat,d.nat);   // amphibious assault penalty
+    const def=wwDefPower(d,tx,ty)*(0.60+Math.random()*0.40)*wwAirFactor(d.nat,a.nat);
     d.org-=atk*0.85; d.str-=atk*0.20; a.org-=def*0.9; a.str-=def*0.22;
     if(a.str<=1.0){ wwRemoveArmy(a); return {result:'invasion-lost'}; }
     if(d.str<=1.0){ wwRemoveArmy(d); }
@@ -4830,7 +4838,9 @@ function wwAINation(n){
 
 function wwProduction(){
   for(const n of WW.nat){
-    if(n.capitulated||n.key==='XXX'||!n.mil) continue;
+    if(n.capitulated||n.key==='XXX') continue;
+    n.air=(n.air||0)+(n.civ||0)*0.05;
+    if(!n.mil) continue;
     n.prod=(n.prod||0)+n.mil;
     if(n.prod>=120){ n.prod-=120;
       const cap=wwCapitalHex(n.key);
@@ -6764,7 +6774,7 @@ function wwUpdateHUD(){
       const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key)).length;
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
-        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Enemies left: '+enemies;
+        '<br>Factories: '+me.civ+'c / '+me.mil+'m<br>Air wings: '+Math.round(me.air||0)+'<br>Enemies left: '+enemies;
     } else ps.classList.add('hidden'); }
 }
 function wwUpdateInfo(){
@@ -6795,6 +6805,7 @@ function wwUpdateInfo(){
       '<tr><td>Cities</td><td>'+n.cityList.length+'</td></tr>'+
       '<tr><td>Civ. factories</td><td>'+n.civ+'</td></tr>'+
       '<tr><td>Mil. factories</td><td>'+n.mil+'</td></tr>'+
+      '<tr><td>Air wings</td><td>'+Math.round(n.air||0)+'</td></tr>'+
       '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
       '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'; return; }
   info.classList.add('hidden');
@@ -7149,7 +7160,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
-    wwCoastal, wwInvadeTargets, wwInvade,
+    wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir,
     getState: () => G,
   };
 }
