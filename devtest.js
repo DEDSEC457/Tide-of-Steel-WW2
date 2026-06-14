@@ -637,6 +637,35 @@ say('— The World at War —');
   let vr; for(let t=0;t<30;t++){ vr=E.wwEndTurn(); if(vr.over) break; }
   check('WW end-turn loop is stable & advances the calendar',
     G2.turn>startTurn && (G2.date.y>y0 || G2.date.m>9) && G2.armies.length>0);
+
+  // declaring war makes two nations enemies (both directions)
+  const Gw = E.wwSetup('GER');
+  check('WW neutral starts at peace', !E.wwAtWar('GER','SWE'));
+  E.wwDeclareWar('GER','SWE');
+  check('WW declaring war makes nations mutual enemies', E.wwAtWar('GER','SWE') && E.wwAtWar('SWE','GER'));
+
+  // attacking a neutral auto-declares war and seizes the hex
+  const Gn = E.wwSetup('GER'); const sw=Gn.byKey.SWE;
+  let sx=-1,sy=-1;
+  for(let y=0;y<Gn.rows && sx<0;y++) for(let x=0;x<Gn.cols;x++) if(Gn.own[y*Gn.cols+x]===sw.i){ sx=x; sy=y; break; }
+  const swnb=E.wwNb(sx,sy)[0];
+  Gn.armies.push({id:8888,nat:'GER',x:swnb[0],y:swnb[1],kind:'arm',str:200,maxStr:200,org:200,maxOrg:200,mp:4,moved:false});
+  check('WW Sweden is neutral before assault', !E.wwAtWar('GER','SWE'));
+  E.wwAttack(Gn.armies[Gn.armies.length-1], sx, sy);
+  check('WW attacking a neutral declares war & captures', E.wwAtWar('GER','SWE') && E.wwOwnerAt(sx,sy).key==='GER');
+
+  // a full all-AI campaign produces real conquest (retreats, encirclements, capitulations)
+  const Gl = E.wwSetup('GER');
+  for(let t=0;t<50;t++){
+    for(const nn of Gl.nat){ if(!nn.capitulated && nn.key!=='XXX') E.wwAINation(nn); }
+    E.wwProduction();
+    for(const a of Gl.armies){ if(!a.moved && E.wwPassableFor(a.nat,a.x,a.y)){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.3); a.str=Math.min(a.maxStr,a.str+0.6); } }
+    for(const a of Gl.armies) a.moved=false;
+  }
+  check('WW living war: at least one nation capitulates over a campaign',
+    Gl.nat.some(n=>n.capitulated), Gl.nat.filter(n=>n.capitulated).map(n=>n.key).join(',')||'none fell');
+  let ol=0; for(let i=0;i<Gl.own.length;i++) if(Gl.own[i]>=0) ol++;
+  check('WW ownership invariant survives a long campaign', ol===owned);
 }
 
 /* ---------------- full AI-vs-AI campaigns ---------------- */
