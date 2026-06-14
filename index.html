@@ -4623,7 +4623,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.bombTarget=null; n.warDmg=0; wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -4655,7 +4655,7 @@ function wwForecast(a, tx, ty){
   const winPct = dp<=0 ? 100 : Math.max(3, Math.min(97, Math.round(100*ap/(ap+dp))));
   return { a, d, tx, ty, foeKey, ap, dp, winPct, amphibious,
     aSup:wwSupport(a,tx,ty), dSup:d?wwSupport(d,tx,ty):0, terr:wwTerrDef(tx,ty),
-    air:wwAirFactor(a.nat, foeKey||a.nat), aSupply:wwInSupply(a), dSupply:d?wwInSupply(d):true };
+    air:wwAirFactor(a.nat, foeKey||a.nat), airSup:wwAirSup(a.nat, foeKey||a.nat), aSupply:wwInSupply(a), dSupply:d?wwInSupply(d):true };
 }
 function wwForeignAdj(a, includeNeutral){
   const out=[];
@@ -4807,7 +4807,7 @@ function wwResearchOutput(n){ return (n.civ||1)*0.6; }
 function wwResearchCost(level){ return 60 + level*45; }
 function wwApplyTech(n,cat){ if(!n.tech) wwTechInit(n); n.tech[cat]=(n.tech[cat]||0)+1;
   if(cat==='ind'){ n.bonusCiv=(n.bonusCiv||0)+2; n.bonusMil=(n.bonusMil||0)+1; }
-  else if(cat==='air'){ n.air=(n.air||0)+15; } }
+  else if(cat==='air'){ wwAddAir(n,15); } }
 function wwAIResearchPick(n){ const order=['land','ind','land','air','log','ind'];
   return order[((n.tech.land||0)+(n.tech.ind||0)+(n.tech.air||0)+(n.tech.log||0))%order.length]; }
 function wwResearchTick(n){ if(!n.tech) wwTechInit(n);
@@ -4861,7 +4861,7 @@ function wwSpawnDivisions(n,count){ const cap=wwCapitalHex(n.key); if(!cap) retu
     WW.armies.push(wwMakeArmy(id++, n.key, x, y, placed%2?'arm':'inf')); placed++; } }
 function wwApplyFocus(n,fx){ const t=fx[0];
   if(t==='factory'){ n.bonusCiv=(n.bonusCiv||0)+fx[1]; n.bonusMil=(n.bonusMil||0)+(fx[2]||0); }
-  else if(t==='air'){ n.air=(n.air||0)+fx[1]; }
+  else if(t==='air'){ wwAddAir(n,fx[1]); }
   else if(t==='research'){ n.research=(n.research||0)+fx[1]; }
   else if(t==='land'){ n.bonusLand=(n.bonusLand||0)+fx[1]; }
   else if(t==='army'){ wwSpawnDivisions(n,fx[1]); }
@@ -4875,20 +4875,40 @@ function wwFocusTick(n){
     if(n.key!==WW.player) wwStartFocus(n.key); } }
 
 // air power: a national air force that grows from industry and tips battles via air superiority
-const WW_AIR = { GER:240, ENG:200, SOV:185, FRA:140, ITA:120, POL:40 };
-function wwBaseAir(nat){ return WW_AIR[nat.key] || Math.round((nat.hexes||0)/35 + (nat.cityList?nat.cityList.length:0)*4); }
-const WW_BOMB_COMMIT=0.5;   // half a bombing nation's air is committed to the strategic campaign
-function wwFrontAir(nat){ return (nat.air||0) * (nat.bombTarget ? (1-WW_BOMB_COMMIT) : 1); }
+// air force = three wing types. fighters win air superiority (and escort/intercept),
+// CAS supports ground battles but only with control of the sky, strategic bombers
+// wreck industry. Curated mixes for the majors; minors scaled from territory.
+const WW_AIR = { GER:[110,90,40], ENG:[95,25,80], SOV:[80,90,15], FRA:[75,45,20], ITA:[55,45,20], POL:[22,14,4] };
+const WW_DOCTRINE = { balanced:{fighter:0.40,cas:0.35,strat:0.25}, superiority:{fighter:0.65,cas:0.20,strat:0.15},
+  support:{fighter:0.40,cas:0.50,strat:0.10}, strategic:{fighter:0.45,cas:0.10,strat:0.45} };
+function wwBaseAir(nat){ const P=WW_AIR[nat.key];
+  if(P) return {fighter:P[0],cas:P[1],strat:P[2]};
+  const tot=Math.round((nat.hexes||0)/35 + (nat.cityList?nat.cityList.length:0)*4);
+  return {fighter:Math.round(tot*0.5),cas:Math.round(tot*0.3),strat:Math.round(tot*0.2)}; }
+function wwDefaultBuild(nat){ const a=nat.air||wwBaseAir(nat); const t=(a.fighter+a.cas+a.strat)||1;
+  return {fighter:a.fighter/t, cas:a.cas/t, strat:a.strat/t}; }
+function wwAirTotal(n){ const a=n&&n.air; return a?(a.fighter+a.cas+a.strat):0; }
+function wwAddAir(n, amt){ const a=n.air||(n.air=wwBaseAir(n)); const b=n.airBuild||WW_DOCTRINE.balanced;
+  a.fighter+=amt*b.fighter; a.cas+=amt*b.cas; a.strat+=amt*b.strat; }
+function wwAirDoctrine(natKey, preset){ const n=WW.byKey[natKey], d=WW_DOCTRINE[preset];
+  if(n&&d) n.airBuild={fighter:d.fighter,cas:d.cas,strat:d.strat}; }
+// fighters over the front — escorts are diverted while running a bombing campaign
+function wwFrontFighters(n){ const a=n&&n.air; if(!a) return 0; return a.fighter * (n.bombTarget?0.6:1); }
+function wwAirSup(meKey, foeKey){ const me=WW.byKey[meKey], foe=WW.byKey[foeKey]; if(!me||!foe) return 0;
+  const mf=wwFrontFighters(me), ff=wwFrontFighters(foe); if(mf+ff<=0) return 0;
+  return Math.max(-1, Math.min(1, (mf-ff)/(mf+ff))); }
 function wwAirFactor(meKey, foeKey){
   const me=WW.byKey[meKey], foe=WW.byKey[foeKey]; if(!me||!foe) return 1;
-  const ma=wwFrontAir(me), fa=wwFrontAir(foe); if(ma+fa<=0) return 1;   // bombers aren't over the front
-  return 1 + 0.22*Math.max(-1, Math.min(1, (ma-fa)/(ma+fa)));
-}
+  const sup=wwAirSup(meKey,foeKey);
+  let f=1 + 0.16*sup;                                               // fighter superiority swings the battle
+  const cas=me.air?me.air.cas:0;
+  if(cas>0) f += Math.min(0.22, cas/500)*(0.4 + 0.6*Math.max(0,sup));  // CAS needs control of the sky
+  return f; }
 function wwSetBombing(natKey, targetKey){ const nn=WW.byKey[natKey]; if(!nn) return;
   if(!targetKey || nn.bombTarget===targetKey){ nn.bombTarget=null; return; }
   if(wwAtWar(natKey,targetKey)) nn.bombTarget=targetKey; }
 function wwAIBombing(nn){
-  if((nn.air||0) < 80){ nn.bombTarget=null; return; }
+  if(wwAirTotal(nn) < 80){ nn.bombTarget=null; return; }
   if(nn.bombTarget){ const t=WW.byKey[nn.bombTarget]; if(t && !t.capitulated && wwAtWar(nn.key,t.key)) return; nn.bombTarget=null; }
   let best=null, bv=-1;
   for(const m of WW.nat){ if(m.capitulated||!wwAtWar(nn.key,m.key)) continue; const v=(m.mil||0)+(m.civ||0)*0.5; if(v>bv){ bv=v; best=m; } }
@@ -4898,12 +4918,14 @@ function wwBombingTick(){
   for(const nn of WW.nat){ if(nn.capitulated||!nn.bombTarget) continue;
     const t=WW.byKey[nn.bombTarget];
     if(!t||t.capitulated||!wwAtWar(nn.key,t.key)){ nn.bombTarget=null; continue; }
-    const bombers=(nn.air||0)*WW_BOMB_COMMIT; if(bombers<5) continue;
-    const interceptors=(t.air||0)*0.6;
-    const eff=bombers*bombers/(bombers+interceptors+1);          // net tonnage on target
-    t.warDmg=Math.min(0.6, (t.warDmg||0)+eff*0.0008);            // industry knocked out
-    nn.air=Math.max(10, (nn.air||0)-interceptors*0.020);         // bombers lost to fighters/flak
-    t.air =Math.max(5,  (t.air||0)-bombers*0.010);               // interceptors lost defending
+    const strat=nn.air?nn.air.strat:0; if(strat<5) continue;
+    const sup=wwAirSup(nn.key,t.key);                            // escort advantage over the target
+    const penetration=Math.max(0.2, Math.min(1, 0.5+0.5*sup));   // share of bombers reaching the target
+    const raw=strat*penetration, interceptors=t.air?t.air.fighter:0;
+    t.warDmg=Math.min(0.6, (t.warDmg||0) + raw*raw/(raw+interceptors*0.7+1)*0.0017);
+    nn.air.strat=Math.max(2, strat - interceptors*0.018*(1-0.5*Math.max(0,sup)));     // bombers downed
+    if(nn.air.fighter>0) nn.air.fighter=Math.max(2, nn.air.fighter - interceptors*0.004); // escorts lost
+    if(t.air) t.air.fighter=Math.max(2, t.air.fighter - raw*0.006);                   // defenders lost
     if(WW.log && Math.random()<0.12) WW.log.push(nn.name+' bombs '+t.name+'’s industry');
   }
   for(const nn of WW.nat){ if(nn.warDmg>0) nn.warDmg=Math.max(0, nn.warDmg-0.015); }   // repair
@@ -4973,7 +4995,7 @@ function wwAINation(n){
 function wwProduction(){
   for(const n of WW.nat){
     if(n.capitulated||n.key==='XXX') continue;
-    n.air=(n.air||0)+(n.civ||0)*0.05;
+    wwAddAir(n, (n.civ||0)*0.05);
     if(!n.mil) continue;
     n.prod=(n.prod||0)+n.mil;
     if(n.prod>=120){ n.prod-=120;
@@ -5005,7 +5027,7 @@ function wwSerialize(){
     date:WW.date, turn:WW.turn, result:WW.result, own:Array.from(WW.own),
     armies:WW.armies.map(a=>({id:a.id,nat:a.nat,x:a.x,y:a.y,kind:a.kind,str:a.str,maxStr:a.maxStr,org:a.org,maxOrg:a.maxOrg,mp:a.mp,moved:a.moved})),
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
-    nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air||0,atWar:[...(nn.atWar||[])],
+    nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
       focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0})) };
 }
@@ -5018,7 +5040,9 @@ function wwDeserialize(s){
   WW.armies=(s.armies||[]).map(a=>Object.assign({},a));
   if(s.cities) WW.cities=s.cities.map(c=>Object.assign({},c));
   for(const ns of (s.nat||[])){ const nn=WW.byKey[ns.key]; if(!nn) continue;
-    nn.capitulated=ns.capitulated; nn.prod=ns.prod; nn.air=ns.air; nn.atWar=new Set(ns.atWar||[]);
+    nn.capitulated=ns.capitulated; nn.prod=ns.prod; nn.atWar=new Set(ns.atWar||[]);
+    nn.air = (typeof ns.air==='number') ? {fighter:Math.round(ns.air*0.5),cas:Math.round(ns.air*0.3),strat:Math.round(ns.air*0.2)} : (ns.air||wwBaseAir(nn));
+    nn.airBuild = ns.airBuild || wwDefaultBuild(nn);
     nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
     nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0; }
@@ -6740,7 +6764,7 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden');
   $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
@@ -6773,7 +6797,7 @@ function wwEnterGameUI(){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden');
   const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
@@ -6938,6 +6962,7 @@ function wwDoEndTurn(){
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if(!$('ww-focus').classList.contains('hidden')) wwRenderFocus();
   if(!$('ww-research').classList.contains('hidden')) wwRenderResearch();
+  if(!$('ww-air').classList.contains('hidden')) wwRenderAir();
   if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
   if(v.over) wwShowEnd(v);
 }
@@ -6954,7 +6979,7 @@ function wwUpdateHUD(){
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
         '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
-        '<br>Air wings: '+Math.round(me.air||0)+(me.bombTarget?' <span style="color:#8ba2b8">(bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+')</span>':'')+
+        '<br>Air: '+Math.round(wwAirTotal(me))+' <span style="color:#8ba2b8">('+Math.round(me.air.fighter)+'F '+Math.round(me.air.cas)+'C '+Math.round(me.air.strat)+'S)</span>'+(me.bombTarget?'<br><span style="color:#c98ac9">Bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+'</span>':'')+
         '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching||'—')+' L'+((me.tech&&me.tech[me.researching])||0)+
         '<br>Enemies left: '+enemies;
     } else ps.classList.add('hidden'); }
@@ -7007,12 +7032,36 @@ function wwRenderDiplo(){
         '<span class="ww-sw" style="background:'+n.col+'"></span><span style="flex:1">'+n.name+(n.capitulated?' ✝':'')+'</span>'+tag+'</div>'; } }
   el.innerHTML=html;
 }
-function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
+function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-air','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
 function wwTogglePanel(id, render){ wwClosePanels(id); const e=$(id); if(!e) return;
   const show=e.classList.contains('hidden'); e.classList.toggle('hidden', !show); if(show) render(); }
 function wwToggleFocus(){ wwTogglePanel('ww-focus', wwRenderFocus); }
 function wwToggleResearch(){ wwTogglePanel('ww-research', wwRenderResearch); }
 function wwToggleDiplo(){ wwTogglePanel('ww-diplo', wwRenderDiplo); }
+function wwBuildName(b){ if(!b) return 'balanced'; let best='balanced',bd=1e9;
+  for(const k in WW_DOCTRINE){ const d=WW_DOCTRINE[k]; const dist=Math.abs(d.fighter-b.fighter)+Math.abs(d.cas-b.cas)+Math.abs(d.strat-b.strat); if(dist<bd){bd=dist;best=k;} } return best; }
+function wwRenderAir(){
+  const el=$('ww-air'); if(!el) return; const me=WW.byKey[WW.player]; if(!me||!me.air){ el.innerHTML=''; return; }
+  const tot=wwAirTotal(me)||1;
+  let html='<h3>AIR FORCE</h3>';
+  for(const [k,name,col,desc] of [['fighter','Fighters','#7fb0e8','air superiority · escort'],['cas','Close Air Support','#e0a06a','ground support (needs the sky)'],['strat','Strategic Bombers','#c98ac9','bomb enemy industry']]){
+    const v=me.air[k]||0;
+    html+='<div class="ww-tech"><span class="tl">'+name+' <span style="color:#7d93ab;font-size:10px">'+desc+'</span></span><span class="tv">'+Math.round(v)+'</span></div>';
+    html+='<div class="ww-bar"><i style="width:'+(100*v/tot)+'%;background:'+col+'"></i></div>'; }
+  html+='<div style="margin-top:10px;font-size:11px;color:#9fb4c9">Production doctrine</div><div style="margin-top:4px">';
+  const cur=wwBuildName(me.airBuild);
+  for(const [k,name] of [['superiority','Air Superiority'],['support','Ground Support'],['strategic','Strategic'],['balanced','Balanced']])
+    html+='<span class="ww-rbtn'+(cur===k?' sel':'')+'" data-doc="'+k+'">'+name+'</span>';
+  html+='</div>';
+  const foes=WW.nat.filter(nn=>!nn.capitulated && wwAtWar(WW.player,nn.key));
+  if(foes.length){ html+='<div style="margin-top:11px;font-size:11px;color:#9fb4c9">Air superiority over the front</div>';
+    for(const fo of foes.slice(0,7)){ const s=Math.round(wwAirSup(WW.player,fo.key)*100);
+      const c=s>=10?'#7fd08a':s<=-10?'#e0856a':'#ffd34d';
+      html+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>'+fo.name+'</span><span style="color:'+c+'">'+(s>0?'+':'')+s+'%</span></div>'; } }
+  el.innerHTML=html;
+  for(const b of el.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ wwAirDoctrine(WW.player, b.dataset.doc); wwRenderAir(); };
+}
+function wwToggleAir(){ wwTogglePanel('ww-air', wwRenderAir); }
 function wwRenderCombat(fc){
   const el=$('ww-combat'); if(!el) return;
   if(!fc){ el.classList.add('hidden'); return; }
@@ -7025,7 +7074,7 @@ function wwRenderCombat(fc){
   if(fc.terr>1.01) fx.push('terrain +'+Math.round((fc.terr-1)*100)+'% def');
   if(fc.aSup>0) fx.push('your support +'+(fc.aSup*30)+'%');
   if(fc.dSup>0) fx.push('enemy line +'+(fc.dSup*20)+'% def');
-  if(fc.air>1.02) fx.push('air superiority +'+Math.round((fc.air-1)*100)+'%');
+  if(fc.air>1.02) fx.push('air support +'+Math.round((fc.air-1)*100)+'%');
   else if(fc.air<0.98) fx.push('enemy air −'+Math.round((1-fc.air)*100)+'%');
   if(!fc.aSupply) fx.push('you cut off −40%');
   if(fc.d && !fc.dSupply) fx.push('enemy cut off −40%');
@@ -7072,7 +7121,8 @@ function wwUpdateInfo(){
       '<tr><td>Cities</td><td>'+n.cityList.length+'</td></tr>'+
       '<tr><td>Civ. factories</td><td>'+n.civ+'</td></tr>'+
       '<tr><td>Mil. factories</td><td>'+n.mil+'</td></tr>'+
-      '<tr><td>Air wings</td><td>'+Math.round(n.air||0)+'</td></tr>'+
+      '<tr><td>Air force</td><td>'+Math.round(wwAirTotal(n))+' <span style="color:#8ba2b8">('+Math.round(n.air?n.air.fighter:0)+'F/'+Math.round(n.air?n.air.cas:0)+'C/'+Math.round(n.air?n.air.strat:0)+'S)</span></td></tr>'+
+      (WW.started && n.key!==WW.player && wwAtWar(WW.player,n.key) ? '<tr><td>Your air superiority</td><td>'+(wwAirSup(WW.player,n.key)>=0?'+':'')+Math.round(wwAirSup(WW.player,n.key)*100)+'%</td></tr>' : '')+
       '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
       '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'+
       (WW.started && n.key!==WW.player && wwAtWar(WW.player,n.key) && !n.capitulated ?
@@ -7122,6 +7172,7 @@ function wwBindInput(){
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
   const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwToggleFocus;
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
+  const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
 }
 // expose a few entry points on window for debugging / headless rendering (no-op in tests)
@@ -7440,7 +7491,8 @@ if (typeof module !== 'undefined' && module.exports){
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
-    wwFrontAir, wwSetBombing, wwAIBombing, wwBombingTick,
+    wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
+    wwSetBombing, wwAIBombing, wwBombingTick,
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
     wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
@@ -7570,6 +7622,7 @@ if (typeof module !== 'undefined' && module.exports){
     <div id="ww-turn"></div>
     <button id="ww-btn-focus" class="ww-hbtn hidden">★ FOCUS</button>
     <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
+    <button id="ww-btn-air" class="ww-hbtn hidden">✈ AIR</button>
     <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
@@ -7579,6 +7632,7 @@ if (typeof module !== 'undefined' && module.exports){
   <div id="ww-pstat" class="hidden"></div>
   <div id="ww-focus" class="ww-panel hidden"></div>
   <div id="ww-research" class="ww-panel hidden"></div>
+  <div id="ww-air" class="ww-panel hidden"></div>
   <div id="ww-diplo" class="ww-panel hidden"></div>
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-combat" class="hidden"></div>

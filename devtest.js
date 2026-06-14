@@ -712,15 +712,26 @@ say('— The World at War —');
   let ov=0; for(let i=0;i<Gv2.own.length;i++) if(Gv2.own[i]>=0) ov++;
   check('WW ownership invariant survives a naval war', ov===owned);
 
-  // --- Phase 6: air power ---
+  // --- Phase 6/12: air power (three wing types) ---
   const Gair = E.wwSetup('GER','normal');
-  check('WW air forces are initialised (Luftwaffe > Polish air)',
-    Gair.byKey.GER.air > Gair.byKey.POL.air && Gair.byKey.ENG.air > 0);
-  check('WW air superiority is asymmetric',
-    E.wwAirFactor('GER','POL') > 1.05 && E.wwAirFactor('POL','GER') < 0.95 && E.wwAirFactor('ITA','ITA')===1);
-  const air0 = Gair.byKey.GER.air;
-  for(let i=0;i<8;i++) E.wwProduction();
-  check('WW air force grows from industry', Gair.byKey.GER.air > air0);
+  const gerAir = Gair.byKey.GER.air;
+  check('WW air force splits into fighters / CAS / strategic bombers',
+    gerAir && gerAir.fighter>0 && gerAir.cas>0 && gerAir.strat>0 && E.wwAirTotal(Gair.byKey.GER) > E.wwAirTotal(Gair.byKey.POL));
+  check('WW fighter superiority is asymmetric & swings combat',
+    E.wwAirSup('GER','POL') > 0.3 && E.wwAirSup('POL','GER') < -0.3 &&
+    E.wwAirFactor('GER','POL') > 1.05 && E.wwAirFactor('POL','GER') < 1.0 &&
+    E.wwAirFactor('GER','POL') > E.wwAirFactor('POL','GER'));
+  // CAS only pays off with control of the sky: same CAS helps far more when you hold air superiority
+  const casWithControl = E.wwAirFactor('GER','POL');           // GER: fighter edge + 90 CAS
+  Gair.byKey.GER.air.fighter = 5;                              // surrender the sky
+  const casWithoutControl = E.wwAirFactor('GER','POL');
+  check('WW CAS needs air superiority to be effective', casWithControl > casWithoutControl + 0.08);
+  // production doctrine steers what you build
+  const Gdoc = E.wwSetup('GER','normal'); E.wwAirDoctrine('GER','superiority');
+  const f0 = Gdoc.byKey.GER.air.fighter, s0 = Gdoc.byKey.GER.air.strat;
+  for(let i=0;i<12;i++) E.wwProduction();
+  check('WW air doctrine steers production (superiority builds fighters fastest)',
+    (Gdoc.byKey.GER.air.fighter-f0) > (Gdoc.byKey.GER.air.strat-s0));
 
   // --- Phase 7: research & national focus ---
   const Gr7 = E.wwSetup('GER','normal');
@@ -809,35 +820,51 @@ say('— The World at War —');
   const opn = E.wwNb(pn[0],pn[1]).find(([x,y])=>!E.wwArmyAt(x,y)&&!E.wwSea(x,y)&&E.wwOwnerAt(x,y)&&E.wwOwnerAt(x,y).key==='POL');
   if(opn) check('WW forecast vs an undefended hex reads a certain capture', E.wwForecast(atk,opn[0],opn[1]).winPct===100);
 
-  // --- Phase 11: strategic bombing ---  (bomb the USSR: too vast to be overrun mid-test)
+  // --- Phase 11/12: strategic bombing (needs air superiority to bite) ---
   const Gb = E.wwSetup('GER','normal');
-  E.wwDeclareWar('GER','SOV');
-  const sovMil0 = Gb.byKey.SOV.mil;
-  E.wwSetBombing('GER','SOV');
+  E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
   check('WW you can order a strategic bombing campaign', Gb.byKey.GER.bombTarget==='SOV');
-  check('WW committing bombers cuts your front-line air', E.wwFrontAir(Gb.byKey.GER) < Gb.byKey.GER.air);
-  const flips = (()=>{ E.wwSetup('GER','normal'); const f0=E.wwAirFactor('GER','FRA'); E.wwSetBombing('GER','FRA'); return E.wwAirFactor('GER','FRA') < f0; })();
+  check('WW committing bombers diverts escorts from the front',
+    E.wwFrontFighters(Gb.byKey.GER) < Gb.byKey.GER.air.fighter);
+  const flips = (()=>{ const t=E.wwSetup('GER','normal'); const f0=E.wwAirFactor('GER','FRA'); E.wwSetBombing('GER','FRA'); return E.wwAirFactor('GER','FRA') < f0; })();
   check('WW bombing trades away air superiority over the front', flips);
-  // a single resolution costs both the bombers and the interceptors (air battle)
-  const Gi = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
-  const gAir0=Gi.byKey.GER.air, sAir0=Gi.byKey.SOV.air; E.wwBombingTick();
-  check('WW interception costs both bombers and defenders', Gi.byKey.GER.air<gAir0 && Gi.byKey.SOV.air<sAir0);
-  for(let t=0;t<10;t++) E.wwEndTurn();
-  check('WW sustained bombing cripples enemy industry', Gb.byKey.SOV.warDmg>0.15 && !Gb.byKey.SOV.capitulated);
-  check('WW effective enemy industry is suppressed', Gb.byKey.SOV.mil < sovMil0);
-  const peak = Gb.byKey.SOV.warDmg; E.wwSetBombing('GER','SOV');   // halt the campaign
-  for(let t=0;t<8;t++) E.wwEndTurn();
-  check('WW industry repairs once the bombing stops', Gb.byKey.SOV.warDmg < peak);
+  // without command of the sky, bombing achieves little and bleeds the bomber fleet
+  const Gnos = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV');
+  Gnos.byKey.GER.air.fighter = 20; Gnos.byKey.SOV.air.fighter = 300; Gnos.byKey.GER.air.strat = 120;
+  E.wwSetBombing('GER','SOV'); const gStrat0 = Gnos.byKey.GER.air.strat;
+  for(let t=0;t<6;t++) E.wwBombingTick();
+  check('WW bombing without air superiority is ineffective & costly',
+    (Gnos.byKey.SOV.warDmg||0) < 0.06 && Gnos.byKey.GER.air.strat < gStrat0);
+  // with fighter superiority the escorted bombers get through and cripple industry
+  const Gc = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV');
+  Gc.byKey.GER.air.fighter = 500; Gc.byKey.GER.air.strat = 200; Gc.byKey.SOV.air.fighter = 40;
+  E.wwSetBombing('GER','SOV');
+  const sovMil0 = Gc.byKey.SOV.mil, sovFt0 = Gc.byKey.SOV.air.fighter;
+  for(let t=0;t<10;t++){ E.wwBombingTick(); E.wwComputeStats(); }
+  check('WW bombing with air superiority cripples enemy industry',
+    Gc.byKey.SOV.warDmg > 0.2 && Gc.byKey.SOV.mil < sovMil0);
+  check('WW interception bleeds the defender’s fighters', Gc.byKey.SOV.air.fighter < sovFt0);
+  const peak = Gc.byKey.SOV.warDmg; E.wwSetBombing('GER','SOV');   // halt
+  for(let t=0;t<8;t++) E.wwBombingTick();
+  check('WW industry repairs once the bombing stops', Gc.byKey.SOV.warDmg < peak);
   // the AI runs its own bombing campaigns
   const Gba = E.wwSetup('POL','normal');
   for(let t=0;t<4;t++) E.wwEndTurn();
   check('WW the AI mounts strategic bombing of its own', Gba.nat.some(nn=>nn.key!=='POL' && nn.bombTarget));
-  // save/load preserves bombing state
+  // save/load preserves air pools, doctrine & bombing
   E.wwClearSave();
-  const Gbs = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV'); Gbs.byKey.SOV.warDmg=0.3; E.wwSave();
+  const Gbs = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
+  E.wwAirDoctrine('GER','strategic'); Gbs.byKey.SOV.warDmg=0.3; E.wwSave();
   E.wwSetup('FRA','easy'); E.wwDeserialize(E.wwLoadSave());
-  check('WW save/load preserves bombing campaigns',
-    E.WW.byKey.GER.bombTarget==='SOV' && Math.abs((E.WW.byKey.SOV.warDmg||0)-0.3)<0.001);
+  check('WW save/load preserves air pools, doctrine & bombing',
+    E.WW.byKey.GER.bombTarget==='SOV' && E.WW.byKey.GER.air && E.WW.byKey.GER.air.strat>0 &&
+    Math.abs(E.WW.byKey.GER.airBuild.strat-0.45)<0.001 && Math.abs((E.WW.byKey.SOV.warDmg||0)-0.3)<0.001);
+  // old numeric-air saves migrate into the three-wing model
+  const oldSave = E.wwSerialize(); oldSave.nat.find(x=>x.key==='ITA').air = 120;
+  memLS.setItem('ww-save-v1', JSON.stringify(oldSave));
+  E.wwDeserialize(E.wwLoadSave());
+  check('WW old numeric-air saves migrate to wings',
+    E.WW.byKey.ITA.air && E.WW.byKey.ITA.air.fighter===60 && E.WW.byKey.ITA.air.strat===24);
   E.wwClearSave();
 }
 
@@ -1034,7 +1061,9 @@ function uiSmoke(side){
       // open the focus & research panels and begin a national focus
       if ($('ww-btn-focus').onclick) $('ww-btn-focus').onclick();
       if ($('ww-btn-research').onclick) $('ww-btn-research').onclick();
+      if ($('ww-btn-air').onclick) $('ww-btn-air').onclick();
       if ($('ww-btn-diplo').onclick) $('ww-btn-diplo').onclick();
+      if (UI.wwAirDoctrine) UI.wwAirDoctrine('GER','superiority');
       if (UI.wwStartFocus) UI.wwStartFocus('GER');
       if (UI.wwSetBombing){ const foe = UI.WW.nat.find(nn=>UI.wwAtWar('GER',nn.key)); if(foe) UI.wwSetBombing('GER', foe.key); }
       const t0 = UI.WW.turn;
