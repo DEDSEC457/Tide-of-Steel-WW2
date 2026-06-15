@@ -6827,8 +6827,8 @@ function wwEnterGameUI(){
   wwFit(); wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if (typeof sClick==='function') sClick();
 }
-function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); wwSave(); }
-function wwContinue(){ const s=wwLoadSave(); if(!s||!wwDeserialize(s)) return; wwEnterGameUI(); }
+function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); wwSave(); if(typeof startMusic==='function') startMusic(); }
+function wwContinue(){ const s=wwLoadSave(); if(!s||!wwDeserialize(s)) return; wwEnterGameUI(); if(typeof startMusic==='function') startMusic(); }
 
 function wwWorldSize(){ return [WW_HX*(WW.cols+0.5)+WW_PAD*2, WW_VY*(WW.rows-1)+2*WW_S+WW_PAD*2]; }
 function wwResize(){ const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1,2);
@@ -7068,6 +7068,11 @@ function wwClickHex(hit){
 }
 function wwAfterAction(r){
   wwComputeStats();
+  const _rr=r&&r.result;
+  if(_rr==='moved'||_rr==='landed') wwSfx('move');
+  else if(_rr==='taken') wwSfx('boom');
+  else if(_rr==='held'||_rr==='repelled') wwSfx('shot');
+  else if(_rr==='attacker-lost'||_rr==='invasion-lost') wwSfx('boom');
   // the acting army has used its turn → drop the selection, refresh
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   wwRenderCombat(null);
@@ -7080,7 +7085,7 @@ function wwAfterAction(r){
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   const v=wwCheckVictory(); if(v.over) wwShowEnd(v);
 }
-function wwDoEndTurn(){
+function wwDoEndTurn(){ wwSfx('endturn');
   if(!WW.started || (WW.result&&WW.result.over)) return;
   const v=wwEndTurn(); WW._mapDirty=true; wwSave();
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
@@ -7092,7 +7097,19 @@ function wwDoEndTurn(){
   if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
   if(v.over) wwShowEnd(v);
 }
-function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ wwToast(WW.log.shift()); } }
+function wwSfx(name){ try{
+  if(name==='click'){ sClick(); }
+  else if(name==='move'){ sMove(); }
+  else if(name==='shot'){ sShot(); }
+  else if(name==='boom'){ sBoom(); }
+  else if(name==='city'){ sCity(); }
+  else if(name==='endturn'){ tone(294,0.07,'triangle',0.05); setTimeout(()=>tone(247,0.12,'triangle',0.05),90); }
+  else if(name==='win'){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.26,'square',0.06),i*150)); }
+  else if(name==='lose'){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.36,'sawtooth',0.06),i*200)); }
+}catch(e){} }
+function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ const msg=WW.log.shift();
+  if(/capitulat|partition/i.test(msg)) wwSfx('city'); else if(/declares war/i.test(msg)) wwSfx('boom');
+  wwToast(msg); } }
 
 function wwDateStr(){ const M=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const d=WW.date; return d.d+' '+M[d.m-1]+' '+d.y; }
@@ -7161,7 +7178,7 @@ function wwRenderDiplo(){
   el.innerHTML=html;
 }
 function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-air','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
-function wwTogglePanel(id, render){ wwClosePanels(id); const e=$(id); if(!e) return;
+function wwTogglePanel(id, render){ wwSfx('click'); wwClosePanels(id); const e=$(id); if(!e) return;
   const show=e.classList.contains('hidden'); e.classList.toggle('hidden', !show); if(show) render(); }
 function wwToggleFocus(){ wwTogglePanel('ww-focus', wwRenderFocus); }
 function wwToggleResearch(){ wwTogglePanel('ww-research', wwRenderResearch); }
@@ -7273,7 +7290,7 @@ function wwFillLegend(){ const el=$('ww-legend'); if(!el) return;
 function wwToast(msg){ const box=$('ww-toast'); if(!box) return;
   const el=document.createElement('div'); el.className='ww-toast-msg'; el.textContent=msg; box.appendChild(el);
   setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, 3600); }
-function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove('hidden');
+function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove('hidden'); wwSfx(v.win?'win':'lose');
   const me=WW.byKey[WW.player];
   el.innerHTML = v.win
     ? '<h1 style="color:#ffe08a">VICTORY</h1><p>'+me.name+' stands triumphant over Europe. Every enemy that took up arms against you has been brought to capitulation.</p>'
