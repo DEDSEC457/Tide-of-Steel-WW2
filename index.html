@@ -4678,6 +4678,7 @@ function wwMoveArmy(a,x,y){ a.x=x; a.y=y; a.moved=true; }
 function wwCaptureHex(x,y,natKey){
   const me=WW.byKey[natKey]; const prev=WW.own[y*WW.cols+x];
   WW.own[y*WW.cols+x]=me.i;
+  WW._stratDirty=true;
   const city=WW.cities.find(c=>c.x===x&&c.y===y);
   if(city && city.cap && prev>=0){ const fallen=WW.nat[prev];
     if(fallen && fallen.key===city.nat && !fallen.capitulated) wwCapitulate(fallen.key, natKey); }
@@ -5094,7 +5095,7 @@ function wwEndTurn(){
     if(wsev>0.02){ a.org=Math.max(1,a.org-a.maxOrg*wsev*0.25); a.str=Math.max(1,a.str-wsev*0.5); } }
   wwAdvanceDate(7);
   for(const a of WW.armies) a.moved=false;
-  WW.turn++;
+  WW.turn++; WW._stratDirty=true;
   wwComputeStats();
   return wwCheckVictory();
 }
@@ -6787,7 +6788,7 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden'); $('ww-btn-supply').classList.add('hidden'); $('ww-minimap').classList.add('hidden');
   $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
@@ -6820,7 +6821,8 @@ function wwEnterGameUI(){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden'); $('ww-btn-supply').classList.remove('hidden');
+  WW.mapMode='political'; WW._stratDirty=true; { const mm=$('ww-minimap'); if(mm){ mm.classList.remove('hidden'); mm.width=184; mm.height=180; } } $('ww-btn-supply').classList.remove('on');
   const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
@@ -6966,6 +6968,39 @@ function wwBuildMapCache(){
   WW.mapCanvas=mc; WW._mapDirty=false;
 }
 
+// builds the front-line overlay (red ticks on contested borders) and the supply overlay
+function wwBuildStrategic(){
+  const W=WW, cols=W.cols, sz=wwWorldSize(), wW=sz[0], wH=sz[1];
+  const fc=document.createElement('canvas'); fc.width=Math.ceil(wW); fc.height=Math.ceil(wH); const fg=fc.getContext('2d');
+  fg.lineCap='round'; fg.strokeStyle='rgba(214,42,32,0.95)'; fg.lineWidth=2.3;
+  for(let y=0;y<W.rows;y++) for(let x=0;x<cols;x++){ if(wwSea(x,y)) continue; const o=W.own[y*cols+x]; if(o<0) continue; const A=W.nat[o];
+    for(const [nx,ny] of wwNb(x,y)){ const o2=W.own[ny*cols+nx]; if(o2<0||o2<=o) continue; if(!wwAtWar(A.key, W.nat[o2].key)) continue;
+      const a=wwHexCenter(x,y), b=wwHexCenter(nx,ny), mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+      const ex=b[0]-a[0], ey=b[1]-a[1], L=Math.hypot(ex,ey)||1, px=-ey/L, py=ex/L, hh=WW_S*0.52;
+      fg.beginPath(); fg.moveTo(mx+px*hh,my+py*hh); fg.lineTo(mx-px*hh,my-py*hh); fg.stroke(); } }
+  W._frontCanvas=fc;
+  const sm=new Uint8Array(cols*W.rows);
+  for(const nat of W.nat){ if(nat.key==='XXX'||!nat.hexes) continue; const f=wwSupplyField(nat.key);
+    for(let i=0;i<sm.length;i++){ if(W.own[i]===nat.i) sm[i]= f[i]?1:2; } }
+  const sc=document.createElement('canvas'); sc.width=Math.ceil(wW); sc.height=Math.ceil(wH); const sg=sc.getContext('2d');
+  for(let y=0;y<W.rows;y++) for(let x=0;x<cols;x++){ const v=sm[y*cols+x]; if(!v) continue; const c=wwHexCenter(x,y); wwHexPath(sg,c[0],c[1],WW_S-0.3);
+    sg.fillStyle= v===1?'rgba(55,195,90,0.30)':'rgba(232,55,45,0.52)'; sg.fill(); }
+  W._supCanvas=sc; W._stratDirty=false;
+}
+function wwDrawMinimap(){
+  const mm=$('ww-minimap'); if(!mm||!WW.mapCanvas) return; const g=mm.getContext('2d'); const MW=mm.width||184, MH=mm.height||180;
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,MW,MH); g.fillStyle='#0a121c'; g.fillRect(0,0,MW,MH);
+  const mc=WW.mapCanvas, sc=Math.min(MW/mc.width, MH/mc.height), dw=mc.width*sc, dh=mc.height*sc, ox=(MW-dw)/2, oy=(MH-dh)/2;
+  g.imageSmoothingEnabled=true; g.drawImage(mc, ox,oy,dw,dh);
+  if(WW.mapMode==='supply' && WW._supCanvas) g.drawImage(WW._supCanvas, ox,oy,dw,dh);
+  if(WW._frontCanvas) g.drawImage(WW._frontCanvas, ox,oy,dw,dh);
+  WW._mm={sc,ox,oy};
+  const cam=WW.cam, cv=$('wwCanvas'), vw=cv.clientWidth||1, vh=cv.clientHeight||1;
+  const wx0=(0-cam.x)/cam.z, wy0=(0-cam.y)/cam.z, wx1=(vw-cam.x)/cam.z, wy1=(vh-cam.y)/cam.z;
+  g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=1.3; g.strokeRect(ox+wx0*sc, oy+wy0*sc, (wx1-wx0)*sc, (wy1-wy0)*sc);
+}
+function wwToggleSupply(){ wwSfx('click'); WW.mapMode = (WW.mapMode==='supply')?'political':'supply'; WW._stratDirty=true;
+  const b=$('ww-btn-supply'); if(b) b.classList.toggle('on', WW.mapMode==='supply'); wwRequest(); }
 function wwRequest(){ if(wwRAFpending||!WW.on) return; wwRAFpending=true;
   requestAnimationFrame(()=>{ wwRAFpending=false; wwRender(); }); }
 function wwRender(){
@@ -6980,6 +7015,9 @@ function wwRender(){
   if(dA>=1){ wwDrawHexesDetailed(ctx); }
   else if(dA<=0){ ctx.drawImage(WW.mapCanvas,0,0); }
   else { ctx.drawImage(WW.mapCanvas,0,0); ctx.save(); ctx.globalAlpha=dA; wwDrawHexesDetailed(ctx); ctx.restore(); }
+  if(WW.started){ if(WW._stratDirty||!WW._frontCanvas) wwBuildStrategic();
+    if(WW.mapMode==='supply' && WW._supCanvas) ctx.drawImage(WW._supCanvas,0,0);
+    if(WW._frontCanvas) ctx.drawImage(WW._frontCanvas,0,0); }
   // selected nation glow
   if(wwSelHexes && !wwSelArmy){ ctx.fillStyle='rgba(255,255,255,0.13)';
     for(const [x,y] of wwSelHexes){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.fill(); }
@@ -7002,6 +7040,7 @@ function wwRender(){
     const tint = seas==='Winter'?'rgba(202,217,237,'+(0.03+wtr*0.05).toFixed(3)+')' : seas==='Autumn'?'rgba(150,108,52,0.055)' : seas==='Spring'?'rgba(118,172,118,0.04)' : null;
     if(tint){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle=tint; ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight); } }
   if(WW.started && WW.armies){ ctx.setTransform(dpr,0,0,dpr,0,0); wwDrawArmies(ctx); }
+  if(WW.started) wwDrawMinimap();
 }
 function wwDrawArmies(ctx){
   const z=WW.cam.z, sz=Math.max(9, Math.min(26, WW_S*z*1.5));
@@ -7320,6 +7359,10 @@ function wwBindInput(){
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
+  const bs=$('ww-btn-supply'); if(bs) bs.onclick=wwToggleSupply;
+  const mm=$('ww-minimap'); if(mm) mm.addEventListener('mousedown', e=>{ if(!WW.on||!WW._mm) return; const r=mm.getBoundingClientRect();
+    const wx=(e.clientX-r.left-WW._mm.ox)/WW._mm.sc, wy=(e.clientY-r.top-WW._mm.oy)/WW._mm.sc, cv2=$('wwCanvas');
+    WW.cam.x=cv2.clientWidth/2-wx*WW.cam.z; WW.cam.y=cv2.clientHeight/2-wy*WW.cam.z; wwRequest(); });
   const wt=$('ww-winter-toggle'); if(wt) wt.onclick=()=>{ if(!WW.started) return; const me=WW.byKey[WW.player]; me.winterizing=!me.winterizing;
     wwToast(me.winterizing?'Winter preparations begun — diverting 30% of production':'Winter preparations halted'); wwUpdateHUD(); };
 }
@@ -7669,7 +7712,10 @@ if (typeof module !== 'undefined' && module.exports){
     #ww-turn{font-size:11px;color:#8ba2b8;}
     #ww-hint{font-size:11px;color:#7d93ab;letter-spacing:.3px;}
     /* faction legend */
-    #ww-legend{position:absolute;left:12px;bottom:12px;background:#0d1826e0;border:1px solid #22364d;
+    #ww-minimap{position:absolute;left:12px;bottom:12px;z-index:4;border:1px solid #2c486a;border-radius:6px;
+      background:#0a121c;box-shadow:0 6px 20px #000a;cursor:pointer;}
+    #ww-minimap.hidden{display:none;}
+    #ww-legend{position:absolute;left:12px;bottom:202px;background:#0d1826e0;border:1px solid #22364d;
       border-radius:8px;padding:8px 10px;z-index:4;max-width:330px;}
     .ww-leg-row{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:11px;}
     .ww-leg-label{width:74px;color:#9fb4c9;font-weight:600;letter-spacing:.5px;}
@@ -7775,9 +7821,11 @@ if (typeof module !== 'undefined' && module.exports){
     <button id="ww-btn-air" class="ww-hbtn hidden">✈ AIR</button>
     <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
     <button id="ww-winter-toggle" class="ww-hbtn hidden">❄ WINTER PREP</button>
+    <button id="ww-btn-supply" class="ww-hbtn hidden">🗺 SUPPLY</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>
+  <canvas id="ww-minimap" class="hidden" width="184" height="180"></canvas>
   <div id="ww-legend"></div>
   <div id="ww-info" class="hidden"></div>
   <div id="ww-pstat" class="hidden"></div>
