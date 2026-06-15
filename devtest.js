@@ -766,6 +766,33 @@ say('— The World at War —');
   check('WW a finished division deploys as a counter of its kind',
     okDep && after26.length===before26+1 && after26.some(a=>a.kind==='arm' && a.nat==='GER'));
 
+  // --- Phase 27: battle plans / frontlines (standing orders auto-execute) ---
+  const Gfr = E.wwSetup('GER','normal'); E.wwDeclareWar('GER','POL');
+  for(const a of E.wwArmiesOf('GER')) E.wwSetOrder(a,'attack');
+  const oc = E.wwOrderCounts('GER');
+  check('WW divisions accept standing front orders', oc.attack===E.wwArmiesOf('GER').length && oc.front===0);
+  // an offensive front advances toward the enemy on its own (no per-hex orders)
+  const polCap = E.wwCapitalHex('POL').slice();   // fixed point even if Warsaw is later taken
+  const meanDist = () => { const arms=E.wwArmiesOf('GER'); return arms.reduce((s,a)=>s+Math.hypot(a.x-polCap[0],a.y-polCap[1]),0)/arms.length; };
+  const d0 = meanDist();
+  for(const a of Gfr.armies) a.moved=false;
+  E.wwExecuteFront('GER');
+  check('WW an offensive front advances toward the enemy unbidden', meanDist() < d0 - 0.001);
+  // an offensive seizes undefended ground; a held line digs in and does not lunge forward
+  function frontGround(order){ const G=E.wwSetup('GER','normal'); E.wwDeclareWar('GER','POL');
+    for(const a of E.wwArmiesOf('GER')) E.wwSetOrder(a,order);
+    let own0=0; for(let i=0;i<G.own.length;i++) if(G.own[i]===G.byKey.GER.i) own0++;
+    for(const a of G.armies) a.moved=false; E.wwExecuteFront('GER');
+    let own1=0; for(let i=0;i<G.own.length;i++) if(G.own[i]===G.byKey.GER.i) own1++;
+    return own1-own0; }
+  check('WW an offensive seizes more ground than a held line', frontGround('attack') > frontGround('front'));
+  // orders survive a save/load round-trip
+  E.wwClearSave(); E.wwSetup('GER','normal'); E.wwArmiesOf('GER')[0].order='attack'; E.wwArmiesOf('GER')[1].order='front'; E.wwSave();
+  E.wwSetup('FRA','easy'); E.wwDeserialize(E.wwLoadSave());
+  check('WW battle-plan orders persist through save/load',
+    E.wwOrderCounts('GER').attack>=1 && E.wwOrderCounts('GER').front>=1);
+  E.wwClearSave();
+
   // --- Phase 5: naval invasions ---
   const Gv = E.wwSetup('ENG','normal');
   let pair=null;

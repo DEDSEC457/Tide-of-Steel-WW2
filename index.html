@@ -5169,6 +5169,46 @@ function wwAINation(n){
     if(!d || a.str>=d.str*0.95){ wwInvade(a,tx,ty); inv++; } }
 }
 
+// ---- battle plans: standing front orders the player paints onto divisions ----
+// 'front'  = hold the line — march up to the border, then dig in and defend;
+// 'attack' = offensive — push toward the enemy capital, taking favourable fights.
+// Ordered divisions auto-execute at the start of each turn (the same primitives
+// the AI fronts use), so the player commands armies, not individual hexes (HOI4).
+function wwSetOrder(a, order){ if(!a) return; a.order = (order==='front'||order==='attack') ? order : null; }
+function wwOnFront(a){
+  for(const [x,y] of wwNb(a.x,a.y)){
+    const o=WW.own[y*WW.cols+x]; if(o>=0 && wwAtWar(a.nat,WW.nat[o].key)) return true;
+    const s=wwArmyAt(x,y); if(s && wwAtWar(a.nat,s.nat)) return true; }
+  return false;
+}
+function wwOrderCounts(natKey){ let front=0,attack=0; for(const a of wwArmiesOf(natKey)){ if(a.order==='front')front++; else if(a.order==='attack')attack++; } return {front,attack}; }
+function wwExecuteFront(natKey){
+  const n=WW.byKey[natKey]; if(!n) return; const mine=wwArmiesOf(natKey);
+  // 1) ordered divisions press attacks (offensive = lenient odds; the line strikes only when strong)
+  for(const a of mine){ if(a.moved || !a.order) continue;
+    const tg=wwAttackTargets(a); if(!tg.length) continue;
+    const oddsNeed = a.order==='attack' ? 0.85 : 1.4;
+    let bestT=null,bestScore=-1e9;
+    for(const [x,y] of tg){ const d=wwArmyAt(x,y);
+      const ap=wwAtkPower(a,x,y), dp=d?wwDefPower(d,x,y):0.1; let score=ap/(dp+0.1);
+      if(!d) score+=1.6; else if(d.org<d.maxOrg*0.45) score+=0.7;
+      if(score>bestScore){ bestScore=score; bestT=[x,y]; } }
+    if(!bestT) continue; const d=wwArmyAt(bestT[0],bestT[1]);
+    const ap=wwAtkPower(a,bestT[0],bestT[1]), dp=d?wwDefPower(d,bestT[0],bestT[1]):0;
+    const take = d ? (ap>=dp*oddsNeed || (a.order==='attack' && d.org<d.maxOrg*0.4))
+                   : (a.order==='attack');   // the line won't chase into empty enemy land
+    if(take) wwAttack(a,bestT[0],bestT[1]);
+  }
+  // 2) ordered divisions advance — offensives march on the objective, the line plugs gaps
+  for(const a of mine){ if(a.moved || !a.order) continue;
+    if(a.order==='front' && wwOnFront(a)) continue;            // already holding the line
+    const obj = a.order==='attack' ? (n.aiObjective || wwAIObjective(natKey,a.x,a.y))
+                                   : (wwNearestEnemyHex(natKey,a.x,a.y,40) || wwAIObjective(natKey,a.x,a.y));
+    if(!obj) continue;
+    const dest=wwAIStep2(a, obj); if(dest) wwMoveArmy(a,dest[0],dest[1]);
+  }
+}
+
 // production lines: military factories are split across Infantry / Armour / Aircraft;
 // each line's efficiency ramps the longer it runs (HOI4). The air line feeds the
 // air force (split by air doctrine); the land lines deploy divisions, gated by
@@ -5232,7 +5272,7 @@ function wwCheckVictory(){
 function wwSerialize(){
   return { v:1, player:WW.player, difficulty:WW.difficulty, aiPow:WW.aiPow, warOn:WW.warOn,
     date:WW.date, turn:WW.turn, result:WW.result, own:Array.from(WW.own),
-    armies:WW.armies.map(a=>({id:a.id,nat:a.nat,x:a.x,y:a.y,kind:a.kind,str:a.str,maxStr:a.maxStr,org:a.org,maxOrg:a.maxOrg,mp:a.mp,moved:a.moved})),
+    armies:WW.armies.map(a=>({id:a.id,nat:a.nat,x:a.x,y:a.y,kind:a.kind,str:a.str,maxStr:a.maxStr,org:a.org,maxOrg:a.maxOrg,mp:a.mp,moved:a.moved,order:a.order||null})),
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       techDone:[...(nn.techDone||[])],research:nn.research||0,researching:nn.researching||null,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,bonusSupply:nn.bonusSupply||0,
@@ -5268,6 +5308,7 @@ function wwClearSave(){ try{ if(typeof localStorage!=='undefined') localStorage.
 function wwEndTurn(){
   WW.log=WW.log||[];
   wwRecomputeSupply();
+  if(WW.player && WW.byKey[WW.player] && !WW.byKey[WW.player].capitulated) wwExecuteFront(WW.player);
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAINation(n); }
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAIBombing(n); }
   for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue;
@@ -7283,6 +7324,11 @@ function wwDrawArmies(ctx){
     }
     if(WW.supply && !wwInSupply(a)){ ctx.save(); ctx.strokeStyle='rgba(240,95,75,0.95)'; ctx.lineWidth=1.6;
       ctx.setLineDash([3,2]); ctx.strokeRect(sx-w/2-1.8,sy-h/2-1.8,w+3.6,h+3.6); ctx.restore(); }
+    // battle-plan badge: a corner flash marks divisions under standing orders
+    if(a.order && a.nat===WW.player){ ctx.save();
+      ctx.fillStyle = a.order==='attack' ? '#ff6a4d' : '#5ad0ff'; const t=Math.max(4,sz*0.40);
+      ctx.beginPath(); ctx.moveTo(sx-w/2,sy-h/2); ctx.lineTo(sx-w/2+t,sy-h/2); ctx.lineTo(sx-w/2,sy-h/2+t); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=0.8; ctx.stroke(); ctx.restore(); }
     // org/str pip bars under the counter when big enough
     if(sz>15){ const bw=w, bx=sx-w/2, by=sy+h/2+1.5;
       ctx.fillStyle='#0008'; ctx.fillRect(bx,by,bw,2.4);
@@ -7387,6 +7433,7 @@ function wwUpdateHUD(){
       const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key)).length;
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
+        (function(){ const oc=wwOrderCounts(WW.player); return (oc.front||oc.attack)?' <span style="color:#8ba2b8">(⚔'+oc.attack+' 🛡'+oc.front+')</span>':''; })()+
         '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
         '<br>🛢 Oil '+(me.oil||0)+' · ⚙ Steel '+(me.steel||0)+' ('+(me.steelStock||0)+')'+
         '<br>⛽ Fuel '+Math.round(me.fuel||0)+'/'+(me.fuelMax||0)+(me.lowFuel?' <span style="color:#e0856a">LOW</span>':'')+
@@ -7606,7 +7653,14 @@ function wwUpdateInfo(){
       '<tr><td>Supply</td><td>'+(wwInSupply(a)?'in supply':'<span style="color:#e0856a">cut off</span>')+'</td></tr>'+
       '<tr><td>Orders</td><td>'+(a.moved?'used':'ready')+'</td></tr></table>'+
       (a.nat===WW.player && !a.moved ? '<div style="font-size:11px;color:#8fb4d8;margin-top:8px">Blue = move · red = attack · amber = declare war'+
-        (wwCoastal(a.x,a.y)?' · <span style="color:#7be0ee">teal = invade by sea</span>':'')+'.</div>' : '');
+        (wwCoastal(a.x,a.y)?' · <span style="color:#7be0ee">teal = invade by sea</span>':'')+'.</div>' : '')+
+      (a.nat===WW.player ? '<div style="font-size:11px;color:#9fb4c9;margin-top:9px">Battle plan</div>'+
+        '<div style="margin-top:4px" id="ww-order-btns">'+
+        '<span class="ww-rbtn'+(a.order==='attack'?' sel':'')+'" data-ord="attack">⚔ Offensive</span>'+
+        '<span class="ww-rbtn'+(a.order==='front'?' sel':'')+'" data-ord="front">🛡 Hold Line</span>'+
+        '<span class="ww-rbtn'+(!a.order?' sel':'')+'" data-ord="manual">✋ Manual</span></div>'+
+        '<div style="font-size:10px;color:#7d93ab;margin-top:4px">Ordered divisions advance & fight on their own every turn.</div>' : '');
+    if(a.nat===WW.player){ const ob=$('ww-order-btns'); if(ob) for(const b of ob.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ wwSetOrder(a, b.dataset.ord==='manual'?null:b.dataset.ord); wwSfx('click'); wwUpdateInfo(); wwUpdateHUD(); wwRequest(); }; }
     return; }
   if(wwSelNat){ const n=wwSelNat; info.classList.remove('hidden');
     const facName={axis:'Axis',allies:'Allies',comintern:'Comintern',neutral:'Neutral'}[n.fac]||'Neutral';
@@ -8005,6 +8059,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwSupplyField, wwRailNetwork, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwEconomyTick, wwEffMp, WW_CITY_RES, WW_ECO,
     wwInitLines, wwSetLineMix, wwDeployDivision, WW_PROD_PRESETS,
+    wwSetOrder, wwOnFront, wwExecuteFront, wwOrderCounts,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
     wwSetBombing, wwAIBombing, wwBombingTick,
