@@ -7321,43 +7321,50 @@ function wwRoundPath(ctx,x,y,w,h,r){ ctx.beginPath();
   ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function wwDrawArmies(ctx){
-  const z=WW.cam.z, sz=Math.max(9, Math.min(26, WW_S*z*1.5));
-  const w=sz*1.32, h=sz*0.96, r=Math.min(4.5, sz*0.18), pale='#e9e5d2';
-  const showSym = sz>10.5, showBars = sz>15;
-  ctx.lineJoin='round';
+  const z=WW.cam.z;
+  // counters scale with the map exactly like the other game modes (sz tracks the hex size),
+  // and the whole layer fades out into the strategic view when you zoom way out — HOI4 style.
+  const layerA = wwSmooth(0.42, 0.66, z);
+  if(layerA<=0.02) return;
+  const sz = WW_S*z;                                          // == the on-screen hex radius
+  const w=sz*1.34, h=sz*0.96, r=Math.min(5, sz*0.20), pale='#e9e5d2';
+  const symW=Math.max(1, sz*0.09), edgeW=Math.max(1, sz*0.085);
+  const showSym = sz>8.5, showBars = sz>10.5;
+  ctx.save(); ctx.globalAlpha=layerA; ctx.lineJoin='round';
   for(const a of WW.armies){
     const [wx,wy]=wwHexCenter(a.x,a.y); const [sx,sy]=wwW2S(wx,wy); const n=WW.byKey[a.nat];
-    if(sx< -30||sy< -30||sx>ctx.canvas.width+30||sy>ctx.canvas.height+30) continue;
+    if(sx< -40||sy< -40||sx>ctx.canvas.width+40||sy>ctx.canvas.height+40) continue;
     ctx.save(); ctx.translate(sx,sy);
     // classic counter: cheap offset drop-shadow, then the coloured body
-    ctx.fillStyle='rgba(0,0,0,0.33)'; wwRoundPath(ctx,-w/2+1.3,-h/2+2,w,h,r); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,0.33)'; wwRoundPath(ctx,-w/2+sz*0.08,-h/2+sz*0.12,w,h,r); ctx.fill();
     ctx.fillStyle=n?n.col:'#888'; wwRoundPath(ctx,-w/2,-h/2,w,h,r); ctx.fill();
     // bevel: a light top edge and a dark bottom edge give the counter depth
-    ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(-w/2+3,-h/2+1.3); ctx.lineTo(w/2-3,-h/2+1.3); ctx.stroke();
-    ctx.strokeStyle='rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.moveTo(-w/2+3,h/2-1.3); ctx.lineTo(w/2-3,h/2-1.3); ctx.stroke();
-    ctx.strokeStyle = a.moved?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.82)'; ctx.lineWidth=1.3; wwRoundPath(ctx,-w/2,-h/2,w,h,r); ctx.stroke();
+    if(sz>9){ ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(-w/2+3,-h/2+1.2); ctx.lineTo(w/2-3,-h/2+1.2); ctx.stroke();
+      ctx.strokeStyle='rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.moveTo(-w/2+3,h/2-1.2); ctx.lineTo(w/2-3,h/2-1.2); ctx.stroke(); }
+    ctx.strokeStyle = a.moved?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.82)'; ctx.lineWidth=edgeW; wwRoundPath(ctx,-w/2,-h/2,w,h,r); ctx.stroke();
     // classic NATO symbol: a pale bordered box with infantry's X or armour's ellipse
-    if(showSym){ const bw=w*0.56, bh=h*0.58;
-      ctx.strokeStyle=pale; ctx.lineWidth=1.5; ctx.strokeRect(-bw/2,-bh/2,bw,bh);
+    if(showSym){ const bw=w*0.52, bh=h*0.52;
+      ctx.strokeStyle=pale; ctx.lineWidth=symW; ctx.strokeRect(-bw/2,-bh/2,bw,bh);
       ctx.beginPath();
-      if(a.kind==='arm'){ ctx.ellipse(0,0,bw*0.34,bh*0.34,0,0,Math.PI*2); ctx.stroke(); }
+      if(a.kind==='arm'){ ctx.ellipse(0,0,bw*0.32,bh*0.32,0,0,Math.PI*2); ctx.stroke(); }
       else { ctx.moveTo(-bw/2,-bh/2); ctx.lineTo(bw/2,bh/2); ctx.moveTo(bw/2,-bh/2); ctx.lineTo(-bw/2,bh/2); ctx.stroke(); } }
     if(a.moved){ wwRoundPath(ctx,-w/2,-h/2,w,h,r); ctx.fillStyle='#0000003a'; ctx.fill(); }   // spent this turn → dim
     ctx.restore();
-    if(WW.supply && !wwInSupply(a)){ ctx.save(); ctx.strokeStyle='rgba(240,95,75,0.95)'; ctx.lineWidth=1.6;
-      ctx.setLineDash([3,2]); ctx.strokeRect(sx-w/2-1.8,sy-h/2-1.8,w+3.6,h+3.6); ctx.restore(); }
+    if(WW.supply && !wwInSupply(a)){ ctx.save(); ctx.strokeStyle='rgba(240,95,75,0.95)'; ctx.lineWidth=Math.max(1.4,sz*0.11);
+      ctx.setLineDash([sz*0.22,sz*0.16]); ctx.strokeRect(sx-w/2-2,sy-h/2-2,w+4,h+4); ctx.restore(); }
     // battle-plan badge: a corner flash marks divisions under standing orders
     if(a.order && a.nat===WW.player){ ctx.save();
-      ctx.fillStyle = a.order==='attack' ? '#ff6a4d' : '#5ad0ff'; const t=Math.max(4,sz*0.38);
+      ctx.fillStyle = a.order==='attack' ? '#ff6a4d' : '#5ad0ff'; const t=Math.max(4,sz*0.34);
       ctx.beginPath(); ctx.moveTo(sx-w/2,sy-h/2); ctx.lineTo(sx-w/2+t,sy-h/2); ctx.lineTo(sx-w/2,sy-h/2+t); ctx.closePath(); ctx.fill();
       ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=0.8; ctx.stroke(); ctx.restore(); }
     // org/str pip bars under the counter when big enough
-    if(showBars){ const bw=w, bx=sx-w/2, by=sy+h/2+1.6;
-      ctx.fillStyle='#0008'; ctx.fillRect(bx,by,bw,2.4);
-      ctx.fillStyle='#7fd08a'; ctx.fillRect(bx,by,bw*Math.max(0,a.str/a.maxStr),2.4);
-      ctx.fillStyle='#0008'; ctx.fillRect(bx,by+3,bw,2.4);
-      ctx.fillStyle='#76b6ff'; ctx.fillRect(bx,by+3,bw*Math.max(0,a.org/a.maxOrg),2.4); }
+    if(showBars){ const bw=w, bx=sx-w/2, by=sy+h/2+sz*0.10, bhh=Math.max(1.8,sz*0.16), gap=bhh+0.6;
+      ctx.fillStyle='#0008'; ctx.fillRect(bx,by,bw,bhh);
+      ctx.fillStyle='#7fd08a'; ctx.fillRect(bx,by,bw*Math.max(0,a.str/a.maxStr),bhh);
+      ctx.fillStyle='#0008'; ctx.fillRect(bx,by+gap,bw,bhh);
+      ctx.fillStyle='#76b6ff'; ctx.fillRect(bx,by+gap,bw*Math.max(0,a.org/a.maxOrg),bhh); }
   }
+  ctx.restore();
 }
 
 function wwPick(sx,sy){ const cam=WW.cam, wx=(sx-cam.x)/cam.z, wy=(sy-cam.y)/cam.z;
