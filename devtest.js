@@ -793,6 +793,28 @@ say('— The World at War —');
     E.wwOrderCounts('GER').attack>=1 && E.wwOrderCounts('GER').front>=1);
   E.wwClearSave();
 
+  // --- Phase 28: combined arms (mixing infantry & armour on the front) ---
+  const Gcom = E.wwSetup('GER','normal'); const gi28=Gcom.byKey.GER.i, cols28=Gcom.cols;
+  // a horizontal pair of GER home hexes ([x+1,y] is always a hex-neighbour of [x,y])
+  let bx=-1,by=-1;
+  for(let y=3;y<Gcom.rows-3 && bx<0;y++) for(let x=3;x<cols28-4;x++){ if(Gcom.own[y*cols28+x]===gi28 && Gcom.own[y*cols28+x+1]===gi28){ bx=x;by=y; break; } }
+  const tank={id:1,nat:'GER',x:bx,y:by,kind:'arm',str:5,maxStr:5,org:6,maxOrg:6,mp:4,moved:false};
+  const tx28=bx+2, ty28=by;
+  Gcom.armies.length=0; Gcom.armies.push(tank); E.wwRecomputeSupply();
+  const pAlone=E.wwAtkPower(tank,tx28,ty28), caAlone=E.wwCombinedArms(tank);
+  // an ARMOUR neighbour gives generic support but no combined arms
+  Gcom.armies.length=1; Gcom.armies.push({id:2,nat:'GER',x:bx+1,y:by,kind:'arm',str:5,maxStr:5,org:6,maxOrg:6,mp:4,moved:false}); E.wwRecomputeSupply();
+  const pArmNbr=E.wwAtkPower(tank,tx28,ty28), caArm=E.wwCombinedArms(tank);
+  // an INFANTRY neighbour gives the same support PLUS combined arms
+  Gcom.armies.length=1; Gcom.armies.push({id:3,nat:'GER',x:bx+1,y:by,kind:'inf',str:6,maxStr:6,org:8,maxOrg:8,mp:2,moved:false}); E.wwRecomputeSupply();
+  const pInfNbr=E.wwAtkPower(tank,tx28,ty28), caInf=E.wwCombinedArms(tank);
+  check('WW combined arms triggers only for mixed infantry/armour formations', !caAlone && !caArm && caInf);
+  check('WW combined arms is a real bonus on top of generic support',
+    pArmNbr>pAlone && Math.abs(pInfNbr/pArmNbr - 1.18) < 0.02);
+  // the combat forecast surfaces it for the player
+  const fcCA = E.wwForecast(tank, tx28, ty28);
+  check('WW the combat forecast reports combined arms', fcCA.aCombined===true);
+
   // --- Phase 5: naval invasions ---
   const Gv = E.wwSetup('ENG','normal');
   let pair=null;
