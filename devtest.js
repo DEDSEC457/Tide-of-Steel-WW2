@@ -735,7 +735,9 @@ say('— The World at War —');
 
   // --- Phase 7: research & national focus ---
   const Gr7 = E.wwSetup('GER','normal');
-  check('WW nations init tech & a focus tree', Gr7.byKey.GER.tech && E.wwFocusList('GER').length===5 && Gr7.byKey.GER.researching==='land');
+  check('WW nations init tech & a branching focus tree',
+    Gr7.byKey.GER.tech && E.wwFocusList('GER').length>10 && Gr7.byKey.GER.researching==='land' &&
+    E.wwAvailableFocuses('GER').length===1 && E.wwFocusList('GER').some(f=>f.req && f.req.length));
   check('WW AI auto-starts a focus, player does not',
     !!Gr7.byKey.SOV.focusProg && !Gr7.byKey.GER.focusProg);
   check('WW land doctrine starts neutral', E.wwLandBonus('GER')===1);
@@ -750,21 +752,25 @@ say('— The World at War —');
   Gr7.byKey.GER.tech.log = 3; const farRange = E.wwSupplyField('GER');
   let base=0, far=0; for(let i=0;i<baseRange.length;i++){ base+=baseRange[i]; far+=farRange[i]; }
   check('WW logistics research widens supply', far > base);
-  // a focus completes and applies its effect (army focus spawns divisions)
+  // prerequisites gate the tree: a deep focus is locked until its requirements are done
+  const Gtree = E.wwSetup('GER','normal');
+  check('WW focus prerequisites lock the branches', !E.wwFocusAvail('GER','panzer') && E.wwFocusAvail('GER','rhein'));
+  // an army focus (panzer, needs rhein->wehr) spawns divisions when completed
   const Gf = E.wwSetup('GER','normal');
+  Gf.byKey.GER.focusDone = new Set(['rhein','wehr']);
   const army0 = E.wwArmiesOf('GER').length;
-  Gf.byKey.GER.focusIdx = 2; // "Wehrmacht Buildup" (+4 divisions)
-  E.wwStartFocus('GER');
+  check('WW unlocking prerequisites makes the next focus available', E.wwFocusAvail('GER','panzer'));
+  E.wwStartFocus('GER','panzer');
   const wk = Gf.byKey.GER.focusProg.turnsLeft;
   for(let i=0;i<wk;i++) E.wwFocusTick(Gf.byKey.GER);
   check('WW completing an army focus spawns divisions',
-    E.wwArmiesOf('GER').length > army0 && Gf.byKey.GER.focusIdx===3);
-  // a war-goal focus declares war when it completes
+    E.wwArmiesOf('GER').length > army0 && Gf.byKey.GER.focusDone.has('panzer'));
+  // a war-goal focus (Danzig or War) declares war when it completes
   const Gwg = E.wwSetup('GER','normal');
-  Gwg.byKey.GER.focusIdx = 4; // "Generalplan Ost" -> war on USSR
-  E.wwStartFocus('GER'); const wk2=Gwg.byKey.GER.focusProg.turnsLeft;
+  Gwg.byKey.GER.focusDone = new Set(['rhein','wehr','ansch','sudet']);
+  E.wwStartFocus('GER','danzig'); const wk2=Gwg.byKey.GER.focusProg.turnsLeft;
   for(let i=0;i<wk2;i++) E.wwFocusTick(Gwg.byKey.GER);
-  check('WW a war-goal focus declares war on completion', E.wwAtWar('GER','SOV'));
+  check('WW a war-goal focus declares war on completion', E.wwAtWar('GER','POL') && Gwg.byKey.GER.focusDone.has('danzig'));
 
   // --- Phase 8: diplomacy & peace conference ---
   const Gd = E.wwSetup('GER','normal');
@@ -786,7 +792,7 @@ say('— The World at War —');
   // --- Phase 9: save / load ---
   E.wwClearSave();
   const Gsl = E.wwSetup('FRA','hard');
-  E.wwApplyTech(Gsl.byKey.FRA,'land'); Gsl.byKey.FRA.focusIdx=1; E.wwStartFocus('FRA');
+  E.wwApplyTech(Gsl.byKey.FRA,'land'); E.wwStartFocus('FRA','maginot');
   for(let i=0;i<5;i++) E.wwEndTurn();
   check('WW no save slot before saving', !E.wwHasSave());
   E.wwSave();

@@ -4820,42 +4820,112 @@ function wwResearchTick(n){ if(!n.tech) wwTechInit(n);
 
 // ---- national focus: a short scripted tree of historical decisions per major ----
 const WW_FOCUS = {
-  GER:[ {id:'rhein',name:'Remilitarise the Rhineland',days:35,fx:['land',0.05]},
-        {id:'4yr',name:'Four Year Plan',days:70,fx:['factory',4,2]},
-        {id:'wehr',name:'Wehrmacht Buildup',days:70,fx:['army',4]},
-        {id:'luft',name:'Luftwaffe Doctrine',days:70,fx:['air',80]},
-        {id:'ost',name:'Generalplan Ost',days:105,fx:['wargoal','SOV']} ],
-  ENG:[ {id:'rearm',name:'Rearmament',days:60,fx:['factory',3,2]},
-        {id:'raf',name:'RAF Expansion',days:70,fx:['air',90]},
-        {id:'shadow',name:'Shadow Factories',days:60,fx:['factory',3,1]},
-        {id:'imp',name:'Imperial Conscription',days:70,fx:['army',4]},
-        {id:'cont',name:'Continental Commitment',days:70,fx:['army',3]} ],
-  FRA:[ {id:'maginot',name:'The Maginot Line',days:60,fx:['land',0.08]},
-        {id:'entente',name:'The Little Entente',days:60,fx:['army',3]},
-        {id:'mech',name:'Mechanise the Army',days:70,fx:['research',120]},
-        {id:'charb',name:'Char B Production',days:60,fx:['army',3]},
-        {id:'levee',name:'Levée en Masse',days:70,fx:['army',4]} ],
-  SOV:[ {id:'fyp',name:'First Five Year Plan',days:70,fx:['factory',5,2]},
-        {id:'collect',name:'Collectivisation',days:70,fx:['factory',4,1]},
-        {id:'doctrine',name:'Deep Battle Doctrine',days:70,fx:['land',0.06]},
-        {id:'avia',name:'Aviation Industry',days:70,fx:['air',90]},
-        {id:'army',name:'Mass Mobilisation',days:90,fx:['army',5]} ],
-  ITA:[ {id:'autarky',name:'Autarky',days:60,fx:['factory',3,1]},
-        {id:'regia',name:'Regia Aeronautica',days:70,fx:['air',70]},
-        {id:'mare',name:'Mare Nostrum',days:70,fx:['army',3]},
-        {id:'black',name:'Blackshirt Legions',days:60,fx:['army',3]},
-        {id:'empire',name:'A New Roman Empire',days:105,fx:['wargoal','YUG']} ],
-  POL:[ {id:'fort',name:'Fortify the Frontier',days:60,fx:['land',0.07]},
-        {id:'modern',name:'Modernise the Army',days:70,fx:['research',100]},
-        {id:'inter',name:'Intermarium',days:70,fx:['army',3]},
-        {id:'cor',name:'Central Industrial Region',days:70,fx:['factory',3,2]},
-        {id:'defence',name:'National Defence',days:60,fx:['army',3]} ],
+  GER:[
+   {id:'rhein',name:'Remilitarise the Rhineland',x:3,y:0,days:35,fx:['land',0.05]},
+   {id:'4yr',name:'The Four Year Plan',x:1,y:1,days:70,req:['rhein'],fx:['factory',3,1]},
+   {id:'wehr',name:'Reorganise the Wehrmacht',x:3,y:1,days:60,req:['rhein'],fx:['land',0.05]},
+   {id:'ribb',name:'Molotov–Ribbentrop Pact',x:5,y:1,days:60,req:['rhein'],fx:['research',80]},
+   {id:'wareco',name:'War Economy',x:1,y:2,days:70,req:['4yr'],fx:['factory',4,2]},
+   {id:'panzer',name:'Panzer Divisions',x:3,y:2,days:70,req:['wehr'],fx:['army',3]},
+   {id:'ansch',name:'Anschluss',x:4,y:2,days:50,req:['wehr'],fx:['factory',3,1]},
+   {id:'ussr',name:'Treaty with the USSR',x:6,y:2,days:50,req:['ribb'],fx:['research',60]},
+   {id:'totmob',name:'Total Mobilisation',x:1,y:3,days:80,req:['wareco'],fx:['army',3]},
+   {id:'luft',name:'Luftwaffe Doctrine',x:3,y:3,days:70,req:['panzer'],fx:['air',80]},
+   {id:'sudet',name:'Demand Sudetenland',x:4,y:3,days:50,req:['ansch'],fx:['factory',3,1]},
+   {id:'danzig',name:'Danzig or War',x:4,y:4,days:70,req:['sudet'],fx:['wargoal','POL']},
+   {id:'yellow',name:'Case Yellow',x:2,y:5,days:80,req:['danzig'],fx:['wargoal','FRA']},
+   {id:'weser',name:'Operation Weserübung',x:4,y:5,days:60,req:['danzig'],fx:['army',3]},
+   {id:'barb',name:'Generalplan Ost',x:6,y:5,days:90,req:['danzig','luft'],fx:['wargoal','SOV']},
+   {id:'sealion',name:'Operation Sea Lion',x:2,y:6,days:80,req:['yellow'],fx:['army',4]},
+   {id:'winterk',name:'Winterausrüstung',x:6,y:6,days:60,req:['barb'],fx:['gear',0.45]},
+  ],
+  ENG:[
+   {id:'rearm',name:'Rearmament',x:2,y:0,days:50,fx:['factory',3,1]},
+   {id:'shadow',name:'Shadow Factories',x:1,y:1,days:60,req:['rearm'],fx:['factory',3,1]},
+   {id:'raf',name:'Expand the RAF',x:3,y:1,days:60,req:['rearm'],fx:['air',70]},
+   {id:'fleet',name:'The Home Fleet',x:4,y:1,days:60,req:['rearm'],fx:['army',2]},
+   {id:'warind',name:'War Industry',x:1,y:2,days:70,req:['shadow'],fx:['factory',4,2]},
+   {id:'bomber',name:'Bomber Command',x:3,y:2,days:70,req:['raf'],fx:['air',80]},
+   {id:'radar',name:'Chain Home Radar',x:4,y:2,days:60,req:['fleet'],fx:['research',90]},
+   {id:'imp',name:'Imperial Conscription',x:1,y:3,days:70,req:['warind'],fx:['army',4]},
+   {id:'cont',name:'Continental Doctrine',x:3,y:3,days:70,req:['bomber'],fx:['land',0.06]},
+   {id:'lease',name:'Cash and Carry',x:4,y:3,days:60,req:['radar'],fx:['factory',3,1]},
+   {id:'bef',name:'The Expeditionary Force',x:2,y:4,days:80,req:['imp','cont'],fx:['army',4]},
+   {id:'overlord',name:'Plan for Liberation',x:4,y:4,days:90,req:['cont','lease'],fx:['army',4]},
+  ],
+  FRA:[
+   {id:'maginot',name:'Extend the Maginot Line',x:2,y:0,days:60,fx:['land',0.08]},
+   {id:'entente',name:'The Little Entente',x:1,y:1,days:60,req:['maginot'],fx:['army',2]},
+   {id:'rearm',name:'Rearm the Army',x:3,y:1,days:60,req:['maginot'],fx:['factory',3,1]},
+   {id:'alliance',name:'Anglo-French Alliance',x:1,y:2,days:60,req:['entente'],fx:['research',90]},
+   {id:'charb',name:'Char B Production',x:3,y:2,days:70,req:['rearm'],fx:['army',3]},
+   {id:'airf',name:'Modernise l’Armée de l’Air',x:4,y:2,days:70,req:['rearm'],fx:['air',60]},
+   {id:'colonial',name:'Colonial Divisions',x:1,y:3,days:60,req:['alliance'],fx:['army',3]},
+   {id:'mech',name:'Mechanise the Army',x:3,y:3,days:70,req:['charb'],fx:['land',0.06]},
+   {id:'ardennes',name:'Fortify the Ardennes',x:4,y:3,days:60,req:['airf'],fx:['land',0.05]},
+   {id:'levee',name:'Levée en Masse',x:2,y:4,days:80,req:['mech','colonial'],fx:['army',5]},
+  ],
+  SOV:[
+   {id:'fyp',name:'First Five Year Plan',x:3,y:0,days:60,fx:['factory',4,1]},
+   {id:'collect',name:'Collectivisation',x:1,y:1,days:70,req:['fyp'],fx:['factory',4,1]},
+   {id:'heavy',name:'Heavy Industry',x:3,y:1,days:70,req:['fyp'],fx:['factory',3,2]},
+   {id:'avia',name:'Aviation Industry',x:5,y:1,days:70,req:['fyp'],fx:['air',70]},
+   {id:'kolkhoz',name:'Kolkhoz Mobilisation',x:1,y:2,days:70,req:['collect'],fx:['army',3]},
+   {id:'tankp',name:'Tank Production',x:3,y:2,days:70,req:['heavy'],fx:['army',4]},
+   {id:'vvs',name:'Reform the VVS',x:5,y:2,days:70,req:['avia'],fx:['air',80]},
+   {id:'siberia',name:'Siberian Industry',x:1,y:3,days:70,req:['kolkhoz'],fx:['factory',4,1]},
+   {id:'deepb',name:'Deep Battle Doctrine',x:3,y:3,days:80,req:['tankp'],fx:['land',0.06]},
+   {id:'winterw',name:'Winter Warfare',x:5,y:3,days:60,req:['vvs'],fx:['gear',0.3]},
+   {id:'massmob',name:'Mass Mobilisation',x:2,y:4,days:90,req:['deepb','siberia'],fx:['army',6]},
+   {id:'guards',name:'Guards Divisions',x:4,y:4,days:80,req:['deepb','winterw'],fx:['army',4]},
+  ],
+  ITA:[
+   {id:'autarky',name:'Autarky',x:2,y:0,days:60,fx:['factory',3,1]},
+   {id:'corp',name:'The Corporate State',x:1,y:1,days:60,req:['autarky'],fx:['factory',3,1]},
+   {id:'regia',name:'Regia Aeronautica',x:3,y:1,days:70,req:['autarky'],fx:['air',60]},
+   {id:'marina',name:'Regia Marina',x:4,y:1,days:60,req:['autarky'],fx:['army',2]},
+   {id:'black',name:'Blackshirt Legions',x:1,y:2,days:60,req:['corp'],fx:['army',3]},
+   {id:'mare',name:'Mare Nostrum',x:3,y:2,days:70,req:['regia'],fx:['army',3]},
+   {id:'libya',name:'Fortify Libya',x:4,y:2,days:60,req:['marina'],fx:['land',0.05]},
+   {id:'alpini',name:'Alpini Mountain Corps',x:1,y:3,days:60,req:['black'],fx:['gear',0.2]},
+   {id:'balkan',name:'Balkan Ambitions',x:3,y:3,days:80,req:['mare'],fx:['wargoal','YUG']},
+   {id:'empire',name:'A New Roman Empire',x:2,y:4,days:90,req:['balkan','alpini'],fx:['army',4]},
+   {id:'greece',name:'War with Greece',x:4,y:4,days:80,req:['balkan','libya'],fx:['wargoal','GRE']},
+  ],
+  POL:[
+   {id:'fort',name:'Fortify the Frontier',x:2,y:0,days:60,fx:['land',0.07]},
+   {id:'cir',name:'Central Industrial Region',x:1,y:1,days:70,req:['fort'],fx:['factory',3,2]},
+   {id:'modern',name:'Modernise the Army',x:3,y:1,days:60,req:['fort'],fx:['research',90]},
+   {id:'steel',name:'Expand the Steelworks',x:1,y:2,days:70,req:['cir'],fx:['factory',3,1]},
+   {id:'cav',name:'Motorise the Cavalry',x:3,y:2,days:60,req:['modern'],fx:['army',3]},
+   {id:'airf',name:'Lotnictwo Wojskowe',x:4,y:2,days:60,req:['modern'],fx:['air',40]},
+   {id:'winterw',name:'Winter Readiness',x:1,y:3,days:50,req:['steel'],fx:['gear',0.25]},
+   {id:'westplan',name:'Plan West',x:3,y:3,days:60,req:['cav'],fx:['land',0.05]},
+   {id:'inter',name:'Intermarium',x:2,y:4,days:70,req:['cav','steel'],fx:['army',3]},
+   {id:'natdef',name:'National Defence',x:3,y:4,days:80,req:['westplan'],fx:['army',4]},
+  ],
 };
-function wwFocusInit(n){ n.focusIdx=0; n.focusProg=null; }
+function wwFocusInit(n){ n.focusDone=new Set(); n.focusProg=null; }
 function wwFocusList(natKey){ return WW_FOCUS[natKey] || []; }
-function wwStartFocus(natKey){ const n=WW.byKey[natKey], list=wwFocusList(natKey);
-  if(!n || n.focusProg || n.focusIdx>=list.length || n.capitulated) return false;
-  const f=list[n.focusIdx]; n.focusProg={ idx:n.focusIdx, turnsLeft:Math.max(1,Math.round(f.days/7)) }; return true; }
+function wwFocusById(natKey,id){ return wwFocusList(natKey).find(f=>f.id===id); }
+function wwFocusAvail(natKey,id){ const n=WW.byKey[natKey]; if(!n||n.capitulated||n.focusProg) return false;
+  if(n.focusDone && n.focusDone.has(id)) return false; const f=wwFocusById(natKey,id); if(!f) return false;
+  return (f.req||[]).every(r=>n.focusDone && n.focusDone.has(r)); }
+function wwAvailableFocuses(natKey){ const n=WW.byKey[natKey]; if(!n||n.focusProg) return [];
+  return wwFocusList(natKey).filter(f=>!(n.focusDone&&n.focusDone.has(f.id)) && (f.req||[]).every(r=>n.focusDone.has(r))); }
+function wwAIPickFocus(n, av){ const w=wwAtWar.bind(null); const atWar=n.atWar&&n.atWar.size>0;
+  const pr=f=>{ const t=f.fx[0];
+    if(t==='wargoal') return atWar?1:6;          // open new wars only when not already busy
+    if(t==='army') return atWar?6:3;
+    if(t==='gear') return (wwWinterAt(WW.date)>0.3)?7:1;
+    if(t==='factory') return atWar?3:5;
+    if(t==='air'||t==='land'||t==='research') return 4;
+    return 3; };
+  return av.slice().sort((a,b)=>pr(b)-pr(a))[0].id; }
+function wwStartFocus(natKey, id){ const n=WW.byKey[natKey]; if(!n||n.focusProg||n.capitulated) return false;
+  if(!id){ const av=wwAvailableFocuses(natKey); if(!av.length) return false; id=wwAIPickFocus(n, av); }
+  if(!wwFocusAvail(natKey,id)) return false;
+  const f=wwFocusById(natKey,id); n.focusProg={ id, turnsLeft:Math.max(1,Math.round(f.days/7)) }; return true; }
 function wwSpawnDivisions(n,count){ const cap=wwCapitalHex(n.key); if(!cap) return;
   let placed=0, id=(WW.armies.reduce((m,a)=>Math.max(m,a.id),0)||0)+1;
   for(const [x,y] of [cap, ...wwNb(cap[0],cap[1])]){ if(placed>=count) break;
@@ -4867,14 +4937,14 @@ function wwApplyFocus(n,fx){ const t=fx[0];
   else if(t==='research'){ n.research=(n.research||0)+fx[1]; }
   else if(t==='land'){ n.bonusLand=(n.bonusLand||0)+fx[1]; }
   else if(t==='army'){ wwSpawnDivisions(n,fx[1]); }
+  else if(t==='gear'){ n.winterGear=Math.min(0.95,(n.winterGear||0)+fx[1]); }
   else if(t==='wargoal'){ wwDeclareWar(n.key,fx[1]); } }
 function wwFocusTick(n){
   if(!n.focusProg){ if(n.key!==WW.player) wwStartFocus(n.key); return; }
   n.focusProg.turnsLeft--;
-  if(n.focusProg.turnsLeft<=0){ const f=wwFocusList(n.key)[n.focusProg.idx];
-    if(f){ wwApplyFocus(n,f.fx); if(WW.log) WW.log.push(n.name+' completes focus: '+f.name); }
-    n.focusIdx=n.focusProg.idx+1; n.focusProg=null;
-    if(n.key!==WW.player) wwStartFocus(n.key); } }
+  if(n.focusProg.turnsLeft<=0){ const f=wwFocusById(n.key, n.focusProg.id);
+    if(f){ n.focusDone=n.focusDone||new Set(); n.focusDone.add(f.id); wwApplyFocus(n,f.fx); if(WW.log) WW.log.push(n.name+' completes focus: '+f.name); }
+    n.focusProg=null; if(n.key!==WW.player) wwStartFocus(n.key); } }
 
 // air power: a national air force that grows from industry and tips battles via air superiority
 // air force = three wing types. fighters win air superiority (and escort/intercept),
@@ -5045,7 +5115,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
-      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing})) };
+      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -5061,7 +5131,7 @@ function wwDeserialize(s){
     nn.airBuild = ns.airBuild || wwDefaultBuild(nn);
     nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
-    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
+    nn.focusDone=new Set(ns.focusDone||[]); nn.focusProg=ns.focusProg||null; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
     nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
@@ -6798,7 +6868,7 @@ function wwOpen(){
   wwRequest();
   if (typeof sClick==='function') sClick();
 }
-function wwClose(){ WW.on=false; const sc=$('ww-screen'); if(sc) sc.classList.add('hidden'); }
+function wwClose(){ WW.on=false; const sc=$('ww-screen'); if(sc) sc.classList.add('hidden'); const fp=$('ww-focus-page'); if(fp) fp.classList.add('hidden'); }
 
 function wwFillPick(){
   const row=$('ww-pick-row'); if(!row) return; let html='';
@@ -7157,7 +7227,7 @@ function wwDoEndTurn(){ wwSfx('endturn');
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
-  if(!$('ww-focus').classList.contains('hidden')) wwRenderFocus();
+  if(!$('ww-focus-page').classList.contains('hidden')) wwRenderFocusTree();
   if(!$('ww-research').classList.contains('hidden')) wwRenderResearch();
   if(!$('ww-air').classList.contains('hidden')) wwRenderAir();
   if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
@@ -7196,14 +7266,40 @@ function wwUpdateHUD(){
     } else ps.classList.add('hidden'); }
 }
 function wwFocusStatus(me){
-  if(me.focusProg){ const f=wwFocusList(WW.player)[me.focusProg.idx]; return (f?f.name:'?')+' ('+me.focusProg.turnsLeft+'w)'; }
-  if(me.focusIdx<wwFocusList(WW.player).length) return '<i style="color:#9fb4c9">choose one</i>';
-  return 'complete';
+  if(me.focusProg){ const f=wwFocusById(WW.player,me.focusProg.id); return (f?f.name:'?')+' ('+me.focusProg.turnsLeft+'w)'; }
+  const av=wwAvailableFocuses(WW.player); return av.length?'<i style="color:#9fb4c9">choose one</i>':'complete';
 }
+const WW_FOC_COLW=164, WW_FOC_ROWH=110, WW_FOC_NW=134, WW_FOC_NH=64, WW_FOC_PAD=36;
+function wwRenderFocusTree(){
+  const me=WW.byKey[WW.player]; if(!me) return; const list=wwFocusList(WW.player);
+  const lines=$('ww-foc-lines'), nodes=$('ww-foc-nodes'), inner=$('ww-foc-inner');
+  let maxX=0,maxY=0; for(const f of list){ if(f.x>maxX)maxX=f.x; if(f.y>maxY)maxY=f.y; }
+  const W=maxX*WW_FOC_COLW+WW_FOC_NW+WW_FOC_PAD*2, H=maxY*WW_FOC_ROWH+WW_FOC_NH+WW_FOC_PAD*2;
+  lines.width=W; lines.height=H; if(inner){ inner.style.width=W+'px'; inner.style.height=H+'px'; }
+  const g=lines.getContext('2d'); g.clearRect(0,0,W,H);
+  const nx=f=>WW_FOC_PAD+f.x*WW_FOC_COLW, ny=f=>WW_FOC_PAD+f.y*WW_FOC_ROWH, cx=f=>nx(f)+WW_FOC_NW/2;
+  g.lineWidth=2;
+  for(const f of list){ for(const r of (f.req||[])){ const p=wwFocusById(WW.player,r); if(!p) continue;
+    const x1=cx(p), y1=ny(p)+WW_FOC_NH, x2=cx(f), y2=ny(f), my=(y1+y2)/2;
+    g.strokeStyle=(me.focusDone&&me.focusDone.has(r))?'rgba(110,200,130,0.7)':'rgba(110,140,175,0.42)';
+    g.beginPath(); g.moveTo(x1,y1); g.lineTo(x1,my); g.lineTo(x2,my); g.lineTo(x2,y2); g.stroke(); } }
+  let html='';
+  for(const f of list){ const done=me.focusDone&&me.focusDone.has(f.id), prog=me.focusProg&&me.focusProg.id===f.id, avail=wwFocusAvail(WW.player,f.id);
+    const cls=done?'done':prog?'prog':avail?'avail':'locked';
+    const sub=prog?('◷ '+me.focusProg.turnsLeft+' wk'):(done?'completed ✓':wwFocusDesc(f.fx));
+    html+='<button class="ww-foc-node '+cls+'" data-id="'+f.id+'" style="left:'+nx(f)+'px;top:'+ny(f)+'px"><div class="fn">'+f.name+'</div><div class="fd">'+sub+'</div></button>'; }
+  nodes.innerHTML=html;
+  for(const b of nodes.querySelectorAll('.ww-foc-node')) b.onclick=()=>{ const id=b.dataset.id;
+    if(wwFocusAvail(WW.player,id)){ wwStartFocus(WW.player,id); wwSfx('city'); wwRenderFocusTree(); wwUpdateHUD(); } };
+  const tt=$('ww-foc-title'); if(tt) tt.textContent=me.name+' — NATIONAL FOCUS';
+}
+function wwOpenFocusPage(){ wwSfx('click'); const p=$('ww-focus-page'); if(!p) return; p.classList.remove('hidden'); wwRenderFocusTree(); }
+function wwCloseFocusPage(){ const p=$('ww-focus-page'); if(p) p.classList.add('hidden'); }
 function wwFocusDesc(fx){ const t=fx[0];
   return t==='factory'?('+'+fx[1]+' civ / +'+(fx[2]||0)+' mil factories')
     : t==='air'?('+'+fx[1]+' air wings') : t==='army'?('+'+fx[1]+' divisions')
     : t==='land'?('+'+Math.round(fx[1]*100)+'% land combat') : t==='research'?('+'+fx[1]+' research')
+    : t==='gear'?('+'+Math.round(fx[1]*100)+'% winter gear')
     : t==='wargoal'?('war goal: '+(WW.byKey[fx[1]]?WW.byKey[fx[1]].name:fx[1])) : ''; }
 function wwRenderFocus(){
   const el=$('ww-focus'); if(!el) return; const me=WW.byKey[WW.player], list=wwFocusList(WW.player);
@@ -7382,7 +7478,8 @@ function wwBindInput(){
     else if(e.key==='-'||e.key==='_'){ const c=$('wwCanvas'); wwZoomAt(c.clientWidth/2,c.clientHeight/2,1/1.15); } });
   const bk=$('ww-back'); if(bk) bk.onclick=()=>{ if(WW.started && !(WW.result&&WW.result.over)) wwSave(); wwClose(); showModeSelect(); };
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
-  const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwToggleFocus;
+  const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwOpenFocusPage;
+  const fcl=$('ww-foc-close'); if(fcl) fcl.onclick=wwCloseFocusPage;
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
@@ -7717,7 +7814,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     wwDayOfYear, wwWinterAt, wwSeasonName, wwLatOf, wwHexWinter, wwGear, wwSetWinterizing, WW_WINTER_BASE,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
-    wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
+    wwFocusInit, wwFocusList, wwFocusById, wwFocusAvail, wwAvailableFocuses, wwAIPickFocus, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
     getState: () => G,
   };
 }
@@ -7815,6 +7912,25 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
       border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
     .ww-panel.hidden{display:none;}
+    #ww-focus-page{position:absolute;inset:0;z-index:9;background:radial-gradient(circle at 50% 16%,#16243488,#0a0f16f6),#0a0f16;display:flex;flex-direction:column;}
+    #ww-focus-page.hidden{display:none;}
+    #ww-foc-head{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid #22364d;background:#0d1826;}
+    #ww-foc-title{font-weight:800;letter-spacing:2px;font-size:15px;color:#eaf2fb;}
+    #ww-foc-hint{font-size:11px;color:#8ba2b8;}
+    #ww-foc-close{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:700 12px 'Segoe UI',sans-serif;padding:8px 16px;border-radius:7px;cursor:pointer;}
+    #ww-foc-close:hover{background:#1d3553;border-color:#3d6ea0;}
+    #ww-foctree{flex:1;overflow:auto;position:relative;}
+    #ww-foc-inner{position:relative;margin:auto;}
+    #ww-foc-lines{position:absolute;left:0;top:0;pointer-events:none;}
+    #ww-foc-nodes{position:absolute;left:0;top:0;}
+    .ww-foc-node{position:absolute;width:134px;height:64px;border-radius:9px;border:1px solid #2c486a;background:#142338;color:#dfe9f5;cursor:default;padding:7px;text-align:center;display:flex;flex-direction:column;justify-content:center;gap:3px;font-family:'Segoe UI',sans-serif;transition:.1s;}
+    .ww-foc-node .fn{font-weight:700;font-size:11.5px;line-height:1.16;}
+    .ww-foc-node .fd{font-size:9.5px;color:#90a6bb;line-height:1.1;}
+    .ww-foc-node.done{background:#11301d;border-color:#2f6a3e;} .ww-foc-node.done .fn{color:#9fe0ad;}
+    .ww-foc-node.prog{background:#2a2410;border-color:#b08a2a;} .ww-foc-node.prog .fn{color:#ffd76a;} .ww-foc-node.prog .fd{color:#d8b24a;}
+    .ww-foc-node.avail{background:#163150;border-color:#4f8fce;cursor:pointer;box-shadow:0 0 12px #2a6fb066;}
+    .ww-foc-node.avail:hover{background:#1d4570;border-color:#6ab0e8;}
+    .ww-foc-node.locked{opacity:0.46;}
     #ww-tut{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:7;width:430px;max-width:88vw;
       background:#0e1d2ef5;border:1px solid #3a6090;border-radius:12px;padding:16px 18px;box-shadow:0 10px 38px #000b;}
     #ww-tut.hidden{display:none;}
@@ -7892,6 +8008,10 @@ if (typeof module !== 'undefined' && module.exports){
     </div>
     <div class="ww-pick-row" id="ww-pick-row"></div>
     <button id="ww-continue" class="ww-pbtn hidden" style="max-width:262px;margin-top:16px">▶ CONTINUE SAVED CAMPAIGN</button>
+  </div>
+  <div id="ww-focus-page" class="hidden">
+    <div id="ww-foc-head"><span id="ww-foc-title">NATIONAL FOCUS</span><div style="flex:1"></div><span id="ww-foc-hint">Click a highlighted focus to begin it — prerequisites unlock the branches below</span><button id="ww-foc-close">✕ CLOSE</button></div>
+    <div id="ww-foctree"><div id="ww-foc-inner"><canvas id="ww-foc-lines"></canvas><div id="ww-foc-nodes"></div></div></div>
   </div>
   <div id="ww-end" class="hidden"></div>
 </div>
