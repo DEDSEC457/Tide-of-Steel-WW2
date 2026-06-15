@@ -6788,7 +6788,7 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden'); $('ww-btn-supply').classList.add('hidden'); $('ww-minimap').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden'); $('ww-btn-supply').classList.add('hidden'); $('ww-minimap').classList.add('hidden'); $('ww-btn-help').classList.add('hidden'); $('ww-tut').classList.add('hidden');
   $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
@@ -6821,7 +6821,7 @@ function wwEnterGameUI(){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden'); $('ww-btn-supply').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden'); $('ww-btn-supply').classList.remove('hidden'); $('ww-btn-help').classList.remove('hidden'); wwSetTips();
   WW.mapMode='political'; WW._stratDirty=true; { const mm=$('ww-minimap'); if(mm){ mm.classList.remove('hidden'); mm.width=184; mm.height=180; } } $('ww-btn-supply').classList.remove('on');
   const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
@@ -6829,7 +6829,7 @@ function wwEnterGameUI(){
   wwFit(); wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if (typeof sClick==='function') sClick();
 }
-function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); wwSave(); if(typeof startMusic==='function') startMusic(); }
+function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); wwSave(); if(typeof startMusic==='function') startMusic(); wwTutStart(false); }
 function wwContinue(){ const s=wwLoadSave(); if(!s||!wwDeserialize(s)) return; wwEnterGameUI(); if(typeof startMusic==='function') startMusic(); }
 
 function wwWorldSize(){ return [WW_HX*(WW.cols+0.5)+WW_PAD*2, WW_VY*(WW.rows-1)+2*WW_S+WW_PAD*2]; }
@@ -6999,6 +6999,33 @@ function wwDrawMinimap(){
   const wx0=(0-cam.x)/cam.z, wy0=(0-cam.y)/cam.z, wx1=(vw-cam.x)/cam.z, wy1=(vh-cam.y)/cam.z;
   g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=1.3; g.strokeRect(ox+wx0*sc, oy+wy0*sc, (wx1-wx0)*sc, (wy1-wy0)*sc);
 }
+const WW_TUT=[
+ 'Welcome to <b>THE WORLD AT WAR</b>. You command <b>{NATION}</b>. Bring every enemy that takes up arms against you to capitulation, and Europe is yours.',
+ 'Drag to pan, scroll to zoom. Zoom in and the map blooms into detailed terrain; the <b>minimap</b> (bottom-left) lets you click to jump anywhere.',
+ 'Click one of your <b>division counters</b> to select it. Then: <span style="color:#8fb4d8">blue = move</span>, <span style="color:#e0856a">red = attack</span>, <span style="color:#ffd34d">amber = declare war</span>, <span style="color:#7be0ee">teal = invade by sea</span>.',
+ 'Run your war effort from the top bar: <b>★ Focus</b> (national agenda) · <b>⚗ Research</b> · <b>✈ Air</b> (fighters, CAS &amp; bombers) · <b>⚑ Diplomacy</b> · <b>❄ Winter Prep</b> · <b>🗺 Supply</b> view.',
+ 'General Winter is real — snow slows movement, saps unprepared troops and weakens their attacks. Keep an eye on the <b>Supply</b> view for cut-off units, and prepare your <b>winter gear</b> before the freeze.',
+ 'When your orders are set, press <b>END TURN</b> (or the Space bar). The enemy moves, then it is your turn again. Good luck, commander.'
+];
+function wwTutShow(){ const el=$('ww-tut'); if(!el) return; const me=WW.byKey[WW.player];
+  const t=(WW_TUT[WW._tutStep]||'').replace('{NATION}', me?me.name:'your nation');
+  $('ww-tut-text').innerHTML=t;
+  $('ww-tut-dots').innerHTML=WW_TUT.map((_,i)=>'<span class="ww-tut-dot'+(i===WW._tutStep?' on':'')+'"></span>').join('');
+  $('ww-tut-next').textContent = WW._tutStep>=WW_TUT.length-1?'Got it ✓':'Next ▶';
+  el.classList.remove('hidden'); }
+function wwTutStart(force){ if(!force){ try{ if(localStorage.getItem('ww-tut-done')) return; }catch(e){} } WW._tutStep=0; wwTutShow(); }
+function wwTutNext(){ WW._tutStep=(WW._tutStep||0)+1; if(WW._tutStep>=WW_TUT.length){ wwTutDone(); } else wwTutShow(); }
+function wwTutDone(){ const el=$('ww-tut'); if(el) el.classList.add('hidden'); try{ localStorage.setItem('ww-tut-done','1'); }catch(e){} }
+function wwSetTips(){
+  const T={ 'ww-btn-focus':'National Focus — your nation’s agenda of decisions and bonuses',
+    'ww-btn-research':'Research — Land Doctrine, Industry, Aircraft and Logistics',
+    'ww-btn-air':'Air Force — fighters (air superiority), CAS (ground support) & strategic bombers; pick a production doctrine',
+    'ww-btn-diplo':'Diplomacy — every nation by bloc and its relation to you',
+    'ww-winter-toggle':'Winter Preparations — divert ~30% of production to ready your troops for the cold',
+    'ww-btn-supply':'Supply map — green = supplied, red = cut off (and encircled enemy pockets)',
+    'ww-btn-help':'Replay the tutorial', 'ww-back':'Return to the menu (your campaign autosaves)',
+    'ww-endturn':'End your turn — the enemy acts, then it’s yours again (Space)' };
+  for(const id in T){ const e=$(id); if(e) e.title=T[id]; } }
 function wwToggleSupply(){ wwSfx('click'); WW.mapMode = (WW.mapMode==='supply')?'political':'supply'; WW._stratDirty=true;
   const b=$('ww-btn-supply'); if(b) b.classList.toggle('on', WW.mapMode==='supply'); wwRequest(); }
 function wwRequest(){ if(wwRAFpending||!WW.on) return; wwRAFpending=true;
@@ -7360,6 +7387,9 @@ function wwBindInput(){
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
   const bs=$('ww-btn-supply'); if(bs) bs.onclick=wwToggleSupply;
+  const bh=$('ww-btn-help'); if(bh) bh.onclick=()=>{ wwSfx('click'); wwTutStart(true); };
+  const tn=$('ww-tut-next'); if(tn) tn.onclick=wwTutNext;
+  const tsk=$('ww-tut-skip'); if(tsk) tsk.onclick=wwTutDone;
   const mm=$('ww-minimap'); if(mm) mm.addEventListener('mousedown', e=>{ if(!WW.on||!WW._mm) return; const r=mm.getBoundingClientRect();
     const wx=(e.clientX-r.left-WW._mm.ox)/WW._mm.sc, wy=(e.clientY-r.top-WW._mm.oy)/WW._mm.sc, cv2=$('wwCanvas');
     WW.cam.x=cv2.clientWidth/2-wx*WW.cam.z; WW.cam.y=cv2.clientHeight/2-wy*WW.cam.z; wwRequest(); });
@@ -7785,6 +7815,16 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
       border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
     .ww-panel.hidden{display:none;}
+    #ww-tut{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:7;width:430px;max-width:88vw;
+      background:#0e1d2ef5;border:1px solid #3a6090;border-radius:12px;padding:16px 18px;box-shadow:0 10px 38px #000b;}
+    #ww-tut.hidden{display:none;}
+    #ww-tut-text{font-size:13.5px;line-height:1.5;color:#e8eff7;}
+    #ww-tut-dots{display:flex;gap:6px;justify-content:center;margin:12px 0 2px;}
+    .ww-tut-dot{width:7px;height:7px;border-radius:50%;background:#2c486a;} .ww-tut-dot.on{background:#6ab0e8;}
+    .ww-tut-row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+    #ww-tut-skip{background:#16263a;border:1px solid #2c486a;color:#9fb4c9;font:600 12px 'Segoe UI',sans-serif;padding:7px 14px;border-radius:7px;cursor:pointer;}
+    #ww-tut-next{background:#234a8a;border:1px solid #4f7fce;color:#eaf2fb;font:700 12px 'Segoe UI',sans-serif;letter-spacing:.5px;padding:7px 18px;border-radius:7px;cursor:pointer;}
+    #ww-btn-help{min-width:30px;text-align:center;}
     .ww-panel h3{margin:0 0 9px;font-size:14px;letter-spacing:1.5px;color:#dfe9f5;}
     .ww-foc{display:flex;gap:8px;align-items:flex-start;padding:7px;border-radius:7px;margin:5px 0;border:1px solid #1c2c40;font-size:12px;}
     .ww-foc .fi{width:18px;text-align:center;font-size:13px;flex:0 0 auto;}
@@ -7822,6 +7862,7 @@ if (typeof module !== 'undefined' && module.exports){
     <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
     <button id="ww-winter-toggle" class="ww-hbtn hidden">❄ WINTER PREP</button>
     <button id="ww-btn-supply" class="ww-hbtn hidden">🗺 SUPPLY</button>
+    <button id="ww-btn-help" class="ww-hbtn hidden" title="Replay the tutorial">?</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>
@@ -7836,6 +7877,11 @@ if (typeof module !== 'undefined' && module.exports){
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-combat" class="hidden"></div>
   <div id="ww-toast"></div>
+  <div id="ww-tut" class="hidden">
+    <div id="ww-tut-text"></div>
+    <div id="ww-tut-dots"></div>
+    <div class="ww-tut-row"><button id="ww-tut-skip">Skip</button><button id="ww-tut-next">Next ▶</button></div>
+  </div>
   <div id="ww-pick">
     <h2>THE WORLD AT WAR</h2>
     <div class="sub">EUROPE · SEPTEMBER 1939 — CHOOSE YOUR NATION</div>

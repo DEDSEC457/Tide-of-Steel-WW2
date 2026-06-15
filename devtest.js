@@ -1120,6 +1120,8 @@ function uiSmoke(side){
       if (UI.wwAirDoctrine) UI.wwAirDoctrine('GER','superiority');
       if ($('ww-winter-toggle').onclick) $('ww-winter-toggle').onclick();
       if ($('ww-btn-supply').onclick) $('ww-btn-supply').onclick();   // supply map mode (builds front/supply overlays)
+      if ($('ww-btn-help').onclick) $('ww-btn-help').onclick();        // open the tutorial
+      for (let i=0;i<7;i++) if ($('ww-tut-next').onclick) $('ww-tut-next').onclick();   // walk through & finish it
       if (UI.wwStartFocus) UI.wwStartFocus('GER');
       if (UI.wwSetBombing){ const foe = UI.WW.nat.find(nn=>UI.wwAtWar('GER',nn.key)); if(foe) UI.wwSetBombing('GER', foe.key); }
       const t0 = UI.WW.turn;
