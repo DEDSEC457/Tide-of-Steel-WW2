@@ -4500,6 +4500,24 @@ function wwCapitalHex(natKey){ const c=WW.cities.find(c=>c.nat===natKey && c.cap
 
 // curated 1939 industrial base for the major powers (civilian + military factories, manpower).
 // minors are scaled from territory/cities in wwComputeStats.
+// ---- war economy: resources, fuel, manpower ----
+const WW_ECO = { GER:{oil:2,steel:11}, SOV:{oil:4,steel:14}, ENG:{oil:3,steel:9}, FRA:{oil:1,steel:7}, ITA:{oil:1,steel:3}, POL:{oil:1,steel:3} };
+// resource-rich cities (whoever holds them gets the output) — the oil & steel of the war
+const WW_CITY_RES = { Bucharest:{oil:6}, Rostov:{oil:3}, Stalingrad:{oil:2}, Gorky:{oil:1,steel:2},
+  Cologne:{steel:5}, Kharkov:{steel:4}, Stockholm:{steel:3}, Manchester:{steel:3}, Stuttgart:{steel:2}, Krakow:{steel:2}, Lwow:{steel:1} };
+const WW_FUEL_PER_OIL=4, WW_ARMOR_FUEL=2, WW_AIR_FUEL=0.025, WW_MP_PER_STR=1500, WW_DIV_MP=10000, WW_DIV_STEEL=10;
+function wwEffMp(a){ const n=WW.byKey[a.nat]; return (a.kind==='arm' && n && n.lowFuel) ? a.mp*0.5 : a.mp; }
+function wwEconomyTick(){
+  for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue;
+    const armor=wwArmiesOf(n.key).reduce((s,a)=>s+(a.kind==='arm'?1:0),0);
+    const burn=armor*WW_ARMOR_FUEL + wwAirTotal(n)*WW_AIR_FUEL;
+    n.fuelMax=200 + (n.civ||0)*6;
+    n.fuel=Math.max(0, Math.min(n.fuelMax, (n.fuel||0) + (n.oil||0)*WW_FUEL_PER_OIL - burn));
+    n.lowFuel = (n.fuel<=0 && (n.oil||0)*WW_FUEL_PER_OIL < burn);
+    n.steelStock=Math.min(400, (n.steelStock||0) + (n.steel||0));
+    n.manpower=Math.min((n.mp||0)*0.08, (n.manpower||0) + (n.mp||0)*0.001);
+  }
+}
 const WW_POWER = {
   GER:{civ:38,mil:24,mp:80}, SOV:{civ:55,mil:30,mp:170}, ENG:{civ:35,mil:18,mp:48},
   FRA:{civ:28,mil:14,mp:42}, ITA:{civ:18,mil:10,mp:45}, POL:{civ:10,mil:5,mp:35},
@@ -4540,6 +4558,10 @@ function wwComputeStats(){
     }
     n.civ += n.bonusCiv||0; n.mil += n.bonusMil||0;
     if(n.warDmg>0){ n.civ=Math.max(1,Math.round(n.civ*(1-n.warDmg))); n.mil=Math.max(0,Math.round(n.mil*(1-n.warDmg))); }
+    const eb = WW_ECO[n.key] || {oil:Math.max(0,Math.round(n.hexes/250)), steel:Math.max(1,Math.round(n.hexes/55))};
+    let oil=eb.oil||0, steel=eb.steel||0;
+    for(const c of n.cityList){ const r=WW_CITY_RES[c.name]; if(r){ oil+=r.oil||0; steel+=r.steel||0; } }
+    n.oil=oil; n.steel=steel;
   }
 }
 
@@ -4625,7 +4647,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; n.railDepth=WW_RAIL_START; wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; n.railDepth=WW_RAIL_START; n.fuelMax=200+(n.civ||0)*6; n.fuel=Math.round(n.fuelMax*0.5); n.manpower=Math.round((n.mp||100000)*0.03); n.steelStock=100; n.casualties=0; n.lowFuel=false; wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -4643,7 +4665,7 @@ function wwReachable(a){
     for(const [nx,ny] of wwNb(x,y)){
       if(!wwPassableFor(a.nat,nx,ny) || wwArmyAt(nx,ny)) continue;
       const nc=c+wwTerrCost(nx,ny)+wwHexWinter(nx,ny)*1.6*(1-wwGear(a.nat)*0.7);
-      if(nc<=a.mp && nc<(best[nx+','+ny]??1e9)){ best[nx+','+ny]=nc; pq.push([nc,nx,ny]); out.push([nx,ny]); }
+      if(nc<=wwEffMp(a) && nc<(best[nx+','+ny]??1e9)){ best[nx+','+ny]=nc; pq.push([nc,nx,ny]); out.push([nx,ny]); }
     }
   }
   return out;
@@ -4772,6 +4794,7 @@ function wwAttack(a,tx,ty){
     const def=wwDefPower(d,tx,ty)*(0.50+Math.random()*0.35)*wwAirFactor(foeKey,a.nat);
     d.org-=atk*0.85; d.str-=atk*0.20;
     a.org-=def*0.80; a.str-=def*0.18;
+    { const dn=WW.byKey[d.nat], an=WW.byKey[a.nat]; if(dn) dn.casualties=(dn.casualties||0)+atk*0.20*WW_MP_PER_STR; if(an) an.casualties=(an.casualties||0)+def*0.18*WW_MP_PER_STR; }
     if(a.str<=1.0){ wwRemoveArmy(a); return {result:'attacker-lost'}; }
     if(d.str<=1.0){ wwRemoveArmy(d); took=true; }
     else if(d.org<=0){ const fled=wwRetreat(d,a.x,a.y); if(!fled){ wwRemoveArmy(d); took=true; } else took=true; }
@@ -5023,7 +5046,7 @@ function wwAddAir(n, amt){ const a=n.air||(n.air=wwBaseAir(n)); const b=n.airBui
 function wwAirDoctrine(natKey, preset){ const n=WW.byKey[natKey], d=WW_DOCTRINE[preset];
   if(n&&d) n.airBuild={fighter:d.fighter,cas:d.cas,strat:d.strat}; }
 // fighters over the front — escorts are diverted while running a bombing campaign
-function wwFrontFighters(n){ const a=n&&n.air; if(!a) return 0; return a.fighter * (n.bombTarget?0.6:1); }
+function wwFrontFighters(n){ const a=n&&n.air; if(!a) return 0; return a.fighter * (n.bombTarget?0.6:1) * (n.lowFuel?0.8:1); }
 function wwAirSup(meKey, foeKey){ const me=WW.byKey[meKey], foe=WW.byKey[foeKey]; if(!me||!foe) return 0;
   const mf=wwFrontFighters(me), ff=wwFrontFighters(foe); if(mf+ff<=0) return 0;
   return Math.max(-1, Math.min(1, (mf-ff)/(mf+ff))); }
@@ -5151,8 +5174,8 @@ function wwProduction(){
     if(n.capitulated||n.key==='XXX') continue;
     wwAddAir(n, (n.civ||0)*0.05);
     if(!n.mil) continue;
-    n.prod=(n.prod||0)+n.mil*(n.winterizing?0.7:1);
-    if(n.prod>=120){ n.prod-=120;
+    n.prod=Math.min(260,(n.prod||0)+n.mil*(n.winterizing?0.7:1));
+    if(n.prod>=120 && (n.manpower||0)>=WW_DIV_MP && (n.steelStock||0)>=WW_DIV_STEEL){ n.prod-=120; n.manpower-=WW_DIV_MP; n.steelStock-=WW_DIV_STEEL;
       const cap=wwCapitalHex(n.key);
       let spot=null;
       if(cap && WW.own[cap[1]*WW.cols+cap[0]]===n.i && !wwArmyAt(cap[0],cap[1])) spot=cap;
@@ -5197,7 +5220,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       techDone:[...(nn.techDone||[])],research:nn.research||0,researching:nn.researching||null,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,bonusSupply:nn.bonusSupply||0,
-      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing,railDepth:nn.railDepth})) };
+      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing,railDepth:nn.railDepth,fuel:nn.fuel||0,manpower:nn.manpower||0,steelStock:nn.steelStock||0,casualties:nn.casualties||0})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -5214,7 +5237,8 @@ function wwDeserialize(s){
     nn.techDone=new Set(ns.techDone||[]); nn.research=ns.research||0; nn.researching=ns.researching||null;
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand; nn.bonusSupply=ns.bonusSupply||0;
     nn.focusDone=new Set(ns.focusDone||[]); nn.focusProg=ns.focusProg||null; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
-    nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; nn.railDepth=ns.railDepth!=null?ns.railDepth:WW_RAIL_START; }
+    nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; nn.railDepth=ns.railDepth!=null?ns.railDepth:WW_RAIL_START;
+    nn.fuel=ns.fuel||0; nn.manpower=ns.manpower||0; nn.steelStock=ns.steelStock||0; nn.casualties=ns.casualties||0; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
   return WW;
@@ -5237,15 +5261,18 @@ function wwEndTurn(){
     n.railDepth = Math.min(WW_RAIL_MAX, (n.railDepth!=null?n.railDepth:WW_RAIL_START) + WW_RAIL_RATE); }
   wwBombingTick();
   wwComputeStats();
+  wwEconomyTick();
   wwProduction();
   for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue; wwResearchTick(n); wwFocusTick(n); }
   wwRecomputeSupply();
   for(const a of WW.armies){ const sup=wwInSupply(a);
-    if(!a.moved){ if(sup){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.30); a.str=Math.min(a.maxStr,a.str+0.6); }
-                  else { a.org=Math.max(1,a.org-a.maxOrg*0.20); a.str=Math.max(1,a.str-0.4); } }
+    const en=WW.byKey[a.nat];
+    if(!a.moved){ if(sup){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.30);
+                    const want=Math.min(0.6, a.maxStr-a.str); if(want>0 && en){ const got=Math.min(want,(en.manpower||0)/WW_MP_PER_STR); a.str+=got; en.manpower=Math.max(0,(en.manpower||0)-got*WW_MP_PER_STR); } }
+                  else { a.org=Math.max(1,a.org-a.maxOrg*0.20); const l=Math.min(0.4,a.str-1); if(l>0){ a.str-=l; if(en) en.casualties=(en.casualties||0)+l*WW_MP_PER_STR; } } }
     else if(!sup){ a.org=Math.max(1,a.org-a.maxOrg*0.12); }
     const wsev=wwHexWinter(a.x,a.y)*(1-wwGear(a.nat));
-    if(wsev>0.02){ a.org=Math.max(1,a.org-a.maxOrg*wsev*0.25); a.str=Math.max(1,a.str-wsev*0.5); } }
+    if(wsev>0.02){ a.org=Math.max(1,a.org-a.maxOrg*wsev*0.25); const l=Math.min(wsev*0.5,a.str-1); if(l>0){ a.str-=l; if(en) en.casualties=(en.casualties||0)+l*WW_MP_PER_STR; } } }
   wwAdvanceDate(7);
   for(const a of WW.armies) a.moved=false;
   WW.turn++; WW._stratDirty=true;
@@ -7332,6 +7359,7 @@ function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ const msg=WW.lo
 
 function wwDateStr(){ const M=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const d=WW.date; return d.d+' '+M[d.m-1]+' '+d.y; }
+function wwFmtNum(v){ v=Math.round(v||0); return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?Math.round(v/1e3)+'k':''+v; }
 function wwUpdateHUD(){
   const dt=$('ww-date'); if(dt) dt.textContent=wwDateStr();
   const tn=$('ww-turn'); if(tn) tn.textContent = WW.started ? ('Week '+(WW.turn+1)+' · '+wwSeasonName(WW.date)) : '';
@@ -7341,6 +7369,9 @@ function wwUpdateHUD(){
       ps.innerHTML='<b>'+me.name+'</b> <span style="color:#8ba2b8">('+(WW.difficulty||'normal')+')</span><br>'+
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
         '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
+        '<br>🛢 Oil '+(me.oil||0)+' · ⚙ Steel '+(me.steel||0)+' ('+(me.steelStock||0)+')'+
+        '<br>⛽ Fuel '+Math.round(me.fuel||0)+'/'+(me.fuelMax||0)+(me.lowFuel?' <span style="color:#e0856a">LOW</span>':'')+
+        '<br>👥 Manpower '+wwFmtNum(me.manpower)+' · ☠ '+wwFmtNum(me.casualties)+' lost'+
         '<br>Air: '+Math.round(wwAirTotal(me))+' <span style="color:#8ba2b8">('+Math.round(me.air.fighter)+'F '+Math.round(me.air.cas)+'C '+Math.round(me.air.strat)+'S)</span>'+(me.bombTarget?'<br><span style="color:#c98ac9">Bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+'</span>':'')+
         '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching?(wwTechById(me.researching)?wwTechById(me.researching).name:'—'):'<i style="color:#9fb4c9">choose</i>')+
         '<br>❄ Winter readiness: '+Math.round((me.winterGear||0)*100)+'%'+(me.winterizing?' <span style="color:#9fd0e8">(preparing)</span>':'')+
@@ -7546,6 +7577,9 @@ function wwUpdateInfo(){
       '<tr><td>Air force</td><td>'+Math.round(wwAirTotal(n))+' <span style="color:#8ba2b8">('+Math.round(n.air?n.air.fighter:0)+'F/'+Math.round(n.air?n.air.cas:0)+'C/'+Math.round(n.air?n.air.strat:0)+'S)</span></td></tr>'+
       (WW.started && n.key!==WW.player && wwAtWar(WW.player,n.key) ? '<tr><td>Your air superiority</td><td>'+(wwAirSup(WW.player,n.key)>=0?'+':'')+Math.round(wwAirSup(WW.player,n.key)*100)+'%</td></tr>' : '')+
       '<tr><td>Manpower</td><td>'+(n.mp/1e6).toFixed(1)+'M</td></tr>'+
+      '<tr><td>Oil / Steel</td><td>'+(n.oil||0)+' / '+(n.steel||0)+'</td></tr>'+
+      '<tr><td>Fuel</td><td>'+Math.round(n.fuel||0)+'/'+(n.fuelMax||0)+(n.lowFuel?' ⚠':'')+'</td></tr>'+
+      (n.casualties>0?'<tr><td>Casualties</td><td>'+wwFmtNum(n.casualties)+'</td></tr>':'')+
       '<tr><td>Victory pts</td><td>'+n.vp+'</td></tr></table>'+
       (WW.started && n.key!==WW.player && wwAtWar(WW.player,n.key) && !n.capitulated ?
         '<div style="margin-top:9px">'+
@@ -7923,6 +7957,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwAIPlan, wwRelation,
     wwSupplyField, wwRailNetwork, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
+    wwEconomyTick, wwEffMp, WW_CITY_RES, WW_ECO,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
     wwSetBombing, wwAIBombing, wwBombingTick,

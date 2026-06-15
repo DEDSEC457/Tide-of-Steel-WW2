@@ -708,6 +708,35 @@ say('— The World at War —');
   const rd0 = Grail.byKey.GER.railDepth; E.wwEndTurn();
   check('WW the railhead extends each turn', Grail.byKey.GER.railDepth > rd0);
 
+  // --- Phase 25: war economy (resources, fuel, manpower, casualties) ---
+  const Geco = E.wwSetup('GER','normal');
+  check('WW nations have oil, steel, fuel & a manpower pool',
+    Geco.byKey.GER.steel>0 && Geco.byKey.GER.fuel>0 && Geco.byKey.GER.manpower>0 && Geco.byKey.ROM.oil>=6);
+  // a resource city transfers its output to whoever holds it (Romanian oil)
+  const oil0 = Geco.byKey.GER.oil, buc = Geco.cities.find(c=>c.name==='Bucharest');
+  Geco.own[buc.y*Geco.cols+buc.x]=Geco.byKey.GER.i; buc.nat='GER'; E.wwComputeStats();
+  check('WW capturing an oil city gains its production', Geco.byKey.GER.oil >= oil0+5);
+  // production is gated by steel & manpower
+  const Gpg = E.wwSetup('GER','normal'); Gpg.byKey.GER.steelStock=0; Gpg.byKey.GER.steel=0; Gpg.byKey.GER.prod=200;
+  const a0 = E.wwArmiesOf('GER').length; E.wwProduction();
+  check('WW production stalls without steel', E.wwArmiesOf('GER').length===a0);
+  // fuel: an armoured force with little oil runs dry
+  const Gf2 = E.wwSetup('ITA','normal');
+  for(let i=0;i<14;i++) Gf2.armies.push({id:9100+i,nat:'ITA',x:38,y:98,kind:'arm',str:5,maxStr:5,org:6,maxOrg:6,mp:4,moved:false});
+  for(let t=0;t<8;t++) E.wwEconomyTick();
+  check('WW an armoured force burns fuel toward empty', Gf2.byKey.ITA.fuel < Gf2.byKey.ITA.fuelMax*0.2);
+  // casualties mount over a war
+  const Gca = E.wwSetup('GER','normal'); Gca.player='NONE';
+  for(let t=0;t<20;t++){ for(const nn of Gca.nat){ if(!nn.capitulated&&nn.key!=='XXX') E.wwAINation(nn);} E.wwEconomyTick(); E.wwProduction();
+    for(const a of Gca.armies){ if(!a.moved && E.wwInSupply(a)){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.3); } } for(const a of Gca.armies) a.moved=false; }
+  check('WW casualties accumulate across a war', Gca.nat.reduce((s,nn)=>s+(nn.casualties||0),0) > 50000);
+  // save/load preserves the economy
+  E.wwClearSave(); const Gsv = E.wwSetup('GER','normal'); Gsv.byKey.GER.fuel=77; Gsv.byKey.GER.casualties=123456; Gsv.byKey.GER.manpower=88888; E.wwSave();
+  E.wwSetup('FRA','easy'); E.wwDeserialize(E.wwLoadSave());
+  check('WW save/load preserves the war economy',
+    E.WW.byKey.GER.fuel===77 && E.WW.byKey.GER.casualties===123456 && E.WW.byKey.GER.manpower===88888);
+  E.wwClearSave();
+
   // --- Phase 5: naval invasions ---
   const Gv = E.wwSetup('ENG','normal');
   let pair=null;
