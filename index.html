@@ -4623,7 +4623,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -4640,7 +4640,7 @@ function wwReachable(a){
     if(c>(best[x+','+y]??1e9)) continue;
     for(const [nx,ny] of wwNb(x,y)){
       if(!wwPassableFor(a.nat,nx,ny) || wwArmyAt(nx,ny)) continue;
-      const nc=c+wwTerrCost(nx,ny);
+      const nc=c+wwTerrCost(nx,ny)+wwHexWinter(nx,ny)*1.6*(1-wwGear(a.nat)*0.7);
       if(nc<=a.mp && nc<(best[nx+','+ny]??1e9)){ best[nx+','+ny]=nc; pq.push([nc,nx,ny]); out.push([nx,ny]); }
     }
   }
@@ -4655,7 +4655,8 @@ function wwForecast(a, tx, ty){
   const winPct = dp<=0 ? 100 : Math.max(3, Math.min(97, Math.round(100*ap/(ap+dp))));
   return { a, d, tx, ty, foeKey, ap, dp, winPct, amphibious,
     aSup:wwSupport(a,tx,ty), dSup:d?wwSupport(d,tx,ty):0, terr:wwTerrDef(tx,ty),
-    air:wwAirFactor(a.nat, foeKey||a.nat), airSup:wwAirSup(a.nat, foeKey||a.nat), aSupply:wwInSupply(a), dSupply:d?wwInSupply(d):true };
+    air:wwAirFactor(a.nat, foeKey||a.nat), airSup:wwAirSup(a.nat, foeKey||a.nat), aSupply:wwInSupply(a), dSupply:d?wwInSupply(d):true,
+    winter:wwHexWinter(tx,ty), atkGear:wwGear(a.nat) };
 }
 function wwForeignAdj(a, includeNeutral){
   const out=[];
@@ -4725,9 +4726,9 @@ function wwSupport(of, tx, ty){ let s=0;
   for(const [nx,ny] of wwNb(tx,ty)){ const u=wwArmyAt(nx,ny); if(u&&u!==of&&(u.nat===of.nat||wwAllied(u.nat,of.nat))) s++; }
   return Math.min(3,s); }
 function wwAtkPower(a,tx,ty){ let p=a.str*(1+0.30*wwSupport(a,tx,ty));
-  if(!wwInSupply(a)) p*=0.6; p*=wwLandBonus(a.nat); if(a.nat!==WW.player) p*=(WW.aiPow||1); return p; }
+  if(!wwInSupply(a)) p*=0.6; p*=wwLandBonus(a.nat); p*=(1 - wwHexWinter(tx,ty)*(1-wwGear(a.nat))*0.35); if(a.nat!==WW.player) p*=(WW.aiPow||1); return p; }
 function wwDefPower(d,tx,ty){ let p=d.str*(1+0.20*wwSupport(d,tx,ty))*wwTerrDef(tx,ty);
-  if(!wwInSupply(d)) p*=0.6; p*=wwLandBonus(d.nat); if(d.nat!==WW.player) p*=(WW.aiPow||1); return p; }
+  if(!wwInSupply(d)) p*=0.6; p*=wwLandBonus(d.nat); p*=(1 - wwHexWinter(tx,ty)*(1-wwGear(d.nat))*0.30); if(d.nat!==WW.player) p*=(WW.aiPow||1); return p; }
 
 function wwRetreat(d, fromX, fromY){
   let best=null, bd=-1;
@@ -4997,7 +4998,7 @@ function wwProduction(){
     if(n.capitulated||n.key==='XXX') continue;
     wwAddAir(n, (n.civ||0)*0.05);
     if(!n.mil) continue;
-    n.prod=(n.prod||0)+n.mil;
+    n.prod=(n.prod||0)+n.mil*(n.winterizing?0.7:1);
     if(n.prod>=120){ n.prod-=120;
       const cap=wwCapitalHex(n.key);
       let spot=null;
@@ -5012,6 +5013,17 @@ function wwProduction(){
 function wwDayOfYear(d){ const M=[0,31,59,90,120,151,181,212,243,273,304,334]; return M[d.m-1]+d.d; }
 function wwWinterAt(date){ const doy=wwDayOfYear(date); return (1+Math.cos(2*Math.PI*(doy-20)/365.25))/2; }   // 1 deep winter ~Jan 20, 0 mid summer
 function wwSeasonName(date){ const m=date.m; return (m>=12||m<=2)?'Winter':m<=5?'Spring':m<=8?'Summer':'Autumn'; }
+const WW_GEO={LON_W:-12,LON_E:58,LAT_N:71,LAT_S:32};
+const wwMercY=d=>Math.log(Math.tan(Math.PI/4 + d*Math.PI/360));
+function wwLatOf(y){ const YN=wwMercY(WW_GEO.LAT_N), YS=wwMercY(WW_GEO.LAT_S); const mY=YN+(y+0.5)/WW.rows*(YS-YN); return (2*Math.atan(Math.exp(mY))-Math.PI/2)*180/Math.PI; }
+// per-hex winter severity 0..1 — snow line creeps south as winter deepens; mountains colder
+function wwHexWinter(x,y){ const w=wwWinterAt(WW.date); if(w<=0.03) return 0; let line=82-36*w; if(WW.terr[y][x]==='h') line-=6;
+  return Math.max(0, Math.min(1, (wwLatOf(y)-line)/12)); }
+// national winter readiness: cold nations come prepared, the rest get caught out
+const WW_WINTER_BASE={ SOV:0.62, FIN:0.85, NOR:0.62, SWE:0.55, EST:0.5, LAT:0.5, LIT:0.45, POL:0.4, DEN:0.35, IRE:0.3,
+  ENG:0.3, FRA:0.25, GER:0.2, HUN:0.25, ROM:0.25, BUL:0.2, YUG:0.2, TUR:0.18, GRE:0.12, ITA:0.1, SPA:0.1, POR:0.1, HOL:0.25, BEL:0.25, SWI:0.5, SLO:0.35, ALB:0.15 };
+function wwGear(natKey){ const n=WW.byKey[natKey]; return n?(n.winterGear!=null?n.winterGear:(WW_WINTER_BASE[natKey]||0.2)):0; }
+function wwSetWinterizing(natKey, on){ const n=WW.byKey[natKey]; if(n) n.winterizing=!!on; }
 const WW_MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
 function wwAdvanceDate(days){
   const d=WW.date; d.d+=days;
@@ -5032,7 +5044,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
-      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0})) };
+      focusIdx:nn.focusIdx||0,focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -5048,7 +5060,8 @@ function wwDeserialize(s){
     nn.airBuild = ns.airBuild || wwDefaultBuild(nn);
     nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
-    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0; }
+    nn.focusIdx=ns.focusIdx; nn.focusProg=ns.focusProg; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
+    nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
   return WW;
@@ -5063,6 +5076,11 @@ function wwEndTurn(){
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAINation(n); }
   for(const n of WW.nat){ if(n.key===WW.player||n.capitulated||n.key==='XXX') continue; wwAIBombing(n); }
+  for(const n of WW.nat){ if(n.capitulated||n.key==='XXX') continue;
+    const base=WW_WINTER_BASE[n.key]||0.2;
+    if(n.key!==WW.player) n.winterizing = base<0.55 && wwWinterAt(WW.date)>0.35 && n.atWar && n.atWar.size>0;
+    if(n.winterGear==null) n.winterGear=base;
+    n.winterGear = n.winterizing ? Math.min(0.95, n.winterGear+0.06) : Math.max(base, n.winterGear-0.015); }
   wwBombingTick();
   wwComputeStats();
   wwProduction();
@@ -5071,7 +5089,9 @@ function wwEndTurn(){
   for(const a of WW.armies){ const sup=wwInSupply(a);
     if(!a.moved){ if(sup){ a.org=Math.min(a.maxOrg,a.org+a.maxOrg*0.30); a.str=Math.min(a.maxStr,a.str+0.6); }
                   else { a.org=Math.max(1,a.org-a.maxOrg*0.20); a.str=Math.max(1,a.str-0.4); } }
-    else if(!sup){ a.org=Math.max(1,a.org-a.maxOrg*0.12); } }
+    else if(!sup){ a.org=Math.max(1,a.org-a.maxOrg*0.12); }
+    const wsev=wwHexWinter(a.x,a.y)*(1-wwGear(a.nat));
+    if(wsev>0.02){ a.org=Math.max(1,a.org-a.maxOrg*wsev*0.25); a.str=Math.max(1,a.str-wsev*0.5); } }
   wwAdvanceDate(7);
   for(const a of WW.armies) a.moved=false;
   WW.turn++;
@@ -6767,7 +6787,7 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden');
   $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
@@ -6800,7 +6820,7 @@ function wwEnterGameUI(){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden');
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden');
   const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
   $('ww-playername').textContent=n.name;
@@ -6828,8 +6848,6 @@ function wwZoomAt(mx,my,f){ const cam=WW.cam, nz=Math.max(0.18,Math.min(4.5,cam.
 const WW_DETAIL_LO = 0.95, WW_DETAIL_HI = 1.5;   // crisp detail cross-fades in across this zoom band
 function wwSmooth(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
 // lon/lat -> world pixel (matches the generator's Mercator grid), for drawing rivers
-const WW_GEO={LON_W:-12,LON_E:58,LAT_N:71,LAT_S:32};
-const wwMercY=d=>Math.log(Math.tan(Math.PI/4 + d*Math.PI/360));
 function wwLonLatToWorld(lon,lat){ const g=WW_GEO, YN=wwMercY(g.LAT_N), YS=wwMercY(g.LAT_S);
   const gx=(lon-g.LON_W)/(g.LON_E-g.LON_W)*WW.cols, gy=(wwMercY(lat)-YN)/(YS-YN)*WW.rows;
   return [WW_PAD + WW_HX*(gx+0.25) + WW_HX/2, WW_PAD + WW_VY*gy + WW_S]; }
@@ -6861,12 +6879,9 @@ function wwDrawRivers(g){ g.lineCap='round'; g.lineJoin='round';
       g.strokeStyle='rgba(62,122,176,0.96)'; g.lineWidth=wd;     g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke();
       if(wd>1.05){ g.strokeStyle='rgba(158,203,234,0.5)'; g.lineWidth=wd*0.32; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke(); } } }
   g.lineCap='butt'; }
-// ---- seasonal snow ----
-function wwRowLat(y){ const g=WW_GEO, YN=wwMercY(g.LAT_N), YS=wwMercY(g.LAT_S); const mY=YN+(y+0.5)/WW.rows*(YS-YN); return (2*Math.atan(Math.exp(mY))-Math.PI/2)*180/Math.PI; }
-function wwSnowAt(x,y,w){ if(w<=0.03) return 0; let line=82-36*w; if(WW.terr[y][x]==='h') line-=6;
-  return Math.max(0, Math.min(1, (wwRowLat(y)-line)/12)); }
+// ---- seasonal snow (severity from the engine's wwHexWinter) ----
 function wwSnowPass(g,c0,c1,r0,r1,w){ if(w<=0.03) return;
-  for(let y=r0;y<=r1;y++) for(let x=c0;x<=c1;x++){ const s=wwSnowAt(x,y,w); if(s<0.03) continue; const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3);
+  for(let y=r0;y<=r1;y++) for(let x=c0;x<=c1;x++){ const s=wwHexWinter(x,y); if(s<0.03) continue; const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3);
     g.fillStyle=wwSea(x,y)?'rgba(208,226,240,'+(s*0.26).toFixed(3)+')':'rgba(238,244,250,'+(s*0.6).toFixed(3)+')'; g.fill(); } }
 // per-hex terrain decorations drawn only when zoomed in (forest tufts, hill ridges, field stipple)
 function wwHexDecor(g, cx, cy, t, hv){
@@ -7092,7 +7107,9 @@ function wwUpdateHUD(){
         '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
         '<br>Air: '+Math.round(wwAirTotal(me))+' <span style="color:#8ba2b8">('+Math.round(me.air.fighter)+'F '+Math.round(me.air.cas)+'C '+Math.round(me.air.strat)+'S)</span>'+(me.bombTarget?'<br><span style="color:#c98ac9">Bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+'</span>':'')+
         '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching||'—')+' L'+((me.tech&&me.tech[me.researching])||0)+
+        '<br>❄ Winter readiness: '+Math.round((me.winterGear||0)*100)+'%'+(me.winterizing?' <span style="color:#9fd0e8">(preparing)</span>':'')+
         '<br>Enemies left: '+enemies;
+      const _wb=$('ww-winter-toggle'); if(_wb){ _wb.textContent='❄ Winter prep: '+(me.winterizing?'ON':'OFF'); _wb.classList.toggle('on', !!me.winterizing); }
     } else ps.classList.add('hidden'); }
 }
 function wwFocusStatus(me){
@@ -7187,6 +7204,7 @@ function wwRenderCombat(fc){
   if(fc.dSup>0) fx.push('enemy line +'+(fc.dSup*20)+'% def');
   if(fc.air>1.02) fx.push('air support +'+Math.round((fc.air-1)*100)+'%');
   else if(fc.air<0.98) fx.push('enemy air −'+Math.round((1-fc.air)*100)+'%');
+  if(fc.winter>0.05){ const wp=Math.round(fc.winter*(1-(fc.atkGear||0))*35); if(wp>1) fx.push('winter −'+wp+'%'); }
   if(!fc.aSupply) fx.push('you cut off −40%');
   if(fc.d && !fc.dSupply) fx.push('enemy cut off −40%');
   el.innerHTML='<div class="wc-head">'+aKind+' &nbsp;▸&nbsp; '+dName+'</div>'+
@@ -7285,6 +7303,8 @@ function wwBindInput(){
   const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
+  const wt=$('ww-winter-toggle'); if(wt) wt.onclick=()=>{ if(!WW.started) return; const me=WW.byKey[WW.player]; me.winterizing=!me.winterizing;
+    wwToast(me.winterizing?'Winter preparations begun — diverting 30% of production':'Winter preparations halted'); wwUpdateHUD(); };
 }
 // expose a few entry points on window for debugging / headless rendering (no-op in tests)
 if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; }
@@ -7605,7 +7625,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
     wwSetBombing, wwAIBombing, wwBombingTick,
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
-    wwDayOfYear, wwWinterAt, wwSeasonName,
+    wwDayOfYear, wwWinterAt, wwSeasonName, wwLatOf, wwHexWinter, wwGear, wwSetWinterizing, WW_WINTER_BASE,
     WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
     wwFocusInit, wwFocusList, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
     getState: () => G,
@@ -7698,6 +7718,7 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-hbtn{background:#142338;border:1px solid #2c486a;color:#cfe2f7;font:700 11px 'Segoe UI',sans-serif;
       letter-spacing:1px;padding:6px 11px;border-radius:6px;cursor:pointer;}
     .ww-hbtn:hover{background:#1d3553;border-color:#4f8fce;} .ww-hbtn.hidden{display:none;}
+    .ww-hbtn.on{background:#2a4a6e;border-color:#6ab0e8;color:#dcefff;}
     .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
       border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
     .ww-panel.hidden{display:none;}
@@ -7736,6 +7757,7 @@ if (typeof module !== 'undefined' && module.exports){
     <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
     <button id="ww-btn-air" class="ww-hbtn hidden">✈ AIR</button>
     <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
+    <button id="ww-winter-toggle" class="ww-hbtn hidden">❄ WINTER PREP</button>
     <div style="flex:1"></div>
     <div id="ww-hint">drag to pan · scroll to zoom</div>
   </div>

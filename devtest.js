@@ -827,6 +827,52 @@ say('— The World at War —');
     E.wwSeasonName({y:1940,m:1,d:1})==='Winter' && E.wwSeasonName({y:1940,m:4,d:1})==='Spring' &&
     E.wwSeasonName({y:1940,m:7,d:1})==='Summer' && E.wwSeasonName({y:1940,m:10,d:1})==='Autumn');
 
+  // --- Phase 16: General Winter ---
+  const Gwin = E.wwSetup('GER','normal'); Gwin.date={y:1941,m:1,d:15};
+  check('WW per-hex winter: deep north, clear south, none in summer',
+    E.wwHexWinter(55,12)>0.8 && E.wwHexWinter(46,100)<0.05 &&
+    (()=>{ Gwin.date={y:1941,m:7,d:15}; const s=E.wwHexWinter(55,12); Gwin.date={y:1941,m:1,d:15}; return s<0.05; })());
+  check('WW cold nations come winter-ready, warm ones do not',
+    E.wwGear('FIN')>0.7 && E.wwGear('SOV')>0.5 && E.wwGear('GER')<0.3 && E.wwGear('ITA')<0.2);
+  let wsx=-1,wsy=-1; const sovI16=Gwin.byKey.SOV.i;
+  for(let y=8;y<40 && wsx<0;y++) for(let x=0;x<Gwin.cols;x++){ if(Gwin.own[y*Gwin.cols+x]===sovI16 && E.wwHexWinter(x,y)>0.6){ wsx=x; wsy=y; break; } }
+  const atkW={nat:'GER',x:wsx,y:wsy-1,kind:'arm',str:10,maxStr:10,org:10,maxOrg:10,mp:4,moved:false};
+  const defW={nat:'SOV',x:wsx,y:wsy,kind:'inf',str:10,maxStr:10,org:10,maxOrg:10,mp:2,moved:false};
+  Gwin.armies.push(atkW,defW); E.wwRecomputeSupply();
+  check('WW winter saps the unprepared attacker more than the prepared defender',
+    E.wwAtkPower(atkW,wsx,wsy) < E.wwDefPower(defW,wsx,wsy));
+  Gwin.byKey.GER.winterGear=0.9; const strongP=E.wwAtkPower(atkW,wsx,wsy);
+  Gwin.byKey.GER.winterGear=0.1; const weakP=E.wwAtkPower(atkW,wsx,wsy);
+  check('WW winter gear restores combat power in the snow', strongP > weakP);
+  // winter attrition on an unequipped army in deep snow
+  const Gat=E.wwSetup('GER','normal'); Gat.date={y:1941,m:1,d:15}; Gat.byKey.GER.winterGear=0.1;
+  let wax=-1,way=-1; for(let y=8;y<40 && wax<0;y++) for(let x=0;x<Gat.cols;x++){ if(Gat.terr[y][x]!=='~' && E.wwHexWinter(x,y)>0.6){ wax=x; way=y; break; } }
+  const coldArmy={nat:'GER',x:wax,y:way,kind:'inf',str:10,maxStr:10,org:12,maxOrg:12,mp:2,moved:false};
+  Gat.armies.push(coldArmy); const coldOrg0=coldArmy.org; E.wwEndTurn();
+  check('WW troops caught in deep snow suffer winter attrition', coldArmy.org < coldOrg0-1);
+  // movement: deep snow shrinks an unprepared army's reach somewhere on the northern front
+  const Gmv=E.wwSetup('SOV','normal'); Gmv.byKey.SOV.winterGear=0.05; const sovMv=Gmv.byKey.SOV.i;
+  let snowSlows=false;
+  for(let y=12;y<46 && !snowSlows;y++) for(let x=2;x<Gmv.cols-2;x++){
+    if(Gmv.own[y*Gmv.cols+x]!==sovMv) continue; Gmv.date={y:1941,m:1,d:15}; if(E.wwHexWinter(x,y)<0.7) continue;
+    let land=0; for(const [nx,ny] of E.wwNb(x,y)) if(Gmv.own[ny*Gmv.cols+nx]===sovMv) land++; if(land<4) continue;
+    const mv={nat:'SOV',x,y,kind:'inf',str:10,maxStr:10,org:10,maxOrg:10,mp:4,moved:false};
+    Gmv.date={y:1941,m:7,d:15}; const rS=E.wwReachable(mv).length;
+    Gmv.date={y:1941,m:1,d:15}; const rW=E.wwReachable(mv).length;
+    if(rW<rS) snowSlows=true;
+  }
+  check('WW deep snow slows movement (routes close in winter)', snowSlows);
+  // winter preparations raise readiness (and cost production)
+  const Gp16=E.wwSetup('GER','normal'); Gp16.date={y:1941,m:1,d:15}; E.wwSetWinterizing('GER',true);
+  const wgear0=Gp16.byKey.GER.winterGear; E.wwEndTurn();
+  check('WW winter preparations raise readiness', Gp16.byKey.GER.winterGear > wgear0);
+  // save/load preserves winter state
+  E.wwClearSave(); const Gs16=E.wwSetup('GER','normal'); E.wwSetWinterizing('GER',true); Gs16.byKey.GER.winterGear=0.5; E.wwSave();
+  E.wwSetup('FRA','easy'); E.wwDeserialize(E.wwLoadSave());
+  check('WW save/load preserves winter readiness',
+    Math.abs(E.WW.byKey.GER.winterGear-0.5)<0.001 && E.WW.byKey.GER.winterizing===true);
+  E.wwClearSave();
+
   // --- Phase 11/12: strategic bombing (needs air superiority to bite) ---
   const Gb = E.wwSetup('GER','normal');
   E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
@@ -1072,6 +1118,7 @@ function uiSmoke(side){
       if ($('ww-btn-air').onclick) $('ww-btn-air').onclick();
       if ($('ww-btn-diplo').onclick) $('ww-btn-diplo').onclick();
       if (UI.wwAirDoctrine) UI.wwAirDoctrine('GER','superiority');
+      if ($('ww-winter-toggle').onclick) $('ww-winter-toggle').onclick();
       if (UI.wwStartFocus) UI.wwStartFocus('GER');
       if (UI.wwSetBombing){ const foe = UI.WW.nat.find(nn=>UI.wwAtWar('GER',nn.key)); if(foe) UI.wwSetBombing('GER', foe.key); }
       const t0 = UI.WW.turn;
