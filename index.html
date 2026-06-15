@@ -4787,8 +4787,8 @@ function wwAIStep(a){
   const cur=(a.x-tgt[0])*(a.x-tgt[0])+(a.y-tgt[1])*(a.y-tgt[1]);
   return (best && bd<cur) ? best : null;
 }
-function wwAIStep2(a){
-  const obj=wwAIObjective(a.nat,a.x,a.y); if(!obj) return null;
+function wwAIStep2(a, obj){
+  if(!obj) obj=wwAIObjective(a.nat,a.x,a.y); if(!obj) return null;
   const reach=wwReachable(a); if(!reach.length) return null;
   const curD=Math.hypot(a.x-obj[0],a.y-obj[1]);
   let best=null, bestScore=-1e9;
@@ -5034,30 +5034,54 @@ function wwInvade(a,tx,ty){
   }
   wwCaptureHex(tx,ty,a.nat); if(!wwArmyAt(tx,ty)){ a.x=tx; a.y=ty; } return {result:'landed'};
 }
+// grand strategy: pick a main enemy (the weakest, nearest), a schwerpunkt to drive on,
+// and a posture (defend if the capital is threatened and we are outnumbered)
+function wwAIPlan(n){
+  const cap=wwCapitalHex(n.key);
+  const enemies=WW.nat.filter(m=>!m.capitulated && wwAtWar(n.key,m.key));
+  if(!enemies.length){ n.aiPosture='consolidate'; n.aiObjective=null; n.aiMainEnemy=null; return; }
+  const str=k=>wwArmiesOf(k).reduce((s,a)=>s+a.str,0);
+  // local balance around the capital sets posture (do not turtle just because the coalition is large)
+  let nearMine=0, nearEnemy=0;
+  if(cap){ for(const a of WW.armies){ if(Math.hypot(a.x-cap[0],a.y-cap[1])>9) continue;
+    if(a.nat===n.key||wwAllied(a.nat,n.key)) nearMine+=a.str; else if(wwAtWar(n.key,a.nat)) nearEnemy+=a.str; } }
+  let main=null, bestScore=-1e18;
+  for(const m of enemies){ const mc=wwCapitalHex(m.key); if(!mc) continue;
+    const dist=cap?Math.hypot(mc[0]-cap[0],mc[1]-cap[1]):0;
+    const score=-str(m.key)*0.6 - dist*0.5 + (m.hexes<70?15:0);
+    if(score>bestScore){ bestScore=score; main=m; } }
+  n.aiMainEnemy=main?main.key:enemies[0].key;
+  n.aiObjective=(main&&wwCapitalHex(main.key)) || wwNearestEnemyHex(n.key, cap?cap[0]:55, cap?cap[1]:60, 50);
+  n.aiPosture=(nearEnemy>5 && nearEnemy>nearMine*1.2) ? 'defensive' : 'offensive';
+}
 function wwAINation(n){
+  wwAIPlan(n);
   const cap=wwCapitalHex(n.key), mine=wwArmiesOf(n.key);
-  // 1) press attacks where the odds are good (concentration emerges from combined-arms power)
+  const defensive=n.aiPosture==='defensive', oddsNeed=defensive?1.15:0.85;
+  // 1) press attacks (posture-aware odds; bias toward the schwerpunkt)
   for(const a of mine){ if(a.moved) continue; const tg=wwAttackTargets(a); if(!tg.length) continue;
     let bestT=null, bestScore=-1e9;
     for(const [x,y] of tg){ const d=wwArmyAt(x,y);
       const ap=wwAtkPower(a,x,y), dp=d?wwDefPower(d,x,y):0.1; let score=ap/(dp+0.1);
       if(!d) score+=1.6; else if(d.org<d.maxOrg*0.45) score+=0.7;
+      if(n.aiObjective) score -= Math.hypot(x-n.aiObjective[0],y-n.aiObjective[1])*0.02;
       if(score>bestScore){ bestScore=score; bestT=[x,y]; } }
     if(bestT){ const d=wwArmyAt(bestT[0],bestT[1]);
       const ap=wwAtkPower(a,bestT[0],bestT[1]), dp=d?wwDefPower(d,bestT[0],bestT[1]):0;
-      if(!d || ap>=dp*0.85 || (d && d.org<d.maxOrg*0.5)) wwAttack(a,bestT[0],bestT[1]); } }
-  // 2) maneuver the rest toward the objective while keeping cohesion
+      if(!d || ap>=dp*oddsNeed || (d && d.org<d.maxOrg*0.45)) wwAttack(a,bestT[0],bestT[1]); } }
+  // 2) concentrate reserves on the objective (or fall back to the capital when defending)
+  const objective = defensive ? (cap||n.aiObjective) : (n.aiObjective||cap);
   for(const a of mine){ if(a.moved) continue;
     if(cap && a.x===cap[0] && a.y===cap[1]){
       const threat=wwNb(a.x,a.y).some(([x,y])=>{ const o=WW.own[y*WW.cols+x]; return o>=0 && wwAtWar(n.key,WW.nat[o].key); });
-      if(!threat) continue; }
-    const dest=wwAIStep2(a); if(dest) wwMoveArmy(a,dest[0],dest[1]); }
-  // 3) opportunistic amphibious assault (island & coastal powers reach the enemy)
+      if(!threat) continue; }   // hold the capital garrison
+    const dest=wwAIStep2(a, objective); if(dest) wwMoveArmy(a,dest[0],dest[1]); }
+  // 3) amphibious assault toward the main objective
   let inv=0;
   for(const a of mine){ if(a.moved||inv>=1) continue; if(!wwCoastal(a.x,a.y)||a.org<a.maxOrg*0.55) continue;
     const beaches=wwInvadeTargets(a).filter(([x,y])=>{ const o=WW.own[y*WW.cols+x]; return o>=0 && wwAtWar(n.key,WW.nat[o].key); });
     if(!beaches.length) continue;
-    const obj=wwAIObjective(n.key,a.x,a.y);
+    const obj=n.aiObjective;
     beaches.sort((p,q)=>{ const dp=wwArmyAt(p[0],p[1]), dq=wwArmyAt(q[0],q[1]); const sp=dp?dp.str:0, sq=dq?dq.str:0;
       if(sp!==sq) return sp-sq; if(!obj) return 0; return Math.hypot(p[0]-obj[0],p[1]-obj[1])-Math.hypot(q[0]-obj[0],q[1]-obj[1]); });
     const [tx,ty]=beaches[0], d=wwArmyAt(tx,ty);
@@ -7806,7 +7830,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwSetup, wwAtWar, wwAllied, wwArmyAt, wwArmiesOf, wwReachable, wwAttackTargets, wwMoveArmy,
     wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwProduction, wwAINation,
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
-    wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwRelation,
+    wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwAIPlan, wwRelation,
     wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,

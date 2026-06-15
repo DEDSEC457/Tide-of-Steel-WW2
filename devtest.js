@@ -879,6 +879,27 @@ say('— The World at War —');
     Math.abs(E.WW.byKey.GER.winterGear-0.5)<0.001 && E.WW.byKey.GER.winterizing===true);
   E.wwClearSave();
 
+  // --- Phase 21: grand-strategy AI ---
+  const Gai = E.wwSetup('ENG','normal');
+  E.wwAIPlan(Gai.byKey.GER);
+  check('WW AI picks a main enemy & a schwerpunkt objective',
+    !!Gai.byKey.GER.aiMainEnemy && Array.isArray(Gai.byKey.GER.aiObjective));
+  check('WW AI is offensive when its capital is safe', Gai.byKey.GER.aiPosture==='offensive');
+  // it turns defensive when the enemy masses on its capital
+  const Gd2 = E.wwSetup('POL','normal'); const pcap = E.wwCapitalHex('POL');
+  for(let i=0;i<6;i++) Gd2.armies.push({id:5000+i,nat:'GER',x:pcap[0]+(i%3-1),y:pcap[1]-2,kind:'arm',str:30,maxStr:30,org:30,maxOrg:30,mp:4,moved:false});
+  E.wwAIPlan(Gd2.byKey.POL);
+  check('WW AI defends when the enemy masses on its capital', Gd2.byKey.POL.aiPosture==='defensive');
+  // a full all-AI campaign is decisive and stable
+  const Gc2 = E.wwSetup('ENG','normal'); Gc2.player='NONE';
+  for(let t=0;t<35;t++){ for(const nn of Gc2.nat){ if(!nn.capitulated&&nn.key!=='XXX') E.wwAINation(nn);} E.wwProduction();
+    for(const nn of Gc2.nat){ if(!nn.capitulated&&nn.key!=='XXX'){ E.wwResearchTick(nn); E.wwFocusTick(nn);} } E.wwRecomputeSupply(); for(const a of Gc2.armies) a.moved=false; }
+  E.wwComputeStats();
+  check('WW the grand-strategy AI wages a decisive war', Gc2.nat.filter(nn=>nn.capitulated).length>=2,
+    Gc2.nat.filter(nn=>nn.capitulated).map(nn=>nn.key).join(','));
+  let aiInv=0; for(let i=0;i<Gc2.own.length;i++) if(Gc2.own[i]>=0) aiInv++;
+  check('WW AI campaign keeps the ownership invariant', aiInv===owned);
+
   // --- Phase 11/12: strategic bombing (needs air superiority to bite) ---
   const Gb = E.wwSetup('GER','normal');
   E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
