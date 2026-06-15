@@ -4578,7 +4578,8 @@ function wwArmyAt(x,y){ for(const a of WW.armies) if(a.x===x&&a.y===y) return a;
 function wwArmiesOf(natKey){ return WW.armies.filter(a=>a.nat===natKey); }
 function wwRemoveArmy(a){ const i=WW.armies.indexOf(a); if(i>=0) WW.armies.splice(i,1); }
 function wwMakeArmy(id,nat,x,y,kind){ const arm=kind==='arm';
-  return {id,nat,x,y,kind, str:arm?8:10, maxStr:arm?8:10, org:arm?8:12, maxOrg:arm?8:12, mp:arm?4:2, moved:false}; }
+  // smaller formations: more divisions on the map so nations can man multiple fronts at once
+  return {id,nat,x,y,kind, str:arm?5:6, maxStr:arm?5:6, org:arm?6:8, maxOrg:arm?6:8, mp:arm?4:2, moved:false}; }
 
 function wwTerrCost(x,y){ const t=WW.terr[y][x]; return (t==='h'||t==='f')?2:1; }
 function wwTerrDef(x,y){ const t=WW.terr[y][x]; return t==='h'?1.5 : t==='f'?1.3 : 1.0; }
@@ -4606,7 +4607,7 @@ function wwPlaceArmies(){
   for(const n of WW.nat){
     if(n.key==='XXX'||!n.hexes) continue;
     const front=wwFrontier(n.i);
-    const count=Math.max(2, Math.min(14, Math.round((n.mil||1)/2)+2));
+    const count=Math.max(4, Math.min(26, Math.round((n.mil||1)*0.85)+4));
     const picks=wwSpread(front, count);
     for(const [x,y] of picks){ const k=x+','+y; if(occupied.has(k)) continue; occupied.add(k);
       WW.armies.push(wwMakeArmy(id++, n.key, x, y, 'inf')); }
