@@ -1057,6 +1057,7 @@ function uiSmoke(side){
     let ok = !!(UI.WW && UI.WW.on === true);
     if (sb.wwStart){
       sb.wwStart('GER'); drain();
+      if (UI.WW){ UI.WW.cam.z = 2.6; if (sb.wwRender) sb.wwRender(); drain(); UI.WW.cam.z = 0.7; }   // exercise the zoomed-in detail renderer
       ok = ok && UI.WW.started === true && UI.wwArmiesOf('GER').length > 0;
       // open the focus & research panels and begin a national focus
       if ($('ww-btn-focus').onclick) $('ww-btn-focus').onclick();

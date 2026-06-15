@@ -6822,6 +6822,55 @@ function wwFit(){ const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
 function wwZoomAt(mx,my,f){ const cam=WW.cam, nz=Math.max(0.18,Math.min(4.5,cam.z*f)), k=nz/cam.z;
   cam.x=mx-(mx-cam.x)*k; cam.y=my-(my-cam.y)*k; cam.z=nz; wwRequest(); }
 
+const WW_DETAIL_Z = 1.2;   // zoom past this and the map renders crisp, decorated per-hex detail
+// per-hex terrain decorations drawn only when zoomed in (forest tufts, hill ridges, field stipple)
+function wwHexDecor(g, cx, cy, t, hv){
+  g.save(); g.translate(cx,cy);
+  if(t==='f'){
+    g.fillStyle='rgba(22,46,26,0.72)';
+    const pts=[[-3.6,1.6],[1,-2.6],[3.4,2],[-1.2,3.2],[2.6,-0.4],[0.2,0.7]], k=hv%pts.length;
+    for(let i=0;i<4;i++){ const p=pts[(i+k)%pts.length]; g.beginPath(); g.moveTo(p[0],p[1]+2.3); g.lineTo(p[0]+1.9,p[1]-2.5); g.lineTo(p[0]+3.8,p[1]+2.3); g.closePath(); g.fill(); }
+    g.fillStyle='rgba(130,170,120,0.16)'; g.beginPath(); g.moveTo(0.4,-0.5); g.lineTo(1.1,-1.7); g.lineTo(1.8,-0.5); g.closePath(); g.fill();
+  } else if(t==='h'){
+    g.strokeStyle='rgba(0,0,0,0.38)'; g.lineWidth=0.95; g.beginPath();
+    g.moveTo(-4.2,1.9); g.quadraticCurveTo(-1.6,-1.9,1,1.6); g.moveTo(0.4,3.1); g.quadraticCurveTo(2.6,-0.4,4.6,2.6); g.stroke();
+    g.strokeStyle='rgba(255,255,255,0.13)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(-3.6,0.8); g.quadraticCurveTo(-1.3,-2.5,1.2,0.8); g.stroke();
+  } else {
+    g.fillStyle='rgba(255,255,255,0.05)'; const px=((hv>>3)%5)-2, py=((hv>>6)%5)-2;
+    g.fillRect(px,py,1.1,1.1); g.fillRect(px+3,py-1,1.0,1.0); g.fillRect(px-2,py+2,0.9,0.9);
+  }
+  g.restore();
+}
+function wwVisibleHexes(){
+  const cv=$('wwCanvas'), cam=WW.cam;
+  const vw=cv.clientWidth||window.innerWidth, vh=cv.clientHeight||window.innerHeight;
+  const wy0=(0-cam.y)/cam.z, wy1=(vh-cam.y)/cam.z, wx0=(0-cam.x)/cam.z, wx1=(vw-cam.x)/cam.z;
+  return { c0:Math.max(0,Math.floor((wx0-WW_PAD-WW_HX)/WW_HX)-1), c1:Math.min(WW.cols-1,Math.ceil((wx1-WW_PAD)/WW_HX)+1),
+           r0:Math.max(0,Math.floor((wy0-WW_PAD-WW_S)/WW_VY)-1), r1:Math.min(WW.rows-1,Math.ceil((wy1-WW_PAD-WW_S)/WW_VY)+1) };
+}
+function wwDrawHexesDetailed(g){
+  const W=WW, R=wwVisibleHexes();
+  for(let y=R.r0;y<=R.r1;y++) for(let x=R.c0;x<=R.c1;x++){ const t=W.terr[y][x], [cx,cy]=wwHexCenter(x,y);
+    wwHexPath(g,cx,cy,WW_S-0.3);
+    if(t==='~'){ g.fillStyle='#16293b'; g.fill(); const hv=(x*2654435761^y*40503)>>>0; if(hv&3){ g.fillStyle='rgba(0,0,0,0.05)'; g.fill(); } continue; }
+    const nn=wwOwnerAt(x,y); g.fillStyle=nn?nn.col:'#5b5b5b'; g.fill();
+    if(t==='h'){ g.fillStyle='rgba(0,0,0,0.20)'; g.fill(); } else if(t==='f'){ g.fillStyle='rgba(0,0,0,0.11)'; g.fill(); }
+    const hv=(x*2654435761^y*40503)>>>0; g.fillStyle=(hv&1)?'rgba(255,255,255,0.03)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')'; g.fill();
+    wwHexDecor(g,cx,cy,t,hv); }
+  g.lineWidth=0.4; g.strokeStyle='rgba(0,0,0,0.22)';
+  for(let y=R.r0;y<=R.r1;y++) for(let x=R.c0;x<=R.c1;x++){ if(wwSea(x,y)) continue; const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3); g.stroke(); }
+  g.lineWidth=1.3; g.strokeStyle='rgba(0,0,0,0.62)'; g.lineJoin='round';
+  for(let y=R.r0;y<=R.r1;y++) for(let x=R.c0;x<=R.c1;x++){ if(wwSea(x,y)) continue; const o=W.own[y*W.cols+x];
+    let edge=false; for(const [nx,ny] of wwNb(x,y)){ if(wwSea(nx,ny)||W.own[ny*W.cols+nx]!==o){ edge=true; break; } }
+    if(edge){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(g,cx,cy,WW_S-0.3); g.stroke(); } }
+  g.textAlign='center';
+  for(const c of W.cities){ if(c.x<R.c0||c.x>R.c1||c.y<R.r0||c.y>R.r1) continue; const [cx,cy]=wwHexCenter(c.x,c.y);
+    g.beginPath(); g.arc(cx,cy,c.cap?4.6:2.9,0,Math.PI*2); g.fillStyle=c.cap?'#ffd34d':'#e8edf2'; g.fill();
+    g.lineWidth=1; g.strokeStyle='#000c'; g.stroke();
+    g.font=(c.cap?'700 ':'600 ')+(c.cap?11:8)+'px "Segoe UI",sans-serif';
+    g.fillStyle='rgba(0,0,0,0.8)'; g.fillText(c.name,cx+0.4,cy-6.2);
+    g.fillStyle=c.cap?'#ffe9a8':'#dfe7ef'; g.fillText(c.name,cx,cy-6.6); }
+}
 function wwBuildMapCache(){
   const W=WW, [wW,wH]=wwWorldSize();
   const mc=document.createElement('canvas'); mc.width=Math.ceil(wW); mc.height=Math.ceil(wH);
@@ -6856,7 +6905,7 @@ function wwRender(){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#0a0f16'; ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
   ctx.translate(cam.x,cam.y); ctx.scale(cam.z,cam.z);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-  ctx.drawImage(WW.mapCanvas,0,0);
+  if(cam.z>=WW_DETAIL_Z) wwDrawHexesDetailed(ctx); else ctx.drawImage(WW.mapCanvas,0,0);
   // selected nation glow
   if(wwSelHexes && !wwSelArmy){ ctx.fillStyle='rgba(255,255,255,0.13)';
     for(const [x,y] of wwSelHexes){ const [cx,cy]=wwHexCenter(x,y); wwHexPath(ctx,cx,cy,WW_S-0.3); ctx.fill(); }
