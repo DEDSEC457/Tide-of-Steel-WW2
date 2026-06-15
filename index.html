@@ -4515,6 +4515,7 @@ function wwBuildState(){
   W.own=new Int16Array(W.cols*W.rows).fill(-1);
   for(let y=0;y<W.rows;y++){ const row=D.owner[y];
     for(let x=0;x<W.cols;x++){ const ch=row[x]; if(ch!=='.'){ const n=W.byChar[ch]; if(n) W.own[y*W.cols+x]=n.i; } } }
+  W.homeOwn=W.own.slice();   // original 1939 ownership — each nation's home rail territory
   W.cities=D.cities.map(c=>Object.assign({}, c));
   W.date={y:1939,m:9,d:1};
   W.turn=0;
@@ -4624,7 +4625,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; n.railDepth=WW_RAIL_START; wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -4709,15 +4710,33 @@ function wwCapitulate(fallenKey, byKey){
 }
 
 // supply: BFS from a nation's owned cities across friendly-owned land, limited range.
+// the rail network: home territory is always railed; rail is RE-LAID into conquered
+// land at a limited reach (railDepth), which creeps forward a few hexes each turn.
+// A blitz that outruns its railhead culminates — exactly like Realistic Mode.
+const WW_RAIL_START=6, WW_RAIL_RATE=3, WW_RAIL_MAX=48, WW_OFFRAIL=4;
+function wwRailNetwork(natKey){
+  const n=WW.byKey[natKey]; if(!n||!WW.homeOwn) return new Set();
+  const cols=WW.cols, depth=(n.railDepth!=null?n.railDepth:WW_RAIL_START);
+  const railed=new Set(); const q=[]; let qi=0;
+  for(let i=0;i<WW.own.length;i++){ if(WW.own[i]===n.i && WW.homeOwn[i]===n.i){ railed.add(i); q.push([i%cols,(i/cols)|0]); } } // home sources
+  // distance map (hops into conquered land); home hexes are dist 0
+  const dist={}; for(const i of railed) dist[i]=0;
+  while(qi<q.length){ const [x,y]=q[qi++]; const d=dist[y*cols+x];
+    for(const [nx,ny] of wwNb(x,y)){ const j=ny*cols+nx; if(railed.has(j)) continue;
+      const o=WW.own[j]; if(o<0) continue; const owner=WW.nat[o]; if(owner.key!==natKey && !wwAllied(owner.key,natKey)) continue;
+      const nd = (WW.homeOwn[j]===n.i)?0:d+1; if(nd>depth) continue; railed.add(j); dist[j]=nd; q.push([nx,ny]); } }
+  return railed;
+}
 function wwSupplyField(natKey){
-  const me=WW.byKey[natKey], cols=WW.cols, RANGE=12 + ((me&&me.bonusSupply)||0);
+  const n=WW.byKey[natKey], cols=WW.cols; if(!n) return new Uint8Array(cols*WW.rows);
+  const railed=wwRailNetwork(natKey);
+  const off=WW_OFFRAIL + ((n.bonusSupply)||0);          // logistics tech extends the off-rail reach
   const sup=new Uint8Array(cols*WW.rows), q=[]; let qi=0;
-  for(const c of WW.cities){ const idx=c.y*cols+c.x; if(WW.own[idx]===me.i && !sup[idx]){ sup[idx]=1; q.push([c.x,c.y,0]); } }
-  while(qi<q.length){ const [x,y,d]=q[qi++]; if(d>=RANGE) continue;
-    for(const [nx,ny] of wwNb(x,y)){ const idx=ny*cols+nx; if(sup[idx]) continue;
-      const o=WW.own[idx]; if(o<0) continue;
-      const owner=WW.nat[o]; if(owner.key!==natKey && !wwAllied(owner.key,natKey)) continue;
-      sup[idx]=1; q.push([nx,ny,d+1]); } }
+  for(const i of railed){ sup[i]=1; q.push([i%cols,(i/cols)|0,0]); }   // the railed corridor is supplied
+  while(qi<q.length){ const [x,y,d]=q[qi++]; if(d>=off) continue;
+    for(const [nx,ny] of wwNb(x,y)){ const j=ny*cols+nx; if(sup[j]) continue;
+      const o=WW.own[j]; if(o<0) continue; const owner=WW.nat[o]; if(owner.key!==natKey && !wwAllied(owner.key,natKey)) continue;
+      sup[j]=1; q.push([nx,ny,d+1]); } }
   return sup;
 }
 function wwRecomputeSupply(){ WW.supply={}; for(const k of new Set(WW.armies.map(a=>a.nat))) WW.supply[k]=wwSupplyField(k); }
@@ -5178,7 +5197,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       techDone:[...(nn.techDone||[])],research:nn.research||0,researching:nn.researching||null,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,bonusSupply:nn.bonusSupply||0,
-      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing})) };
+      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing,railDepth:nn.railDepth})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -5195,7 +5214,7 @@ function wwDeserialize(s){
     nn.techDone=new Set(ns.techDone||[]); nn.research=ns.research||0; nn.researching=ns.researching||null;
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand; nn.bonusSupply=ns.bonusSupply||0;
     nn.focusDone=new Set(ns.focusDone||[]); nn.focusProg=ns.focusProg||null; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
-    nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; }
+    nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; nn.railDepth=ns.railDepth!=null?ns.railDepth:WW_RAIL_START; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
   return WW;
@@ -5214,7 +5233,8 @@ function wwEndTurn(){
     const base=WW_WINTER_BASE[n.key]||0.2;
     if(n.key!==WW.player) n.winterizing = base<0.55 && wwWinterAt(WW.date)>0.35 && n.atWar && n.atWar.size>0;
     if(n.winterGear==null) n.winterGear=base;
-    n.winterGear = n.winterizing ? Math.min(0.95, n.winterGear+0.06) : Math.max(base, n.winterGear-0.015); }
+    n.winterGear = n.winterizing ? Math.min(0.95, n.winterGear+0.06) : Math.max(base, n.winterGear-0.015);
+    n.railDepth = Math.min(WW_RAIL_MAX, (n.railDepth!=null?n.railDepth:WW_RAIL_START) + WW_RAIL_RATE); }
   wwBombingTick();
   wwComputeStats();
   wwProduction();
@@ -7902,7 +7922,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwProduction, wwAINation,
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwAIPlan, wwRelation,
-    wwSupplyField, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
+    wwSupplyField, wwRailNetwork, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
     wwSetBombing, wwAIBombing, wwBombingTick,

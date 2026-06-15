@@ -693,6 +693,21 @@ say('— The World at War —');
   Ga.armies.push(iso); const org0=iso.org; E.wwEndTurn();
   check('WW out-of-supply armies suffer attrition', iso.org < org0);
 
+  // --- Phase 24: railroad supply (railheads creep forward, like Realistic Mode) ---
+  const Grail = E.wwSetup('GER','normal'); const gcap2 = E.wwCapitalHex('GER');
+  const homeArmy2 = {nat:'GER',x:gcap2[0],y:gcap2[1],kind:'inf',str:6,maxStr:6,org:8,maxOrg:8,mp:2,moved:false};
+  check('WW home territory is railed & supplied at start', E.wwInSupply(homeArmy2) && Grail.byKey.GER.railDepth>0);
+  check('WW the rail network covers the homeland', E.wwRailNetwork('GER').size > 100);
+  // a unit dropped far beyond friendly rail is cut off (no railhead reaches it)
+  let frx=-1,fry=-1; const sovi24=Grail.byKey.SOV.i;
+  for(let y=0;y<Grail.rows && frx<0;y++) for(let x=Grail.cols-1;x>=0;x--) if(Grail.own[y*Grail.cols+x]===sovi24){ frx=x; fry=y; break; }
+  const farU = {nat:'GER',x:frx,y:fry,kind:'inf',str:6,maxStr:6,org:8,maxOrg:8,mp:2,moved:false};
+  Grail.armies.push(farU); E.wwRecomputeSupply();
+  check('WW a spearhead beyond the railhead is cut off', !E.wwInSupply(farU));
+  // the railhead creeps forward each turn (rail re-laid behind the advance)
+  const rd0 = Grail.byKey.GER.railDepth; E.wwEndTurn();
+  check('WW the railhead extends each turn', Grail.byKey.GER.railDepth > rd0);
+
   // --- Phase 5: naval invasions ---
   const Gv = E.wwSetup('ENG','normal');
   let pair=null;
