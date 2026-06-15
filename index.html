@@ -4709,7 +4709,7 @@ function wwCapitulate(fallenKey, byKey){
 
 // supply: BFS from a nation's owned cities across friendly-owned land, limited range.
 function wwSupplyField(natKey){
-  const me=WW.byKey[natKey], cols=WW.cols, RANGE=12 + (((me&&me.tech&&me.tech.log)||0)*3);
+  const me=WW.byKey[natKey], cols=WW.cols, RANGE=12 + ((me&&me.bonusSupply)||0);
   const sup=new Uint8Array(cols*WW.rows), q=[]; let qi=0;
   for(const c of WW.cities){ const idx=c.y*cols+c.x; if(WW.own[idx]===me.i && !sup[idx]){ sup[idx]=1; q.push([c.x,c.y,0]); } }
   while(qi<q.length){ const [x,y,d]=q[qi++]; if(d>=RANGE) continue;
@@ -4803,20 +4803,57 @@ function wwAIStep2(a, obj){
   return best;
 }
 // ---- research: tech levels that compound a nation's war effort ----
-function wwTechInit(n){ n.tech={land:0,ind:0,air:0,log:0}; n.research=0; n.researching='land'; n.bonusCiv=0; n.bonusMil=0; n.bonusLand=0; }
-function wwLandBonus(natKey){ const n=WW.byKey[natKey]; if(!n) return 1; return 1 + 0.04*((n.tech&&n.tech.land)||0) + (n.bonusLand||0); }
+// research is a HOI4-style tech tree shared by every nation; the tiers are years.
+const WW_TECH_YEARS=['1936','1937','1939','1941','1943'];
+const WW_TECH=[
+ {id:'con1',name:'Construction I',x:0,y:0,cost:50,fx:['factory',2,0]},
+ {id:'prod1',name:'Industrial Production',x:1,y:0,cost:50,fx:['factory',1,1]},
+ {id:'con2',name:'Construction II',x:0,y:1,cost:70,req:['con1'],fx:['factory',2,1]},
+ {id:'prod2',name:'Production Efficiency',x:1,y:1,cost:70,req:['prod1'],fx:['factory',1,1]},
+ {id:'con3',name:'Construction III',x:0,y:2,cost:100,req:['con2'],fx:['factory',3,1]},
+ {id:'prod3',name:'Assembly Lines',x:1,y:2,cost:100,req:['prod2'],fx:['factory',2,2]},
+ {id:'con4',name:'Advanced Construction',x:0,y:3,cost:140,req:['con3'],fx:['factory',3,2]},
+ {id:'prod4',name:'War Production',x:1,y:3,cost:140,req:['prod3'],fx:['factory',2,3]},
+ {id:'con5',name:'Industrial Complex',x:0,y:4,cost:190,req:['con4'],fx:['factory',4,2]},
+ {id:'inf1',name:'Infantry Weapons I',x:2,y:0,cost:50,fx:['land',0.03]},
+ {id:'inf2',name:'Infantry Weapons II',x:2,y:1,cost:70,req:['inf1'],fx:['land',0.04]},
+ {id:'inf3',name:'Improved Infantry',x:2,y:2,cost:100,req:['inf2'],fx:['land',0.05]},
+ {id:'inf4',name:'Advanced Infantry',x:2,y:3,cost:140,req:['inf3'],fx:['land',0.05]},
+ {id:'arm1',name:'Light Tanks',x:3,y:0,cost:55,fx:['land',0.03]},
+ {id:'arm2',name:'Medium Tanks',x:3,y:1,cost:80,req:['arm1'],fx:['land',0.05]},
+ {id:'arm3',name:'Heavy Tanks',x:3,y:2,cost:110,req:['arm2'],fx:['land',0.05]},
+ {id:'arm4',name:'Armoured Doctrine',x:3,y:3,cost:150,req:['arm3'],fx:['land',0.06]},
+ {id:'ftr1',name:'Fighter I',x:4,y:0,cost:50,fx:['air',25]},
+ {id:'cas1',name:'Close Air Support',x:5,y:0,cost:50,fx:['air',20]},
+ {id:'ftr2',name:'Fighter II',x:4,y:1,cost:80,req:['ftr1'],fx:['air',30]},
+ {id:'strat1',name:'Strategic Bomber',x:5,y:1,cost:80,req:['cas1'],fx:['air',25]},
+ {id:'ftr3',name:'Heavy Fighter',x:4,y:2,cost:110,req:['ftr2'],fx:['air',35]},
+ {id:'strat2',name:'Heavy Bomber',x:5,y:2,cost:120,req:['strat1'],fx:['air',35]},
+ {id:'log1',name:'Logistics Company',x:6,y:0,cost:50,fx:['log',2]},
+ {id:'eng1',name:'Combat Engineers',x:6,y:1,cost:70,req:['log1'],fx:['land',0.03]},
+ {id:'log2',name:'Motorised Logistics',x:6,y:2,cost:100,req:['eng1'],fx:['log',3]},
+ {id:'radio',name:'Radio & Encryption',x:6,y:3,cost:130,req:['log2'],fx:['research',60]},
+];
+function wwTechInit(n){ n.techDone=new Set(); n.research=0; n.researching=null; n.bonusCiv=0; n.bonusMil=0; n.bonusLand=0; n.bonusSupply=0; }
+function wwTechList(){ return WW_TECH; }
+function wwTechById(id){ return WW_TECH.find(t=>t.id===id); }
+function wwTechAvail(natKey,id){ const n=WW.byKey[natKey]; if(!n) return false; if(n.techDone&&n.techDone.has(id)) return false;
+  const t=wwTechById(id); if(!t) return false; return (t.req||[]).every(r=>n.techDone&&n.techDone.has(r)); }
+function wwAvailableTechs(natKey){ const n=WW.byKey[natKey]; if(!n) return [];
+  return WW_TECH.filter(t=>!(n.techDone&&n.techDone.has(t.id)) && (t.req||[]).every(r=>n.techDone.has(r))); }
+function wwAIPickTech(n, av){ const pr=t=>{ const f=t.fx[0];
+  if(f==='factory') return n.techDone.size<5?6:4; if(f==='land') return 5; if(f==='air') return 3; if(f==='log') return 2; if(f==='research') return 1; return 3; };
+  return av.slice().sort((a,b)=>pr(b)-pr(a) || a.cost-b.cost)[0].id; }
+function wwStartResearch(natKey, id){ const n=WW.byKey[natKey]; if(!n||!wwTechAvail(natKey,id)) return false; n.researching=id; return true; }
+function wwLandBonus(natKey){ const n=WW.byKey[natKey]; if(!n) return 1; return 1 + (n.bonusLand||0); }
 function wwResearchOutput(n){ return (n.civ||1)*0.6; }
-function wwResearchCost(level){ return 60 + level*45; }
-function wwApplyTech(n,cat){ if(!n.tech) wwTechInit(n); n.tech[cat]=(n.tech[cat]||0)+1;
-  if(cat==='ind'){ n.bonusCiv=(n.bonusCiv||0)+2; n.bonusMil=(n.bonusMil||0)+1; }
-  else if(cat==='air'){ wwAddAir(n,15); } }
-function wwAIResearchPick(n){ const order=['land','ind','land','air','log','ind'];
-  return order[((n.tech.land||0)+(n.tech.ind||0)+(n.tech.air||0)+(n.tech.log||0))%order.length]; }
-function wwResearchTick(n){ if(!n.tech) wwTechInit(n);
+function wwResearchTick(n){ if(!n.techDone) wwTechInit(n);
+  if(!n.researching){ if(n.key!==WW.player){ const av=wwAvailableTechs(n.key); if(av.length) n.researching=wwAIPickTech(n,av); } if(!n.researching) return; }
   n.research += wwResearchOutput(n);
-  const cost=wwResearchCost(n.tech[n.researching]||0);
-  if(n.research>=cost){ n.research-=cost; wwApplyTech(n,n.researching);
-    if(n.key!==WW.player) n.researching=wwAIResearchPick(n); } }
+  const t=wwTechById(n.researching); if(!t){ n.researching=null; return; }
+  if(n.research >= t.cost){ n.research -= t.cost; n.techDone.add(t.id); wwApplyFocus(n, t.fx);
+    if(WW.log && n.key===WW.player) WW.log.push('Researched: '+t.name);
+    n.researching=null; if(n.key!==WW.player){ const av=wwAvailableTechs(n.key); if(av.length) n.researching=wwAIPickTech(n,av); } } }
 
 // ---- national focus: a short scripted tree of historical decisions per major ----
 const WW_FOCUS = {
@@ -4936,6 +4973,7 @@ function wwApplyFocus(n,fx){ const t=fx[0];
   else if(t==='air'){ wwAddAir(n,fx[1]); }
   else if(t==='research'){ n.research=(n.research||0)+fx[1]; }
   else if(t==='land'){ n.bonusLand=(n.bonusLand||0)+fx[1]; }
+  else if(t==='log'){ n.bonusSupply=(n.bonusSupply||0)+fx[1]; }
   else if(t==='army'){ wwSpawnDivisions(n,fx[1]); }
   else if(t==='gear'){ n.winterGear=Math.min(0.95,(n.winterGear||0)+fx[1]); }
   else if(t==='wargoal'){ wwDeclareWar(n.key,fx[1]); } }
@@ -5138,7 +5176,7 @@ function wwSerialize(){
     armies:WW.armies.map(a=>({id:a.id,nat:a.nat,x:a.x,y:a.y,kind:a.kind,str:a.str,maxStr:a.maxStr,org:a.org,maxOrg:a.maxOrg,mp:a.mp,moved:a.moved})),
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
-      tech:nn.tech,research:nn.research||0,researching:nn.researching,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,
+      techDone:[...(nn.techDone||[])],research:nn.research||0,researching:nn.researching||null,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,bonusSupply:nn.bonusSupply||0,
       focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing})) };
 }
 function wwDeserialize(s){
@@ -5153,8 +5191,8 @@ function wwDeserialize(s){
     nn.capitulated=ns.capitulated; nn.prod=ns.prod; nn.atWar=new Set(ns.atWar||[]);
     nn.air = (typeof ns.air==='number') ? {fighter:Math.round(ns.air*0.5),cas:Math.round(ns.air*0.3),strat:Math.round(ns.air*0.2)} : (ns.air||wwBaseAir(nn));
     nn.airBuild = ns.airBuild || wwDefaultBuild(nn);
-    nn.tech=ns.tech||{land:0,ind:0,air:0,log:0}; nn.research=ns.research; nn.researching=ns.researching||'land';
-    nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand;
+    nn.techDone=new Set(ns.techDone||[]); nn.research=ns.research||0; nn.researching=ns.researching||null;
+    nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand; nn.bonusSupply=ns.bonusSupply||0;
     nn.focusDone=new Set(ns.focusDone||[]); nn.focusProg=ns.focusProg||null; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
     nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; }
   WW.started=true; WW.on=true; WW._mapDirty=true;
@@ -6892,7 +6930,7 @@ function wwOpen(){
   wwRequest();
   if (typeof sClick==='function') sClick();
 }
-function wwClose(){ WW.on=false; const sc=$('ww-screen'); if(sc) sc.classList.add('hidden'); const fp=$('ww-focus-page'); if(fp) fp.classList.add('hidden'); }
+function wwClose(){ WW.on=false; const sc=$('ww-screen'); if(sc) sc.classList.add('hidden'); const fp=$('ww-focus-page'); if(fp) fp.classList.add('hidden'); const rp=$('ww-research-page'); if(rp) rp.classList.add('hidden'); }
 
 function wwFillPick(){
   const row=$('ww-pick-row'); if(!row) return; let html='';
@@ -7252,7 +7290,7 @@ function wwDoEndTurn(){ wwSfx('endturn');
   wwDrainLog();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if(!$('ww-focus-page').classList.contains('hidden')) wwRenderFocusTree();
-  if(!$('ww-research').classList.contains('hidden')) wwRenderResearch();
+  if(!$('ww-research-page').classList.contains('hidden')) wwRenderResearchTree();
   if(!$('ww-air').classList.contains('hidden')) wwRenderAir();
   if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
   if(v.over) wwShowEnd(v);
@@ -7283,7 +7321,7 @@ function wwUpdateHUD(){
         'Territory: '+me.hexes+' hexes<br>Armies: '+wwArmiesOf(WW.player).length+
         '<br>Factories: '+me.civ+'c / '+me.mil+'m'+(me.warDmg>0.01?' <span style="color:#e0856a">(−'+Math.round(me.warDmg*100)+'%)</span>':'')+
         '<br>Air: '+Math.round(wwAirTotal(me))+' <span style="color:#8ba2b8">('+Math.round(me.air.fighter)+'F '+Math.round(me.air.cas)+'C '+Math.round(me.air.strat)+'S)</span>'+(me.bombTarget?'<br><span style="color:#c98ac9">Bombing '+(WW.byKey[me.bombTarget]?WW.byKey[me.bombTarget].name:'?')+'</span>':'')+
-        '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching||'—')+' L'+((me.tech&&me.tech[me.researching])||0)+
+        '<br>Focus: '+wwFocusStatus(me)+'<br>Research: '+(me.researching?(wwTechById(me.researching)?wwTechById(me.researching).name:'—'):'<i style="color:#9fb4c9">choose</i>')+
         '<br>❄ Winter readiness: '+Math.round((me.winterGear||0)*100)+'%'+(me.winterizing?' <span style="color:#9fd0e8">(preparing)</span>':'')+
         '<br>Enemies left: '+enemies;
       const _wb=$('ww-winter-toggle'); if(_wb){ _wb.textContent='❄ Winter prep: '+(me.winterizing?'ON':'OFF'); _wb.classList.toggle('on', !!me.winterizing); }
@@ -7319,11 +7357,42 @@ function wwRenderFocusTree(){
 }
 function wwOpenFocusPage(){ wwSfx('click'); const p=$('ww-focus-page'); if(!p) return; p.classList.remove('hidden'); wwRenderFocusTree(); }
 function wwCloseFocusPage(){ const p=$('ww-focus-page'); if(p) p.classList.add('hidden'); }
+const WW_RES_COLW=150, WW_RES_ROWH=118, WW_RES_NW=122, WW_RES_NH=58, WW_RES_PAD=30, WW_RES_LABELW=58;
+function wwRenderResearchTree(){
+  const me=WW.byKey[WW.player]; if(!me) return; const list=wwTechList();
+  const lines=$('ww-res-lines'), nodes=$('ww-res-nodes'), inner=$('ww-res-inner');
+  let maxX=0,maxY=0; for(const t of list){ if(t.x>maxX)maxX=t.x; if(t.y>maxY)maxY=t.y; }
+  const W=WW_RES_LABELW+maxX*WW_RES_COLW+WW_RES_NW+WW_RES_PAD*2, H=maxY*WW_RES_ROWH+WW_RES_NH+WW_RES_PAD*2;
+  lines.width=W; lines.height=H; if(inner){ inner.style.width=W+'px'; inner.style.height=H+'px'; }
+  const g=lines.getContext('2d'); g.clearRect(0,0,W,H);
+  const nx=t=>WW_RES_LABELW+WW_RES_PAD+t.x*WW_RES_COLW, ny=t=>WW_RES_PAD+t.y*WW_RES_ROWH, cx=t=>nx(t)+WW_RES_NW/2;
+  g.font='700 13px sans-serif'; g.textAlign='left';
+  for(let y=0;y<=maxY;y++){ const yy=WW_RES_PAD+y*WW_RES_ROWH+WW_RES_NH/2;
+    g.strokeStyle='rgba(120,150,180,0.08)'; g.lineWidth=1; g.beginPath(); g.moveTo(WW_RES_LABELW,yy); g.lineTo(W,yy); g.stroke();
+    g.fillStyle='rgba(170,195,220,0.55)'; g.fillText(WW_TECH_YEARS[y]||'', 10, yy+4); }
+  g.lineWidth=2;
+  for(const t of list){ for(const r of (t.req||[])){ const p=wwTechById(r); if(!p) continue;
+    const x1=cx(p), y1=ny(p)+WW_RES_NH, x2=cx(t), y2=ny(t), my=(y1+y2)/2;
+    g.strokeStyle=(me.techDone&&me.techDone.has(r))?'rgba(110,200,130,0.7)':'rgba(110,140,175,0.4)';
+    g.beginPath(); g.moveTo(x1,y1); g.lineTo(x1,my); g.lineTo(x2,my); g.lineTo(x2,y2); g.stroke(); } }
+  let html='';
+  for(const t of list){ const done=me.techDone&&me.techDone.has(t.id), cur=me.researching===t.id, avail=wwTechAvail(WW.player,t.id);
+    const cls=done?'done':cur?'prog':avail?'avail':'locked';
+    const pct=cur?Math.min(100,Math.round(100*(me.research||0)/t.cost)):0;
+    const sub=cur?('researching '+pct+'%'):(done?'researched ✓':wwFocusDesc(t.fx));
+    html+='<button class="ww-foc-node '+cls+'" data-id="'+t.id+'" style="left:'+nx(t)+'px;top:'+ny(t)+'px;width:'+WW_RES_NW+'px;height:'+WW_RES_NH+'px"><div class="fn">'+t.name+'</div><div class="fd">'+sub+'</div></button>'; }
+  nodes.innerHTML=html;
+  for(const b of nodes.querySelectorAll('.ww-foc-node')) b.onclick=()=>{ const id=b.dataset.id;
+    if(wwTechAvail(WW.player,id)){ wwStartResearch(WW.player,id); wwSfx('click'); wwRenderResearchTree(); wwUpdateHUD(); } };
+  const tt=$('ww-res-title'); if(tt) tt.textContent=me.name+' — RESEARCH';
+}
+function wwOpenResearchPage(){ wwSfx('click'); const p=$('ww-research-page'); if(!p) return; p.classList.remove('hidden'); wwRenderResearchTree(); }
+function wwCloseResearchPage(){ const p=$('ww-research-page'); if(p) p.classList.add('hidden'); }
 function wwFocusDesc(fx){ const t=fx[0];
   return t==='factory'?('+'+fx[1]+' civ / +'+(fx[2]||0)+' mil factories')
     : t==='air'?('+'+fx[1]+' air wings') : t==='army'?('+'+fx[1]+' divisions')
     : t==='land'?('+'+Math.round(fx[1]*100)+'% land combat') : t==='research'?('+'+fx[1]+' research')
-    : t==='gear'?('+'+Math.round(fx[1]*100)+'% winter gear')
+    : t==='gear'?('+'+Math.round(fx[1]*100)+'% winter gear') : t==='log'?('+'+fx[1]+' supply range')
     : t==='wargoal'?('war goal: '+(WW.byKey[fx[1]]?WW.byKey[fx[1]].name:fx[1])) : ''; }
 function wwRenderFocus(){
   const el=$('ww-focus'); if(!el) return; const me=WW.byKey[WW.player], list=wwFocusList(WW.player);
@@ -7504,7 +7573,8 @@ function wwBindInput(){
   const et=$('ww-endturn'); if(et) et.onclick=wwDoEndTurn;
   const bf=$('ww-btn-focus'); if(bf) bf.onclick=wwOpenFocusPage;
   const fcl=$('ww-foc-close'); if(fcl) fcl.onclick=wwCloseFocusPage;
-  const br=$('ww-btn-research'); if(br) br.onclick=wwToggleResearch;
+  const br=$('ww-btn-research'); if(br) br.onclick=wwOpenResearchPage;
+  const rcl=$('ww-res-close'); if(rcl) rcl.onclick=wwCloseResearchPage;
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
   const bs=$('ww-btn-supply'); if(bs) bs.onclick=wwToggleSupply;
@@ -7837,7 +7907,8 @@ if (typeof module !== 'undefined' && module.exports){
     wwSetBombing, wwAIBombing, wwBombingTick,
     wwSerialize, wwDeserialize, wwSave, wwLoadSave, wwHasSave, wwClearSave,
     wwDayOfYear, wwWinterAt, wwSeasonName, wwLatOf, wwHexWinter, wwGear, wwSetWinterizing, WW_WINTER_BASE,
-    WW_FOCUS, wwTechInit, wwLandBonus, wwResearchTick, wwResearchCost, wwApplyTech,
+    WW_FOCUS, WW_TECH, WW_TECH_YEARS, wwTechInit, wwLandBonus, wwResearchTick,
+    wwTechList, wwTechById, wwTechAvail, wwAvailableTechs, wwAIPickTech, wwStartResearch,
     wwFocusInit, wwFocusList, wwFocusById, wwFocusAvail, wwAvailableFocuses, wwAIPickFocus, wwStartFocus, wwFocusTick, wwApplyFocus, wwSpawnDivisions,
     getState: () => G,
   };
@@ -7936,8 +8007,10 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
       border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
     .ww-panel.hidden{display:none;}
-    #ww-focus-page{position:absolute;inset:0;z-index:9;background:radial-gradient(circle at 50% 16%,#16243488,#0a0f16f6),#0a0f16;display:flex;flex-direction:column;}
-    #ww-focus-page.hidden{display:none;}
+    #ww-focus-page,#ww-research-page{position:absolute;inset:0;z-index:9;background:radial-gradient(circle at 50% 16%,#16243488,#0a0f16f6),#0a0f16;display:flex;flex-direction:column;}
+    #ww-focus-page.hidden,#ww-research-page.hidden{display:none;}
+    #ww-res-title{font-weight:800;letter-spacing:2px;font-size:15px;color:#eaf2fb;} #ww-res-close{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:700 12px 'Segoe UI',sans-serif;padding:8px 16px;border-radius:7px;cursor:pointer;} #ww-res-close:hover{background:#1d3553;}
+    #ww-res-lines{position:absolute;left:0;top:0;pointer-events:none;}
     #ww-foc-head{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid #22364d;background:#0d1826;}
     #ww-foc-title{font-weight:800;letter-spacing:2px;font-size:15px;color:#eaf2fb;}
     #ww-foc-hint{font-size:11px;color:#8ba2b8;}
@@ -8032,6 +8105,10 @@ if (typeof module !== 'undefined' && module.exports){
     </div>
     <div class="ww-pick-row" id="ww-pick-row"></div>
     <button id="ww-continue" class="ww-pbtn hidden" style="max-width:262px;margin-top:16px">▶ CONTINUE SAVED CAMPAIGN</button>
+  </div>
+  <div id="ww-research-page" class="hidden">
+    <div id="ww-foc-head"><span id="ww-res-title">RESEARCH</span><div style="flex:1"></div><span id="ww-foc-hint">Click a highlighted technology to research it — earlier tiers unlock the later ones</span><button id="ww-res-close">✕ CLOSE</button></div>
+    <div id="ww-foctree"><div id="ww-res-inner" style="position:relative;margin:auto"><canvas id="ww-res-lines"></canvas><div id="ww-res-nodes" style="position:absolute;left:0;top:0"></div></div></div>
   </div>
   <div id="ww-focus-page" class="hidden">
     <div id="ww-foc-head"><span id="ww-foc-title">NATIONAL FOCUS</span><div style="flex:1"></div><span id="ww-foc-hint">Click a highlighted focus to begin it — prerequisites unlock the branches below</span><button id="ww-foc-close">✕ CLOSE</button></div>

@@ -733,26 +733,33 @@ say('— The World at War —');
   check('WW air doctrine steers production (superiority builds fighters fastest)',
     (Gdoc.byKey.GER.air.fighter-f0) > (Gdoc.byKey.GER.air.strat-s0));
 
-  // --- Phase 7: research & national focus ---
+  // --- Phase 7/22: research tech tree & national focus ---
   const Gr7 = E.wwSetup('GER','normal');
-  check('WW nations init tech & a branching focus tree',
-    Gr7.byKey.GER.tech && E.wwFocusList('GER').length>10 && Gr7.byKey.GER.researching==='land' &&
+  check('WW nations init a tech tree & a branching focus tree',
+    Gr7.byKey.GER.techDone && E.wwTechList().length>20 && Gr7.byKey.GER.researching===null &&
     E.wwAvailableFocuses('GER').length===1 && E.wwFocusList('GER').some(f=>f.req && f.req.length));
   check('WW AI auto-starts a focus, player does not',
     !!Gr7.byKey.SOV.focusProg && !Gr7.byKey.GER.focusProg);
-  check('WW land doctrine starts neutral', E.wwLandBonus('GER')===1);
-  // research compounds: levelling land raises the combat bonus
-  const lb0=E.wwLandBonus('GER'); E.wwApplyTech(Gr7.byKey.GER,'land');
-  check('WW researching land doctrine raises combat power', E.wwLandBonus('GER') > lb0);
-  // industry tech adds factories (via computeStats bonus)
-  E.wwApplyTech(Gr7.byKey.GER,'ind'); E.wwComputeStats();
-  check('WW industry research adds factories', Gr7.byKey.GER.civ >= 38+2 && Gr7.byKey.GER.mil >= 24+1);
-  // logistics tech extends supply range
-  const baseRange = E.wwSupplyField('GER'); // computed at log 0
-  Gr7.byKey.GER.tech.log = 3; const farRange = E.wwSupplyField('GER');
+  check('WW land bonus starts neutral', E.wwLandBonus('GER')===1);
+  // helper: research a specific tech to completion
+  const research = (key, id) => { E.wwStartResearch(key, id); const n=E.WW.byKey[key]; let g=0; while(!n.techDone.has(id) && g++<60) E.wwResearchTick(n); };
+  // a land tech raises the combat bonus
+  const lb0=E.wwLandBonus('GER'); research('GER','inf1');
+  check('WW researching a land tech raises combat power', E.wwLandBonus('GER') > lb0);
+  // an industry tech adds factories (via computeStats bonus)
+  research('GER','con1'); E.wwComputeStats();
+  check('WW industry research adds factories', Gr7.byKey.GER.civ >= 38+2);
+  // a logistics tech extends supply range
+  const baseRange = E.wwSupplyField('GER');
+  research('GER','log1'); const farRange = E.wwSupplyField('GER');
   let base=0, far=0; for(let i=0;i<baseRange.length;i++){ base+=baseRange[i]; far+=farRange[i]; }
   check('WW logistics research widens supply', far > base);
-  // prerequisites gate the tree: a deep focus is locked until its requirements are done
+  // tech prerequisites gate the tree
+  const Gt2 = E.wwSetup('GER','normal');
+  check('WW tech prerequisites lock later tiers', !E.wwTechAvail('GER','con2') && E.wwTechAvail('GER','con1'));
+  research('GER','con1');
+  check('WW completing a tech unlocks its successor', E.wwTechAvail('GER','con2'));
+  // prerequisites gate the focus tree: a deep focus is locked until its requirements are done
   const Gtree = E.wwSetup('GER','normal');
   check('WW focus prerequisites lock the branches', !E.wwFocusAvail('GER','panzer') && E.wwFocusAvail('GER','rhein'));
   // an army focus (panzer, needs rhein->wehr) spawns divisions when completed
@@ -792,19 +799,19 @@ say('— The World at War —');
   // --- Phase 9: save / load ---
   E.wwClearSave();
   const Gsl = E.wwSetup('FRA','hard');
-  E.wwApplyTech(Gsl.byKey.FRA,'land'); E.wwStartFocus('FRA','maginot');
+  research('FRA','inf1'); E.wwStartFocus('FRA','maginot');
   for(let i=0;i<5;i++) E.wwEndTurn();
   check('WW no save slot before saving', !E.wwHasSave());
   E.wwSave();
   check('WW save slot is written', E.wwHasSave());
   const hash = own => Array.from(own).reduce((a,b,i)=>(a+(b+2)*(i%7+1))>>>0,0);
   const want = {turn:Gsl.turn, player:Gsl.player, diff:Gsl.difficulty, armies:Gsl.armies.length,
-    fraLand:Gsl.byKey.FRA.tech.land, gerHexes:Gsl.byKey.GER.hexes, ownHash:hash(Gsl.own)};
+    fraLand:Gsl.byKey.FRA.bonusLand, gerHexes:Gsl.byKey.GER.hexes, ownHash:hash(Gsl.own)};
   E.wwSetup('GER','easy');                       // corrupt with a different game
   E.wwDeserialize(E.wwLoadSave());               // restore
   const R = E.WW;
   const got = {turn:R.turn, player:R.player, diff:R.difficulty, armies:R.armies.length,
-    fraLand:R.byKey.FRA.tech.land, gerHexes:R.byKey.GER.hexes, ownHash:hash(R.own)};
+    fraLand:R.byKey.FRA.bonusLand, gerHexes:R.byKey.GER.hexes, ownHash:hash(R.own)};
   check('WW save/load round-trips the full campaign',
     JSON.stringify(want)===JSON.stringify(got), JSON.stringify(want)+' vs '+JSON.stringify(got));
   const tBefore = R.turn; E.wwEndTurn();
@@ -1147,6 +1154,8 @@ function uiSmoke(side){
       if (UI.wwAirDoctrine) UI.wwAirDoctrine('GER','superiority');
       if ($('ww-winter-toggle').onclick) $('ww-winter-toggle').onclick();
       if ($('ww-btn-supply').onclick) $('ww-btn-supply').onclick();   // supply map mode (builds front/supply overlays)
+      if ($('ww-btn-research').onclick) $('ww-btn-research').onclick();  // open research tree page
+      if (UI.wwStartResearch) UI.wwStartResearch('GER','con1');
       if ($('ww-btn-help').onclick) $('ww-btn-help').onclick();        // open the tutorial
       for (let i=0;i<7;i++) if ($('ww-tut-next').onclick) $('ww-tut-next').onclick();   // walk through & finish it
       if (UI.wwStartFocus) UI.wwStartFocus('GER');
