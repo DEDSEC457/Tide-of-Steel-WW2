@@ -820,6 +820,13 @@ say('— The World at War —');
   const opn = E.wwNb(pn[0],pn[1]).find(([x,y])=>!E.wwArmyAt(x,y)&&!E.wwSea(x,y)&&E.wwOwnerAt(x,y)&&E.wwOwnerAt(x,y).key==='POL');
   if(opn) check('WW forecast vs an undefended hex reads a certain capture', E.wwForecast(atk,opn[0],opn[1]).winPct===100);
 
+  // --- Phase 15: seasons ---
+  check('WW season cycle peaks in winter, bottoms in summer',
+    E.wwWinterAt({y:1940,m:1,d:20})>0.95 && E.wwWinterAt({y:1940,m:7,d:22})<0.05 && E.wwWinterAt({y:1940,m:4,d:5})>0.2 && E.wwWinterAt({y:1940,m:4,d:5})<0.8);
+  check('WW season names by month',
+    E.wwSeasonName({y:1940,m:1,d:1})==='Winter' && E.wwSeasonName({y:1940,m:4,d:1})==='Spring' &&
+    E.wwSeasonName({y:1940,m:7,d:1})==='Summer' && E.wwSeasonName({y:1940,m:10,d:1})==='Autumn');
+
   // --- Phase 11/12: strategic bombing (needs air superiority to bite) ---
   const Gb = E.wwSetup('GER','normal');
   E.wwDeclareWar('GER','SOV'); E.wwSetBombing('GER','SOV');
