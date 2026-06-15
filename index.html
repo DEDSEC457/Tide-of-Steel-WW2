@@ -4647,7 +4647,7 @@ function wwSetup(playerKey, difficulty){
   WW.difficulty = difficulty || 'normal';
   WW.aiPow = WW.difficulty==='easy'?0.82 : WW.difficulty==='hard'?1.18 : 1.0;
   WW.warOn = true;
-  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; n.railDepth=WW_RAIL_START; n.fuelMax=200+(n.civ||0)*6; n.fuel=Math.round(n.fuelMax*0.5); n.manpower=Math.round((n.mp||100000)*0.03); n.steelStock=100; n.casualties=0; n.lowFuel=false; wwTechInit(n); wwFocusInit(n); }
+  for(const n of WW.nat){ n.capitulated=false; n.prod=0; n.atWar=new Set(); n.air=wwBaseAir(n); n.airBuild=wwDefaultBuild(n); n.bombTarget=null; n.warDmg=0; n.winterGear=WW_WINTER_BASE[n.key]||0.2; n.winterizing=false; n.railDepth=WW_RAIL_START; n.fuelMax=200+(n.civ||0)*6; n.fuel=Math.round(n.fuelMax*0.5); n.manpower=Math.round((n.mp||100000)*0.03); n.steelStock=100; n.casualties=0; n.lowFuel=false; wwInitLines(n); wwTechInit(n); wwFocusInit(n); }
   wwPlaceArmies();
   wwRecomputeSupply();
   for(const n of WW.nat){ if(n.key!==WW.player && n.key!=='XXX' && !n.capitulated) wwStartFocus(n.key); }
@@ -5169,19 +5169,35 @@ function wwAINation(n){
     if(!d || a.str>=d.str*0.95){ wwInvade(a,tx,ty); inv++; } }
 }
 
+// production lines: military factories are split across Infantry / Armour / Aircraft;
+// each line's efficiency ramps the longer it runs (HOI4). The air line feeds the
+// air force (split by air doctrine); the land lines deploy divisions, gated by
+// steel + manpower, with armour costing more.
+const WW_PROD_PRESETS = { balanced:{inf:0.5,arm:0.3,air:0.2}, infantry:{inf:0.7,arm:0.15,air:0.15},
+  armoured:{inf:0.35,arm:0.5,air:0.15}, airforce:{inf:0.35,arm:0.2,air:0.45} };
+function wwInitLines(n){ n.lineMix={inf:0.5,arm:0.3,air:0.2}; n.lineEff={inf:0.3,arm:0.3,air:0.3}; n.lineProg={inf:0,arm:0,air:0}; }
+function wwSetLineMix(natKey, mix){ const n=WW.byKey[natKey]; if(!n) return; let s=(mix.inf||0)+(mix.arm||0)+(mix.air||0); if(s<=0) s=1;
+  n.lineMix={inf:(mix.inf||0)/s, arm:(mix.arm||0)/s, air:(mix.air||0)/s}; }
+function wwDeployDivision(n, kind){
+  const cap=wwCapitalHex(n.key); let spot=null;
+  if(cap && WW.own[cap[1]*WW.cols+cap[0]]===n.i && !wwArmyAt(cap[0],cap[1])) spot=cap;
+  else { const fr=wwFrontier(n.i); for(const [x,y] of fr) if(!wwArmyAt(x,y)){ spot=[x,y]; break; } }
+  if(!spot) return false; const id=(WW.armies.reduce((m,a)=>Math.max(m,a.id),0)||0)+1;
+  WW.armies.push(wwMakeArmy(id,n.key,spot[0],spot[1],kind)); return true;
+}
 function wwProduction(){
-  for(const n of WW.nat){
-    if(n.capitulated||n.key==='XXX') continue;
-    wwAddAir(n, (n.civ||0)*0.05);
-    if(!n.mil) continue;
-    n.prod=Math.min(260,(n.prod||0)+n.mil*(n.winterizing?0.7:1));
-    if(n.prod>=120 && (n.manpower||0)>=WW_DIV_MP && (n.steelStock||0)>=WW_DIV_STEEL){ n.prod-=120; n.manpower-=WW_DIV_MP; n.steelStock-=WW_DIV_STEEL;
-      const cap=wwCapitalHex(n.key);
-      let spot=null;
-      if(cap && WW.own[cap[1]*WW.cols+cap[0]]===n.i && !wwArmyAt(cap[0],cap[1])) spot=cap;
-      else { const fr=wwFrontier(n.i); for(const [x,y] of fr) if(!wwArmyAt(x,y)){ spot=[x,y]; break; } }
-      if(spot){ const id=(WW.armies.reduce((m,a)=>Math.max(m,a.id),0)||0)+1;
-        WW.armies.push(wwMakeArmy(id, n.key, spot[0], spot[1], (n.prod%2?'arm':'inf'))); }
+  for(const n of WW.nat){ if(n.capitulated||n.key==='XXX'||!n.mil) continue;
+    if(!n.lineMix) wwInitLines(n);
+    const milEff=n.mil*(n.winterizing?0.7:1);
+    for(const L of ['inf','arm','air']){ const fac=milEff*(n.lineMix[L]||0);
+      n.lineEff[L] = fac>0.05 ? Math.min(1, (n.lineEff[L]||0.3)+0.06) : Math.max(0.25, (n.lineEff[L]||0.3)-0.04);
+      const out=fac*n.lineEff[L];
+      if(L==='air'){ wwAddAir(n, out*0.5); continue; }
+      n.lineProg[L]=(n.lineProg[L]||0)+out;
+      const cost=L==='arm'?150:110, steelC=L==='arm'?16:10, mpC=L==='arm'?12000:10000;
+      let guard=0;
+      while(n.lineProg[L]>=cost && (n.manpower||0)>=mpC && (n.steelStock||0)>=steelC && guard++<3){
+        n.lineProg[L]-=cost; n.manpower-=mpC; n.steelStock-=steelC; wwDeployDivision(n,L); }
     }
   }
 }
@@ -5220,7 +5236,7 @@ function wwSerialize(){
     cities:WW.cities.map(c=>({name:c.name,x:c.x,y:c.y,cap:c.cap,nat:c.nat})),
     nat:WW.nat.map(nn=>({key:nn.key,capitulated:!!nn.capitulated,prod:nn.prod||0,air:nn.air,airBuild:nn.airBuild,atWar:[...(nn.atWar||[])],
       techDone:[...(nn.techDone||[])],research:nn.research||0,researching:nn.researching||null,bonusCiv:nn.bonusCiv||0,bonusMil:nn.bonusMil||0,bonusLand:nn.bonusLand||0,bonusSupply:nn.bonusSupply||0,
-      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing,railDepth:nn.railDepth,fuel:nn.fuel||0,manpower:nn.manpower||0,steelStock:nn.steelStock||0,casualties:nn.casualties||0})) };
+      focusDone:[...(nn.focusDone||[])],focusProg:nn.focusProg||null,bombTarget:nn.bombTarget||null,warDmg:nn.warDmg||0,winterGear:nn.winterGear,winterizing:!!nn.winterizing,railDepth:nn.railDepth,fuel:nn.fuel||0,manpower:nn.manpower||0,steelStock:nn.steelStock||0,casualties:nn.casualties||0,lineMix:nn.lineMix,lineEff:nn.lineEff,lineProg:nn.lineProg})) };
 }
 function wwDeserialize(s){
   if(!s||s.v!==1) return null;
@@ -5238,7 +5254,8 @@ function wwDeserialize(s){
     nn.bonusCiv=ns.bonusCiv; nn.bonusMil=ns.bonusMil; nn.bonusLand=ns.bonusLand; nn.bonusSupply=ns.bonusSupply||0;
     nn.focusDone=new Set(ns.focusDone||[]); nn.focusProg=ns.focusProg||null; nn.bombTarget=ns.bombTarget||null; nn.warDmg=ns.warDmg||0;
     nn.winterGear=ns.winterGear!=null?ns.winterGear:(WW_WINTER_BASE[ns.key]||0.2); nn.winterizing=!!ns.winterizing; nn.railDepth=ns.railDepth!=null?ns.railDepth:WW_RAIL_START;
-    nn.fuel=ns.fuel||0; nn.manpower=ns.manpower||0; nn.steelStock=ns.steelStock||0; nn.casualties=ns.casualties||0; }
+    nn.fuel=ns.fuel||0; nn.manpower=ns.manpower||0; nn.steelStock=ns.steelStock||0; nn.casualties=ns.casualties||0;
+    if(ns.lineMix){ nn.lineMix=ns.lineMix; nn.lineEff=ns.lineEff||{inf:0.3,arm:0.3,air:0.3}; nn.lineProg=ns.lineProg||{inf:0,arm:0,air:0}; } else wwInitLines(nn); }
   WW.started=true; WW.on=true; WW._mapDirty=true;
   wwComputeStats(); wwRecomputeSupply();
   return WW;
@@ -6968,7 +6985,7 @@ function wwOpen(){
   $('ww-screen').classList.remove('hidden');
   $('ww-info').classList.add('hidden');
   $('ww-endturn').classList.add('hidden');
-  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden'); $('ww-btn-supply').classList.add('hidden'); $('ww-minimap').classList.add('hidden'); $('ww-btn-help').classList.add('hidden'); $('ww-tut').classList.add('hidden');
+  $('ww-btn-focus').classList.add('hidden'); $('ww-btn-research').classList.add('hidden'); $('ww-btn-air').classList.add('hidden'); $('ww-btn-prod').classList.add('hidden'); $('ww-btn-diplo').classList.add('hidden'); $('ww-winter-toggle').classList.add('hidden'); $('ww-btn-supply').classList.add('hidden'); $('ww-minimap').classList.add('hidden'); $('ww-btn-help').classList.add('hidden'); $('ww-tut').classList.add('hidden');
   $('ww-focus').classList.add('hidden'); $('ww-research').classList.add('hidden'); $('ww-diplo').classList.add('hidden');
   $('ww-pstat').classList.add('hidden');
   $('ww-end').classList.add('hidden');
@@ -7001,7 +7018,7 @@ function wwEnterGameUI(){
   $('ww-pick').classList.add('hidden');
   $('ww-endturn').classList.remove('hidden');
   $('ww-pstat').classList.remove('hidden');
-  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden'); $('ww-btn-supply').classList.remove('hidden'); $('ww-btn-help').classList.remove('hidden'); wwSetTips();
+  $('ww-btn-focus').classList.remove('hidden'); $('ww-btn-research').classList.remove('hidden'); $('ww-btn-air').classList.remove('hidden'); $('ww-btn-prod').classList.remove('hidden'); $('ww-btn-diplo').classList.remove('hidden'); $('ww-winter-toggle').classList.remove('hidden'); $('ww-btn-supply').classList.remove('hidden'); $('ww-btn-help').classList.remove('hidden'); wwSetTips();
   WW.mapMode='political'; WW._stratDirty=true; { const mm=$('ww-minimap'); if(mm){ mm.classList.remove('hidden'); mm.width=184; mm.height=180; } } $('ww-btn-supply').classList.remove('on');
   const n=WW.byKey[WW.player];
   $('ww-playerflag').style.display='block'; $('ww-playerflag').style.background=n.col;
@@ -7200,6 +7217,7 @@ function wwSetTips(){
   const T={ 'ww-btn-focus':'National Focus — your nation’s agenda of decisions and bonuses',
     'ww-btn-research':'Research — Land Doctrine, Industry, Aircraft and Logistics',
     'ww-btn-air':'Air Force — fighters (air superiority), CAS (ground support) & strategic bombers; pick a production doctrine',
+    'ww-btn-prod':'Production — military factories building infantry, armour & air wings; pick a production focus',
     'ww-btn-diplo':'Diplomacy — every nation by bloc and its relation to you',
     'ww-winter-toggle':'Winter Preparations — divert ~30% of production to ready your troops for the cold',
     'ww-btn-supply':'Supply map — green = supplied, red = cut off (and encircled enemy pockets)',
@@ -7340,6 +7358,7 @@ function wwDoEndTurn(){ wwSfx('endturn');
   if(!$('ww-focus-page').classList.contains('hidden')) wwRenderFocusTree();
   if(!$('ww-research-page').classList.contains('hidden')) wwRenderResearchTree();
   if(!$('ww-air').classList.contains('hidden')) wwRenderAir();
+  if(!$('ww-prod').classList.contains('hidden')) wwRenderProduction();
   if(!$('ww-diplo').classList.contains('hidden')) wwRenderDiplo();
   if(v.over) wwShowEnd(v);
 }
@@ -7484,7 +7503,7 @@ function wwRenderDiplo(){
         '<span class="ww-sw" style="background:'+n.col+'"></span><span style="flex:1">'+n.name+(n.capitulated?' ✝':'')+'</span>'+tag+'</div>'; } }
   el.innerHTML=html;
 }
-function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-air','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
+function wwClosePanels(except){ for(const id of ['ww-focus','ww-research','ww-air','ww-prod','ww-diplo']){ if(id!==except){ const e=$(id); if(e) e.classList.add('hidden'); } } }
 function wwTogglePanel(id, render){ wwSfx('click'); wwClosePanels(id); const e=$(id); if(!e) return;
   const show=e.classList.contains('hidden'); e.classList.toggle('hidden', !show); if(show) render(); }
 function wwToggleFocus(){ wwTogglePanel('ww-focus', wwRenderFocus); }
@@ -7514,6 +7533,32 @@ function wwRenderAir(){
   for(const b of el.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ wwAirDoctrine(WW.player, b.dataset.doc); wwRenderAir(); };
 }
 function wwToggleAir(){ wwTogglePanel('ww-air', wwRenderAir); }
+function wwProdPresetName(mix){ if(!mix) return 'balanced'; let best='balanced',bd=1e9;
+  for(const k in WW_PROD_PRESETS){ const p=WW_PROD_PRESETS[k]; const dist=Math.abs(p.inf-mix.inf)+Math.abs(p.arm-mix.arm)+Math.abs(p.air-mix.air); if(dist<bd){bd=dist;best=k;} } return best; }
+function wwRenderProduction(){
+  const el=$('ww-prod'); if(!el) return; const me=WW.byKey[WW.player]; if(!me){ el.innerHTML=''; return; }
+  if(!me.lineMix) wwInitLines(me);
+  let cInf=0,cArm=0; for(const a of WW.armies){ if(a.nat===me.key){ if(a.kind==='arm') cArm++; else cInf++; } }
+  let html='<h3>PRODUCTION</h3>';
+  html+='<div style="font-size:11px;color:#9fb4c9;margin-bottom:7px">'+Math.round(me.mil)+' military factories · Steel '+wwFmtNum(me.steelStock||0)+' · MP '+wwFmtNum(me.manpower||0)+(me.lowFuel?' · <span style="color:#e0856a">LOW FUEL −30%</span>':'')+'</div>';
+  const lines=[['inf','Infantry','#7fb0e8',cInf,110],['arm','Armour','#e0a06a',cArm,150],['air','Air Wings','#c98ac9',Math.round(wwAirTotal(me)),0]];
+  for(const [k,name,col,count,cost] of lines){
+    const mix=me.lineMix[k]||0, eff=me.lineEff[k]||0, fac=(me.mil||0)*mix;
+    html+='<div class="ww-tech" style="margin-top:9px"><span class="tl">'+name+' <span style="color:#7d93ab;font-size:10px">'+fac.toFixed(1)+' factories · '+count+' deployed</span></span><span class="tv">'+Math.round(mix*100)+'%</span></div>';
+    html+='<div style="font-size:10px;color:#7d93ab;margin:3px 0 1px">efficiency '+Math.round(eff*100)+'%</div>';
+    html+='<div class="ww-bar"><i style="width:'+(100*eff).toFixed(0)+'%;background:'+col+'"></i></div>';
+    if(cost>0){ const prog=Math.min(1,(me.lineProg[k]||0)/cost);
+      html+='<div class="ww-bar" style="margin-top:2px;height:4px"><i style="width:'+(100*prog).toFixed(0)+'%;background:#5c7d4a"></i></div>'; }
+  }
+  html+='<div style="margin-top:12px;font-size:11px;color:#9fb4c9">Production focus</div><div style="margin-top:4px">';
+  const cur=wwProdPresetName(me.lineMix);
+  for(const [k,name] of [['balanced','Balanced'],['infantry','Infantry'],['armoured','Armoured'],['airforce','Air Force']])
+    html+='<span class="ww-rbtn'+(cur===k?' sel':'')+'" data-mix="'+k+'">'+name+'</span>';
+  html+='</div>';
+  el.innerHTML=html;
+  for(const b of el.querySelectorAll('.ww-rbtn')) b.onclick=()=>{ wwSetLineMix(WW.player, WW_PROD_PRESETS[b.dataset.mix]); wwRenderProduction(); };
+}
+function wwToggleProduction(){ wwTogglePanel('ww-prod', wwRenderProduction); }
 function wwRenderCombat(fc){
   const el=$('ww-combat'); if(!el) return;
   if(!fc){ el.classList.add('hidden'); return; }
@@ -7631,6 +7676,7 @@ function wwBindInput(){
   const br=$('ww-btn-research'); if(br) br.onclick=wwOpenResearchPage;
   const rcl=$('ww-res-close'); if(rcl) rcl.onclick=wwCloseResearchPage;
   const ba=$('ww-btn-air'); if(ba) ba.onclick=wwToggleAir;
+  const bp=$('ww-btn-prod'); if(bp) bp.onclick=wwToggleProduction;
   const bd=$('ww-btn-diplo'); if(bd) bd.onclick=wwToggleDiplo;
   const bs=$('ww-btn-supply'); if(bs) bs.onclick=wwToggleSupply;
   const bh=$('ww-btn-help'); if(bh) bh.onclick=()=>{ wwSfx('click'); wwTutStart(true); };
@@ -7958,6 +8004,7 @@ if (typeof module !== 'undefined' && module.exports){
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwAIPlan, wwRelation,
     wwSupplyField, wwRailNetwork, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwAIStep2,
     wwEconomyTick, wwEffMp, WW_CITY_RES, WW_ECO,
+    wwInitLines, wwSetLineMix, wwDeployDivision, WW_PROD_PRESETS,
     wwCoastal, wwInvadeTargets, wwInvade, wwAirFactor, wwBaseAir, wwForecast,
     wwAirTotal, wwAirSup, wwFrontFighters, wwAddAir, wwAirDoctrine, WW_DOCTRINE,
     wwSetBombing, wwAIBombing, wwBombingTick,
@@ -8128,6 +8175,7 @@ if (typeof module !== 'undefined' && module.exports){
     <button id="ww-btn-focus" class="ww-hbtn hidden">★ FOCUS</button>
     <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
     <button id="ww-btn-air" class="ww-hbtn hidden">✈ AIR</button>
+    <button id="ww-btn-prod" class="ww-hbtn hidden">🏭 PRODUCTION</button>
     <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
     <button id="ww-winter-toggle" class="ww-hbtn hidden">❄ WINTER PREP</button>
     <button id="ww-btn-supply" class="ww-hbtn hidden">🗺 SUPPLY</button>
@@ -8142,6 +8190,7 @@ if (typeof module !== 'undefined' && module.exports){
   <div id="ww-focus" class="ww-panel hidden"></div>
   <div id="ww-research" class="ww-panel hidden"></div>
   <div id="ww-air" class="ww-panel hidden"></div>
+  <div id="ww-prod" class="ww-panel hidden"></div>
   <div id="ww-diplo" class="ww-panel hidden"></div>
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-combat" class="hidden"></div>

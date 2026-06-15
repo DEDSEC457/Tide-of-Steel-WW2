@@ -737,6 +737,35 @@ say('— The World at War —');
     E.WW.byKey.GER.fuel===77 && E.WW.byKey.GER.casualties===123456 && E.WW.byKey.GER.manpower===88888);
   E.wwClearSave();
 
+  // --- Phase 26: production lines (HOI4-style factory allocation) ---
+  const Gpl = E.wwSetup('GER','normal'); const gpl=Gpl.byKey.GER;
+  check('WW nations run infantry/armour/air production lines',
+    gpl.lineMix && gpl.lineEff && gpl.lineProg &&
+    Math.abs((gpl.lineMix.inf+gpl.lineMix.arm+gpl.lineMix.air)-1) < 1e-6);
+  // a production focus re-weights the lines (normalised)
+  E.wwSetLineMix('GER', E.WW_PROD_PRESETS.armoured);
+  check('WW a production focus re-weights the lines toward armour',
+    gpl.lineMix.arm > gpl.lineMix.inf && gpl.lineMix.arm > gpl.lineMix.air &&
+    Math.abs((gpl.lineMix.inf+gpl.lineMix.arm+gpl.lineMix.air)-1) < 1e-6);
+  // arbitrary weights are normalised to sum 1
+  E.wwSetLineMix('GER', {inf:2,arm:1,air:1});
+  check('WW production weights are normalised', Math.abs(gpl.lineMix.inf-0.5)<1e-6);
+  // efficiency ramps up the longer a line runs
+  const Gef = E.wwSetup('GER','normal'); const gef=Gef.byKey.GER;
+  gef.steelStock=99999; gef.manpower=9999999; const eff0=gef.lineEff.inf;
+  for(let i=0;i<10;i++) E.wwProduction();
+  check('WW line efficiency ramps up while producing', gef.lineEff.inf > eff0);
+  // an armoured focus fields more tanks than an infantry focus, given equal industry
+  function plTanks(focus){ const G=E.wwSetup('GER','normal'); const g=G.byKey.GER;
+    g.steelStock=99999; g.manpower=9999999; E.wwSetLineMix('GER', E.WW_PROD_PRESETS[focus]);
+    for(let i=0;i<30;i++) E.wwProduction(); return E.wwArmiesOf('GER').filter(a=>a.kind==='arm').length; }
+  check('WW an armoured focus fields more tanks than an infantry focus', plTanks('armoured') > plTanks('infantry'));
+  // deploying a finished division places a real counter of the requested kind
+  const Gdp = E.wwSetup('GER','normal'); const before26=E.wwArmiesOf('GER').length;
+  const okDep = E.wwDeployDivision(Gdp.byKey.GER, 'arm'); const after26=E.wwArmiesOf('GER');
+  check('WW a finished division deploys as a counter of its kind',
+    okDep && after26.length===before26+1 && after26.some(a=>a.kind==='arm' && a.nat==='GER'));
+
   // --- Phase 5: naval invasions ---
   const Gv = E.wwSetup('ENG','normal');
   let pair=null;
