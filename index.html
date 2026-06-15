@@ -7094,7 +7094,7 @@ function wwFit(){ const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
 function wwZoomAt(mx,my,f){ const cam=WW.cam, nz=Math.max(0.18,Math.min(4.5,cam.z*f)), k=nz/cam.z;
   cam.x=mx-(mx-cam.x)*k; cam.y=my-(my-cam.y)*k; cam.z=nz; wwRequest(); }
 
-const WW_DETAIL_LO = 0.95, WW_DETAIL_HI = 1.5;   // crisp detail cross-fades in across this zoom band
+const WW_DETAIL_LO = 0.6, WW_DETAIL_HI = 0.74;   // crisp vector hexes cross-fade in here; the supersampled cache covers below
 function wwSmooth(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
 // lon/lat -> world pixel (matches the generator's Mercator grid), for drawing rivers
 function wwLonLatToWorld(lon,lat){ const g=WW_GEO, YN=wwMercY(g.LAT_N), YS=wwMercY(g.LAT_S);
@@ -7191,8 +7191,12 @@ function wwDrawHexesDetailed(g){
 }
 function wwBuildMapCache(){
   const W=WW, [wW,wH]=wwWorldSize(); WW._cacheW=wwWinterAt(WW.date);
-  const mc=document.createElement('canvas'); mc.width=Math.ceil(wW); mc.height=Math.ceil(wH);
-  const g=mc.getContext('2d'); g.fillStyle='#0c1622'; g.fillRect(0,0,mc.width,mc.height);
+  // supersample the cached base map so the camera can scale it up without going blurry
+  // (the cache serves the zoomed-out range; crisp vector hexes take over up close).
+  // SS is capped so the offscreen canvas stays under mobile's ~16M-pixel limit.
+  const SS=Math.max(1, Math.min(1.5, Math.sqrt(14e6/(wW*wH)))); WW._mapSS=SS; WW._mapW=wW; WW._mapH=wH;
+  const mc=document.createElement('canvas'); mc.width=Math.ceil(wW*SS); mc.height=Math.ceil(wH*SS);
+  const g=mc.getContext('2d'); g.scale(SS,SS); g.fillStyle='#0c1622'; g.fillRect(0,0,wW,wH);
   for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){ const t=W.terr[y][x], [cx,cy]=wwHexCenter(x,y);
     wwHexPath(g,cx,cy,WW_S-0.3);
     if(t==='~'){ g.fillStyle='#16293b'; g.fill(); const hv=(x*2654435761^y*40503)>>>0; if(hv&3){ g.fillStyle='rgba(0,0,0,0.05)'; g.fill(); } continue; }
@@ -7238,13 +7242,14 @@ function wwDrawMinimap(){
   const mm=$('ww-minimap'); if(!mm||!WW.mapCanvas) return; const g=mm.getContext('2d'); const MW=mm.width||184, MH=mm.height||180;
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,MW,MH); g.fillStyle='#0a121c'; g.fillRect(0,0,MW,MH);
   const mc=WW.mapCanvas, sc=Math.min(MW/mc.width, MH/mc.height), dw=mc.width*sc, dh=mc.height*sc, ox=(MW-dw)/2, oy=(MH-dh)/2;
+  const scW=sc*(WW._mapSS||1);   // world-units → minimap-pixels (cache is supersampled)
   g.imageSmoothingEnabled=true; g.drawImage(mc, ox,oy,dw,dh);
   if(WW.mapMode==='supply' && WW._supCanvas) g.drawImage(WW._supCanvas, ox,oy,dw,dh);
   if(WW._frontCanvas) g.drawImage(WW._frontCanvas, ox,oy,dw,dh);
-  WW._mm={sc,ox,oy};
+  WW._mm={sc:scW,ox,oy};
   const cam=WW.cam, cv=$('wwCanvas'), vw=cv.clientWidth||1, vh=cv.clientHeight||1;
   const wx0=(0-cam.x)/cam.z, wy0=(0-cam.y)/cam.z, wx1=(vw-cam.x)/cam.z, wy1=(vh-cam.y)/cam.z;
-  g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=1.3; g.strokeRect(ox+wx0*sc, oy+wy0*sc, (wx1-wx0)*sc, (wy1-wy0)*sc);
+  g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=1.3; g.strokeRect(ox+wx0*scW, oy+wy0*scW, (wx1-wx0)*scW, (wy1-wy0)*scW);
 }
 const WW_TUT=[
  'Welcome to <b>THE WORLD AT WAR</b>. You command <b>{NATION}</b>. Bring every enemy that takes up arms against you to capitulation, and Europe is yours.',
@@ -7288,8 +7293,8 @@ function wwRender(){
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   const dA=wwSmooth(WW_DETAIL_LO, WW_DETAIL_HI, cam.z);
   if(dA>=1){ wwDrawHexesDetailed(ctx); }
-  else if(dA<=0){ ctx.drawImage(WW.mapCanvas,0,0); }
-  else { ctx.drawImage(WW.mapCanvas,0,0); ctx.save(); ctx.globalAlpha=dA; wwDrawHexesDetailed(ctx); ctx.restore(); }
+  else if(dA<=0){ ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); }
+  else { ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); ctx.save(); ctx.globalAlpha=dA; wwDrawHexesDetailed(ctx); ctx.restore(); }
   if(WW.started){ if(WW._stratDirty||!WW._frontCanvas) wwBuildStrategic();
     if(WW.mapMode==='supply' && WW._supCanvas) ctx.drawImage(WW._supCanvas,0,0);
     if(WW._frontCanvas) ctx.drawImage(WW._frontCanvas,0,0); }
