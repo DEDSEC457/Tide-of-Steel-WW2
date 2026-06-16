@@ -7091,8 +7091,28 @@ function wwFit(){ const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
   if(cap){ z=Math.min(2.0, z*2.1); const [wx,wy]=wwHexCenter(cap[0],cap[1]);
     WW.cam={ z, x:vw/2-wx*z, y:vh/2-wy*z };
   } else { WW.cam={ z, x:(vw-wW*z)/2, y:(vh-wH*z)/2 }; } }
-function wwZoomAt(mx,my,f){ const cam=WW.cam, nz=Math.max(0.18,Math.min(4.5,cam.z*f)), k=nz/cam.z;
-  cam.x=mx-(mx-cam.x)*k; cam.y=my-(my-cam.y)*k; cam.z=nz; wwRequest(); }
+// smooth, eased zoom: wheel notches push a target the camera glides toward, anchored
+// under the cursor. While it animates we draw the cheap cached map (see wwRender's
+// _interacting check) and snap back to crisp vector hexes once it settles.
+let wwZoomState=null, wwZoomRAF=0;
+function wwZoomAt(mx,my,f){
+  const cam=WW.cam, curTarget = wwZoomState ? wwZoomState.target : cam.z;
+  const target = Math.max(0.18, Math.min(4.5, curTarget*f));
+  if(Math.abs(target-cam.z) < 1e-4){ return; }
+  wwZoomState = { sx:mx, sy:my, wx:(mx-cam.x)/cam.z, wy:(my-cam.y)/cam.z, target };
+  WW._interacting = true;
+  if(!wwZoomRAF) wwZoomRAF = requestAnimationFrame(wwZoomTick);
+}
+function wwZoomTick(){
+  wwZoomRAF=0; const st=wwZoomState; if(!st||!WW.on){ WW._interacting=false; wwZoomState=null; return; }
+  const cam=WW.cam;
+  cam.z += (st.target - cam.z) * 0.33;                        // exponential ease toward the target
+  if(Math.abs(st.target - cam.z) <= st.target*0.004) cam.z = st.target;
+  cam.x = st.sx - st.wx*cam.z; cam.y = st.sy - st.wy*cam.z;   // keep the cursor over the same world point
+  wwRender();
+  if(cam.z === st.target){ wwZoomState=null; WW._interacting=false; wwRequest(); }   // settled → one crisp redraw
+  else wwZoomRAF = requestAnimationFrame(wwZoomTick);
+}
 
 const WW_DETAIL_LO = 0.6, WW_DETAIL_HI = 0.74;   // crisp vector hexes cross-fade in here; the supersampled cache covers below
 function wwSmooth(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
@@ -7291,7 +7311,9 @@ function wwRender(){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#0a0f16'; ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
   ctx.translate(cam.x,cam.y); ctx.scale(cam.z,cam.z);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-  const dA=wwSmooth(WW_DETAIL_LO, WW_DETAIL_HI, cam.z);
+  // while zooming/panning, draw the cheap cached map when lots of hexes are on screen
+  // (zoomed out / mid); when zoomed in only a handful are visible, so keep crisp detail.
+  const dA = (WW._interacting && cam.z < 1.3) ? 0 : wwSmooth(WW_DETAIL_LO, WW_DETAIL_HI, cam.z);
   if(dA>=1){ wwDrawHexesDetailed(ctx); }
   else if(dA<=0){ ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); }
   else { ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); ctx.save(); ctx.globalAlpha=dA; wwDrawHexesDetailed(ctx); ctx.restore(); }
@@ -7746,13 +7768,15 @@ function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove
 function wwBindInput(){
   if(wwBound) return; wwBound=true; const cv=$('wwCanvas');
   cv.addEventListener('mousedown',e=>{ if(!WW.on) return; wwDrag=true; wwDragMoved=false; wwLMx=e.clientX; wwLMy=e.clientY; cv.classList.add('drag'); });
+  // (panning renders the cheap cached map; full detail returns on release — see _interacting)
   window.addEventListener('mousemove',e=>{ if(!WW.on) return;
     if(wwDrag){ const dx=e.clientX-wwLMx, dy=e.clientY-wwLMy;
-      if(Math.abs(dx)+Math.abs(dy)>3) wwDragMoved=true; WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); return; }
+      if(Math.abs(dx)+Math.abs(dy)>3){ wwDragMoved=true; WW._interacting=true; } WW.cam.x+=dx; WW.cam.y+=dy; wwLMx=e.clientX; wwLMy=e.clientY; wwRequest(); return; }
     const r=cv.getBoundingClientRect(); wwHoverForecast(e.clientX-r.left, e.clientY-r.top); });
   window.addEventListener('mouseup',e=>{ if(!WW.on){ wwDrag=false; return; }
     if(wwDrag && !wwDragMoved){ const r=cv.getBoundingClientRect(); wwClickHex(wwPick(e.clientX-r.left, e.clientY-r.top)); }
-    wwDrag=false; cv.classList.remove('drag'); });
+    wwDrag=false; cv.classList.remove('drag');
+    if(wwDragMoved && !wwZoomState){ WW._interacting=false; wwRequest(); } });   // settled → one crisp redraw
   cv.addEventListener('wheel',e=>{ if(!WW.on) return; e.preventDefault(); const r=cv.getBoundingClientRect(); wwZoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:1/1.12); }, {passive:false});
   window.addEventListener('resize',()=>{ if(WW.on){ wwResize(); wwRequest(); } });
   window.addEventListener('keydown',e=>{ if(!WW.on) return;
@@ -7780,7 +7804,7 @@ function wwBindInput(){
     wwToast(me.winterizing?'Winter preparations begun — diverting 30% of production':'Winter preparations halted'); wwUpdateHUD(); };
 }
 // expose a few entry points on window for debugging / headless rendering (no-op in tests)
-if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; }
+if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRender; window.wwDoEndTurn=wwDoEndTurn; window.wwSelectArmy=wwSelectArmy; window.wwFit=wwFit; window.wwZoomAt=wwZoomAt; }
 
 /* mode-select routing — each sub-menu shows its own Continue button only if that
    slot actually holds a saved campaign */
