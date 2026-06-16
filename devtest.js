@@ -632,6 +632,20 @@ say('— The World at War —');
   check('WW ownership stays consistent after conquest',
     (()=>{ let o=0; for(let i=0;i<G.own.length;i++) if(G.own[i]>=0) o++; let land=0;
       for(const r of D.owner) for(const c of r) if(c!=='.') land++; return o===land; })());
+  // peace conference: conquered land is split by who militarily OCCUPIES it; co-belligerents
+  // who merely declared war (no troops on the ground) get nothing.
+  const Gpc = E.wwSetup('GER','normal');
+  E.wwDeclareWar('GER','POL'); E.wwDeclareWar('SOV','POL');
+  const pcGi=Gpc.byKey.GER.i, pcSi=Gpc.byKey.SOV.i, pcPi=Gpc.byKey.POL.i;
+  let polCells=[]; for(let i=0;i<Gpc.own.length;i++) if(Gpc.own[i]===pcPi) polCells.push([i%Gpc.cols,(i/Gpc.cols)|0]);
+  polCells.sort((a,b)=>a[0]-b[0]);   // west → east
+  Gpc.armies.length=0; let aid=1; const nP=polCells.length;
+  for(let k=0;k<Math.floor(nP*0.65);k+=2){ const [x,y]=polCells[k]; Gpc.armies.push({id:aid++,nat:'GER',x,y,kind:'inf',str:5,maxStr:5,org:6,maxOrg:6,mp:2,moved:false}); } // Germany holds the west
+  for(let k=Math.floor(nP*0.85);k<nP;k+=2){ const [x,y]=polCells[k]; Gpc.armies.push({id:aid++,nat:'SOV',x,y,kind:'inf',str:5,maxStr:5,org:6,maxOrg:6,mp:2,moved:false}); } // the USSR holds the east
+  E.wwCapitulate('POL','GER'); E.wwComputeStats();
+  let gGain=0,sGain=0; for(const [x,y] of polCells){ const o=Gpc.own[y*Gpc.cols+x]; if(o===pcGi)gGain++; else if(o===pcSi)sGain++; }
+  check('WW peace conference splits conquered land by who occupies it (bystanders get nothing)',
+    Gpc.byKey.POL.hexes===0 && gGain+sGain===nP && gGain > sGain && sGain > 0);
   // run many AI turns without crashing; the calendar advances correctly
   const G2 = E.wwSetup('GER'); const y0=G2.date.y, startTurn=G2.turn;
   let vr; for(let t=0;t<30;t++){ vr=E.wwEndTurn(); if(vr.over) break; }

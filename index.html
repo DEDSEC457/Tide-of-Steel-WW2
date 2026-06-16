@@ -4719,13 +4719,14 @@ function wwCapitulate(fallenKey, byKey){
     for(const o of caps){ const dd=(o.cap[0]-x)*(o.cap[0]-x)+(o.cap[1]-y)*(o.cap[1]-y); if(dd<bd){ bd=dd; best=o.v; } } return best; };
   if(victors.length<=1){ const w=victors[0]||by; if(w){ for(let i=0;i<WW.own.length;i++) if(WW.own[i]===f.i) WW.own[i]=w.i;
       for(const c of WW.cities) if(c.nat===fallenKey) c.nat=w.key; } }
-  else { // territorial partition: each fallen hex goes to the nearest victor land (multi-source BFS)
-    const label=new Int16Array(WW.own.length).fill(-1); const q=[]; let qi=0;
-    for(let i=0;i<WW.own.length;i++){ const v=WW.own[i]; if(v>=0 && victors.indexOf(WW.nat[v])>=0){ label[i]=v; q.push(i); } }
-    while(qi<q.length){ const i=q[qi++], x=i%WW.cols, y=(i/WW.cols)|0;
-      for(const [nx,ny] of wwNb(x,y)){ const j=ny*WW.cols+nx; if(label[j]>=0 || WW.own[j]!==f.i) continue; label[j]=label[i]; q.push(j); } }
-    for(let i=0;i<WW.own.length;i++){ if(WW.own[i]!==f.i) continue;
-      if(label[i]>=0) WW.own[i]=label[i]; else { const x=i%WW.cols, y=(i/WW.cols)|0; WW.own[i]=assign(x,y).i; } }
+  else { // peace conference: each fallen hex goes to the victor that militarily OCCUPIES it
+         // (its nearest army), so the power that actually did the conquering keeps the land —
+         // not whoever merely shared a border. Nearest-capital is only a fallback for gaps.
+    const vArmies = WW.armies.filter(ar=>{ const v=WW.byKey[ar.nat]; return v && v.key!==fallenKey && victors.indexOf(v)>=0; });
+    const occupier=(x,y)=>{ let best=null, bd=1e18;
+      for(const ar of vArmies){ const dd=(ar.x-x)*(ar.x-x)+(ar.y-y)*(ar.y-y); if(dd<bd){ bd=dd; best=ar; } }
+      return best ? WW.byKey[best.nat] : assign(x,y); };
+    for(let i=0;i<WW.own.length;i++){ if(WW.own[i]!==f.i) continue; const x=i%WW.cols, y=(i/WW.cols)|0; WW.own[i]=occupier(x,y).i; }
     for(const c of WW.cities) if(c.nat===fallenKey){ const o=WW.own[c.y*WW.cols+c.x]; c.nat = o>=0?WW.nat[o].key:(by||victors[0]).key; } }
   WW.armies=WW.armies.filter(ar=>ar.nat!==fallenKey);
   if(WW.log) WW.log.push(f.name+(victors.length>1?' is partitioned among the victors at the peace table!':' capitulates to '+((by||victors[0])?(by||victors[0]).name:'the enemy')+'!'));
