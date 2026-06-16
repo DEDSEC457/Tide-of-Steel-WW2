@@ -4710,9 +4710,13 @@ function wwCaptureHex(x,y,natKey){
 function wwCapitulate(fallenKey, byKey){
   const f=WW.byKey[fallenKey]; if(!f||f.capitulated) return;
   const by=WW.byKey[byKey];
-  // the peace conference: everyone still at war with the fallen power shares the spoils
-  const victors=WW.nat.filter(m=>!m.capitulated && m.key!==fallenKey && wwAtWar(m.key,fallenKey));
+  // the peace conference: only the major powers (and the human player) sit at the table —
+  // minor co-belligerents who merely declared war don't carve off the spoils. Their occupied
+  // hexes fall to the nearest major instead. If no major is involved, the original victors split it.
+  let victors=WW.nat.filter(m=>!m.capitulated && m.key!==fallenKey && wwAtWar(m.key,fallenKey));
   if(by && !by.capitulated && by.key!==fallenKey && victors.indexOf(by)<0) victors.push(by);
+  const majors=victors.filter(v=> WW_POWER[v.key] || v.key===WW.player );
+  if(majors.length) victors=majors;
   f.capitulated=true; f.focusProg=null;
   const caps=victors.map(v=>({v,cap:wwCapitalHex(v.key)})).filter(o=>o.cap);
   const assign=(x,y)=>{ if(!caps.length) return by||victors[0]||f; let best=caps[0].v, bd=1e18;

@@ -642,10 +642,13 @@ say('— The World at War —');
   Gpc.armies.length=0; let aid=1; const nP=polCells.length;
   for(let k=0;k<Math.floor(nP*0.65);k+=2){ const [x,y]=polCells[k]; Gpc.armies.push({id:aid++,nat:'GER',x,y,kind:'inf',str:5,maxStr:5,org:6,maxOrg:6,mp:2,moved:false}); } // Germany holds the west
   for(let k=Math.floor(nP*0.85);k<nP;k+=2){ const [x,y]=polCells[k]; Gpc.armies.push({id:aid++,nat:'SOV',x,y,kind:'inf',str:5,maxStr:5,org:6,maxOrg:6,mp:2,moved:false}); } // the USSR holds the east
+  const pcHi = Gpc.byKey.HUN ? Gpc.byKey.HUN.i : -1;   // a minor that occupies central Poland but isn't a major
+  if(pcHi>=0){ const [hx,hy]=polCells[Math.floor(nP*0.75)]; Gpc.armies.push({id:aid++,nat:'HUN',x:hx,y:hy,kind:'inf',str:5,maxStr:5,org:6,maxOrg:6,mp:2,moved:false}); }
   E.wwCapitulate('POL','GER'); E.wwComputeStats();
-  let gGain=0,sGain=0; for(const [x,y] of polCells){ const o=Gpc.own[y*Gpc.cols+x]; if(o===pcGi)gGain++; else if(o===pcSi)sGain++; }
+  let gGain=0,sGain=0,hGain=0; for(const [x,y] of polCells){ const o=Gpc.own[y*Gpc.cols+x]; if(o===pcGi)gGain++; else if(o===pcSi)sGain++; else if(o===pcHi)hGain++; }
   check('WW peace conference splits conquered land by who occupies it (bystanders get nothing)',
     Gpc.byKey.POL.hexes===0 && gGain+sGain===nP && gGain > sGain && sGain > 0);
+  check('WW only majors (and the player) sit at the peace table — a minor occupier gets nothing', hGain===0);
   // run many AI turns without crashing; the calendar advances correctly
   const G2 = E.wwSetup('GER'); const y0=G2.date.y, startTurn=G2.turn;
   let vr; for(let t=0;t<30;t++){ vr=E.wwEndTurn(); if(vr.over) break; }
