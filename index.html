@@ -7141,9 +7141,18 @@ function wwSmoothPath(p, seg){ if(p.length<3) return p.slice(); const out=[];
                  0.5*((2*b[1])+(-a[1]+c[1])*s+(2*a[1]-5*b[1]+4*c[1]-d[1])*s2+(-a[1]+3*b[1]-3*c[1]+d[1])*s3) ]); } }
   out.push(p[p.length-1]); return out; }
 // layered, tapered river (dark bank + water body + light sheen), narrow at source -> wide at mouth
+// the smoothed river polylines are static — build them once, not every frame
+let wwRiverPathCache=null;
+function wwRiverPaths(){ if(wwRiverPathCache) return wwRiverPathCache;
+  wwRiverPathCache = WW_RIVERS.map(riv=>({ w:riv.w, pts: wwSmoothPath(riv.p.map(q=>wwLonLatToWorld(q[0],q[1])), 7) }));
+  return wwRiverPathCache; }
 function wwDrawRivers(g){ g.lineCap='round'; g.lineJoin='round';
-  for(const riv of WW_RIVERS){ const wp=riv.p.map(q=>wwLonLatToWorld(q[0],q[1])); const pts=wwSmoothPath(wp,7), N=pts.length;
-    for(let i=1;i<N;i++){ const f=i/N, wd=(0.5+f*1.9)*riv.w, a=pts[i-1], b=pts[i];
+  const cv=$('wwCanvas'), cam=WW.cam, vw=cv.clientWidth||1600, vh=cv.clientHeight||900, M=30/cam.z;
+  const wx0=(0-cam.x)/cam.z-M, wx1=(vw-cam.x)/cam.z+M, wy0=(0-cam.y)/cam.z-M, wy1=(vh-cam.y)/cam.z+M;
+  for(const riv of wwRiverPaths()){ const pts=riv.pts, N=pts.length;
+    for(let i=1;i<N;i++){ const a=pts[i-1], b=pts[i];
+      if((a[0]<wx0&&b[0]<wx0)||(a[0]>wx1&&b[0]>wx1)||(a[1]<wy0&&b[1]<wy0)||(a[1]>wy1&&b[1]>wy1)) continue;   // off-screen
+      const f=i/N, wd=(0.5+f*1.9)*riv.w;
       g.strokeStyle='rgba(16,34,52,0.42)'; g.lineWidth=wd+1.1; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke();
       g.strokeStyle='rgba(62,122,176,0.96)'; g.lineWidth=wd;     g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke();
       if(wd>1.05){ g.strokeStyle='rgba(158,203,234,0.5)'; g.lineWidth=wd*0.32; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke(); } } }
