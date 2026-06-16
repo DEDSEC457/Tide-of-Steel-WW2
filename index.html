@@ -4904,7 +4904,7 @@ function wwResearchTick(n){ if(!n.techDone) wwTechInit(n);
   n.research += wwResearchOutput(n);
   const t=wwTechById(n.researching); if(!t){ n.researching=null; return; }
   if(n.research >= t.cost){ n.research -= t.cost; n.techDone.add(t.id); wwApplyFocus(n, t.fx);
-    if(WW.log && n.key===WW.player) WW.log.push('Researched: '+t.name);
+    if(n.key===WW.player) (WW.notify=WW.notify||[]).push({kind:'research', name:t.name, fx:t.fx});
     n.researching=null; if(n.key!==WW.player){ const av=wwAvailableTechs(n.key); if(av.length) n.researching=wwAIPickTech(n,av); } } }
 
 // ---- national focus: a short scripted tree of historical decisions per major ----
@@ -5033,7 +5033,9 @@ function wwFocusTick(n){
   if(!n.focusProg){ if(n.key!==WW.player) wwStartFocus(n.key); return; }
   n.focusProg.turnsLeft--;
   if(n.focusProg.turnsLeft<=0){ const f=wwFocusById(n.key, n.focusProg.id);
-    if(f){ n.focusDone=n.focusDone||new Set(); n.focusDone.add(f.id); wwApplyFocus(n,f.fx); if(WW.log) WW.log.push(n.name+' completes focus: '+f.name); }
+    if(f){ n.focusDone=n.focusDone||new Set(); n.focusDone.add(f.id); wwApplyFocus(n,f.fx);
+      if(n.key===WW.player) (WW.notify=WW.notify||[]).push({kind:'focus', name:f.name, fx:f.fx});
+      else if(WW.log) WW.log.push(n.name+' completes focus: '+f.name); }
     n.focusProg=null; if(n.key!==WW.player) wwStartFocus(n.key); } }
 
 // air power: a national air force that grows from industry and tips battles via air superiority
@@ -7464,7 +7466,7 @@ function wwDoEndTurn(){ wwSfx('endturn');
   if(!WW.started || (WW.result&&WW.result.over)) return;
   const v=wwEndTurn(); WW._mapDirty=true; wwSave();
   wwSelArmy=null; wwReachSet=null; wwTargetSet=null; wwDeclareSet=null; wwInvadeSet=null;
-  wwDrainLog();
+  wwDrainLog(); wwDrainNotify();
   wwUpdateHUD(); wwUpdateInfo(); wwRequest();
   if(!$('ww-focus-page').classList.contains('hidden')) wwRenderFocusTree();
   if(!$('ww-research-page').classList.contains('hidden')) wwRenderResearchTree();
@@ -7480,12 +7482,42 @@ function wwSfx(name){ try{
   else if(name==='boom'){ sBoom(); }
   else if(name==='city'){ sCity(); }
   else if(name==='endturn'){ tone(294,0.07,'triangle',0.05); setTimeout(()=>tone(247,0.12,'triangle',0.05),90); }
+  else if(name==='notify'){ tone(659,0.09,'triangle',0.05); setTimeout(()=>tone(880,0.10,'triangle',0.05),95); setTimeout(()=>tone(1175,0.20,'triangle',0.05),195); }
   else if(name==='win'){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.26,'square',0.06),i*150)); }
   else if(name==='lose'){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.36,'sawtooth',0.06),i*200)); }
 }catch(e){} }
 function wwDrainLog(){ if(!WW.log) return; while(WW.log.length){ const msg=WW.log.shift();
   if(/capitulat|partition/i.test(msg)) wwSfx('city'); else if(/declares war/i.test(msg)) wwSfx('boom');
   wwToast(msg); } }
+// HOI4-style completion popup for the player's national focus & research
+function wwFxDesc(fx){ if(!fx||!fx.length) return ''; const t=fx[0];
+  if(t==='factory'){ const c=fx[1]||0, mil=fx[2]||0; return (c?'+'+c+' civilian':'')+(c&&mil?' · ':'')+(mil?'+'+mil+' military':'')+' factories'; }
+  if(t==='air') return '+'+fx[1]+' aircraft';
+  if(t==='research') return '+'+fx[1]+' research';
+  if(t==='land') return '+'+Math.round(fx[1]*100)+'% land combat power';
+  if(t==='log') return '+'+fx[1]+' supply range';
+  if(t==='army') return '+'+fx[1]+' divisions deployed';
+  if(t==='gear') return '+'+Math.round(fx[1]*100)+'% winter readiness';
+  if(t==='wargoal') return 'War declared on '+((WW.byKey[fx[1]]&&WW.byKey[fx[1]].name)||fx[1]);
+  return ''; }
+let wwNotifyQueue=[], wwNotifyActive=false, wwNotifyTimer=0;
+function wwDrainNotify(){ if(WW.notify&&WW.notify.length){ while(WW.notify.length) wwNotifyQueue.push(WW.notify.shift()); }
+  if(!wwNotifyActive) wwNotifyNext(); }
+function wwNotifyNext(){ const ev=wwNotifyQueue.shift(); const el=$('ww-notify'); if(!el) return;
+  if(!ev){ wwNotifyActive=false; el.classList.remove('show'); el.classList.add('hidden'); return; }
+  wwNotifyActive=true; const isFocus=ev.kind==='focus'; const desc=wwFxDesc(ev.fx);
+  wwSfx('notify');
+  el.innerHTML='<div class="ww-noti '+(isFocus?'foc':'res')+'">'+
+    '<div class="ww-noti-ico">'+(isFocus?'★':'⚗')+'</div>'+
+    '<div class="ww-noti-bd"><div class="ww-noti-kind">'+(isFocus?'National Focus Completed':'Research Completed')+'</div>'+
+    '<div class="ww-noti-name">'+ev.name+'</div>'+(desc?'<div class="ww-noti-fx">'+desc+'</div>':'')+'</div>'+
+    '<div class="ww-noti-x">✕</div></div>';
+  el.classList.remove('hidden'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(wwNotifyTimer);
+  const dismiss=()=>{ clearTimeout(wwNotifyTimer); el.classList.remove('show'); setTimeout(wwNotifyNext, 260); };
+  el.onclick=dismiss;
+  wwNotifyTimer=setTimeout(dismiss, 4600);
+}
 
 function wwDateStr(){ const M=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const d=WW.date; return d.d+' '+M[d.m-1]+' '+d.y; }
@@ -8198,6 +8230,24 @@ if (typeof module !== 'undefined' && module.exports){
       flex-direction:column;gap:6px;align-items:center;pointer-events:none;}
     .ww-toast-msg{background:#1a1020e8;border:1px solid #6a3a4a;color:#ffd9c2;font-size:13px;font-weight:600;
       padding:8px 16px;border-radius:7px;box-shadow:0 4px 16px #000a;}
+    #ww-notify{position:absolute;left:50%;top:96px;transform:translate(-50%,-22px);z-index:8;
+      opacity:0;pointer-events:none;transition:opacity .28s ease, transform .28s cubic-bezier(.2,.9,.3,1.2);}
+    #ww-notify.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+    #ww-notify.hidden{display:none;}
+    .ww-noti{display:flex;align-items:center;gap:13px;min-width:300px;max-width:460px;cursor:pointer;
+      background:linear-gradient(180deg,#16243aF7,#0e1726F7);border:1px solid #38597f;border-top:2px solid #5b85b8;
+      border-radius:11px;padding:12px 16px;box-shadow:0 12px 40px #000c, inset 0 1px 0 #ffffff14;}
+    .ww-noti.foc{border-top-color:#e7c14a;}
+    .ww-noti.res{border-top-color:#6fb0e0;}
+    .ww-noti-ico{font-size:26px;width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;
+      border-radius:9px;background:#0b1422;border:1px solid #2c4a6e;}
+    .ww-noti.foc .ww-noti-ico{color:#ffd34d;border-color:#7a6420;text-shadow:0 0 12px #ffd34d66;}
+    .ww-noti.res .ww-noti-ico{color:#8fd0ff;border-color:#2c5e7e;text-shadow:0 0 12px #6fb0e066;}
+    .ww-noti-bd{flex:1;text-align:left;}
+    .ww-noti-kind{font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#9fb4c9;font-weight:700;}
+    .ww-noti-name{font-size:16px;font-weight:700;color:#f1f6fb;margin-top:1px;}
+    .ww-noti-fx{font-size:12px;color:#8fd99a;margin-top:3px;font-weight:600;}
+    .ww-noti-x{color:#6f86a0;font-size:13px;align-self:flex-start;}
     #ww-combat{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;background:#0d1826f6;
       border:1px solid #2c4a6e;border-radius:11px;padding:10px 18px;min-width:248px;
       text-align:center;box-shadow:0 8px 32px #000b;}
@@ -8320,6 +8370,7 @@ if (typeof module !== 'undefined' && module.exports){
   <button id="ww-endturn" class="hidden">END TURN ▶</button>
   <div id="ww-combat" class="hidden"></div>
   <div id="ww-toast"></div>
+  <div id="ww-notify" class="hidden"></div>
   <div id="ww-tut" class="hidden">
     <div id="ww-tut-text"></div>
     <div id="ww-tut-dots"></div>
