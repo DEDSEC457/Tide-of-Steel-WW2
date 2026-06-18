@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operation Barbarossa — Eastern Front 1941</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0d0f0c; --panel:#161a14; --panel2:#1d2218; --line:#3a4430;
+    --ink:#d8d4c0; --dim:#8d8a76; --amber:#e8b34b; --red:#c4453a; --redL:#e06a5f;
+    --grn:#7a9d54; --cyan:#69c5c9; --ger:#5a6470; --sov:#a93226;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; user-select:none;}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:"Segoe UI",Tahoma,Verdana,sans-serif;color:var(--ink);}
+  #map{position:absolute;inset:0;cursor:grab;}
+  #map.dragging{cursor:grabbing;}
+
+  /* ---------- top bar ---------- */
+  #topbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    gap:14px;padding:0 14px;background:linear-gradient(#181c13ee,#12150eee);
+    border-bottom:1px solid var(--line);z-index:20;font-size:14px;}
+  #topbar .t-title{font-weight:700;letter-spacing:2px;color:var(--amber);font-size:15px;white-space:nowrap;}
+  #topbar .t-chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+    padding:4px 10px;white-space:nowrap;}
+  #topbar .t-chip b{color:var(--amber);}
+  #wx-chip.mud b{color:#b07d4f;} #wx-chip.snow b{color:#cfe6ef;} #wx-chip.freeze b{color:#9fc7d8;}
+  #wx-chip{cursor:pointer;} #wx-chip:hover{border-color:var(--amber);}
+  .clk{display:flex;gap:12px;padding:7px 9px;border-radius:6px;margin:3px 0;font-size:13px;line-height:1.45;}
+  .clk .c-turns{color:var(--dim);min-width:150px;flex-shrink:0;}
+  .clk.now{background:#262d1a;border:1px solid var(--amber);}
+  #topbar .spacer{flex:1;}
+  button{font-family:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:6px 14px;font-size:14px;cursor:pointer;}
+  button:hover{border-color:var(--amber);color:var(--amber);}
+  button:disabled{opacity:.4;cursor:default;}
+  button.primary{background:#4a3b18;border-color:var(--amber);color:#ffd98a;font-weight:600;}
+  button.primary:hover{background:#5d4a1d;}
+  button.danger{border-color:var(--red);color:var(--redL);}
+
+  /* ---------- side panel ---------- */
+  #side{position:absolute;top:60px;right:8px;width:262px;z-index:20;display:flex;
+    flex-direction:column;gap:8px;max-height:calc(100% - 130px);}
+  .card{background:#14180fdd;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-size:13px;line-height:1.45;}
+  .card h3{font-size:11px;letter-spacing:2px;color:var(--dim);margin-bottom:6px;font-weight:600;}
+  .card .big{font-size:15px;font-weight:700;}
+  .ger .big{color:#aeb9c6;} .sov .big{color:#e88c80;}
+  .statrow{display:flex;justify-content:space-between;margin:1px 0;}
+  .statrow span:last-child{color:var(--amber);font-weight:600;}
+  .bad{color:var(--redL)!important;} .good{color:var(--grn)!important;}
+  #unit-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  #unit-actions button{padding:4px 10px;font-size:12px;}
+  #preview-card .vs{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
+  #log-card{overflow-y:auto;min-height:60px;}
+  #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
+  #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys{color:var(--amber);}
+
+  /* ---------- bottom hint ---------- */
+  #hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
+    background:#14180fcc;border:1px solid var(--line);border-radius:8px;padding:6px 16px;
+    font-size:13px;color:var(--dim);white-space:nowrap;}
+  #hint b{color:var(--ink);}
+
+  /* ---------- modals ---------- */
+  .modal-back{position:absolute;inset:0;background:#000a;z-index:40;display:flex;
+    align-items:center;justify-content:center;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:26px 30px;max-width:660px;width:92%;max-height:88%;overflow-y:auto;
+    box-shadow:0 12px 60px #000c;}
+  .modal h2{color:var(--amber);letter-spacing:3px;font-size:20px;margin-bottom:12px;}
+  .modal p,.modal li{font-size:14px;line-height:1.55;color:var(--ink);}
+  .modal ul{margin:8px 0 8px 20px;}
+  .modal .mrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .hidden{display:none!important;}
+
+  /* ---------- title screen ---------- */
+  #menu{background:radial-gradient(1200px 700px at 50% 30%, #1d2415 0%, #0a0c08 70%);}
+  #menu .modal{max-width:740px;background:#11150cf2;text-align:center;border-color:#4a5538;}
+  #menu h1{font-size:34px;letter-spacing:6px;color:var(--amber);text-shadow:0 0 22px #e8b34b44;}
+  #menu .sub{color:var(--dim);letter-spacing:3px;font-size:13px;margin:4px 0 18px;}
+  #menu .pick-row{display:flex;gap:14px;justify-content:center;margin:14px 0;}
+  .pick{flex:1;max-width:280px;border:1px solid var(--line);border-radius:10px;padding:14px;
+    cursor:pointer;background:var(--panel2);text-align:left;}
+  .pick:hover{border-color:var(--amber);}
+  .pick.sel{border-color:var(--amber);box-shadow:0 0 14px #e8b34b33;background:#242a1b;}
+  .pick h4{font-size:15px;margin-bottom:4px;} .pick p{font-size:12px;color:var(--dim);line-height:1.4;}
+  .pick.p-ger h4{color:#b9c4d2;} .pick.p-sov h4{color:#e88c80;}
+  #menu .opt-row{display:flex;gap:8px;justify-content:center;margin:8px 0 18px;flex-wrap:wrap;}
+  .opt{border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+    color:var(--dim);background:var(--panel2);}
+  .opt.sel{color:var(--amber);border-color:var(--amber);}
+  #menu .start-btn{font-size:17px;padding:12px 44px;letter-spacing:2px;}
+  #menu .foot{margin-top:14px;font-size:12px;color:var(--dim);}
+
+  /* ---------- end screen ---------- */
+  #end-modal h2.win{color:var(--grn);} #end-modal h2.lose{color:var(--redL);}
+  #end-stats{margin:10px 0;font-size:14px;}
+
+  /* AI banner */
+  #ai-banner{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:25;
+    background:#1b1410ee;border:1px solid var(--red);color:var(--redL);border-radius:8px;
+    padding:8px 22px;font-size:14px;letter-spacing:2px;}
+  #pass-banner{font-size:16px;}
+  .pulse{animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* ---------- polish pass ---------- */
+  button{background:linear-gradient(#262c1d,#181d12);box-shadow:0 1px 3px #0009;
+    transition:border-color .15s, color .15s, box-shadow .15s;}
+  button:hover{box-shadow:0 1px 6px #000b, 0 0 8px #e8b34b22;}
+  button.primary{background:linear-gradient(#564418,#3d3114);}
+  button.primary:hover{background:linear-gradient(#64511f,#473a18);}
+  .card{box-shadow:0 4px 16px #0008;border-radius:9px;}
+  .t-chip{background:linear-gradient(#222719,#191e12)!important;box-shadow:0 1px 3px #0008;}
+  .modal{animation:fadeUp .22s ease-out;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  #menu h1{animation:titleGlow 3.5s ease-in-out infinite alternate;}
+  @keyframes titleGlow{from{text-shadow:0 0 16px #e8b34b33;}to{text-shadow:0 0 34px #e8b34b88,0 0 80px #e8b34b22;}}
+  .pick{transition:border-color .15s, box-shadow .15s, background .15s;}
+  #hint{box-shadow:0 2px 10px #0008;}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0;font-size:14px;}
+  .setrow input[type=range]{width:150px;accent-color:var(--amber);}
+  .setrow .vlabel{color:var(--amber);min-width:42px;text-align:right;font-weight:600;}
+  .gfx-seg{display:flex;gap:0;}
+  .gfx-seg button{padding:6px 14px;font-size:13px;border-radius:0;border:1px solid var(--line);border-left-width:0;background:#181d12;}
+  .gfx-seg button:first-child{border-left-width:1px;border-radius:6px 0 0 6px;}
+  .gfx-seg button:last-child{border-radius:0 6px 6px 0;}
+  .gfx-seg button.sel{background:#2a3119;color:var(--amber);border-color:var(--amber);}
+
+  ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
+
+  /* ---------- mode select screen ---------- */
+  #mode-select{background:radial-gradient(ellipse 1400px 800px at 50% 35%, #192010 0%, #07090a 75%);}
+  #mode-select .modal{max-width:880px;background:#0d1108f5;text-align:center;border-color:#3d4e2a;position:relative;}
+  #mode-select h1{font-size:36px;letter-spacing:7px;color:var(--amber);text-shadow:0 0 28px #e8b34b55;
+    animation:titleGlow 3.5s ease-in-out infinite alternate;}
+  #mode-select .sub{color:var(--dim);letter-spacing:4px;font-size:11px;margin:4px 0 20px;}
+  #btn-settings-main{position:absolute;top:16px;right:16px;padding:6px 12px;font-size:13px;}
+  .mode-row{display:flex;gap:14px;justify-content:center;margin:0;}
+  .mode-card{flex:1;max-width:300px;border:1px solid var(--line);border-radius:14px;padding:20px 18px 18px;
+    cursor:pointer;background:var(--panel2);text-align:left;position:relative;overflow:hidden;
+    transition:border-color .2s, box-shadow .2s, background .2s;}
+  .mode-card:hover{border-color:var(--amber);box-shadow:0 0 30px #e8b34b22;background:#1d2415;}
+  .mc-badge{position:absolute;top:12px;right:12px;font-size:10px;letter-spacing:2px;
+    padding:2px 7px;border-radius:4px;font-weight:700;}
+  .mc-badge.ready{background:#1c2e0f;color:var(--grn);border:1px solid #4a7a28;}
+  .mc-badge.wip{background:#2a1e0c;color:#c8923a;border:1px solid #8a5a18;}
+  .mode-card .mc-icon{font-size:34px;margin-bottom:8px;line-height:1;}
+  .mode-card h2{font-size:16px;letter-spacing:3px;color:var(--amber);margin-bottom:6px;}
+  .mode-card .mc-desc{font-size:12px;color:var(--ink);line-height:1.5;margin-bottom:14px;}
+  .mode-card .mc-btn{width:100%;font-size:13px;padding:9px;text-align:center;display:block;}
+  .mc-hero{max-width:none;flex:none;width:100%;padding:22px 26px;margin-bottom:12px;}
+  .mc-hero .mc-inner{display:flex;align-items:center;gap:22px;}
+  .mc-hero .mc-icon{font-size:44px;margin-bottom:0;flex-shrink:0;}
+  .mc-hero .mc-text{flex:1;text-align:left;}
+  .mc-hero h2{font-size:22px;letter-spacing:4px;margin-bottom:5px;}
+  .mc-hero .mc-desc{font-size:13px;margin-bottom:0;}
+  .mc-hero .mc-badge{position:static;display:inline-block;margin-bottom:5px;}
+  .mc-hero .mc-btn{width:160px;flex-shrink:0;padding:12px 0;font-size:14px;}
+  #mode-select .foot{margin-top:10px;font-size:12px;color:var(--dim);}
+  /* realistic mode */
+  #realistic-menu{background:radial-gradient(ellipse 1400px 800px at 50% 35%, #192010 0%, #07090a 75%);}
+  #realistic-menu .modal{max-width:640px;text-align:center;}
+  .rm-features{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:16px 20px;margin:20px auto 0;max-width:400px;text-align:left;
+    font-size:13px;color:var(--ink);line-height:1.9;}
+  .rm-features .rml{color:var(--dim);font-size:11px;letter-spacing:2px;margin-bottom:10px;}
+
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+
+<div id="topbar" class="hidden">
+  <span class="t-title" id="game-title">⚙ BARBAROSSA</span>
+  <span class="t-chip" id="date-chip"><b>Turn 1</b> · 22 Jun 1941</span>
+  <span class="t-chip" id="wx-chip">Weather: <b>Clear</b></span>
+  <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
+  <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
+  <span class="spacer"></span>
+  <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚 Supply</button>
+  <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
+  <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
+  <button id="btn-help2" title="How to play">Help</button>
+  <button id="btn-sound" title="Sound & graphics settings">🔊</button>
+  <button id="btn-menu" title="Save and return to the menu">Menu</button>
+  <button id="btn-next" class="hidden" title="Jump to your next unit with orders left (N / Space / Tab)">⏭ Next</button>
+  <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩ Undo</button>
+  <button id="btn-endturn" class="primary">End Turn ▶</button>
+</div>
+
+<div id="side" class="hidden">
+  <div class="card" id="unit-card"><h3>UNIT</h3><div id="unit-body">Select one of your units.</div>
+    <div id="unit-actions"></div></div>
+  <div class="card" id="air-card"><h3>✈ AIR FORCES</h3><div id="air-body">—</div></div>
+  <div class="card hidden" id="preview-card"><h3>BATTLE FORECAST</h3><div id="preview-body"></div></div>
+  <div class="card" id="terrain-card"><h3>TERRAIN</h3><div id="terrain-body">Hover the map.</div></div>
+  <div class="card" id="log-card"><h3>WAR DIARY</h3><div id="log"></div></div>
+</div>
+
+<div id="hint" class="hidden"></div>
+<div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
+
+<!-- ============ TITLE / MENU ============ -->
+<!-- ============ MODE SELECT ============ -->
+<div id="mode-select" class="modal-back">
+  <div class="modal">
+    <button id="btn-settings-main">⚙ Settings</button>
+    <h1>HEARTS OF IRON 5</h1>
+    <div class="sub">SELECT YOUR EXPERIENCE</div>
+    <!-- Arcade — featured hero card -->
+    <div class="mode-card mc-hero" id="mc-arcade">
+      <div class="mc-inner">
+        <div class="mc-icon">⚔</div>
+        <div class="mc-text">
+          <span class="mc-badge ready">6 CAMPAIGNS</span>
+          <h2>ARCADE MODE</h2>
+          <p class="mc-desc">Historical battles from Operation Barbarossa to the Battle of the Bulge — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
+        </div>
+        <button class="primary mc-btn">PLAY NOW ▶</button>
+      </div>
+    </div>
+    <!-- Three secondary modes -->
+    <div class="mode-row">
+      <div class="mode-card" id="mc-realistic">
+        <span class="mc-badge ready">2 SCENARIOS</span>
+        <div class="mc-icon">🗺</div>
+        <h2>REALISTIC MODE</h2>
+        <p class="mc-desc">The full Eastern Front 1941–45 with fuel logistics, railheads and historical OOB — inspired by the great wargames.</p>
+        <button class="primary mc-btn">PLAY ▶</button>
+      </div>
+      <div class="mode-card" id="mc-wawtest">
+        <span class="mc-badge ready">NEW</span>
+        <div class="mc-icon">🗺</div>
+        <h2>GRAND EASTERN FRONT</h2>
+        <p class="mc-desc">Realistic mode doubled in scale — 120×72 hexes, continuous front, a long campaign grinding from 1941 to 1943.</p>
+        <button class="primary mc-btn">LAUNCH ▶</button>
+      </div>
+      <div class="mode-card" id="mc-hex">
+        <span class="mc-badge wip">WIP</span>
+        <div class="mc-icon">🌍</div>
+        <h2>THE WORLD AT WAR</h2>
+        <p class="mc-desc">All of Europe on a full hex map with NATO counters and real 1938 borders — the grand strategic theatre. A work in progress.</p>
+        <button class="mc-btn">LAUNCH ▶</button>
+      </div>
+    </div>
+    <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
+  </div>
+</div>
+
+
+<!-- ============ REALISTIC MODE ============ -->
+<div id="realistic-menu" class="modal-back hidden">
+  <div class="modal">
+    <h2>REALISTIC MODE</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 14px;">OPERATIONAL WARGAMES · FULL SUPPLY, FUEL &amp; ENCIRCLEMENT</div>
+    <div class="pick-row" id="rm-scn-row" style="display:flex;gap:14px;justify-content:center;margin:0 0 4px;">
+      <div class="pick sel" data-scn="realistic" style="max-width:248px;">
+        <h4>🗺 War in the East</h4><p>Operation Barbarossa, 1941 — the 60×36 Eastern Front from the Baltic to the Caucasus.</p>
+      </div>
+      <div class="pick" data-scn="france" style="max-width:248px;">
+        <h4>🗺 Battle of France</h4><p>Fall Gelb, May 1940 — the sickle cut through the Ardennes and the race to the Channel.</p>
+      </div>
+    </div>
+    <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:14px 0 0;">
+      <div class="pick p-ger sel" id="rm-pick-ger" style="max-width:240px;">
+        <h4>⬛ Germany</h4><p>Three army groups, one season. Take Leningrad, Moscow and the Donbas before the snow.</p>
+      </div>
+      <div class="pick p-sov" id="rm-pick-sov" style="max-width:240px;">
+        <h4>🟥 Soviet Union</h4><p>Trade a continent for time. Hold the rivers, dodge the pockets, counterattack in winter.</p>
+      </div>
+    </div>
+    <div class="opt-row" id="rm-diff-row" style="justify-content:center;margin-top:16px;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt sel" data-d="normal">Normal</span>
+      <span class="opt" data-d="hard">Hard</span>
+    </div>
+    <div class="mrow" style="justify-content:center;margin-top:16px;">
+      <button id="btn-back-realistic">← Back</button>
+      <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
+      <button class="primary" id="btn-play-realistic">PLAY ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GRAND EASTERN FRONT (bigger, harder Realistic) ============ -->
+<div id="waw-menu" class="modal-back hidden">
+  <div class="modal" style="max-width:660px;">
+    <h2>GRAND EASTERN FRONT</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 16px;">BARBAROSSA TO 1943 · 2× SCALE · A LONG, HARD WAR</div>
+    <p style="color:var(--dim);font-size:13px;line-height:1.7;max-width:500px;margin:0 auto 4px;">
+      Realistic mode, doubled in scale and stretched across two years of war — a
+      continuous front from the Baltic to the Black Sea, deeper reserves, and an
+      enemy that keeps coming. Pick your side and how much pain you want.
+    </p>
+    <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:14px 0 0;">
+      <div class="pick p-ger sel" id="waw-pick-ger" style="max-width:240px;">
+        <h4>⬛ Germany</h4><p>Break the front and drive east before the Soviet reserves and the winter bury you.</p>
+      </div>
+      <div class="pick p-sov" id="waw-pick-sov" style="max-width:240px;">
+        <h4>🟥 Soviet Union</h4><p>Trade space for time, survive 1941, then bleed the Wehrmacht white and roll it back.</p>
+      </div>
+    </div>
+    <div class="opt-row" id="waw-diff-row" style="justify-content:center;margin-top:16px;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt" data-d="normal">Normal</span>
+      <span class="opt sel" data-d="hard">Hard</span>
+      <span class="opt" data-d="brutal">Brutal</span>
+    </div>
+    <div id="waw-diff-desc" style="color:var(--dim);font-size:12px;margin-top:2px;min-height:16px;"></div>
+    <div class="mrow" style="justify-content:center;margin-top:18px;">
+      <button id="waw-back">← Back</button>
+      <button id="waw-continue" class="hidden">CONTINUE SAVED WAR</button>
+      <button class="primary" id="waw-play">BEGIN THE WAR ▶</button>
+    </div>
+  </div>
+</div>
+
+<div id="menu" class="modal-back hidden">
+  <div class="modal">
+    <h1 id="menu-title">OPERATION BARBAROSSA</h1>
+    <div class="sub" id="menu-sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
+    <div class="opt-row" id="scn-row">
+      <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
+      <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
+      <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
+      <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
+      <span class="opt" data-s="midway">⚓ Midway 1942</span>
+      <span class="opt" data-s="dday">🟦 D-Day 1944</span>
+      <span class="opt" data-s="bulge">🎄 The Bulge 1944</span>
+    </div>
+    <div class="pick-row">
+      <div class="pick p-ger sel" id="pick-ger">
+        <h4>⬛ Germany (Axis)</h4>
+        <p>Race the clock. Use your panzers to break through, encircle whole Soviet armies,
+           and take Moscow before the winter snows stop you cold.</p>
+      </div>
+      <div class="pick p-sov" id="pick-sov">
+        <h4>🟥 Soviet Union</h4>
+        <p>Trade space for time. Hold the rivers and cities, never let your armies get
+           surrounded, and bleed the invader until winter — then strike back.</p>
+      </div>
+    </div>
+    <div class="opt-row" id="diff-row">
+      <span style="color:var(--dim);padding:6px 0;">Difficulty:</span>
+      <span class="opt" data-d="easy">Easy</span>
+      <span class="opt sel" data-d="normal">Normal</span>
+      <span class="opt" data-d="hard">Hard</span>
+    </div>
+    <div class="opt-row">
+      <span class="opt sel" id="mode-ai">vs Computer</span>
+      <span class="opt" id="mode-hotseat">2-Player Hotseat</span>
+    </div>
+    <div class="mrow" style="justify-content:center;">
+      <button class="primary start-btn" id="btn-start">BEGIN CAMPAIGN</button>
+      <button id="btn-continue" class="hidden start-btn">CONTINUE SAVE</button>
+    </div>
+    <div class="mrow" style="justify-content:center;">
+      <button id="btn-back-arcade">← Back</button>
+      <button id="btn-help">How to Play</button>
+      <button id="btn-settings-menu">Settings</button>
+    </div>
+    <div class="foot">Runs 100% on your PC — no internet needed. Progress autosaves every turn.</div>
+  </div>
+</div>
+
+<!-- ============ HELP ============ -->
+<div id="help-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2>HOW TO PLAY</h2>
+    <p><b>Goal.</b> Germany must capture the Soviet objective cities (Moscow is worth the most)
+       before the campaign ends on <b>turn 28</b> (early January 1942). The Soviets win by holding them.
+       Each turn is one week of 1941.</p>
+    <ul>
+      <li><b>Select</b> one of your units, then click a highlighted hex to <b>move</b>, or click an
+          adjacent enemy (red ring) to <b>attack</b>. Every unit can move and attack once per turn.
+          You can drive deep into enemy ground — but any hex <b>next to an enemy unit</b> halts
+          movement for the turn (zone of control). Punch a hole in their line, then pour through it.</li>
+      <li><b>Strength</b> (the number on the counter) is a unit's health <i>and</i> its punch.
+          Spend <b>⚙ Production</b> to reinforce a damaged unit or deploy new ones at your cities.</li>
+      <li><b>Read the forecast.</b> Hover an enemy you can hit and the <b>Battle Forecast</b> shows
+          the odds, expected losses, and a <b>WHY</b> breakdown of every modifier — terrain, rivers,
+          dig-in, generals, supply, and ganging up — so you always know what's deciding the fight.</li>
+      <li><b>⚑ Decisions.</b> At the great historical crossroads you'll be handed a real choice —
+          the Kiev Turn, Nagumo's rearming gamble at Midway, the Mortain counterattack at Normandy —
+          each with lasting consequences. There's no taking it back.</li>
+      <li><b>Terrain matters.</b> Forests, hills and cities boost defense. Rivers are deadly to attack
+          across. Units that hold still <b>dig in</b> (▮ pips = bonus defense). The map is tinted
+          with the front line: <b>grey</b> ground is Axis-held, <b>red</b> is Soviet — watch it
+          shift as the armies advance.</li>
+      <li><b>SUPPLY is everything.</b> Supply reaches only <b>7 hexes</b> from your map edge (Germans
+          west, Soviets east) — and from every <b>city you control</b>, which acts as a forward depot.
+          Capture cities to push your supply network deeper. A unit cut off (by distance, or because
+          enemies stand between it and home) shows <b style="color:var(--redL)">⚠ OUT OF SUPPLY</b>
+          and a red ring: it attacks at <b>40%</b>, defends at <b>65%</b>, cannot dig in or
+          reinforce, and starves — losing strength every single turn. <b>Surround enemy armies
+          to destroy them — and don't let it happen to your spearheads.</b></li>
+      <li><b>The clock.</b> October brings <b>mud</b> (slow, weak attacks). December brings <b>snow</b> —
+          German attacks falter while fresh <b>Siberian divisions</b> arrive for the Soviets. Germany:
+          win <i>before</i> winter. Soviets: survive <i>until</i> it.</li>
+      <li>A unit forced to retreat with nowhere to go is <b>destroyed</b> — pockets kill.</li>
+      <li><b>⭐ Generals.</b> Historical commanders lead their formations — Guderian's panzers
+          hit harder and drive deeper, Rokossovsky's riflemen are hard to dislodge. Units with a
+          general show a gold star; the unit panel and battle forecast show the effect. A general
+          is <b>lost with his unit</b>. From early October, <b>Zhukov</b> takes over the Moscow
+          defense: Soviet units near the capital defend better while it holds.</li>
+      <li><b>✚ Experience.</b> Units harden as they fight — <b>Veteran</b>, <b>Hardened</b>, <b>Elite</b>
+          (gold chevrons on the counter) for +5/+10/+15% to attack and defense. Veterancy survives
+          reinforcement, so keep your best formations alive.</li>
+      <li><b>⚔ Combined arms.</b> <b>Shift-click</b> several of your units, then click one adjacent
+          enemy to assault it together — far more punch than attacking one at a time, and a tank +
+          infantry mix lands a bonus on top. If the enemy breaks, <b>you choose which unit advances</b>
+          into the empty hex.</li>
+      <li><b>⌂ Headquarters.</b> Each side fields HQs (a command pennant). Friendly units within
+          <b>5 hexes</b> of an HQ get +5% attack/defense and <b>+1 movement</b>. HQs can't take ground
+          and are weak in a fight — keep them just behind the line, where their command reaches the front.</li>
+      <li><b>📰 History unfolds.</b> Real dispatches from 1941 appear as the weeks pass — a few
+          carry production bonuses. In mid-August the German side faces the <b>winter question</b>:
+          divert 10 ⚙ to winter equipment, or gamble that the war ends first. Gear mostly saves
+          the <b>defense</b> in deep snow and keeps the infantry marching — panzers freeze and
+          attacks stay hard either way.</li>
+      <li><b>Quality of life.</b> <b>U</b> / the ↩ Undo button takes back your last move
+          (until anything else happens). <b>S</b> / the 🚚 Supply button shades every hex
+          outside your supply network — see where your spearheads go dry <i>before</i> they do.
+          Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
+          speed (normal / fast / instant). Ending your turn with units still ready asks for a
+          second click, and so does overwriting a saved campaign.</li>
+      <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
+          give. <b>N</b> / <b>Space</b> / <b>Tab</b> (or the <b>⏭ Next</b> button) jumps to the
+          next one and centres it; the button also shows how many are left. <b>Arrow keys</b> pan,
+          <b>+</b> / <b>−</b> (and the scroll wheel) zoom, and <b>C</b> recentres
+          on your selected unit. <b>Right-click</b> cancels a deploy, an air strike or a selection;
+          <b>double-click</b> recentres the map. <b>E</b> ends the turn, <b>Esc</b> clears everything.</li>
+      <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
+          plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields) or of
+          a friendly <b>aircraft carrier</b> in naval scenarios, or fly <b>Patrol</b> to intercept enemy
+          strikes. Groups that stay grounded repair. Flak and dogfights cause losses — and deep snow
+          all but grounds an unprepared air force.</li>
+    </ul>
+    <p style="color:var(--dim)"><b>Tips:</b> punch holes with panzers, pour through, and meet behind the
+       enemy line — that's an encirclement. As the Soviets, keep a straight front, garrison cities,
+       and always have an escape route east.</p>
+    <div class="mrow"><button class="primary" id="btn-help-close">Got it</button></div>
+  </div>
+</div>
+
+<!-- ============ OBJECTIVES ============ -->
+<div id="obj-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2>OBJECTIVE CITIES</h2>
+    <div id="obj-list" style="font-size:14px;line-height:1.9;"></div>
+    <p id="obj-summary" style="margin-top:10px;"></p>
+    <div class="mrow"><button class="primary" id="btn-obj-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ END GAME ============ -->
+<div id="end-modal" class="modal-back hidden">
+  <div class="modal">
+    <h2 id="end-title">VICTORY</h2>
+    <p id="end-text"></p>
+    <div id="end-stats"></div>
+    <div class="mrow">
+      <button class="primary" id="btn-end-menu">Back to Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div id="settings-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:440px;">
+    <h2>SETTINGS</h2>
+    <div class="setrow"><span>🎵 Music volume</span>
+      <input type="range" id="vol-music" min="0" max="100" step="1">
+      <span class="vlabel" id="vol-music-val">40%</span></div>
+    <div class="setrow"><span>💥 Effects volume</span>
+      <input type="range" id="vol-sfx" min="0" max="100" step="1">
+      <span class="vlabel" id="vol-sfx-val">80%</span></div>
+    <div class="setrow"><span>🔇 Mute everything</span>
+      <button id="btn-mute">Sound: ON</button></div>
+    <div style="color:var(--dim);font-size:12px;margin-top:6px;">The soundtrack is an original score
+      played live by the game's own synthesizer — somber strings for a long war.</div>
+    <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
+    <div class="setrow"><span>🖥 Graphics quality</span>
+      <div class="gfx-seg">
+        <button id="gfx-low">Low</button><button id="gfx-medium">Medium</button><button id="gfx-high">High</button>
+      </div></div>
+    <div id="gfx-desc" style="color:var(--dim);font-size:12px;margin-top:2px;"></div>
+    <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ CAMPAIGN CLOCK ============ -->
+<div id="clock-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:580px;">
+    <h2>THE CAMPAIGN CLOCK</h2>
+    <div id="clock-body"></div>
+    <div class="mrow"><button class="primary" id="btn-clock-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ HISTORICAL EVENT ============ -->
+<div id="event-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:540px;">
+    <h2 style="font-size:14px;letter-spacing:4px;">📰 THIS WEEK IN 1941</h2>
+    <div id="event-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
+    <h3 id="event-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
+    <p id="event-text"></p>
+    <p id="event-effect" style="color:var(--amber);margin-top:8px;"></p>
+    <div class="mrow"><button class="primary" id="btn-event-close">Continue</button></div>
+  </div>
+</div>
+
+<!-- ============ THE WINTER QUESTION ============ -->
+<div id="gear-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:580px;">
+    <h2>THE WINTER QUESTION</h2>
+    <div style="color:var(--dim);letter-spacing:2px;font-size:12px;margin-bottom:8px;">QUARTERMASTER-GENERAL'S REPORT · MID-AUGUST 1941</div>
+    <p>The army has winter clothing for barely <b>one soldier in five</b>. The railways can haul
+       ammunition and fuel for the offensive — or greatcoats, felt boots and stoves for three
+       million men. The General Staff is confident: <i>Russia will collapse before the first snow.</i></p>
+    <p style="margin-top:8px;">If they are wrong, and the army is still in the field in December:
+       without winter equipment the men can barely hold their positions, let alone march.
+       With it, the infantry keeps moving and the line holds far better — though no greatcoat
+       will unfreeze a panzer's engine, or make a winter offensive easy.</p>
+    <p style="color:var(--dim);font-size:12px;margin-top:8px;">Short on production? The order can
+       still be placed on credit — your balance goes negative, and future income pays it off
+       (you can't reinforce or deploy until you're out of debt).</p>
+    <div class="mrow">
+      <button class="primary" id="btn-gear-buy" style="text-align:left;line-height:1.35;padding:10px 14px;">Divert the trains — winter equipment (10 ⚙)
+        <div style="margin-top:5px;font-weight:700;color:#cfe8a8;font-size:12px;">→ In deep snow: your line holds far better (−10% defense instead of −20%), infantry keeps moving, winter attacks sting less. Costs 10⚙ now (credit allowed). Panzers still freeze.</div></button>
+      <button id="btn-gear-front" style="text-align:left;line-height:1.35;padding:10px 14px;">"Home before the snow" — everything to the front
+        <div style="margin-top:5px;font-weight:700;color:#e8c79a;font-size:12px;">→ Keep all 10⚙ for the offensive now — gamble on winning before December. If the war drags into snow, your troops barely hold (−20% defense) and the infantry bog down.</div></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STRATEGIC DECISION ============ -->
+<div id="decision-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:600px;">
+    <h2 style="font-size:14px;letter-spacing:4px;">⚑ A DECISION IS DEMANDED</h2>
+    <div id="decision-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
+    <h3 id="decision-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
+    <p id="decision-text"></p>
+    <div id="decision-options" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
+<!-- ============ HOTSEAT PASS ============ -->
+<div id="pass-modal" class="modal-back hidden">
+  <div class="modal" style="text-align:center;">
+    <h2 id="pass-title">PASS THE KEYBOARD</h2>
+    <p id="pass-text"></p>
+    <div id="pass-report"></div>
+    <div class="mrow" style="justify-content:center;"><button class="primary" id="btn-pass-go">Ready — Begin Turn</button></div>
+  </div>
+</div>
+
+
+<!-- ============ THE WORLD AT WAR — native screen ============ -->
+<div id="ww-screen" class="hidden">
+  <style>
+    #ww-screen{position:fixed;inset:0;z-index:560;background:#0a0f16;font-family:'Segoe UI',system-ui,sans-serif;color:#e8edf2;overflow:hidden;}
+    #ww-screen.hidden{display:none;}
+    #wwCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;}
+    #wwCanvas.drag{cursor:grabbing;}
+    #ww-top{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:14px;
+      padding:0 14px;background:linear-gradient(#0b1420f5,#0b142000);pointer-events:none;z-index:4;}
+    #ww-top>*{pointer-events:auto;}
+    #ww-back{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:600 13px 'Segoe UI',sans-serif;
+      padding:7px 13px;border-radius:6px;cursor:pointer;letter-spacing:.5px;}
+    #ww-back:hover{background:#1d3553;border-color:#3d6ea0;}
+    #ww-title{font-weight:800;letter-spacing:3px;font-size:14px;color:#dfe9f5;text-shadow:0 1px 3px #000;}
+    #ww-playerflag{width:24px;height:16px;border-radius:3px;border:1px solid #0009;}
+    #ww-playername{font-size:13px;font-weight:700;color:#eaf1f8;}
+    #ww-date{font-size:13px;color:#ffe9a8;font-weight:600;letter-spacing:.5px;}
+    #ww-turn{font-size:11px;color:#8ba2b8;}
+    #ww-hint{font-size:11px;color:#7d93ab;letter-spacing:.3px;}
+    /* faction legend */
+    #ww-minimap{position:absolute;left:12px;bottom:12px;z-index:4;border:1px solid #2c486a;border-radius:6px;
+      background:#0a121c;box-shadow:0 6px 20px #000a;cursor:pointer;}
+    #ww-minimap.hidden{display:none;}
+    #ww-legend{position:absolute;left:12px;bottom:202px;background:#0d1826e0;border:1px solid #22364d;
+      border-radius:8px;padding:8px 10px;z-index:4;max-width:330px;}
+    .ww-leg-row{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:11px;}
+    .ww-leg-label{width:74px;color:#9fb4c9;font-weight:600;letter-spacing:.5px;}
+    .ww-sw{width:13px;height:13px;border-radius:3px;border:1px solid #0008;display:inline-block;}
+    /* info card */
+    #ww-info{position:absolute;right:12px;top:60px;width:238px;background:#0d1826ee;border:1px solid #25405e;
+      border-radius:10px;padding:13px;z-index:4;box-shadow:0 8px 30px #000a;}
+    #ww-info.hidden{display:none;}
+    .ww-card-head{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+    .ww-flag{width:30px;height:20px;border-radius:3px;border:1px solid #0009;box-shadow:0 1px 3px #0007;flex:0 0 auto;}
+    .ww-name{font-weight:700;font-size:15px;letter-spacing:.3px;}
+    .ww-fac{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+    .ww-axis{color:#e08a6a;} .ww-allies{color:#7fb0e8;} .ww-comintern{color:#e8716a;} .ww-neutral{color:#9fb0bf;}
+    .ww-stats{width:100%;border-collapse:collapse;font-size:12.5px;}
+    .ww-stats td{padding:3px 2px;border-bottom:1px solid #1c2c40;}
+    .ww-stats td:first-child{color:#8ba2b8;} .ww-stats td:last-child{text-align:right;font-weight:600;color:#eaf1f8;}
+    .ww-bar{height:7px;border-radius:4px;background:#22344a;overflow:hidden;margin-top:2px;}
+    .ww-bar>i{display:block;height:100%;}
+    /* end-turn + status */
+    #ww-endturn{position:absolute;right:14px;bottom:16px;z-index:4;background:linear-gradient(#2a6e3a,#1f5a2e);
+      border:1px solid #3f9a52;color:#eafce9;font:800 15px 'Segoe UI',sans-serif;letter-spacing:1.5px;
+      padding:12px 22px;border-radius:9px;cursor:pointer;box-shadow:0 6px 20px #0009;}
+    #ww-endturn:hover{background:linear-gradient(#338046,#246a36);}
+    #ww-endturn.hidden{display:none;}
+    #ww-pstat{position:absolute;right:14px;bottom:64px;z-index:4;background:#0d1826e6;border:1px solid #22364d;
+      border-radius:8px;padding:7px 11px;font-size:12px;color:#cfe0f2;min-width:150px;}
+    #ww-pstat.hidden{display:none;} #ww-pstat b{color:#ffe9a8;}
+    /* toast */
+    #ww-toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:6;display:flex;
+      flex-direction:column;gap:6px;align-items:center;pointer-events:none;}
+    .ww-toast-msg{background:#1a1020e8;border:1px solid #6a3a4a;color:#ffd9c2;font-size:13px;font-weight:600;
+      padding:8px 16px;border-radius:7px;box-shadow:0 4px 16px #000a;}
+    #ww-notify{position:absolute;left:50%;top:96px;transform:translate(-50%,-22px);z-index:8;
+      opacity:0;pointer-events:none;transition:opacity .28s ease, transform .28s cubic-bezier(.2,.9,.3,1.2);}
+    #ww-notify.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+    #ww-notify.hidden{display:none;}
+    .ww-noti{display:flex;align-items:center;gap:13px;min-width:300px;max-width:460px;cursor:pointer;
+      background:linear-gradient(180deg,#16243aF7,#0e1726F7);border:1px solid #38597f;border-top:2px solid #5b85b8;
+      border-radius:11px;padding:12px 16px;box-shadow:0 12px 40px #000c, inset 0 1px 0 #ffffff14;}
+    .ww-noti.foc{border-top-color:#e7c14a;}
+    .ww-noti.res{border-top-color:#6fb0e0;}
+    .ww-noti-ico{font-size:26px;width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;
+      border-radius:9px;background:#0b1422;border:1px solid #2c4a6e;}
+    .ww-noti.foc .ww-noti-ico{color:#ffd34d;border-color:#7a6420;text-shadow:0 0 12px #ffd34d66;}
+    .ww-noti.res .ww-noti-ico{color:#8fd0ff;border-color:#2c5e7e;text-shadow:0 0 12px #6fb0e066;}
+    .ww-noti-bd{flex:1;text-align:left;}
+    .ww-noti-kind{font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#9fb4c9;font-weight:700;}
+    .ww-noti-name{font-size:16px;font-weight:700;color:#f1f6fb;margin-top:1px;}
+    .ww-noti-fx{font-size:12px;color:#8fd99a;margin-top:3px;font-weight:600;}
+    .ww-noti-x{color:#6f86a0;font-size:13px;align-self:flex-start;}
+    #ww-combat{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;background:#0d1826f6;
+      border:1px solid #2c4a6e;border-radius:11px;padding:10px 18px;min-width:248px;
+      text-align:center;box-shadow:0 8px 32px #000b;}
+    #ww-combat.hidden{display:none;}
+    .wc-head{font-size:12px;font-weight:700;letter-spacing:1px;color:#cfe0f2;margin-bottom:7px;}
+    .wc-bars{display:flex;align-items:center;justify-content:center;gap:18px;}
+    .wc-side{font-size:11px;color:#90a6bb;} .wc-side b{display:block;font-size:18px;color:#eaf2fb;line-height:1.1;}
+    .wc-odds{font-size:23px;font-weight:800;}
+    .wc-meter{height:6px;border-radius:4px;background:#22344a;overflow:hidden;margin:7px 0 5px;}
+    .wc-meter>i{display:block;height:100%;}
+    .wc-fx{font-size:10.5px;color:#8ba2b8;line-height:1.4;}
+    /* nation pick */
+    #ww-pick{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#10202fe0,#070b11f4);}
+    #ww-pick.hidden{display:none;}
+    #ww-pick h2{font-weight:800;letter-spacing:4px;font-size:22px;color:#eaf2fb;text-shadow:0 2px 8px #000;margin:0;}
+    #ww-pick .sub{color:#9fb4c9;font-size:12px;letter-spacing:2px;margin-top:-8px;}
+    .ww-pick-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:680px;}
+    .ww-pick-card{width:150px;background:#0e1c2c;border:1px solid #284562;border-radius:10px;padding:12px;
+      cursor:pointer;transition:.12s;text-align:left;}
+    .ww-pick-card:hover{border-color:#4f8fce;background:#13283c;transform:translateY(-2px);}
+    .ww-pick-card .ph{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+    .ww-pick-card .pf{width:26px;height:17px;border-radius:3px;border:1px solid #0009;}
+    .ww-pick-card .pn{font-weight:700;font-size:14px;}
+    .ww-pick-card .pd{font-size:11px;color:#90a6bb;line-height:1.35;}
+    #ww-diff-row{display:flex;gap:8px;margin:-4px 0 2px;}
+    .ww-diff{font-size:11px;font-weight:700;letter-spacing:1.5px;color:#8ea6bd;border:1px solid #2c486a;
+      border-radius:14px;padding:5px 16px;cursor:pointer;background:#0e1c2c;}
+    .ww-diff:hover{border-color:#4f8fce;}
+    .ww-diff.sel{background:#1d3553;color:#eaf2fb;border-color:#5a9fde;}
+    .ww-hbtn{background:#142338;border:1px solid #2c486a;color:#cfe2f7;font:700 11px 'Segoe UI',sans-serif;
+      letter-spacing:1px;padding:6px 11px;border-radius:6px;cursor:pointer;}
+    .ww-hbtn:hover{background:#1d3553;border-color:#4f8fce;} .ww-hbtn.hidden{display:none;}
+    .ww-hbtn.on{background:#2a4a6e;border-color:#6ab0e8;color:#dcefff;}
+    .ww-panel{position:absolute;left:12px;top:60px;width:266px;max-height:72vh;overflow:auto;background:#0d1826f4;
+      border:1px solid #25405e;border-radius:10px;padding:13px;z-index:5;box-shadow:0 8px 30px #000a;}
+    .ww-panel.hidden{display:none;}
+    #ww-focus-page,#ww-research-page{position:absolute;inset:0;z-index:9;background:radial-gradient(circle at 50% 16%,#16243488,#0a0f16f6),#0a0f16;display:flex;flex-direction:column;}
+    #ww-focus-page.hidden,#ww-research-page.hidden{display:none;}
+    #ww-res-title{font-weight:800;letter-spacing:2px;font-size:15px;color:#eaf2fb;} #ww-res-close{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:700 12px 'Segoe UI',sans-serif;padding:8px 16px;border-radius:7px;cursor:pointer;} #ww-res-close:hover{background:#1d3553;}
+    #ww-res-lines{position:absolute;left:0;top:0;pointer-events:none;}
+    #ww-foc-head{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid #22364d;background:#0d1826;}
+    #ww-foc-title{font-weight:800;letter-spacing:2px;font-size:15px;color:#eaf2fb;}
+    #ww-foc-hint{font-size:11px;color:#8ba2b8;}
+    #ww-foc-close{background:#16263a;border:1px solid #2c486a;color:#cfe2f7;font:700 12px 'Segoe UI',sans-serif;padding:8px 16px;border-radius:7px;cursor:pointer;}
+    #ww-foc-close:hover{background:#1d3553;border-color:#3d6ea0;}
+    #ww-foctree{flex:1;overflow:auto;position:relative;}
+    #ww-foc-inner{position:relative;margin:auto;}
+    #ww-foc-lines{position:absolute;left:0;top:0;pointer-events:none;}
+    #ww-foc-nodes{position:absolute;left:0;top:0;}
+    .ww-foc-node{position:absolute;width:134px;height:64px;border-radius:9px;border:1px solid #2c486a;background:#142338;color:#dfe9f5;cursor:default;padding:7px;text-align:center;display:flex;flex-direction:column;justify-content:center;gap:3px;font-family:'Segoe UI',sans-serif;transition:.1s;}
+    .ww-foc-node .fn{font-weight:700;font-size:11.5px;line-height:1.16;}
+    .ww-foc-node .fd{font-size:9.5px;color:#90a6bb;line-height:1.1;}
+    .ww-foc-node.done{background:#11301d;border-color:#2f6a3e;} .ww-foc-node.done .fn{color:#9fe0ad;}
+    .ww-foc-node.prog{background:#2a2410;border-color:#b08a2a;} .ww-foc-node.prog .fn{color:#ffd76a;} .ww-foc-node.prog .fd{color:#d8b24a;}
+    .ww-foc-node.avail{background:#163150;border-color:#4f8fce;cursor:pointer;box-shadow:0 0 12px #2a6fb066;}
+    .ww-foc-node.avail:hover{background:#1d4570;border-color:#6ab0e8;}
+    .ww-foc-node.locked{opacity:0.46;}
+    #ww-tut{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:7;width:430px;max-width:88vw;
+      background:#0e1d2ef5;border:1px solid #3a6090;border-radius:12px;padding:16px 18px;box-shadow:0 10px 38px #000b;}
+    #ww-tut.hidden{display:none;}
+    #ww-tut-text{font-size:13.5px;line-height:1.5;color:#e8eff7;}
+    #ww-tut-dots{display:flex;gap:6px;justify-content:center;margin:12px 0 2px;}
+    .ww-tut-dot{width:7px;height:7px;border-radius:50%;background:#2c486a;} .ww-tut-dot.on{background:#6ab0e8;}
+    .ww-tut-row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+    #ww-tut-skip{background:#16263a;border:1px solid #2c486a;color:#9fb4c9;font:600 12px 'Segoe UI',sans-serif;padding:7px 14px;border-radius:7px;cursor:pointer;}
+    #ww-tut-next{background:#234a8a;border:1px solid #4f7fce;color:#eaf2fb;font:700 12px 'Segoe UI',sans-serif;letter-spacing:.5px;padding:7px 18px;border-radius:7px;cursor:pointer;}
+    #ww-btn-help{min-width:30px;text-align:center;}
+    .ww-panel h3{margin:0 0 9px;font-size:14px;letter-spacing:1.5px;color:#dfe9f5;}
+    .ww-foc{display:flex;gap:8px;align-items:flex-start;padding:7px;border-radius:7px;margin:5px 0;border:1px solid #1c2c40;font-size:12px;}
+    .ww-foc .fi{width:18px;text-align:center;font-size:13px;flex:0 0 auto;}
+    .ww-foc.done{background:#10241a;border-color:#2c5a3a;} .ww-foc.done .fi{color:#7fd08a;}
+    .ww-foc.active{background:#1a2740;border-color:#4f7fce;} .ww-foc.active .fi{color:#ffd34d;}
+    .ww-foc .fn{font-weight:600;color:#e6eef7;} .ww-foc .fd{color:#90a6bb;font-size:11px;margin-top:1px;}
+    .ww-pbtn{width:100%;margin-top:8px;background:#234a8a;border:1px solid #4f7fce;color:#eaf2fb;
+      font:700 12px 'Segoe UI',sans-serif;letter-spacing:1px;padding:9px;border-radius:7px;cursor:pointer;}
+    .ww-pbtn:hover{background:#2c5aa6;} .ww-pbtn:disabled{opacity:.45;cursor:default;}
+    .ww-tech{display:flex;justify-content:space-between;align-items:center;margin:6px 0;font-size:12.5px;}
+    .ww-tech .tl{color:#cfe0f2;} .ww-tech .tv{color:#ffe9a8;font-weight:700;}
+    .ww-rbtn{font-size:11px;font-weight:700;letter-spacing:.5px;color:#9fb4c9;border:1px solid #2c486a;
+      border-radius:13px;padding:4px 11px;cursor:pointer;background:#0e1c2c;margin:2px 3px 2px 0;display:inline-block;}
+    .ww-rbtn:hover{border-color:#4f8fce;} .ww-rbtn.sel{background:#1d3553;color:#eaf2fb;border-color:#5a9fde;}
+    /* win/lose */
+    #ww-end{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:14px;background:#060a10ee;}
+    #ww-end.hidden{display:none;}
+    #ww-end h1{font-size:40px;font-weight:900;letter-spacing:6px;margin:0;}
+    #ww-end p{color:#a9bccf;font-size:14px;max-width:440px;text-align:center;}
+    #ww-end button{margin-top:8px;background:#1d3553;border:1px solid #3d6ea0;color:#dceaf8;
+      font:700 14px 'Segoe UI',sans-serif;letter-spacing:1px;padding:11px 24px;border-radius:8px;cursor:pointer;}
+  </style>
+  <canvas id="wwCanvas"></canvas>
+  <div id="ww-top">
+    <button id="ww-back">◀ MENU</button>
+    <div id="ww-title">THE WORLD AT WAR</div>
+    <div id="ww-playerflag" style="display:none"></div>
+    <div id="ww-playername"></div>
+    <div id="ww-date">1 September 1939</div>
+    <div id="ww-turn"></div>
+    <button id="ww-btn-focus" class="ww-hbtn hidden">★ FOCUS</button>
+    <button id="ww-btn-research" class="ww-hbtn hidden">⚗ RESEARCH</button>
+    <button id="ww-btn-air" class="ww-hbtn hidden">✈ AIR</button>
+    <button id="ww-btn-prod" class="ww-hbtn hidden">🏭 PRODUCTION</button>
+    <button id="ww-btn-diplo" class="ww-hbtn hidden">⚑ DIPLOMACY</button>
+    <button id="ww-winter-toggle" class="ww-hbtn hidden">❄ WINTER PREP</button>
+    <button id="ww-btn-supply" class="ww-hbtn hidden">🗺 SUPPLY</button>
+    <button id="ww-btn-help" class="ww-hbtn hidden" title="Replay the tutorial">?</button>
+    <div style="flex:1"></div>
+    <div id="ww-hint">drag to pan · scroll to zoom</div>
+  </div>
+  <canvas id="ww-minimap" class="hidden" width="184" height="180"></canvas>
+  <div id="ww-legend"></div>
+  <div id="ww-info" class="hidden"></div>
+  <div id="ww-pstat" class="hidden"></div>
+  <div id="ww-focus" class="ww-panel hidden"></div>
+  <div id="ww-research" class="ww-panel hidden"></div>
+  <div id="ww-air" class="ww-panel hidden"></div>
+  <div id="ww-prod" class="ww-panel hidden"></div>
+  <div id="ww-diplo" class="ww-panel hidden"></div>
+  <button id="ww-endturn" class="hidden">END TURN ▶</button>
+  <div id="ww-combat" class="hidden"></div>
+  <div id="ww-toast"></div>
+  <div id="ww-notify" class="hidden"></div>
+  <div id="ww-tut" class="hidden">
+    <div id="ww-tut-text"></div>
+    <div id="ww-tut-dots"></div>
+    <div class="ww-tut-row"><button id="ww-tut-skip">Skip</button><button id="ww-tut-next">Next ▶</button></div>
+  </div>
+  <div id="ww-pick">
+    <h2>THE WORLD AT WAR</h2>
+    <div class="sub">EUROPE · SEPTEMBER 1939 — CHOOSE YOUR NATION</div>
+    <div id="ww-diff-row">
+      <span class="ww-diff" data-diff="easy">EASY</span>
+      <span class="ww-diff sel" data-diff="normal">NORMAL</span>
+      <span class="ww-diff" data-diff="hard">HARD</span>
+    </div>
+    <div class="ww-pick-row" id="ww-pick-row"></div>
+    <button id="ww-continue" class="ww-pbtn hidden" style="max-width:262px;margin-top:16px">▶ CONTINUE SAVED CAMPAIGN</button>
+  </div>
+  <div id="ww-research-page" class="hidden">
+    <div id="ww-foc-head"><span id="ww-res-title">RESEARCH</span><div style="flex:1"></div><span id="ww-foc-hint">Click a highlighted technology to research it — earlier tiers unlock the later ones</span><button id="ww-res-close">✕ CLOSE</button></div>
+    <div id="ww-foctree"><div id="ww-res-inner" style="position:relative;margin:auto"><canvas id="ww-res-lines"></canvas><div id="ww-res-nodes" style="position:absolute;left:0;top:0"></div></div></div>
+  </div>
+  <div id="ww-focus-page" class="hidden">
+    <div id="ww-foc-head"><span id="ww-foc-title">NATIONAL FOCUS</span><div style="flex:1"></div><span id="ww-foc-hint">Click a highlighted focus to begin it — prerequisites unlock the branches below</span><button id="ww-foc-close">✕ CLOSE</button></div>
+    <div id="ww-foctree"><div id="ww-foc-inner"><canvas id="ww-foc-lines"></canvas><div id="ww-foc-nodes"></div></div></div>
+  </div>
+  <div id="ww-end" class="hidden"></div>
+</div>
+  <script defer src="/legacy/game.js"></script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
