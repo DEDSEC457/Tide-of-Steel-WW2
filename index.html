@@ -244,6 +244,13 @@
         <p class="mc-desc">All of Europe on a full hex map with NATO counters and real 1938 borders — the grand strategic theatre. A work in progress.</p>
         <button class="mc-btn">LAUNCH ▶</button>
       </div>
+      <div class="mode-card" id="mc-roguelike">
+        <span class="mc-badge ready">NEW</span>
+        <div class="mc-icon">🎲</div>
+        <h2>BREAKTHROUGH</h2>
+        <p class="mc-desc">A roguelike campaign — fight a chain of escalating battles, keep your veterans alive, and pick a reward between each fight. How far can you push?</p>
+        <button class="primary mc-btn">START ▶</button>
+      </div>
     </div>
     <div class="foot">Runs 100% offline · No installs · Progress autosaves every turn</div>
   </div>
@@ -465,6 +472,39 @@
     <div id="end-stats"></div>
     <div class="mrow">
       <button class="primary" id="btn-end-menu">Back to Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ROGUELIKE: BREAKTHROUGH ============ -->
+<div id="rog-menu" class="modal-back hidden">
+  <div class="modal">
+    <h2>🎲 BREAKTHROUGH</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 12px;">ROGUELIKE CAMPAIGN · PUSH AS FAR AS YOU CAN</div>
+    <div id="rog-stat" style="display:flex;gap:30px;justify-content:center;margin:0 0 10px;"></div>
+    <div id="rog-roster"></div>
+    <div class="mrow" style="margin-top:14px;">
+      <button class="primary" id="rog-fight">START BATTLE ▶</button>
+      <button id="rog-newrun">New Run</button>
+      <button id="rog-back">Menu</button>
+    </div>
+  </div>
+</div>
+<div id="rog-reward" class="modal-back hidden">
+  <div class="modal">
+    <h2 class="win">POSITION TAKEN</h2>
+    <p id="rog-reward-sub"></p>
+    <div id="rog-reward-cards" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:14px 0;"></div>
+  </div>
+</div>
+<div id="rog-over" class="modal-back hidden">
+  <div class="modal">
+    <h2 id="rog-over-title" class="lose">RUN OVER</h2>
+    <p id="rog-over-text"></p>
+    <div id="rog-over-stats"></div>
+    <div class="mrow">
+      <button class="primary" id="rog-over-new">New Run</button>
+      <button id="rog-over-menu">Menu</button>
     </div>
   </div>
 </div>
@@ -4415,9 +4455,9 @@ function aiFullPhase(side){
 /* Two independent slots — Arcade and Realistic — so starting (or autosaving)
    a game in one mode never clobbers the other's campaign. A pre-slots save is
    migrated into the slot matching its own scenario. */
-const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1' };
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', roguelike:'hoi5-save-roguelike-battle-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
-function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : 'arcade'; }
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'roguelike' ? 'roguelike' : 'arcade'; }
 function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
@@ -5354,6 +5394,114 @@ function wwEndTurn(){
   return wwCheckVictory();
 }
 
+/* ============================ ROGUELIKE: "BREAKTHROUGH" ============================
+   A run is a chain of escalating tactical battles. Your army (the roster) persists and
+   keeps its veterancy; between battles you pick a reward. Lose a battle and the run ends.
+   Each round builds a small scenario on the fly and reuses the whole tactical engine. */
+let ROG = null;
+const ROG_SAVE_KEY = 'hoi5-roguelike-v1', ROG_BEST_KEY = 'hoi5-roguelike-best-v1';
+let rogNameN = 2;
+function rogUnitName(stem){ return (++rogNameN) + '. ' + stem; }
+function rogStartingRoster(){
+  return [
+    {kind:'g_inf', name:'1. Infanterie', str:10, xp:0},
+    {kind:'g_inf', name:'2. Infanterie', str:10, xp:0},
+    {kind:'g_pz',  name:'1. Panzer',     str:10, xp:0},
+    {kind:'g_hq',  name:'Heeresgruppe',  str:6,  xp:0},
+  ];
+}
+function rogBest(){ try{ if(typeof localStorage!=='undefined') return parseInt(localStorage.getItem(ROG_BEST_KEY)||'0',10)||0; }catch(e){} return 0; }
+function rogSetBest(v){ try{ if(typeof localStorage!=='undefined' && v>rogBest()) localStorage.setItem(ROG_BEST_KEY, String(v)); }catch(e){} }
+function rogNewRun(){ rogNameN=2; ROG = { active:true, round:1, score:0, roster:rogStartingRoster(), reward:null, over:false, best:rogBest() }; rogClearSave(); return ROG; }
+// scaled enemy garrison for a round — grows in number and quality
+function rogEnemyForce(round){
+  const out=[]; const n = Math.min(14, 2 + Math.round(round*1.25));
+  const pool = round<3 ? ['s_mil','s_inf','s_mil'] : round<6 ? ['s_inf','s_inf','s_tank'] : ['s_inf','s_tank','s_guard'];
+  const str = Math.min(10, 6 + Math.floor(round/2));
+  for(let i=0;i<n;i++){ const k=pool[i%pool.length]; out.push({kind:k, name:'Defenders '+(i+1), str:Math.min(KINDS[k].maxStr,str)}); }
+  if(round>=4) out.push({kind:'s_hq', name:'Sector HQ', str:6});
+  return out;
+}
+// build & register a small battle scenario from the current roster + a scaled enemy
+function rogBuildScenario(rog){
+  const cols=16, rows=11;
+  const map=[];
+  for(let y=0;y<rows;y++){ let row='';
+    for(let x=0;x<cols;x++){ let t='.'; const h=((x*73856093)^(y*19349663))>>>0;
+      if(x>5&&x<11){ if(h%13===0) t='f'; else if(h%19===0) t='h'; }   // texture only in the no-man's-land middle
+      row+=t; }
+    map.push(row); }
+  const hqName='Objective';
+  const cities=[{x:13,y:5,name:hqName,vp:3,owner:'S'}];
+  const startUnits=[]; const used=new Set();
+  const take=(xs,ys)=>{ for(const y of ys) for(const x of xs){ const k=x+','+y; if(used.has(k)) continue; used.add(k); return [x,y]; } return null; };
+  const ys=[5,4,6,3,7,2,8,1,9,0,10];
+  for(const u of rog.roster){ const p=take([1,2,3],ys); if(!p) break; startUnits.push([u.kind,u.name,p[0],p[1],u.str]); }       // player on the left
+  for(const e of rogEnemyForce(rog.round)){ const p=take([13,12,14,11,15],ys); if(!p) break; startUnits.push([e.kind,e.name,p[0],p[1],e.str]); }  // enemy on the right
+  const scn = {
+    id:'roguelike', title:'BREAKTHROUGH', short:'BREAKTHROUGH · RD '+rog.round, sub:'ROGUELIKE CAMPAIGN · ROUND '+rog.round,
+    menu:{ger:{h:'Attack',p:'Break the line.'}, sov:{h:'Defend',p:'Hold the line.'}},
+    cols, rows, map, cities,
+    startUnits, sovSpawns:[], gerSpawns:[], sovSchedule:[], generals:[], events:[], decisions:[], airInit:[], sovAirSchedule:[],
+    maxTurn:16, startDate:Date.UTC(1941,5,22), turnDays:7,
+    victoryTiers:[[3,'POSITION TAKEN','You broke through and seized the objective.'],[0,'OVERRUN','The assault stalled and your army was thrown back.']],
+    sudden:{axisCities:[hqName], minAxisUnits:1,
+      axisTitle:'POSITION TAKEN', axisText:'The objective is yours — press on to the next sector.',
+      sovTitle:'OVERRUN', sovText:'Your army is broken. The advance is over.'},
+    weather:()=> 'clear',
+    pp:(side)=> side==='S' ? 2 : 1,
+    opening:()=> ['Round '+rog.round+' — break through the enemy line and take the objective.'],
+  };
+  SCENARIOS.roguelike = scn;
+  return scn;
+}
+function rogDifficulty(round){ return round<3?'normal':round<6?'hard':'brutal'; }
+// start the battle for the current round (player = Axis attacker, AI = defenders)
+function rogStartBattle(){
+  if(!ROG) rogNewRun();
+  rogBuildScenario(ROG);
+  newGame('G', rogDifficulty(ROG.round), 'ai', 'roguelike');
+  // makeUnit() zeroes xp, so re-apply each roster unit's veterancy by name
+  const xpByName=new Map(ROG.roster.map(u=>[u.name, u.xp||0]));
+  for(const u of G.units){ if(u.side==='G' && xpByName.has(u.name)) u.xp=xpByName.get(u.name); }
+  return G;
+}
+// 'win' | 'loss' | null — read from a finished battle state
+function rogBattleResult(){
+  if(!G || !G.over) return null;
+  const wonCity = G.cities.some(c=>c.owner==='G' && c.vp>0);
+  const alive = unitsOf('G').filter(u=>u.str>0).length;
+  return (wonCity && alive>0) ? 'win' : 'loss';
+}
+// fold survivors back into the roster and advance the run (after a win)
+function rogCarry(){
+  ROG.roster = unitsOf('G').filter(u=>u.str>0).map(u=>({kind:u.kind, name:u.name, str:u.str, xp:u.xp||0}));
+  ROG.score += 100 + ROG.round*40 + (G.stats ? G.stats.S.lost*4 : 0);
+  ROG.round += 1;
+  rogSetBest(ROG.score); ROG.best=rogBest();
+}
+function rogEndRun(){ if(!ROG) return; ROG.over=true; ROG.active=false; rogSetBest(ROG.score); ROG.best=rogBest(); rogClearSave(); }
+function rogRewardChoices(){
+  return [
+    {id:'reinforce', label:'Fresh Division',          desc:'+1 full-strength Infantry Army'},
+    {id:'armor',     label:'Panzer Reserve',          desc:'+1 full-strength Panzer Group'},
+    {id:'heal',      label:'Rest & Refit',            desc:'+3 strength to every surviving unit'},
+    {id:'elite',     label:'Battlefield Promotion',   desc:'Promote your strongest unit (+veterancy)'},
+  ];
+}
+function rogApplyReward(id){
+  if(!ROG) return;
+  if(id==='reinforce') ROG.roster.push({kind:'g_inf', name:rogUnitName('Infanterie'), str:10, xp:0});
+  else if(id==='armor') ROG.roster.push({kind:'g_pz', name:rogUnitName('Panzer'), str:10, xp:0});
+  else if(id==='heal') for(const u of ROG.roster) u.str=Math.min(KINDS[u.kind].maxStr, u.str+3);
+  else if(id==='elite'){ const best=ROG.roster.slice().filter(u=>!KINDS[u.kind].hq).sort((a,b)=>b.str-a.str)[0]; if(best) best.xp=(best.xp||0)+12; }
+  ROG.reward=null;
+}
+function rogSave(){ try{ if(typeof localStorage!=='undefined'&&ROG) localStorage.setItem(ROG_SAVE_KEY, JSON.stringify(ROG)); }catch(e){} }
+function rogLoad(){ try{ if(typeof localStorage==='undefined') return null; const s=localStorage.getItem(ROG_SAVE_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function rogHasSave(){ try{ return typeof localStorage!=='undefined' && !!localStorage.getItem(ROG_SAVE_KEY); }catch(e){ return false; } }
+function rogClearSave(){ try{ if(typeof localStorage!=='undefined') localStorage.removeItem(ROG_SAVE_KEY); }catch(e){} }
+
 /* ====================================================================
    Everything below is browser-only: rendering, input, UI, sound.
    The game engine above runs headless too (used by the test harness).
@@ -5644,7 +5792,7 @@ onCityTaken = function(c){
   boomAt(c.x, c.y, true);
   floatText(c.x, c.y, '★ '+c.name+' taken', '#ffd34d');
 };
-onGameOver = function(){ setTimeout(showEnd, 600); };
+onGameOver = function(){ if (ROG && ROG.active && G && G.scenario==='roguelike'){ setTimeout(rogBattleEnd, 600); } else { setTimeout(showEnd, 600); } };
 onAirStrike = function(au, t, res){
   boomAt(t.x, t.y, res.killed);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
@@ -7939,6 +8087,64 @@ $('btn-continue-realistic').onclick = ()=>{
 };
 $('btn-back-arcade').onclick = ()=>{ show('menu', false); show('mode-select', true); };
 
+/* ---------------- Roguelike: Breakthrough ---------------- */
+function rogFmt(n){ n=Math.round(n||0); return n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : ''+n; }
+function rogLvl(xp){ xp=xp||0; return xp>=24?4:xp>=16?3:xp>=8?2:xp>=3?1:0; }
+function rogRenderMenu(){
+  const rog = ROG; if(!rog) return;
+  $('rog-stat').innerHTML =
+    '<div><div style="font-size:11px;color:var(--dim)">ROUND</div><div style="font-size:26px;font-weight:800;color:#ffd98a">'+rog.round+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--dim)">SCORE</div><div style="font-size:26px;font-weight:800">'+rogFmt(rog.score)+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--dim)">BEST</div><div style="font-size:26px;font-weight:800;color:#8fd0ff">'+rogFmt(rog.best||0)+'</div></div>';
+  const lvlName=['Green','Trained','Regular','Veteran','Elite'];
+  let html='<div style="font-size:11px;color:var(--dim);letter-spacing:2px;margin:6px 0 5px;text-align:left">YOUR ARMY — '+rog.roster.length+' UNITS</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start;max-width:560px">';
+  for(const u of rog.roster){ const k=KINDS[u.kind]||{label:u.kind}; const lvl=rogLvl(u.xp);
+    html+='<div style="background:#0d141d;border:1px solid #29384a;border-radius:7px;padding:5px 9px;min-width:118px;text-align:left">'+
+      '<div style="font-size:12px;font-weight:700;color:#dfe7ef">'+u.name+'</div>'+
+      '<div style="font-size:10px;color:var(--dim)">'+k.label+'</div>'+
+      '<div style="font-size:11px;margin-top:2px">str <b style="color:#7fd08a">'+u.str+'</b>'+(lvl>0?' · <span style="color:#ffd98a">'+lvlName[lvl]+' '+'★'.repeat(lvl)+'</span>':'')+'</div></div>';
+  }
+  html+='</div>';
+  $('rog-roster').innerHTML=html;
+}
+function rogOpen(){ sClick(); show('mode-select', false);
+  if(!ROG || ROG.over || !ROG.active){ const sv=rogLoad(); if(sv && sv.active && !sv.over){ ROG=sv; } else { rogNewRun(); } }
+  rogRenderMenu(); show('rog-menu', true);
+}
+function rogStartBattleUI(){ sClick(); show('rog-menu', false); rogStartBattle(); rogSave(); startCampaign(); }
+function rogShowReward(){
+  $('rog-reward-sub').textContent = 'Round '+(ROG.round-1)+' cleared — score '+rogFmt(ROG.score)+'. Choose a reward for the next assault:';
+  const cards=rogRewardChoices();
+  $('rog-reward-cards').innerHTML = cards.map(c=>
+    '<div class="rog-rcard" data-id="'+c.id+'" style="background:#0d141d;border:1px solid #2c4a6e;border-radius:9px;padding:12px 14px;width:182px;cursor:pointer">'+
+    '<div style="font-weight:800;color:#ffd98a;margin-bottom:5px">'+c.label+'</div>'+
+    '<div style="font-size:12px;color:#aebfce">'+c.desc+'</div></div>').join('');
+  for(const el of $('rog-reward-cards').querySelectorAll('.rog-rcard'))
+    el.onclick=()=>{ rogApplyReward(el.dataset.id); rogSave(); show('rog-reward',false); rogRenderMenu(); show('rog-menu',true); sClick(); };
+  show('rog-over', false); show('end-modal', false); show('rog-reward', true);
+}
+function rogShowOver(){
+  $('rog-over-title').textContent = 'RUN OVER — ROUND '+ROG.round;
+  $('rog-over-text').textContent = 'Your army was broken at round '+ROG.round+'. You cleared '+(ROG.round-1)+' sector'+(ROG.round-1===1?'':'s')+'.';
+  $('rog-over-stats').innerHTML =
+    '<div class="statrow"><span>Final score</span><span>'+rogFmt(ROG.score)+'</span></div>'+
+    '<div class="statrow"><span>Best run</span><span>'+rogFmt(ROG.best||0)+'</span></div>'+
+    '<div class="statrow"><span>Sectors cleared</span><span>'+(ROG.round-1)+'</span></div>';
+  show('rog-reward', false); show('end-modal', false); show('rog-over', true);
+}
+function rogBattleEnd(){
+  show('end-modal', false);
+  if(rogBattleResult()==='win'){ rogCarry(); rogSave(); rogShowReward(); }
+  else { rogEndRun(); rogShowOver(); }
+}
+$('mc-roguelike').onclick = rogOpen;
+$('rog-fight').onclick = rogStartBattleUI;
+$('rog-newrun').onclick = ()=>{ rogNewRun(); rogSave(); rogRenderMenu(); sClick(); };
+$('rog-back').onclick = ()=>{ rogSave(); show('rog-menu', false); showModeSelect(); };
+$('rog-over-new').onclick = ()=>{ rogNewRun(); rogSave(); show('rog-over', false); rogRenderMenu(); show('rog-menu', true); sClick(); };
+$('rog-over-menu').onclick = ()=>{ show('rog-over', false); showModeSelect(); };
+
 $('btn-menu').onclick = ()=>{
   saveGame();                        // autosave into this game's own slot
   showModeSelect();                  // continue buttons are set when each sub-menu opens
@@ -8156,6 +8362,8 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
+    rogNewRun, rogEnemyForce, rogBuildScenario, rogStartBattle, rogBattleResult, rogCarry, rogEndRun,
+    rogRewardChoices, rogApplyReward, rogSave, rogLoad, rogHasSave, rogClearSave, rogState: () => ROG,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
