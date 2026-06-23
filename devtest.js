@@ -1108,6 +1108,11 @@ say('— The World at War —');
   check('ROG built battle has correct map dimensions', okMap);
   check('ROG built battle: units on land, unique hexes, valid kinds', onLand&&uniq&&kindsOk);
   check('ROG built battle has an enemy objective city', scn.cities.length===1 && scn.cities[0].owner==='S' && scn.cities[0].vp>0);
+  // supply must reach across the whole small battlefield, or the player starves on the advance
+  E.rogNewRun(); E.rogBuildScenario(E.rogState()); E.newGame('G','normal','hotseat','roguelike');
+  const supNet = E.computeSupply('G');
+  let deep=null; for(const c of [[11,8],[11,9],[10,9],[12,9],[10,8],[9,9]]) if(!E.unitAt(c[0],c[1])){ deep=c; break; }
+  check('ROG supply reaches deep across the field (no starving on the assault)', !!deep && supNet.has(deep[0]+','+deep[1]));
   // a battle plays to completion (AI vs AI) and yields a clean result
   E.rogNewRun(); E.rogBuildScenario(E.rogState());
   E.newGame('G','normal','hotseat','roguelike');

@@ -5444,6 +5444,7 @@ function rogBuildScenario(rog){
     cols, rows, map, cities,
     startUnits, sovSpawns:[], gerSpawns:[], sovSchedule:[], generals:[], events:[], decisions:[], airInit:[], sovAirSchedule:[],
     maxTurn:16, startDate:Date.UTC(1941,5,22), turnDays:7,
+    supplyRange:30,   // small battle map: supply reaches the whole field from the home edge — the enemy is the challenge, not starvation
     victoryTiers:[[3,'POSITION TAKEN','You broke through and seized the objective.'],[0,'OVERRUN','The assault stalled and your army was thrown back.']],
     sudden:{axisCities:[hqName], minAxisUnits:1,
       axisTitle:'POSITION TAKEN', axisText:'The objective is yours — press on to the next sector.',
