@@ -31,12 +31,15 @@ deps, runs offline by double-clicking. Keep it that way.
 | `SCENARIOS.barbarossa =` | Scenario 1 data (map/cities/units/generals/events/tiers) |
 | `SCENARIOS.winter41 =` | Scenario 2 — Soviets attack, Road of Life supplySeeds |
 | `SCENARIOS.stalingrad =` | Scenario 3 — southern map, allied flank armies |
-| `SCENARIOS.dday =` | Scenario 4 — 36×22 map, beach supplySeeds, edgeSupply off |
+| `SCENARIOS.kursk =` | Kursk 1943 — axis starts holding VP cities (score moves both ways), dug-in defenders |
+| `SCENARIOS.dday =` | Scenario 4 — 36×22 map (18 turns), beach supplySeeds, edgeSupply off |
 | `SCENARIOS.midway =` | Scenario 5 — naval kinds, carriers, 1-day turns |
 | `DEFAULT_KINDS` / `DEFAULT_SIDES` | Eastern-front unit types; side names/flags/colors |
 | `function loadScenario` | Sets the mutable mirrors (COLS, KINDS, EVENTS…) engine reads |
 | `VETERANCY & HQ` | xp levels, vetMul, underHQ, previewGroup (combined arms) |
 | `FUEL (realistic mode)` | usesFuel/fuelOf, FUEL_MAX/REGEN/DEPOT/TRICKLE — gated by `SCN.fuel` |
+| `FOG OF WAR (variant)` | sightFor/isSpotted/ghosts/fowMovePlan/airRecon — all gated by `G.variants.fow`; AI never fooled |
+| `CAMPAIGN VARIANTS` | applyVariants (chaos-weather wxPlan, shuffled G.sched, veteran cadres, fow) — menu chips `var-*` |
 | `SCENARIOS.realistic =` | Realistic Mode — 60×36 front, `fuel`/`harshOOS` flags, g_mot/g_ss/s_cav kinds |
 | `============ SUPPLY` | computeSupply (heap Dijkstra; edgeSupply, supplySeeds, range), ZOC, railNetwork |
 | `makeHeap` / `railNetwork` | binary heap for the hot Dijkstras; railhead BFS (SCN.railhead) |

@@ -603,6 +603,93 @@ say('— campaign variants —');
     && Gp.units.every(u=>!(u.xp>0)));
 }
 
+/* ---------------- fog of war ---------------- */
+say('— fog of war —');
+{
+  E.newGame('G','normal','ai','barbarossa',{fow:true});
+  const Gf = E.getState();
+  check('fow: variant state initialised', !!(Gf.variants.fow && Gf.seen && Array.isArray(Gf.recon)));
+  const sight = E.sightFor('G');
+  check('fow: sight covers every friendly position', E.unitsOf('G').every(u=>sight.has(u.x+','+u.y)));
+  const seenFoe = E.unitsOf('S').find(t=>sight.has(t.x+','+t.y));
+  const hidFoe  = E.unitsOf('S').filter(t=>!sight.has(t.x+','+t.y)).pop();  // deepest reserve
+  check('fow: frontier enemies spotted, deep reserves hidden',
+    !!seenFoe && !!hidFoe && E.isSpotted(seenFoe,'G') && !E.isSpotted(hidFoe,'G'));
+  check('fow: your own units are always visible to you', E.unitsOf('G').every(u=>E.isSpotted(u,'G')));
+
+  // ghost memory: scout a hidden reserve, pull the scout back — the marker stays
+  const scout = E.unitsOf('G')[0];
+  const [ox,oy] = [scout.x, scout.y];
+  const nb = E.neighbors(hidFoe.x,hidFoe.y).find(([x,y])=>E.passable(x,y) && !E.unitAt(x,y));
+  scout.x = nb[0]; scout.y = nb[1]; Gf.mv = (Gf.mv||0)+1;
+  E.sightFor('G');
+  check('fow: scouting records the contact', !!Gf.seen.G[hidFoe.id]);
+  scout.x = ox; scout.y = oy; Gf.mv++;
+  E.sightFor('G');
+  check('fow: a contact that slips from view leaves a last-seen ghost',
+    Gf.seen.G[hidFoe.id] && Gf.seen.G[hidFoe.id].x===hidFoe.x && Gf.seen.G[hidFoe.id].y===hidFoe.y);
+  // watching a hex stay empty clears the ghost
+  scout.x = nb[0]; scout.y = nb[1]; Gf.mv++;
+  const fx0 = hidFoe.x; hidFoe.x = ox; Gf.mv++;             // foe sneaks off while we watch its hex
+  E.sightFor('G');
+  check('fow: re-scouting an empty hex clears the ghost', !Gf.seen.G[hidFoe.id] || Gf.seen.G[hidFoe.id].x!==fx0);
+  scout.x = ox; scout.y = oy; hidFoe.x = fx0; Gf.mv++;
+
+  // hidden enemies don't dent the move preview — and the march contact-stops
+  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  const r0 = E.reachable(pz);
+  let dest=null, path=null;
+  for (const k of r0.keys()){                                // longest traced route
+    const [x,y] = k.split(',').map(Number);
+    const p = E.tracePath(pz, r0, x, y);
+    if (p && (!path || p.length>path.length)){ path=p; dest=[x,y]; }
+  }
+  check('fow: a long route exists to test against', !!path && path.length>=4);
+  // plant an ambusher beside a late step of the route, out of everyone's sight
+  const step = path[path.length-2];
+  const amb = E.neighbors(step[0],step[1]).map(([x,y])=>({x,y}))
+    .find(h=>E.passable(h.x,h.y) && !E.unitAt(h.x,h.y) && !E.sightFor('G').has(h.x+','+h.y));
+  if (amb){
+    hidFoe.x = amb.x; hidFoe.y = amb.y; Gf.mv++;
+    const r1 = E.reachable(pz);
+    check('fow: the unseen ambusher leaves no hole in the reach preview',
+      r1.has(amb.x+','+amb.y) || r1.size >= r0.size - 2);
+    const plan = E.fowMovePlan(pz, dest[0], dest[1], r1);
+    check('fow: the march halts on surprise contact',
+      plan.contact && plan.contact.id===hidFoe.id && !(plan.x===dest[0] && plan.y===dest[1]));
+    check('fow: the halt hex is free ground', !E.unitAt(plan.x,plan.y) || (plan.x===pz.x && plan.y===pz.y));
+  } else {
+    check('fow: ambush spot found beside the route', false, 'no hidden hex next to route');
+  }
+
+  // photo-recon reveals a patch, costs the mission, and goes stale next turn
+  E.newGame('G','normal','ai','barbarossa',{fow:true});
+  const G4 = E.getState();
+  const au = G4.air.find(a=>a.side==='G');
+  let hit=null;
+  outer2: for (let y=0;y<E.ROWS;y++) for (let x=0;x<E.COLS;x++){
+    if (!E.passable(x,y) || E.sightFor('G').has(x+','+y)) continue;
+    if (E.airRecon(au, x, y)){ hit=[x,y]; break outer2; }
+  }
+  check('fow: photo-recon reveals the target patch', !!hit && E.sightFor('G').has(hit[0]+','+hit[1]));
+  check('fow: recon spends the air group', au.mission==='done');
+  E.startPhase('G');
+  check('fow: the photos are stale by your next turn', !E.sightFor('G').has(hit[0]+','+hit[1]));
+
+  // fog survives a save/load and a few AI turns without breaking invariants
+  E.newGame('S','normal','ai','barbarossa',{fow:true});   // human plays S → the AI owns G
+  E.deserialize(E.serialize());
+  const G5 = E.getState();
+  check('fow: state round-trips through a save', G5.variants.fow && !!G5.seen);
+  for (let i=0;i<6 && !G5.over;i++){
+    if (G5.phase==='G') E.aiFullPhase('G');                 // AI side plays under full information
+    if (!G5.over) E.endPhase();
+  }
+  const pos = new Set(); let stacked=false;
+  for (const u of G5.units){ const k=u.x+','+u.y; if (pos.has(k)) stacked=true; pos.add(k); }
+  check('fow: AI turns keep the no-stacking invariant', !stacked);
+}
+
 /* ---------------- The World at War (native Europe strategic layer) ---------------- */
 say('— The World at War —');
 {
@@ -1299,7 +1386,8 @@ function uiSmoke(side){
   if ($('btn-next').onclick) $('btn-next').onclick();   // cycle to next unit with orders
   if ($('btn-undo').onclick) $('btn-undo').onclick();
   // campaign-variant chips toggle on and back off cleanly (leave defaults untouched)
-  for (const vid of ['var-wx','var-res','var-vet','rvar-wx','rvar-res','rvar-vet','wvar-wx','wvar-res','wvar-vet'])
+  for (const vid of ['var-wx','var-res','var-vet','var-fow','rvar-wx','rvar-res','rvar-vet','rvar-fow',
+                     'wvar-wx','wvar-res','wvar-vet','wvar-fow'])
     if ($(vid).onclick){ $(vid).onclick(); $(vid).onclick(); }
   $('btn-sound').onclick();                  // opens the settings modal
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }

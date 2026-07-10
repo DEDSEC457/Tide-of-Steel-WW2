@@ -222,7 +222,7 @@
       <div class="mc-inner">
         <div class="mc-icon">⚔</div>
         <div class="mc-text">
-          <span class="mc-badge ready">6 CAMPAIGNS</span>
+          <span class="mc-badge ready">7 CAMPAIGNS</span>
           <h2>ARCADE MODE</h2>
           <p class="mc-desc">Historical battles from Operation Barbarossa to the Battle of the Bulge — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
         </div>
@@ -290,6 +290,7 @@
       <span class="opt" id="rvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="rvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="rvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+      <span class="opt" id="rvar-fow" title="You see what your troops see: units spot 2 hexes (cavalry & carriers 3), your cities report, air groups fly photo-recon. Hidden enemies ambush careless marches. The computer is not fooled — this is YOUR handicap">🕵 Fog of war</span>
     </div>
     <div id="rm-rec" style="color:var(--dim);font-size:12px;letter-spacing:1px;margin-top:2px;"></div>
     <div class="mrow" style="justify-content:center;margin-top:16px;">
@@ -331,6 +332,7 @@
       <span class="opt" id="wvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="wvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="wvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+      <span class="opt" id="wvar-fow" title="You see what your troops see: units spot 2 hexes (cavalry & carriers 3), your cities report, air groups fly photo-recon. Hidden enemies ambush careless marches. The computer is not fooled — this is YOUR handicap">🕵 Fog of war</span>
     </div>
     <div class="mrow" style="justify-content:center;margin-top:18px;">
       <button id="waw-back">← Back</button>
@@ -350,6 +352,7 @@
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
+      <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
       <span class="opt" data-s="dday">🟦 D-Day 1944</span>
       <span class="opt" data-s="bulge">🎄 The Bulge 1944</span>
     </div>
@@ -376,6 +379,7 @@
       <span class="opt" id="var-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="var-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="var-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+      <span class="opt" id="var-fow" title="You see what your troops see: units spot 2 hexes (cavalry & carriers 3), your cities report, air groups fly photo-recon. Hidden enemies ambush careless marches. The computer is not fooled — this is YOUR handicap">🕵 Fog of war</span>
     </div>
     <div class="opt-row">
       <span class="opt sel" id="mode-ai">vs Computer</span>
@@ -463,8 +467,13 @@
           menus mixes optional mutators into a new war: <b>Chaos weather</b> re-rolls the season
           script (watch the campaign clock — it becomes this war's forecast), <b>Shuffled
           reserves</b> moves every reinforcement up to two weeks early or late, and <b>Veteran
-          cadres</b> hands each side three battle-tested formations. Mix them freely — no two
-          campaigns play the same. Every finished game against the computer goes into your
+          cadres</b> hands each side three battle-tested formations. <b>Fog of war</b> hides
+          every enemy your troops haven't spotted: units see 2 hexes (cavalry and carriers 3),
+          cities you hold report around themselves, and air groups can fly <b>🔭 photo-recon</b>
+          over anywhere your airfields cover. Enemies you lose track of leave a faded
+          <b>? last-seen marker</b>, and marching into an unseen enemy's path halts your unit
+          on contact — probe with cavalry before you commit the panzers. Mix variants freely —
+          no two campaigns play the same. Every finished game against the computer goes into your
           <b>service record</b>, shown on the menu: campaigns fought and your best result on
           each side. Beat your own history.</li>
       <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
@@ -1359,7 +1368,249 @@ SCENARIOS.stalingrad = {
   ]; },
 };
 
-/* ---------- Scenario 4: D-Day — Normandy, June–August 1944 ----------
+/* ---------- Scenario: Kursk — Zitadelle, July–August 1943 ----------
+   The greatest armoured battle in history. The Axis start holding three
+   VP cities (Orel, Belgorod, Kharkov) — the Soviet counteroffensives
+   exist to take them away, so the score can move in BOTH directions. */
+SCENARIOS.kursk = {
+  id: 'kursk',
+  title: 'ZITADELLE — KURSK', short: 'KURSK',
+  sub: 'THE KURSK SALIENT · JULY — AUGUST 1943 · TURN-BASED STRATEGY',
+  menu: {
+    ger: {h:'⬛ Germany (Axis)', p:'The last great gamble in the East. Cut the salient with two panzer pincers before the Soviet steamroller is ready — and know that every day you fail, the counterblow gathers.'},
+    sov: {h:'🟥 Soviet Union', p:'You know they are coming — six fortified belts deep, a million mines. Bleed the panzers white in the wire, then unleash Kutuzov and Rumyantsev and take back Orel, Belgorod and Kharkov.'},
+  },
+  kinds: {
+    g_inf:  {side:'G', label:'Infanterie-Korps', atk:5, def:5, mp:3, maxStr:10, cost:10, sym:'inf'},
+    g_pz:   {side:'G', label:'Panzerkorps',      atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+    g_ss:   {side:'G', label:'SS-Panzerkorps',   atk:9, def:6, mp:5, maxStr:10, cost:20, sym:'arm', noBuy:true, color:'#3a3a3a'},
+    s_inf:  {side:'S', label:'Rifle Army',       atk:4, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    s_gd:   {side:'S', label:'Guards Army',      atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', color:'#b04a18'},
+    s_tank: {side:'S', label:'Tank Army',        atk:7, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
+    g_hq:   {side:'G', label:'Army Group HQ',    atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+    s_hq:   {side:'S', label:'Front HQ',         atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6e2620'},
+  },
+  deployNames: {g_inf:'Ersatz-Korps', g_pz:'Panzer Reserve', s_inf:'Reserve Army', s_gd:'Guards Reserve', s_tank:'Tank Reserve'},
+  cols: 30, rows: 20,
+  /* The salient: Orel shoulder north, Belgorod–Kharkov shoulder south, Kursk in
+     the bulge. The Oka guards Orel's flank, the Seim runs west of Kursk, the
+     Psel shields Oboyan–Prokhorovka, the Donets angles past Belgorod. The
+     Olkhovatka hills (north) and the Prokhorovka ridge (south) are the keys. */
+  map: [
+  /*           0    5    10   15   20   25     */
+  /* 0*/ "..fff.........................",
+  /* 1*/ ".ffff........r................",
+  /* 2*/ "..fff........r................",
+  /* 3*/ "..ff........r.................",
+  /* 4*/ "............r.................",
+  /* 5*/ "..............................",
+  /* 6*/ "..............................",
+  /* 7*/ "..............................",
+  /* 8*/ "...........hhh................",
+  /* 9*/ "..............................",
+  /*10*/ "..............................",
+  /*11*/ "....rrrrr.....................",
+  /*12*/ "...............hh.............",
+  /*13*/ "...........rrrr...............",
+  /*14*/ "..............................",
+  /*15*/ ".............r................",
+  /*16*/ "..............r...............",
+  /*17*/ "...............r..............",
+  /*18*/ "................r.............",
+  /*19*/ ".................r............",
+  ],
+  /* vp>0 counts for the Axis wherever they hold it — Orel, Belgorod and Kharkov
+     start German: lose them to the counteroffensive and the score bleeds away. */
+  cities: [
+    {x:2, y:3,  name:'Bryansk',          vp:0, owner:'G'},
+    {x:10,y:3,  name:'Orel',             vp:2, owner:'G'},
+    {x:8, y:5,  name:'Kromy',            vp:0, owner:'G'},
+    {x:11,y:7,  name:'Ponyri',           vp:1, owner:'S'},
+    {x:14,y:7,  name:'Maloarkhangelsk',  vp:0, owner:'S'},
+    {x:18,y:4,  name:'Livny',            vp:0, owner:'S'},
+    {x:22,y:2,  name:'Yelets',           vp:0, owner:'S'},
+    {x:26,y:4,  name:'Voronezh',         vp:0, owner:'S'},
+    {x:10,y:10, name:'Kursk',            vp:3, owner:'S'},
+    {x:20,y:9,  name:'Stary Oskol',      vp:0, owner:'S'},
+    {x:3, y:12, name:'Sumy',             vp:0, owner:'G'},
+    {x:9, y:13, name:'Oboyan',           vp:1, owner:'S'},
+    {x:14,y:12, name:'Prokhorovka',      vp:1, owner:'S'},
+    {x:19,y:13, name:'Novy Oskol',       vp:0, owner:'S'},
+    {x:9, y:15, name:'Tomarovka',        vp:0, owner:'G'},
+    {x:12,y:15, name:'Belgorod',         vp:1, owner:'G'},
+    {x:11,y:18, name:'Kharkov',          vp:2, owner:'G'},
+  ],
+  sovSpawns: [[29,4],[29,8],[29,12],[26,4],[22,2],[20,9],[19,13],[24,16]],
+  gerSpawns: [[0,2],[0,8],[0,14],[2,3],[10,3],[11,18]],
+  /* Zitadelle order of battle: two armoured pincers against a defense that
+     knows the day, the hour and very nearly the map reference. */
+  startUnits: [
+    // — 9. Armee (Model), the northern pincer —
+    ['g_inf','XXIII. Korps',        14,4, 9], ['g_pz','XLI. Panzerkorps',   12,5, 10],
+    ['g_pz','XLVII. Panzerkorps',   10,5, 10], ['g_inf','XX. Korps',         8,4, 9],
+    // — 2. Armee holds the western face —
+    ['g_inf','2. Armee',             4,8, 8], ['g_inf','VII. Korps',         4,10, 8],
+    // — 4. Panzerarmee & Armee-Abteilung Kempf, the southern pincer —
+    ['g_pz','XLVIII. Panzerkorps',   9,14, 10], ['g_ss','II. SS-Panzerkorps', 11,14, 10],
+    ['g_pz','III. Panzerkorps',     14,15, 10], ['g_inf','Korps Raus',        15,16, 9],
+    ['g_inf','52. Korps',            7,15, 8],
+    ['g_hq','HGr Mitte HQ',          9,2, 6], ['g_hq','HGr Süd HQ',          10,16, 6],
+    // — Central Front (Rokossovsky) mans the northern belts —
+    ['s_inf','13th Army',           11,6, 9], ['s_inf','70th Army',           8,6, 8],
+    ['s_inf','48th Army',           14,6, 8], ['s_inf','65th Army',           6,7, 8],
+    ['s_inf','60th Army',            6,10, 7],
+    // — Voronezh Front (Vatutin) mans the south —
+    ['s_gd','6th Guards Army',      10,12, 9], ['s_gd','7th Guards Army',    15,13, 9],
+    ['s_inf','69th Army',           12,11, 8], ['s_tank','1st Tank Army',     9,11, 9],
+    // — the deep reserve —
+    ['s_tank','2nd Tank Army',      13,9, 8], ['s_inf','38th Army',           5,12, 7],
+    ['s_hq','Central Front HQ',     15,8, 6], ['s_hq','Voronezh Front HQ',   12,10, 6],
+  ],
+  /* the Steppe Front pours in as the German blow spends itself */
+  sovSchedule: [
+    [2,'s_tank','5th Guards Tank Army'], [3,'s_gd','5th Guards Army'],
+    [3,'g_pz','XXIV. Panzerkorps'],      [4,'s_inf','53rd Army'],
+    [5,'s_tank','3rd Gds Tank Army'],    [6,'s_gd','11th Guards Army'],
+    [6,'g_inf','Gruppe Esebeck'],        [7,'s_inf','63rd Army'],
+    [8,'s_inf','57th Army'],
+  ],
+  generals: [
+    // — Axis —
+    {side:'G', unit:'XLVII. Panzerkorps', name:'Model',   def:1.12,
+     bio:'The Führer\'s fireman drives the northern pincer — a defensive genius about to learn what six fortified belts mean.'},
+    {side:'G', unit:'XLVIII. Panzerkorps', name:'Hoth',   atk:1.12,
+     bio:'Commands the strongest armoured formation Germany ever assembled — aimed straight up the Oboyan road.'},
+    {side:'G', unit:'II. SS-Panzerkorps', name:'Hausser', atk:1.15,
+     bio:'Leibstandarte, Das Reich and Totenkopf under one hard-bitten SS veteran — the spear-point of Zitadelle.'},
+    {side:'G', unit:'III. Panzerkorps',   name:'Breith',  atk:1.08,
+     bio:'Kempf\'s armoured fist, fighting across the Donets to guard the SS corps\' open flank.'},
+    // — Soviet —
+    {side:'S', unit:'13th Army',          name:'Pukhov',  def:1.15,
+     bio:'His army sits astride the Ponyri rail line in the deepest fieldworks ever dug — the Olkhovatka hills behind him.'},
+    {side:'S', unit:'6th Guards Army',    name:'Chistyakov', def:1.12,
+     bio:'First to take the SS blow on the Oboyan road — his anti-tank fronts trade lives for panzer tracks.'},
+    {side:'S', unit:'1st Tank Army',      name:'Katukov', def:1.10,
+     bio:'Refuses the order to counterattack head-on — digs his tanks in hull-down and lets the panzers come to him.'},
+    {side:'S', unit:'5th Guards Tank Army', name:'Rotmistrov', atk:1.12,
+     bio:'Leads 800 tanks headlong into the SS at Prokhorovka — the greatest armoured melee in history.'},
+  ],
+  decisions: [
+    {
+      id:'counterprep', turn:1, side:'S',
+      date:'5 July 1943', title:'THE COUNTER-PREPARATION',
+      text:'A captured pioneer has talked: the offensive begins <b>before dawn</b>. Zhukov can fire a thousand guns at the German assembly areas now — a colossal expenditure of shells against troops who may already have moved up. Fire the counter-preparation, or hoard the ammunition for the defensive battle?',
+      options:[
+        {label:'Fire everything — catch them forming up',
+         effect:'The two nearest German panzer corps each lose 1 strength before the battle begins',
+         blurb:'At 02:20 the whole northern artillery fires at once. The German barrage, when it comes, is ragged — batteries smashed on their start lines, timetables in ruins.',
+         log:'🟥 A thousand guns speak first. Zitadelle begins an hour late, and bleeding.',
+         apply(G){
+           const k = G.cities.find(c=>c.name==='Kursk') || {x:10,y:10};
+           unitsOf('G').filter(u=>KINDS[u.kind].sym==='arm')
+             .sort((a,b)=>hexDist(a.x,a.y,k.x,k.y)-hexDist(b.x,b.y,k.x,k.y))
+             .slice(0,2).forEach(u=>{ u.str = Math.max(1, u.str-1); });
+         }},
+        {label:'Hoard the shells for the defensive battle',
+         effect:'+4 ⚙ banked — every shell saved is a panzer stopped in the belts',
+         blurb:'The guns stay silent and full. When the panzers enter the minefields, the artillery that greets them has not fired a round.',
+         log:'🟥 The guns wait, loaded, for the real battle.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+4); }},
+      ],
+      ai(G){ return 0; },   // Zhukov fired it
+    },
+    {
+      id:'sicily43', turn:5, side:'G',
+      date:'1 August 1943', title:'SICILY — BREAK OFF ZITADELLE?',
+      text:'The Western Allies are ashore in <b>Sicily</b> and Italy is wobbling. The Führer wants the SS-Panzerkorps entrained for the Mediterranean <b>immediately</b>. Manstein protests: the Soviet armour is finally in the open and one more week could break it. Obey — or gamble on one last push?',
+      options:[
+        {label:'Obey — the SS entrain for Italy',
+         effect:'Every SS-Panzerkorps loses 2 strength, but +6 ⚙ banked as the front shortens',
+         blurb:'The elite divisions roll west. What is left in the East must hold with less — but husbanded, not squandered.',
+         log:'⬛ The Leibstandarte hands over its tanks and boards the trains. Zitadelle is over.',
+         apply(G){
+           unitsOf('G').filter(u=>u.kind==='g_ss').forEach(u=>{ u.str = Math.max(1, u.str-2); });
+           G.pp.G = Math.min(40, G.pp.G+6);
+         }},
+        {label:'Defy the order — one last push',
+         effect:'+1 strength to your 3 strongest panzer corps — but the Soviets bank +5 ⚙ as your rear thins',
+         blurb:'Manstein keeps the SS in the line for one more heave. Every day they stay, the counteroffensive building against your shoulders grows.',
+         log:'⬛ "The battle is at its decisive point." The panzers stay — and the East gets no reserves.',
+         apply(G){
+           unitsOf('G').filter(u=>KINDS[u.kind].sym==='arm')
+             .sort((a,b)=>b.str-a.str).slice(0,3)
+             .forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+1); });
+           G.pp.S = Math.min(40, G.pp.S+5);
+         }},
+      ],
+      ai(G){ return 0; },   // history: Hitler pulled the plug
+    },
+  ],
+  events: [
+    {turn:1, date:'5 July 1943',   title:'ZITADELLE',
+     text:'At 04:30 the greatest concentration of armour ever assembled rolls forward — 2,700 panzers against six belts of mines, wire and dug-in guns. Both sides have waited three months for this morning. Nobody is surprised, and that is precisely the problem.'},
+    {turn:2, date:'12 July 1943',  title:'PROKHOROVKA', pp:{S:2},
+     text:'Rotmistrov\'s 5th Guards Tank Army charges headlong into the II. SS-Panzerkorps in the morning mist — eight hundred tanks in a field six kilometres wide. By nightfall the field is a graveyard of burning steel, and the SS advance has lost its edge. The same day, KUTUZOV opens against the Orel salient.'},
+    {turn:3, date:'19 July 1943',  title:'THE NORTHERN PINCER DIES',
+     text:'Model\'s divisions, ground down at Ponyri — "a second Verdun" — now face rupture in their own rear as three Soviet fronts converge on Orel. The 9. Armee turns from attack to a fighting retreat it will conduct for the rest of the war.'},
+    {turn:4, date:'26 July 1943',  title:'THE OREL SALIENT BURNS',
+     text:'Hitler authorises withdrawal to the Hagen line. Everything that rolls streams west out of the salient under a sky the Red Air Force finally owns. The scorched-earth order goes out behind them.'},
+    {turn:5, date:'3 August 1943', title:'OPERATION RUMYANTSEV', pp:{S:2},
+     text:'The southern counterblow: Vatutin and Konev smash the rebuilt German line north of Belgorod with a superiority the Wehrmacht can no longer even count. The road to Kharkov — and behind it the Dnieper — lies open.'},
+    {turn:6, date:'10 August 1943', title:'THE BELLS OF MOSCOW',
+     text:'Orel and Belgorod have fallen on the same day, and Moscow fires the first artillery salute of the war — 120 guns, twelve salvoes. There will be three hundred more such salutes before Berlin.'},
+    {turn:7, date:'17 August 1943', title:'BOGODUKHOV',
+     text:'The SS divisions — the ones that never left for Italy — counterattack the overextended Soviet tank armies west of Kharkov and maul them. It is a tactical masterpiece and a strategic irrelevance: the Soviet tide barely pauses.'},
+    {turn:8, date:'23 August 1943', title:'THE FOURTH BATTLE OF KHARKOV',
+     text:'The most fought-over city of the war changes hands for the last time. Konev\'s troops enter a Kharkov of ruins and mass graves. In two months the Wehrmacht has lost the initiative in the East — permanently.'},
+    {turn:9, date:'30 August 1943', title:'TO THE DNIEPER',
+     text:'Along a thousand kilometres the German armies are in motion — westward. The Ostheer\'s last offensive is over; ahead lies only the long defence of a river line the Führer has forbidden anyone to prepare.'},
+  ],
+  maxTurn: 9,                               // 9 weeks: 5 Jul → 30 Aug 1943
+  startDate: Date.UTC(1943,6,5),
+  // the July thunderstorms that bogged the Donets crossings on the southern face
+  weather(turn){ return turn===2 ? 'mud' : 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=4 ? 9 : 7;   // after Sicily, the East is starved
+    return turn<=2 ? 8 : 12;                  // the Stavka reserve flows once the blow is spent
+  },
+  capitalDefense: {turn:1, range:4, def:1.2, city:'Kursk',
+    announce:'🟥 Six fortified belts ring Kursk — a million mines, three thousand kilometres of trench.'},
+  /* Axis VP held at the end (11 total; history ≈ 0 — the tide turned) */
+  victoryTiers: [
+    [10,'ZITADELLE TRIUMPHANT','The pincers meet and the salient is erased — the impossible victory. The Soviet strategic reserve is wrecked, and the war in the East hangs in the balance once more.'],
+    [7,'BREAKTHROUGH AT TERRIBLE COST','The salient is bitten deep and held — but the panzer force that did it will never be rebuilt. A victory that feels like a wound.'],
+    [5,'STALEMATE IN THE MINEFIELDS','The offensive gains ground and bleeds out in the wire. Both armies stagger back exhausted — and only one of them can replace its losses.'],
+    [2,'FIGHTING WITHDRAWAL','Zitadelle fails, but the shoulders hold longer than history allowed — Kharkov is still German when the autumn rains come. It changes nothing, slowly.'],
+    [0,'THE TIDE TURNS — HISTORY REPEATS','Orel, Belgorod, Kharkov — the bells of Moscow ring the first salute of the war. The initiative in the East passes to the Red Army, and it will never come back.'],
+  ],
+  sudden: {
+    axisCities: ['Kursk'], minAxisUnits: 6,
+    axisTitle: 'THE SALIENT IS CUT',
+    axisText:  'The pincers meet at Kursk. Five Soviet armies are in the bag — the greatest encirclement since Kiev, and the Ostfront breathes again.',
+    sovTitle:  'THE WEHRMACHT\'S SWORD BREAKS',
+    sovText:   'The panzer force of the Reich lies burning in the belts before Kursk. There is nothing left to stop what comes next.',
+  },
+  airInit: [
+    ['G','Luftflotte 6', 9],
+    ['G','Luftflotte 4', 9],
+    ['S','16th Air Army', 8],
+    ['S','2nd Air Army', 8],
+  ],
+  sovAirSchedule: [[4,'17th Air Army',7]],
+  setup(st){
+    // the deepest field fortifications of the war: the defenders start dug in
+    for (const u of st.units) if (u.side==='S' && !KINDS[u.kind].hq) u.entrench = 2;
+  },
+  opening(playerSide){ return [
+    '⬛ 5 July 1943 — OPERATION ZITADELLE. Two panzer pincers strike the Kursk salient from Orel and Belgorod.',
+    '🟥 The Red Army has known for months. Six belts, a million mines — and two full tank armies waiting behind them.',
+    playerSide==='G'
+      ? '⬛ Cut the salient at Kursk before your shoulders crack — Orel, Belgorod and Kharkov are yours to lose.'
+      : '🟥 Bleed the pincers white in the wire — then take Orel, Belgorod and Kharkov back.',
+  ]; },
+};
+
+/* ---------- Scenario 4: D-Day — Normandy, June–October 1944 ----------
    The Western Front. Side G = the Allies (they move first and their
    captured objectives drive the victory tiers); side S = the Germans.
    The Allies have NO map-edge supply: everything flows from the four
@@ -2978,9 +3229,15 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
    and (G.sched || SOV_SCHEDULE), so old saves and variant-free games are
    untouched — and the AI-vs-AI balance sims never see them. */
 function applyVariants(v){
-  if (!v || !(v.wx || v.res || v.vet)) return;
-  G.variants = {wx:!!v.wx, res:!!v.res, vet:!!v.vet};
+  if (!v || !(v.wx || v.res || v.vet || v.fow)) return;
+  G.variants = {wx:!!v.wx, res:!!v.res, vet:!!v.vet, fow:!!v.fow};
   const on = [];
+  if (v.fow){
+    // fog of war: sight memory + photo-recon state live in the save
+    G.seen = {G:{}, S:{}};
+    G.recon = [];
+    on.push('🕵 fog of war — you see what your troops see; cavalry & carriers scout further, air groups fly 🔭 photo-recon');
+  }
   if (v.wx){
     // chaos weather: the seasons themselves shift a little, and any week can
     // bring a freak storm or an unexpected break in the clouds
@@ -3093,10 +3350,12 @@ function logMsg(cls, text){
 
 /* ============================ SUPPLY & ZOC ============================ */
 /* A hex is in a side's Zone of Control if adjacent to that side's unit. */
-function computeZOC(side){
+function computeZOC(side, filter){
   const z = new Set();
-  for (const u of unitsOf(side))
+  for (const u of unitsOf(side)){
+    if (filter && !filter(u)) continue;          // fog of war: only SEEN units project ZOC
     for (const [nx,ny] of neighbors(u.x,u.y)) z.add(keyOf(nx,ny));
+  }
   return z;
 }
 
@@ -3314,6 +3573,110 @@ function absorbPockets(){
   }
 }
 
+/* ============================ FOG OF WAR (variant) ============================
+   You see what your troops see. Every friendly unit spots SIGHT hexes around it
+   (cavalry screens and carrier scout planes see further); cities you hold report
+   one hex around them; air groups can fly photo-recon over any covered hex.
+   Enemies you have seen leave a faded "last known position" ghost when they slip
+   out of view. Hidden enemies don't block your move preview — instead, marching
+   into an unseen enemy's ZOC halts the unit on the spot (surprise contact).
+   The AI is never fooled — fog is the human's handicap — and none of this runs
+   unless the variant is on, so vanilla games and the balance sims are untouched. */
+function fowActive(){ return !!(G && G.variants && G.variants.fow); }
+function viewerSide(){ return !G ? 'G' : (G.mode==='hotseat' ? G.phase : G.playerSide); }
+function sightRange(u){
+  const sym = KINDS[u.kind].sym;
+  return (sym==='cav' || sym==='cv') ? 3 : 2;   // recon cavalry & carrier scouts see further
+}
+let _sightCache = null, _sightKey = '';
+function sightFor(side){
+  if (!fowActive()) return null;
+  let h = side + '|' + G.turn + '|' + G.phase + '|' + (G.mv||0) + '|' + G.units.length + '|' + (G.recon||[]).length;
+  for (const u of G.units) if (u.side===side) h += u.x + ',' + u.y + ';';
+  for (const c of G.cities) h += c.owner;
+  if (_sightKey !== h){ _sightCache = computeSight(side); _sightKey = h; fowRemember(side, _sightCache); }
+  return _sightCache;
+}
+function computeSight(side){
+  const s = new Set();
+  const spot = (cx,cy,r)=>{
+    for (let y=Math.max(0,cy-r); y<=Math.min(ROWS-1,cy+r); y++)
+      for (let x=Math.max(0,cx-r-1); x<=Math.min(COLS-1,cx+r+1); x++)
+        if (hexDist(cx,cy,x,y)<=r) s.add(keyOf(x,y));
+  };
+  for (const u of unitsOf(side)) spot(u.x, u.y, sightRange(u));
+  for (const c of G.cities) if (c.owner===side) spot(c.x, c.y, 1);   // garrisons & partisans report
+  for (const rc of (G.recon||[])) if (rc.side===side) spot(rc.x, rc.y, 3);  // photo-recon sweep
+  return s;
+}
+function isSpotted(u, side){
+  if (!fowActive() || !u || u.side===side) return true;
+  const s = sightFor(side);
+  return !!s && s.has(keyOf(u.x,u.y));
+}
+/* ghost memory: remember the last place each enemy formation was seen */
+function fowRemember(side, sight){
+  if (!G.seen) G.seen = {G:{}, S:{}};
+  const mem = G.seen[side];
+  for (const u of unitsOf(enemyOf(side)))
+    if (sight.has(keyOf(u.x,u.y)))
+      mem[u.id] = {x:u.x, y:u.y, kind:u.kind, name:u.name, str:u.str, turn:G.turn};
+  for (const id of Object.keys(mem)){
+    const g = mem[id];
+    const live = G.units.find(t=>t.id===+id);
+    // scouting the remembered hex and finding it empty clears the ghost; so does the kill
+    if (!live || (sight.has(keyOf(g.x,g.y)) && !(live.x===g.x && live.y===g.y))) delete mem[id];
+  }
+}
+function ghostsFor(side){ return (fowActive() && G.seen) ? G.seen[side] : null; }
+/* fog pathing applies ONLY to the human's own units in a vs-AI game: the human
+   moves exclusively through fowMovePlan (which contact-stops), so it can never
+   stack onto a hidden unit. The AI keeps vanilla pathing everywhere. */
+function fowHuman(u){ return fowActive() && G.mode==='ai' && u.side===G.playerSide; }
+/* surprise contact: walk the planned route; entering the ZOC of an UNSEEN enemy
+   halts the march there — and the halt itself spots the ambusher */
+function fowMovePlan(u, x, y, r){
+  if (!fowHuman(u)) return {x, y, contact:null};
+  const path = (r && tracePath(u, r, x, y)) || [[u.x,u.y],[x,y]];
+  const sight = sightFor(u.side);
+  const hidden = unitsOf(enemyOf(u.side)).filter(t=>!sight.has(keyOf(t.x,t.y)));
+  for (let i=1;i<path.length;i++){
+    const foe = hidden.find(t=>hexDist(path[i][0],path[i][1],t.x,t.y) <= 1);
+    if (foe){
+      let j = i;                                 // never halt ON someone — back up to a free hex
+      while (j>0){ const o = unitAt(path[j][0],path[j][1]); if (!o || o.id===u.id) break; j--; }
+      return {x:path[j][0], y:path[j][1], contact:foe};
+    }
+  }
+  if (unitAt(x,y)) return {x:u.x, y:u.y, contact:unitAt(x,y)};   // paranoia: refuse to stack
+  return {x, y, contact:null};
+}
+/* photo-reconnaissance: an air group spends its turn to reveal 3 hexes around a
+   target anywhere your airfields cover; the picture lasts until your next turn */
+function airRecon(au, x, y){
+  if (!fowActive() || !au || au.mission!=='ready') return false;
+  if (!airfieldCovered(au.side, x, y)) return false;
+  au.mission = 'done';
+  if (!G.recon) G.recon = [];
+  G.recon.push({side:au.side, x, y});
+  logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} flies photo-reconnaissance over ${cityAt(x,y)?.name || 'the sector'}.`);
+  return true;
+}
+/* route reconstruction: walk the Dijkstra parent chain back from a target hex
+   (also drives the UI's route preview) */
+function tracePath(u, r, x, y){
+  if (!r || !r.parent || !r.has(keyOf(x,y))) return null;
+  const home = keyOf(u.x,u.y), path = [];
+  let k = keyOf(x,y), guard = 0;
+  while (k && k !== home && guard++ < 99){
+    path.push(k.split(',').map(Number));
+    k = r.parent.get(k);
+  }
+  if (k !== home) return null;
+  path.push([u.x,u.y]);
+  return path.reverse();
+}
+
 /* ============================ MOVEMENT ============================ */
 function moveCost(u, x, y){
   let c = effTerrain(x,y).move;
@@ -3334,9 +3697,17 @@ function reachable(u){
     mp = Math.max(1, mp-1);
   if (underHQ(u)) mp += 1;                      // forward HQ keeps the formation moving
   if (usesFuel(u)) mp = Math.min(mp, Math.max(1, fuelOf(u))); // low on fuel = short hops; dry = a 1-hex crawl back to supply
-  const foeZOC = computeZOC(enemyOf(u.side));
+  // fog of war (human units only): hidden enemies don't shape the plan — no ZOC,
+  // no occupied-hex holes. The march itself contact-stops instead (fowMovePlan).
+  const fh = fowHuman(u);
+  const sight = fh ? sightFor(u.side) : null;
+  const foeZOC = computeZOC(enemyOf(u.side), fh ? (t=>sight.has(keyOf(t.x,t.y))) : null);
   const occ = {};
-  for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
+  for (const t of G.units){
+    if (t.id===u.id) continue;
+    if (fh && t.side!==u.side && !sight.has(keyOf(t.x,t.y))) continue;   // looks empty
+    occ[keyOf(t.x,t.y)] = t.side;
+  }
   const best = new Map([[keyOf(u.x,u.y), 0]]);
   const parent = new Map();                     // k -> previous k, for the route preview
   const heap = makeHeap(); heap.push(0,u.x,u.y);
@@ -3354,9 +3725,10 @@ function reachable(u){
     }
   }
   best.delete(keyOf(u.x,u.y));
-  for (const [k] of [...best]) {                       // can't end on any unit
+  for (const [k] of [...best]) {                       // can't end on any (visible) unit
     const [x,y] = k.split(',').map(Number);
-    if (unitAt(x,y)) best.delete(k);
+    const o = unitAt(x,y);
+    if (o && !(fh && o.side!==u.side && !sight.has(k))) best.delete(k);
   }
   best.parent = parent; best.mp = mp;           // extras the UI reads for the route preview
   return best;
@@ -3368,6 +3740,7 @@ function doMove(u, x, y){
     u.fuel = Math.max(0, fuelOf(u) - (cost ?? hexDist(u.x,u.y,x,y)));
   }
   u.x = x; u.y = y; u.moved = true; u.entrench = 0;
+  G.mv = (G.mv||0) + 1;                          // ticks the fog-of-war sight cache
   const c = cityAt(x,y);
   if (c && c.owner !== u.side && !KINDS[u.kind].noCapture){
     c.owner = u.side;
@@ -3559,6 +3932,8 @@ function defNoEscape(ev){ return ev.destroyed && !ev.retreated; }
 function killUnit(u){
   const g = generalOf(u);
   if (g) logMsg('sys', `⭐ ${g.name} is lost with this command — a grievous blow.`);
+  if (G.seen){ delete G.seen.G[u.id]; delete G.seen.S[u.id]; }   // fog of war: no ghost of the dead
+  G.mv = (G.mv||0) + 1;
   // carrier air groups go down with their ship
   for (const a of G.air.filter(a => a.home === u.name)){
     killAir(a);
@@ -3605,7 +3980,9 @@ function doDeploy(side, kind, x, y){
   const u = makeUnit(kind, names[kind]||k.label, x, y, k.maxStr);
   u.moved = true; u.attacked = true;        // arrives unready
   G.units.push(u);
-  logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
+  // fog of war: enemy deployments in unscouted hexes go unreported
+  if (!fowActive() || side===viewerSide() || sightFor(viewerSide()).has(keyOf(x,y)))
+    logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
   refreshSupply();
   return true;
 }
@@ -3746,6 +4123,8 @@ function dateStr(turn){
 
 function startPhase(side){
   G.phase = side;
+  // last turn's photo-recon pictures are stale by the time this turn starts
+  if (G.recon) G.recon = G.recon.filter(rc => rc.side !== side);
   // the railhead creeps forward: engineers re-lay track behind the advance
   if (railSide(side) && G.railDepth)
     G.railDepth[side] = Math.min(COLS + 8, railDepthOf(side) + RAIL_RATE);
@@ -3878,7 +4257,9 @@ function endPhase(){
         if (spot){
           const u = makeUnit(kind, name, spot[0], spot[1]);
           G.units.push(u);
-          logMsg(sd==='G'?'l-g':'l-s', `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
+          // fog of war: enemy reinforcements arriving out of sight go unreported
+          if (!fowActive() || sd===viewerSide() || sightFor(viewerSide()).has(keyOf(spot[0],spot[1])))
+            logMsg(sd==='G'?'l-g':'l-s', `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
         }
       }
     }
@@ -5548,6 +5929,7 @@ let advanceChoice = null;  // {x,y,ids} — pick who advances after a combined k
 let hover = null;          // [x,y] under mouse
 let deployKind = null;     // kind being placed
 let airTarget = null;      // air group id picking a strike target
+let reconTarget = null;    // air group id picking a photo-recon hex (fog of war)
 let anims = [];            // floating texts / flashes
 let scars = [];            // lingering scorched ground & smoke at battle sites
 let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
@@ -5831,7 +6213,7 @@ $('btn-undo').onclick = ()=>{
   if (!undoSnap || !G || G.over || aiRunning) return;
   deserialize(undoSnap);
   undoSnap = null; moveAnim = null; scars = [];
-  sel = null; reach = null; deployKind = null; airTarget = null;
+  sel = null; reach = null; deployKind = null; airTarget = null; reconTarget = null;
   sMove(); updateAll(); saveGame();
 };
 $('btn-next').onclick = ()=>{
@@ -6192,7 +6574,9 @@ function drawMinimap(now, wx){
   if (!mc) return;
   if (_mmBase) mc.drawImage(_mmBase, 0, 0);
   const sc = _mmScale;
+  const mmSight = fowActive() ? sightFor(viewerSide()) : null;
   for (const u of G.units){                               // live unit dots
+    if (mmSight && u.side!==viewerSide() && !mmSight.has(keyOf(u.x,u.y))) continue;
     const [cx,cy] = hexCenter(u.x,u.y);
     mc.fillStyle = (KINDS[u.kind] && KINDS[u.kind].color) || SIDES[u.side].color;
     mc.fillRect(cx*sc - 1.5, cy*sc - 1.5, 3, 3);
@@ -6214,20 +6598,6 @@ function mmFly(e){
 mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation(); mmDragging = true; mmFly(e); });
 window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
-
-/* route preview: walk the Dijkstra parent chain back from the hovered hex */
-function tracePath(u, r, x, y){
-  if (!r || !r.parent || !r.has(keyOf(x,y))) return null;
-  const home = keyOf(u.x,u.y), path = [];
-  let k = keyOf(x,y), guard = 0;
-  while (k && k !== home && guard++ < 99){
-    path.push(k.split(',').map(Number));
-    k = r.parent.get(k);
-  }
-  if (k !== home) return null;
-  path.push([u.x,u.y]);
-  return path.reverse();
-}
 
 function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -6375,6 +6745,17 @@ function draw(){
     }
   }
 
+  // fog of war: dim every hex your troops can't currently see
+  const fowSight = fowActive() ? sightFor(viewerSide()) : null;
+  if (fowSight){
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (fowSight.has(keyOf(x,y))) continue;
+      const [cx,cy] = hexCenter(x,y);
+      if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
+      hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(4,6,10,0.34)'; ctx.fill();
+    }
+  }
+
   // cities
   for (const c of G.cities){
     const [cx,cy] = hexCenter(c.x,c.y);
@@ -6396,6 +6777,7 @@ function draw(){
   }
   if (airTarget){
     for (const t of strikeTargets(G.phase)){
+      if (!isSpotted(t, G.phase)) continue;           // can't bomb what you haven't found
       const [cx,cy] = hexCenter(t.x,t.y);
       hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 3; ctx.stroke();
     }
@@ -6409,6 +6791,7 @@ function draw(){
       ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
     }
     if (!su.attacked) for (const t of enemiesInRange(su)){
+      if (!isSpotted(t, G.phase)) continue;
       const [cx,cy] = hexCenter(t.x,t.y);
       hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#e2493b'; ctx.lineWidth = 3; ctx.stroke();
     }
@@ -6455,6 +6838,8 @@ function draw(){
   const showReady = !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
   const readyPulse = 0.5 + 0.5*Math.sin(now*0.005);
   for (const u of G.units){
+    // fog of war: unseen enemy formations simply aren't on your map
+    if (fowSight && u.side!==viewerSide() && !fowSight.has(keyOf(u.x,u.y))) continue;
     let [cx,cy] = hexCenter(u.x,u.y);
     if (moveAnim && moveAnim.unit.id===u.id){
       const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
@@ -6472,6 +6857,32 @@ function draw(){
       ctx.strokeStyle = '#5a4410'; ctx.lineWidth = 1; ctx.stroke();
       ctx.globalAlpha = 1;
     }
+  }
+
+  // fog of war: faded "last known position" markers for enemies that slipped away
+  if (fowSight){
+    const mem = ghostsFor(viewerSide()) || {};
+    ctx.save();
+    for (const id of Object.keys(mem)){
+      const g = mem[id];
+      if (fowSight.has(keyOf(g.x,g.y))) continue;      // hex re-scouted — no marker needed
+      const [cx,cy] = hexCenter(g.x,g.y);
+      if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
+      const w = S*1.22, h = S*0.92;
+      ctx.globalAlpha = 0.42;
+      ctx.fillStyle = '#14180f';
+      ctx.fillRect(cx-w/2, cy-h/2, w, h);
+      if (ctx.setLineDash) ctx.setLineDash([4,3]);
+      ctx.strokeStyle = SIDES[KINDS[g.kind] ? KINDS[g.kind].side : 'S'].color;
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(cx-w/2, cy-h/2, w, h);
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      ctx.font = '700 15px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#d8d4c0';
+      ctx.fillText('?', cx, cy+5);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
   }
 
   // route preview (drawn over the counters so it stays legible): hovering a
@@ -6826,12 +7237,23 @@ canvas.addEventListener('click', e=>{
   const h = hexFromPixel(wx,wy);
   if (!h) { deselect(); return; }
   const [x,y] = h;
+  // photo-recon targeting mode (fog of war)
+  if (reconTarget){
+    const au = G.air.find(a=>a.id===reconTarget);
+    reconTarget = null;
+    if (au && airRecon(au, x, y)){
+      clearUndo(); sClick();
+      floatText(x, y, '🔭 RECON', '#9fd8ff');
+    }
+    $('hint').innerHTML = defaultHint();
+    updateAll(); return;
+  }
   // air strike targeting mode
   if (airTarget){
     const au = G.air.find(a=>a.id===airTarget);
     const t = unitAt(x,y);
     airTarget = null;
-    if (au && t && t.side!==G.phase){
+    if (au && t && t.side!==G.phase && isSpotted(t, G.phase)){
       const res = airStrike(au, t);
       if (res){ clearUndo(); res.killed ? sBoom() : sShot(); }
     }
@@ -6843,7 +7265,9 @@ canvas.addEventListener('click', e=>{
     if (doDeploy(G.phase, deployKind, x, y)){ clearUndo(); sCity(); updateAll(); }
     deployKind = null; updateUnitCard(); return;
   }
-  const u = unitAt(x,y);
+  let u = unitAt(x,y);
+  // fog of war: an unseen enemy is, as far as you know, empty ground
+  if (u && u.side!==G.phase && !isSpotted(u, G.phase)) u = undefined;
   // advance-choice mode after a combined kill: click a candidate to move it in
   if (advanceChoice){
     if (u && advanceChoice.ids.includes(u.id)) finishAdvance(u);
@@ -6871,8 +7295,8 @@ canvas.addEventListener('click', e=>{
 canvas.addEventListener('contextmenu', e=>{
   e.preventDefault();
   if (!G || G.over) return;
-  if (deployKind || airTarget || advanceChoice || selSet.length || sel){
-    deselect(); deployKind=null; airTarget=null; advanceChoice=null; selSet=[];
+  if (deployKind || airTarget || reconTarget || advanceChoice || selSet.length || sel){
+    deselect(); deployKind=null; airTarget=null; reconTarget=null; advanceChoice=null; selSet=[];
     $('hint').innerHTML = defaultHint(); updateAll();
   }
 });
@@ -6930,7 +7354,7 @@ window.addEventListener('keydown', e=>{
   // don't hijack typing or keys meant for an open dialog
   if (document.querySelector('.modal-back:not(.hidden)')) return;
   const k = e.key;
-  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
+  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; reconTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
   // map navigation — arrow keys pan, +/- (and scroll wheel) zoom
   const pan = 90/cam.z;
   if (k==='ArrowLeft'){  cam.x-=pan; requestRender(); e.preventDefault(); return; }
@@ -6957,8 +7381,9 @@ function selectUnit(u){
   updateUnitCard();
 }
 function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
-/* a unit still has orders to give if it can move, or can still attack something */
-function isActionable(u){ return !u.moved || (!u.attacked && enemiesInRange(u).length>0); }
+/* a unit still has orders to give if it can move, or can still attack something
+   it has actually SEEN (fog of war must not leak through the amber pips) */
+function isActionable(u){ return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
 function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
 function centerOn(x,y){
   const [cx,cy] = hexCenter(x,y);
@@ -6976,8 +7401,15 @@ function selectNext(){
 
 function playerMove(u,x,y){
   undoSnap = serialize();                    // one-step undo, until anything else happens
+  const plan = fowMovePlan(u, x, y, reach);  // fog of war: the march may be intercepted
   const [fx,fy] = hexCenter(u.x,u.y);
-  doMove(u,x,y);
+  doMove(u, plan.x, plan.y);
+  if (plan.contact){
+    clearUndo();                             // no taking back what the contact taught you
+    logMsg('sys', `⚠ ${u.name} runs into ${plan.contact.name} — advance halted on contact!`);
+    floatText(plan.x, plan.y, '⚠ CONTACT', '#ffd23f');
+    sShot();
+  }
   moveAnim = {unit:u, fx, fy, t0:performance.now(), dur:240};
   sMove();
   reach = new Map();
@@ -7083,14 +7515,24 @@ function updateAirCard(){
       act.style.cssText = 'display:flex;gap:6px;margin:2px 0 6px;';
       const bs = document.createElement('button');
       bs.textContent = '💥 Strike'; bs.style.cssText = 'padding:2px 10px;font-size:12px;';
-      bs.onclick = ()=>{ sClick(); airTarget = (airTarget===au.id ? null : au.id);
+      bs.onclick = ()=>{ sClick(); airTarget = (airTarget===au.id ? null : au.id); reconTarget = null;
         $('hint').innerHTML = airTarget
           ? 'Click a <b>ringed enemy</b> to bomb it (damage + digs them out) — Esc cancels.'
           : defaultHint(); };
       const bp = document.createElement('button');
       bp.textContent = '🛡 Patrol'; bp.style.cssText = 'padding:2px 10px;font-size:12px;';
-      bp.onclick = ()=>{ clearUndo(); sClick(); setPatrol(au); airTarget=null; updateAll(); };
+      bp.onclick = ()=>{ clearUndo(); sClick(); setPatrol(au); airTarget=null; reconTarget=null; updateAll(); };
       act.appendChild(bs); act.appendChild(bp);
+      if (fowActive()){
+        const bc = document.createElement('button');
+        bc.textContent = '🔭 Recon'; bc.style.cssText = 'padding:2px 10px;font-size:12px;';
+        bc.title = 'Photo-reconnaissance: reveal 3 hexes around any point your airfields cover, until your next turn.';
+        bc.onclick = ()=>{ sClick(); reconTarget = (reconTarget===au.id ? null : au.id); airTarget = null;
+          $('hint').innerHTML = reconTarget
+            ? '🔭 Click anywhere in <b>air range</b> to photograph it — reveals 3 hexes around the point until your next turn. Esc cancels.'
+            : defaultHint(); };
+        act.appendChild(bc);
+      }
       row.appendChild(act);
     }
     if (isHuman){
@@ -7152,10 +7594,18 @@ function updateTerrainCard(){
       html += `<div class="statrow"><span>March for ${su.name}</span><span>${cst}${reach.mp?'/'+reach.mp:''} MP</span></div>`;
   }
   const u = unitAt(x,y);
-  if (u){
+  if (u && isSpotted(u, viewerSide())){
     const ug = generalOf(u);
     html += `<div style="margin-top:4px;border-top:1px solid var(--line);padding-top:4px;">
       ${flag(u.side)} <b>${u.name}</b>${ug?' · ⭐ '+ug.name:''} — str ${u.str}${u.oos?' <span class="bad">⚠ no supply</span>':''}</div>`;
+  } else if (fowActive()){
+    // hovering a remembered contact shows the stale intelligence
+    const mem = ghostsFor(viewerSide()) || {};
+    const g = Object.values(mem).find(m => m.x===x && m.y===y);
+    if (g) html += `<div style="margin-top:4px;border-top:1px solid var(--line);padding-top:4px;color:var(--dim)">
+      ? <b>${g.name}</b> — last seen here on turn ${g.turn} (str ${g.str} then)</div>`;
+    else if (!sightFor(viewerSide()).has(keyOf(x,y)))
+      html += `<div style="margin-top:4px;color:var(--dim)">🕵 Unscouted — your troops can't see this hex.</div>`;
   }
   $('terrain-body').innerHTML = html;
 }
@@ -7163,7 +7613,7 @@ function updateTerrainCard(){
 function updatePreview(){
   if (!G || aiRunning){ show('preview-card', false); return; }   // no game yet — unitAt would crash
   const t = hover && unitAt(hover[0],hover[1]);
-  if (!t || t.side===G.phase){ show('preview-card', false); return; }
+  if (!t || t.side===G.phase || !isSpotted(t, viewerSide())){ show('preview-card', false); return; }
   const attackers = combinedAttackers(t);
   if (!attackers.length){ show('preview-card', false); return; }
   show('preview-card', true);
@@ -8357,9 +8807,9 @@ function showEnd(){
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false); showModeSelect(); $('btn-continue').classList.add('hidden'); };
 
 /* ---------------- campaign variants & service record ---------------- */
-const VAR_CHIPS = [['var-wx','wx'],['var-res','res'],['var-vet','vet'],
-                   ['rvar-wx','wx'],['rvar-res','res'],['rvar-vet','vet'],
-                   ['wvar-wx','wx'],['wvar-res','res'],['wvar-vet','vet']];
+const VAR_CHIPS = [['var-wx','wx'],['var-res','res'],['var-vet','vet'],['var-fow','fow'],
+                   ['rvar-wx','wx'],['rvar-res','res'],['rvar-vet','vet'],['rvar-fow','fow'],
+                   ['wvar-wx','wx'],['wvar-res','res'],['wvar-vet','vet'],['wvar-fow','fow']];
 let mVar = {wx:false, res:false, vet:false};
 try { mVar = {...mVar, ...JSON.parse(localStorage.getItem('barb-variants')||'{}')}; } catch(e){}
 function syncVarChips(){
@@ -8481,6 +8931,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
+    fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
