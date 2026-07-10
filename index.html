@@ -62,6 +62,12 @@
     font-size:13px;color:var(--dim);white-space:nowrap;}
   #hint b{color:var(--ink);}
 
+  /* ---------- minimap ---------- */
+  #minimap{position:absolute;left:8px;bottom:8px;z-index:20;background:#0d100a;
+    border:1px solid var(--line);border-radius:8px;cursor:pointer;box-shadow:0 2px 10px #0008;
+    padding:3px;}
+  #minimap:hover{border-color:var(--amber);}
+
   /* ---------- modals ---------- */
   .modal-back{position:absolute;inset:0;background:#000a;z-index:40;display:flex;
     align-items:center;justify-content:center;}
@@ -200,6 +206,7 @@
 </div>
 
 <div id="hint" class="hidden"></div>
+<canvas id="minimap" class="hidden" title="Click or drag to jump the camera · M hides the minimap"></canvas>
 <div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
 
 <!-- ============ TITLE / MENU ============ -->
@@ -432,6 +439,9 @@
       <li><b>Quality of life.</b> <b>U</b> / the ↩ Undo button takes back your last move
           (until anything else happens). <b>S</b> / the 🚚 Supply button shades every hex
           outside your supply network — see where your spearheads go dry <i>before</i> they do.
+          With a unit selected, <b>hover any reachable hex</b> to see the exact route it will
+          march and the movement-point price. The <b>minimap</b> (bottom-left) shows the whole
+          front — click or drag it to fly the camera anywhere; <b>M</b> hides it.
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
           speed (normal / fast / instant). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
@@ -3270,6 +3280,7 @@ function reachable(u){
   const occ = {};
   for (const t of G.units) if (t.id!==u.id) occ[keyOf(t.x,t.y)] = t.side;
   const best = new Map([[keyOf(u.x,u.y), 0]]);
+  const parent = new Map();                     // k -> previous k, for the route preview
   const heap = makeHeap(); heap.push(0,u.x,u.y);
   while (heap.size()){
     const [c,x,y] = heap.pop();
@@ -3281,7 +3292,7 @@ function reachable(u){
       if (occ[k] === enemyOf(u.side)) continue;
       const nc = c + moveCost(u,nx,ny);
       if (nc > mp) continue;
-      if (nc < (best.get(k) ?? 1e9)){ best.set(k, nc); heap.push(nc,nx,ny); }
+      if (nc < (best.get(k) ?? 1e9)){ best.set(k, nc); parent.set(k, keyOf(x,y)); heap.push(nc,nx,ny); }
     }
   }
   best.delete(keyOf(u.x,u.y));
@@ -3289,6 +3300,7 @@ function reachable(u){
     const [x,y] = k.split(',').map(Number);
     if (unitAt(x,y)) best.delete(k);
   }
+  best.parent = parent; best.mp = mp;           // extras the UI reads for the route preview
   return best;
 }
 
@@ -6176,6 +6188,98 @@ function drawScars(){
   }
 }
 
+/* ---------------- minimap (main hex game) ----------------
+   A strategic thumbnail bottom-left: terrain + territory tint + cities + unit
+   dots + the camera's viewport box. Click or drag to fly the camera anywhere.
+   The terrain/territory base is cached and refreshed at most ~3×/second; only
+   the unit dots and viewport box redraw per frame. M toggles it. */
+let showMinimap = true;
+try { showMinimap = localStorage.getItem('barb-minimap') !== '0'; } catch(e){}
+const mmCv = $('minimap');
+let _mmBase = null, _mmKey = '', _mmAt = 0, _mmScale = 1;
+
+function minimapVisible(){
+  return !!G && showMinimap && !$('topbar').classList.contains('hidden');
+}
+function mmSnowMudColor(t, wx){
+  let col = TERRAIN[t] ? TERRAIN[t].color : '#333';
+  if (wx==='snow' && t!=='~' && t!=='o')
+    col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t] || col;
+  else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.' ? '#54482e' : '#463f2e';
+  return col;
+}
+function mmRebuild(wx, w, h){
+  if (!_mmBase) _mmBase = document.createElement('canvas');
+  _mmBase.width = w; _mmBase.height = h;
+  const mc = _mmBase.getContext('2d');
+  if (!mc) return;
+  mc.fillStyle = '#0d100a'; mc.fillRect(0,0,w,h);
+  const sc = _mmScale, hs = Math.max(1.1, HX*sc);        // one soft square per hex
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = terrainAt(x,y), [cx,cy] = hexCenter(x,y);
+    mc.fillStyle = mmSnowMudColor(t, wx);
+    mc.fillRect(cx*sc - hs/2, cy*sc - hs/2, hs, hs);
+    const to = t!=='~' && t!=='o' && terrOwner(x,y);
+    if (to){ mc.fillStyle = SIDES[to].tint; mc.fillRect(cx*sc - hs/2, cy*sc - hs/2, hs, hs); }
+  }
+  for (const c of G.cities){                              // cities: objectives glow amber
+    const [cx,cy] = hexCenter(c.x,c.y);
+    mc.fillStyle = c.vp ? '#ffd34d' : '#c9c2a6';
+    const r = c.vp ? 2.4 : 1.5;
+    mc.beginPath(); mc.arc(cx*sc, cy*sc, r, 0, Math.PI*2); mc.fill();
+  }
+}
+function drawMinimap(now, wx){
+  const vis = minimapVisible();
+  mmCv.classList.toggle('hidden', !vis);
+  if (!vis) return;
+  const maxW = 208, maxH = 148;
+  _mmScale = Math.min(maxW/mapW(), maxH/mapH());
+  const w = Math.max(2, Math.round(mapW()*_mmScale)), h = Math.max(2, Math.round(mapH()*_mmScale));
+  if (mmCv.width !== w || mmCv.height !== h){ mmCv.width = w; mmCv.height = h; _mmKey = ''; }
+  const key = (SCN.id||'?') + '|' + wx + '|' + COLS + 'x' + ROWS;
+  if (_mmKey !== key || now - _mmAt > 350){ mmRebuild(wx, w, h); _mmKey = key; _mmAt = now; }
+  const mc = mmCv.getContext('2d');
+  if (!mc) return;
+  if (_mmBase) mc.drawImage(_mmBase, 0, 0);
+  const sc = _mmScale;
+  for (const u of G.units){                               // live unit dots
+    const [cx,cy] = hexCenter(u.x,u.y);
+    mc.fillStyle = (KINDS[u.kind] && KINDS[u.kind].color) || SIDES[u.side].color;
+    mc.fillRect(cx*sc - 1.5, cy*sc - 1.5, 3, 3);
+    mc.strokeStyle = '#0009'; mc.lineWidth = 0.5;
+    mc.strokeRect(cx*sc - 1.5, cy*sc - 1.5, 3, 3);
+  }
+  // viewport box
+  mc.strokeStyle = '#ffd98a'; mc.lineWidth = 1;
+  mc.strokeRect(cam.x*sc, cam.y*sc, innerWidth/cam.z*sc, innerHeight/cam.z*sc);
+}
+let mmDragging = false;
+function mmFly(e){
+  const r = mmCv.getBoundingClientRect ? mmCv.getBoundingClientRect() : null;
+  if (!r || !_mmScale) return;
+  const wx = (e.clientX - r.left - 3)/_mmScale, wy = (e.clientY - r.top - 3)/_mmScale;   // 3 = css padding
+  cam.x = wx - innerWidth/cam.z/2; cam.y = wy - innerHeight/cam.z/2;
+  requestRender();
+}
+mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation(); mmDragging = true; mmFly(e); });
+window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
+window.addEventListener('mouseup', ()=>{ mmDragging = false; });
+
+/* route preview: walk the Dijkstra parent chain back from the hovered hex */
+function tracePath(u, r, x, y){
+  if (!r || !r.parent || !r.has(keyOf(x,y))) return null;
+  const home = keyOf(u.x,u.y), path = [];
+  let k = keyOf(x,y), guard = 0;
+  while (k && k !== home && guard++ < 99){
+    path.push(k.split(',').map(Number));
+    k = r.parent.get(k);
+  }
+  if (k !== home) return null;
+  path.push([u.x,u.y]);
+  return path.reverse();
+}
+
 function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = '#0a0c08'; ctx.fillRect(0,0,innerWidth,innerHeight);
@@ -6183,6 +6287,14 @@ function draw(){
   if (!G) return;
   const wx = weatherFor(G.turn);
   const now = performance.now();
+  // camera shake: a short decaying rattle after a kill
+  if (shakeMag > 0){
+    const el = now - shakeT0;
+    if (el < 320){
+      const f = (1 - el/320) * shakeMag / cam.z;
+      ctx.translate(Math.sin(el*0.09)*f, Math.cos(el*0.13)*f);
+    } else shakeMag = 0;
+  }
   // viewport cull bounds (world space) — only draw what's on screen. Cheap on the
   // small arcade/realistic maps, essential on the 3×-scale World-at-War-Test map.
   const vL = cam.x - S, vT = cam.y - S,
@@ -6413,6 +6525,52 @@ function draw(){
     }
   }
 
+  // route preview (drawn over the counters so it stays legible): hovering a
+  // reachable hex traces the exact march and prices it in movement points
+  if (su && reach && hover && !su.moved && reach.has(keyOf(hover[0],hover[1]))){
+    const path = tracePath(su, reach, hover[0], hover[1]);
+    if (path && path.length > 1){
+      ctx.save();
+      ctx.strokeStyle = '#fff3d0'; ctx.lineWidth = 2.4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+      if (ctx.setLineDash) ctx.setLineDash([8,7]);
+      ctx.lineDashOffset = -(now*0.02) % 15;              // ants march toward the target
+      ctx.beginPath();
+      for (let i=0;i<path.length;i++){
+        const [cx,cy] = hexCenter(path[i][0], path[i][1]);
+        i ? ctx.lineTo(cx,cy) : ctx.moveTo(cx,cy);
+      }
+      ctx.stroke();
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      // arrowhead into the destination
+      const [ex,ey] = hexCenter(path[path.length-1][0], path[path.length-1][1]);
+      const [px,py] = hexCenter(path[path.length-2][0], path[path.length-2][1]);
+      const ang = Math.atan2(ey-py, ex-px);
+      ctx.fillStyle = '#fff3d0';
+      ctx.beginPath();
+      ctx.moveTo(ex + 8*Math.cos(ang), ey + 8*Math.sin(ang));
+      ctx.lineTo(ex - 7*Math.cos(ang-0.55), ey - 7*Math.sin(ang-0.55));
+      ctx.lineTo(ex - 7*Math.cos(ang+0.55), ey - 7*Math.sin(ang+0.55));
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      // MP price tag above the destination hex
+      const cost = reach.get(keyOf(hover[0],hover[1]));
+      if (cost != null){
+        const label = cost + (reach.mp ? '/'+reach.mp : '') + ' MP';
+        ctx.font = '700 12px Segoe UI'; ctx.textAlign = 'center';
+        const m = ctx.measureText && ctx.measureText(label);
+        const tw = (m && m.width) || 40;
+        ctx.fillStyle = '#14180fee';
+        ctx.fillRect(ex - tw/2 - 6, ey - S - 24, tw + 12, 17);
+        ctx.strokeStyle = '#e8b34b'; ctx.lineWidth = 1;
+        ctx.strokeRect(ex - tw/2 - 6, ey - S - 24, tw + 12, 17);
+        ctx.fillStyle = '#ffd98a';
+        ctx.fillText(label, ex, ey - S - 11);
+      }
+      ctx.restore();
+    }
+  }
+
   // floating texts & explosions
   anims = anims.filter(a => now - a.t0 < 1100);
   for (const a of anims){
@@ -6493,6 +6651,7 @@ function draw(){
       ctx.globalAlpha = 1;
     }
   }
+  drawMinimap(now, wx);
 }
 
 function star(x,y,r){
@@ -6641,6 +6800,15 @@ function boomAt(x,y,big){
   const [cx,cy] = hexCenter(x,y);
   anims.push({type:'boom', x:cx, y:cy, big:!!big, seed:(x*31+y*47)%360, t0:performance.now()});
   addScar(x,y);                                  // leave scorched ground & smoke behind
+  if (big) kickShake(5);                         // a kill rattles the camera a touch
+}
+
+/* brief decaying camera shake — big explosions only, skipped on Low quality */
+let shakeT0 = 0, shakeMag = 0;
+function kickShake(mag){
+  if (!GFX.particles) return;
+  shakeT0 = performance.now(); shakeMag = mag;
+  requestRender();
 }
 function attackArrow(att, def){
   const [x1,y1] = hexCenter(att.x,att.y), [x2,y2] = hexCenter(def.x,def.y);
@@ -6662,6 +6830,7 @@ function _sceneAnimating(){
   const wx = weatherFor(G.turn);
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
+  if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   return false;
 }
 (function loop(ts){
@@ -6826,6 +6995,11 @@ window.addEventListener('keydown', e=>{
   if (k==='e' || k==='E') $('btn-endturn').click();
   if (k==='u' || k==='U'){ if (!$('btn-undo').classList.contains('hidden')) $('btn-undo').onclick(); }
   if (k==='s' || k==='S') $('btn-supply').onclick();
+  if (k==='m' || k==='M'){
+    showMinimap = !showMinimap;
+    try { localStorage.setItem('barb-minimap', showMinimap ? '1' : '0'); } catch(err){}
+    requestRender();
+  }
 });
 
 function selectUnit(u){
@@ -7021,6 +7195,13 @@ function updateTerrainCard(){
            <div class="statrow"><span>Max dig-in</span><span>${t.dig}</span></div>`;
   const to = terrOwner(x,y);
   if (to) html += `<div class="statrow"><span>Ground held by</span><span>${flag(to)} ${sideName(to)}</span></div>`;
+  // if a unit is selected and can march here, price the whole route
+  const su = sel && G.units.find(tt=>tt.id===sel);
+  if (su && reach && !su.moved){
+    const cst = reach.get(keyOf(x,y));
+    if (cst != null)
+      html += `<div class="statrow"><span>March for ${su.name}</span><span>${cst}${reach.mp?'/'+reach.mp:''} MP</span></div>`;
+  }
   const u = unitAt(x,y);
   if (u){
     const ug = generalOf(u);
@@ -7031,8 +7212,9 @@ function updateTerrainCard(){
 }
 
 function updatePreview(){
+  if (!G || aiRunning){ show('preview-card', false); return; }   // no game yet — unitAt would crash
   const t = hover && unitAt(hover[0],hover[1]);
-  if (!G || aiRunning || !t || t.side===G.phase){ show('preview-card', false); return; }
+  if (!t || t.side===G.phase){ show('preview-card', false); return; }
   const attackers = combinedAttackers(t);
   if (!attackers.length){ show('preview-card', false); return; }
   show('preview-card', true);
