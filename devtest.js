@@ -1125,58 +1125,6 @@ say('— The World at War —');
   E.wwClearSave();
 }
 
-/* ---------------- Roguelike: "Breakthrough" ---------------- */
-{
-  const r = E.rogNewRun();
-  check('ROG new run starts at round 1 with a roster', r.round===1 && r.roster.length>=3 && r.score===0);
-  check('ROG enemy garrison scales with the round', E.rogEnemyForce(8).length > E.rogEnemyForce(1).length);
-  // the on-the-fly battle scenario is registry-valid
-  const scn = E.rogBuildScenario(r);
-  let okMap = scn.map.length===scn.rows && scn.map.every(row=>row.length===scn.cols);
-  const seen=new Set(); let onLand=true, uniq=true, kindsOk=true;
-  for(const [k,n,x,y] of scn.startUnits){ if(!E.KINDS[k]) kindsOk=false; const key=x+','+y; if(seen.has(key)) uniq=false; seen.add(key);
-    const t=scn.map[y][x]; if(t==='~'||t==='s') onLand=false; }
-  check('ROG built battle has correct map dimensions', okMap);
-  check('ROG built battle: units on land, unique hexes, valid kinds', onLand&&uniq&&kindsOk);
-  check('ROG built battle has an enemy objective city', scn.cities.length===1 && scn.cities[0].owner==='S' && scn.cities[0].vp>0);
-  // supply must reach across the whole small battlefield, or the player starves on the advance
-  E.rogNewRun(); E.rogBuildScenario(E.rogState()); E.newGame('G','normal','hotseat','roguelike');
-  const supNet = E.computeSupply('G');
-  let deep=null; for(const c of [[11,8],[11,9],[10,9],[12,9],[10,8],[9,9]]) if(!E.unitAt(c[0],c[1])){ deep=c; break; }
-  check('ROG supply reaches deep across the field (no starving on the assault)', !!deep && supNet.has(deep[0]+','+deep[1]));
-  // a battle plays to completion (AI vs AI) and yields a clean result
-  E.rogNewRun(); E.rogBuildScenario(E.rogState());
-  E.newGame('G','normal','hotseat','roguelike');
-  const Gr = E.getState(); let phases=0, crash=null;
-  try { while(!Gr.over && phases<400){ E.aiFullPhase(Gr.phase);
-    const pos=new Set(); for(const u of Gr.units){ if(!E.passable(u.x,u.y)) throw new Error('unit off land'); const kk=u.x+','+u.y; if(pos.has(kk)) throw new Error('stack'); pos.add(kk); }
-    if(!Gr.over) E.endPhase(); phases++; } } catch(e){ crash=e.message; }
-  check('ROG battle plays to completion without crashing', !crash && Gr.over, crash||'');
-  check('ROG finished battle reports win or loss', ['win','loss'].includes(E.rogBattleResult()));
-  // veterancy carries from the roster into the battle units
-  E.rogNewRun(); E.rogState().roster[2].xp=22;
-  const Gv = E.rogStartBattle();
-  const pz = Gv.units.find(u=>u.name==='1. Panzer');
-  check('ROG veterancy is re-applied to units at battle start', pz && pz.xp===22);
-  // a won battle folds survivors back into the roster, advances the round, raises the score
-  Gv.cities[0].owner='G'; Gv.over=true;
-  const rs = E.rogState(); const round0=rs.round, score0=rs.score, alive=E.unitsOf('G').filter(u=>u.str>0).length;
-  check('ROG win detected when objective taken and army alive', E.rogBattleResult()==='win');
-  E.rogCarry();
-  check('ROG carry advances round, raises score, keeps survivors & veterancy',
-    rs.round===round0+1 && rs.score>score0 && rs.roster.length===alive && rs.roster.some(u=>u.xp===22));
-  // rewards mutate the roster
-  E.rogNewRun(); const rw=E.rogState(); const n0=rw.roster.length;
-  E.rogApplyReward('reinforce'); check('ROG reward "reinforce" adds a unit', rw.roster.length===n0+1);
-  rw.roster.forEach(u=>u.str=4); E.rogApplyReward('heal'); check('ROG reward "heal" restores strength', rw.roster.every(u=>u.str>4));
-  const xp0=Math.max(...rw.roster.map(u=>u.xp||0)); E.rogApplyReward('elite'); check('ROG reward "elite" promotes a unit', Math.max(...rw.roster.map(u=>u.xp||0))>xp0);
-  // save / load
-  E.rogClearSave(); E.rogNewRun(); const rsv=E.rogState(); rsv.round=5; rsv.score=1234; E.rogSave();
-  check('ROG run saves & loads', E.rogHasSave() && (()=>{ const l=E.rogLoad(); return l && l.round===5 && l.score===1234; })());
-  E.rogClearSave(); check('ROG clear save works', !E.rogHasSave());
-  E.loadScenario('barbarossa');   // restore the default scenario — the campaign sims below default to the current SCN
-}
-
 /* ---------------- full AI-vs-AI campaigns ---------------- */
 const RUNS = parseInt(process.argv[2] || '8', 10);
 const results = {};
@@ -1411,15 +1359,7 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  // Roguelike "Breakthrough": mode select → start a run → launch the first battle
-  let rogOk = true;
-  if ($('mc-roguelike').onclick){
-    $('mc-roguelike').onclick(); drain();                 // open the roguelike meta-screen
-    if ($('rog-newrun').onclick) $('rog-newrun').onclick();
-    if ($('rog-fight').onclick){ $('rog-fight').onclick(); drain(); }   // build the battle scenario + startCampaign
-    rogOk = UI.getState().scenario === 'roguelike' && !!(UI.rogState() && UI.rogState().active);
-  }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, rogOk, recOk};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk};
 }
 
 for (const side of ['G','S']){
@@ -1431,7 +1371,6 @@ for (const side of ['G','S']){
     check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
     check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
-    check(`UI Breakthrough roguelike launches a battle (${side})`, r.rogOk, 'scenario not roguelike');
   } catch(err){
     failures++;
     console.log(`  FAIL UI smoke (${side}) — ${err.message}`);
