@@ -52,6 +52,15 @@
   #unit-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   #unit-actions button{padding:4px 10px;font-size:12px;}
   #preview-card .vs{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
+  /* animated odds bar: your combat-power share fills from the left */
+  .odds{position:relative;height:10px;border-radius:5px;overflow:hidden;margin:6px 0 4px;
+    background:linear-gradient(#7e3a31,#5e2a23);border:1px solid #000a;}
+  .odds i{display:block;height:100%;background:linear-gradient(#8fbf62,#557f36);
+    transform-origin:left;animation:oddsIn .55s cubic-bezier(.2,.8,.3,1);}
+  .odds i.even{background:linear-gradient(#c9a23e,#8f7328);}
+  .odds i.bad{background:linear-gradient(#a86048,#7d4433);}
+  .odds::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:#00000088;}
+  @keyframes oddsIn{from{transform:scaleX(0);}to{transform:scaleX(1);}}
   #log-card{overflow-y:auto;min-height:60px;}
   #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
   #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys{color:var(--amber);}
@@ -4019,6 +4028,7 @@ function doMove(u, x, y){
   const c = cityAt(x,y);
   if (c && c.owner !== u.side && !KINDS[u.kind].noCapture){
     c.owner = u.side;
+    c.ruin = Math.min(1, (c.ruin||0) + 0.12);      // street fighting during the capture
     logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} captured by ${u.name}!`);
     if (typeof onCityTaken === 'function') onCityTaken(c);
   }
@@ -4164,6 +4174,9 @@ function resolveCombat(att, def, supports){
   const lead = group.find(u => u.str > 0) || null;
   const tag = combined ? att.name+' & co.' : att.name;
   const defCity = cityAt(def.x,def.y);
+  // fighting in a city wrecks it, block by block — purely cosmetic ruin level,
+  // rendered by drawCity and carried in the save
+  if (defCity) defCity.ruin = Math.min(1, (defCity.ruin||0) + 0.10 + (defLoss+atkLoss)*0.025);
   const fortress = defCity && defCity.vp >= 3 && defCity.owner === def.side;
   if (def.str <= 0){
     events.destroyed = true;
@@ -4329,7 +4342,9 @@ function airStrike(au, t){
   res.dmg = Math.min(2, t.str, Math.max(0, Math.round(eff*(1.1 + Math.random()*0.7))));
   t.str -= res.dmg;
   // field entrenchments are blasted open — but bombed cities just become rubble fortresses
-  if (t.entrench > 0 && !cityAt(t.x,t.y)) t.entrench--;
+  const bc = cityAt(t.x,t.y);
+  if (bc && res.dmg > 0) bc.ruin = Math.min(1, (bc.ruin||0) + 0.08);   // carpet bombing scars the town
+  if (t.entrench > 0 && !bc) t.entrench--;
   G.stats[t.side].lost += res.dmg; G.stats[au.side].killed += res.dmg;
   if (t.str <= 0){
     res.killed = true; killUnit(t);
@@ -6422,6 +6437,12 @@ onCityTaken = function(c){
 };
 onGameOver = function(){ recordResult(); setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
+  // a strafing pass streaks across the target hex as the bombs land
+  {
+    const [tcx,tcy] = hexCenter(t.x,t.y);
+    const dir = au.side==='G' ? 1 : -1;                  // each side flies in from its own rear
+    anims.push({type:'plane', x0:tcx - dir*S*3.2, x1:tcx + dir*S*3.2, y:tcy - S*0.55, dir, t0:performance.now()});
+  }
   boomAt(t.x, t.y, res.killed);
   if (!res.killed && res.dmg > 0) flashUnit(t);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
@@ -6731,21 +6752,43 @@ function drawRailhead(){
    An industrial-era silhouette — building blocks with lit windows, factory
    smokestacks, a domed cathedral — scaled by importance; the great capitals
    (Moscow) get a gold dome. Cosmetic only. */
-function drawCity(owner, vp){
+function drawCity(owner, vp, ruin, seed, now){
   const body = owner==='G' ? '#474e59' : '#6e2a24',
         dark = owner==='G' ? '#363c46' : '#561f1a',
         roof = owner==='G' ? '#3d434d' : '#5f231d';
+  const r = Math.min(1, ruin||0);
+  seed = seed||0;
   ctx.lineWidth = 0.9; ctx.lineJoin = 'round';
   const base = 8;
   const blocks = vp>=5 ? [[-14,9,4],[-10,15,5],[-4,12,5],[2,19,5],[8,13,5],[13,8,4]]
                : vp>=3 ? [[-13,8,4],[-8,13,5],[-2,11,5],[4,16,5],[10,9,4]]
                : vp>=1 ? [[-10,7,5],[-4,12,6],[3,9,5],[9,7,4]]
                :          [[-7,6,5],[-1,9,6],[6,6,5]];
+  let bi = 0;
   for (const [bx,bh,bw] of blocks){
+    // the harder the fighting has been, the more blocks stand as burnt-out shells
+    const wrecked = r > 0 && ((seed + bi*37) % 100) < r*120;
+    bi++;
+    if (wrecked){
+      const h2 = bh * (0.35 + ((seed + bi*13) % 25)/100);      // broken to a jagged stump
+      ctx.fillStyle = dark; ctx.strokeStyle = '#000a';
+      ctx.beginPath();
+      ctx.moveTo(bx, base); ctx.lineTo(bx, base-h2);
+      ctx.lineTo(bx+bw*0.3, base-h2*1.35); ctx.lineTo(bx+bw*0.55, base-h2*0.7);
+      ctx.lineTo(bx+bw*0.8, base-h2*1.1); ctx.lineTo(bx+bw, base-h2*0.55);
+      ctx.lineTo(bx+bw, base); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#55504844';                              // rubble spill at the foot
+      ctx.beginPath(); ctx.moveTo(bx-1.2, base); ctx.lineTo(bx+bw*0.5, base-1.6); ctx.lineTo(bx+bw+1.2, base); ctx.closePath(); ctx.fill();
+      if (r > 0.5 && ((seed + bi*7) & 1)){                      // embers in the shell
+        ctx.fillStyle = 'rgba(255,120,40,0.75)';
+        ctx.fillRect(bx+bw*0.35, base-h2*0.55, 1.2, 1.2);
+      }
+      continue;
+    }
     ctx.fillStyle = body; ctx.strokeStyle = '#000a';
     ctx.beginPath(); ctx.rect(bx, base-bh, bw, bh); ctx.fill(); ctx.stroke();
     ctx.fillStyle = roof; ctx.fillRect(bx, base-bh, bw, 1.2);                 // roofline
-    ctx.fillStyle = '#ffd98a88';                                             // window grid
+    ctx.fillStyle = `rgba(255,217,138,${(0.53*(1-r*0.85)).toFixed(2)})`;      // windows go dark as the city burns
     for (let wy=base-bh+2.5; wy<base-1.5; wy+=2.6)
       for (let wx=bx+1; wx<bx+bw-1.2; wx+=2.1)
         if (((wx*7+wy*5)|0)%3) ctx.fillRect(wx, wy, 1.1, 1.3);
@@ -6767,6 +6810,24 @@ function drawCity(owner, vp){
     ctx.bezierCurveTo(dx+3.5, base-25, dx+6, base-21, dx+5, base-15);
     ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#ffd34d'; ctx.fillRect(dx+2, base-29, 1, 4);            // finial
+  }
+  // soot wash + battle smoke over a fought-over city
+  if (r > 0.15){
+    ctx.fillStyle = `rgba(12,9,6,${(0.20*r).toFixed(2)})`;
+    ctx.fillRect(-17, base-26, 35, 27);
+  }
+  if (r > 0.4 && GFX.particles && now !== undefined){
+    const secs = now/1000;
+    for (let i=0; i<(r>0.75?2:1); i++){
+      const px = ((seed + i*61) % 22) - 11;
+      const rise = (secs*7 + i*11 + seed%9) % 24;
+      const sa = 0.34 * r * (1 - rise/24);
+      if (sa > 0.02){
+        ctx.fillStyle = `rgba(52,46,42,${sa.toFixed(3)})`;
+        const drift = Math.sin((secs+i+seed%5)*0.8) * 4 * (rise/24);
+        ctx.beginPath(); ctx.arc(px + drift, base-8-rise, 2.6 + rise*0.16, 0, Math.PI*2); ctx.fill();
+      }
+    }
   }
   ctx.lineJoin = 'miter';
   if (vp>0){ const sy = vp>=3 ? -24 : -19; ctx.fillStyle = '#ffd34d2e'; star(0,sy,10); ctx.fillStyle = '#ffd34d'; star(0,sy,5); }
@@ -7064,7 +7125,7 @@ function draw(){
   for (const c of G.cities){
     const [cx,cy] = hexCenter(c.x,c.y);
     ctx.save(); ctx.translate(cx,cy);
-    drawCity(c.owner, c.vp);
+    drawCity(c.owner, c.vp, c.ruin, c.x*31 + c.y*47, now);
     ctx.font = '600 11px Segoe UI'; ctx.textAlign = 'center';
     ctx.fillStyle = '#000c'; ctx.fillText(c.name, 1, 25);
     ctx.fillStyle = c.vp>0 ? '#ffe9a8' : '#cfccba'; ctx.fillText(c.name, 0, 24);
@@ -7272,6 +7333,25 @@ function draw(){
       ctx.moveTo(gx,gy);
       ctx.lineTo(gx-9*Math.cos(ang-0.5), gy-9*Math.sin(ang-0.5));
       ctx.lineTo(gx-9*Math.cos(ang+0.5), gy-9*Math.sin(ang+0.5));
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'plane'){
+      const pr = Math.min(1, p*1.8);                       // crosses the hex, then the anim fades
+      const px = a.x0 + (a.x1-a.x0)*pr, py = a.y + Math.sin(pr*Math.PI)*-5;
+      // fading contrail behind the aircraft
+      ctx.globalAlpha = (1-pr)*0.5;
+      ctx.strokeStyle = '#cfd8e2'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(px - a.dir*S*1.6, py + 2); ctx.lineTo(px - a.dir*S*0.25, py + 0.4); ctx.stroke();
+      // dart silhouette
+      ctx.globalAlpha = Math.min(1, (1-pr)*2.2);
+      ctx.fillStyle = '#2c3138';
+      ctx.beginPath();
+      ctx.moveTo(px + a.dir*7, py);                        // nose
+      ctx.lineTo(px - a.dir*4, py - 4);                    // wing
+      ctx.lineTo(px - a.dir*2, py);
+      ctx.lineTo(px - a.dir*4, py + 4);                    // wing
       ctx.closePath(); ctx.fill();
       ctx.globalAlpha = 1;
       continue;
@@ -7921,7 +8001,11 @@ function updateTerrainCard(){
   const [x,y] = hover;
   const t = effTerrain(x,y), c = cityAt(x,y);
   let html = `<span class="big">${c ? c.name : t.name}</span>`;
-  if (c) html += ` <span style="color:var(--dim)">(${t.name}${c.vp?` · ★ objective ×${c.vp}`:''} · ${sideName(c.owner)})</span>`;
+  if (c){
+    const ruinNote = (c.ruin||0) > 0.7 ? ' · <span class="bad">☒ in ruins</span>'
+                   : (c.ruin||0) > 0.3 ? ' · <span class="bad">burning</span>' : '';
+    html += ` <span style="color:var(--dim)">(${t.name}${c.vp?` · ★ objective ×${c.vp}`:''} · ${sideName(c.owner)}${ruinNote})</span>`;
+  }
   html += `<div class="statrow"><span>Defense bonus</span><span>×${t.def.toFixed(2)}</span></div>
            <div class="statrow"><span>Move cost</span><span>${t.move||'—'}</span></div>
            <div class="statrow"><span>Max dig-in</span><span>${t.dig}</span></div>`;
@@ -7951,12 +8035,23 @@ function updateTerrainCard(){
   $('terrain-body').innerHTML = html;
 }
 
+let _pvKey = '';
+function oddsBar(ratio){
+  const share = Math.max(6, Math.min(94, Math.round(100*ratio/(ratio+1))));
+  const cls = ratio >= 1.2 ? '' : ratio >= 0.8 ? ' class="even"' : ' class="bad"';
+  return `<div class="odds" title="Your share of the combat power"><i${cls} style="width:${share}%"></i></div>`;
+}
 function updatePreview(){
-  if (!G || aiRunning){ show('preview-card', false); return; }   // no game yet — unitAt would crash
+  if (!G || aiRunning){ show('preview-card', false); _pvKey=''; return; }   // no game yet — unitAt would crash
   const t = hover && unitAt(hover[0],hover[1]);
-  if (!t || t.side===G.phase || !isSpotted(t, viewerSide())){ show('preview-card', false); return; }
+  if (!t || t.side===G.phase || !isSpotted(t, viewerSide())){ show('preview-card', false); _pvKey=''; return; }
   const attackers = combinedAttackers(t);
-  if (!attackers.length){ show('preview-card', false); return; }
+  if (!attackers.length){ show('preview-card', false); _pvKey=''; return; }
+  // rebuild only when the matchup actually changes — keeps the odds-bar
+  // animation from restarting on every pixel of mouse movement
+  const key = t.id + ':' + t.str + '|' + attackers.map(a=>a.id+':'+a.str).join(',');
+  if (key === _pvKey){ show('preview-card', true); return; }
+  _pvKey = key;
   show('preview-card', true);
   // combined-arms assault forecast
   if (attackers.length >= 2){
@@ -7967,6 +8062,7 @@ function updatePreview(){
       <div style="font-size:12px;margin-bottom:3px;">${list}</div>
       <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
       <div class="statrow"><span>Combined odds</span><span class="${g.ratio>=1.2?'good':g.ratio<0.8?'bad':''}">${g.ratio.toFixed(2)} : 1</span></div>
+      ${oddsBar(g.ratio)}
       <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${g.defLoss}</span></div>
       <div class="statrow"><span>Coordination bonus</span><span class="good">+${Math.round((g.synergy-1)*100)}%${g.combinedArms?' · combined arms!':''}</span></div>
       <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack together. If it falls, you choose who advances.</div>`;
@@ -7986,6 +8082,7 @@ function updatePreview(){
     <div class="vs"><span>${flag(su.side)} ${su.name}</span><span>str ${su.str}</span></div>
     <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
     <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
+    ${oddsBar(p.ratio)}
     <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
     <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
     ${rows ? `<div style="border-top:1px solid var(--line);margin:5px 0 2px;padding-top:3px;color:var(--dim);font-size:11px;letter-spacing:1px;">WHY</div>${rows}` : '<div style="color:var(--dim);font-size:12px;">Even ground, no modifiers.</div>'}

@@ -329,6 +329,18 @@ say('— QoL —');
   check('hotseat pass-report snapshot recorded',
     !!(G2.turnSnap && G2.turnSnap.G) && typeof G2.turnSnap.G.lost==='number'
     && Array.isArray(G2.turnSnap.G.cities));
+  // fighting in a city raises its cosmetic ruin level (rendered + saved)
+  E.newGame('G','normal','hotseat');
+  const Gr2 = E.getState();
+  const town = Gr2.cities.find(c=>c.name==='Minsk');
+  const dfd = E.unitsOf('S')[0]; dfd.x = town.x; dfd.y = town.y;
+  const agr = E.unitsOf('G')[0];
+  const nb3 = E.neighbors(town.x,town.y).find(([x,y])=>E.passable(x,y) && !E.unitAt(x,y));
+  agr.x = nb3[0]; agr.y = nb3[1];
+  E.resolveCombat(agr, dfd);
+  check('city fighting scars the city (ruin level rises)', (town.ruin||0) > 0);
+  check('ruin level survives a save round-trip',
+    (()=>{ E.deserialize(E.serialize()); return (E.getState().cities.find(c=>c.name==='Minsk').ruin||0) > 0; })());
 }
 
 /* veterancy, HQ command, and combined arms */
