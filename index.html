@@ -62,6 +62,19 @@
     font-size:13px;color:var(--dim);white-space:nowrap;}
   #hint b{color:var(--ink);}
 
+  /* ---------- new-turn banner ---------- */
+  #turn-banner{position:absolute;top:62px;left:50%;transform:translateX(-50%);z-index:24;
+    background:linear-gradient(90deg,#14180f00,#14180fee 15%,#14180fee 85%,#14180f00);
+    border-top:1px solid #e8b34b55;border-bottom:1px solid #e8b34b55;
+    padding:9px 52px;text-align:center;pointer-events:none;white-space:nowrap;
+    animation:tbIn .35s ease-out;opacity:1;transition:opacity .6s;}
+  #turn-banner.fade{opacity:0;}
+  #tb-main{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--amber);}
+  #tb-sub{font-size:12.5px;color:var(--ink);margin-top:3px;}
+  #tb-sub .bad{color:var(--redL);}
+  @keyframes tbIn{from{opacity:0;transform:translateX(-50%) translateY(-10px);}
+                  to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
   /* ---------- minimap ---------- */
   #minimap{position:absolute;left:8px;bottom:8px;z-index:20;background:#0d100a;
     border:1px solid var(--line);border-radius:8px;cursor:pointer;box-shadow:0 2px 10px #0008;
@@ -210,6 +223,7 @@
 <div id="hint" class="hidden"></div>
 <canvas id="minimap" class="hidden" title="Click or drag to jump the camera · M hides the minimap"></canvas>
 <div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
+<div id="turn-banner" class="hidden"><div id="tb-main"></div><div id="tb-sub"></div></div>
 
 <!-- ============ TITLE / MENU ============ -->
 <!-- ============ MODE SELECT ============ -->
@@ -481,9 +495,13 @@
       <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
           give. <b>N</b> / <b>Space</b> / <b>Tab</b> (or the <b>⏭ Next</b> button) jumps to the
           next one and centres it; the button also shows how many are left. <b>Arrow keys</b> pan,
-          <b>+</b> / <b>−</b> (and the scroll wheel) zoom, and <b>C</b> recentres
-          on your selected unit. <b>Right-click</b> cancels a deploy, an air strike or a selection;
-          <b>double-click</b> recentres the map. <b>E</b> ends the turn, <b>Esc</b> clears everything.</li>
+          <b>+</b> / <b>−</b> (and the scroll wheel) zoom, <b>C</b> recentres
+          on your selected unit, and <b>F</b> re-fits the whole map. <b>Right-click</b> cancels a
+          deploy, an air strike or a selection; <b>double-click</b> recentres the map.
+          <b>E</b> ends the turn, <b>H</b> opens this help, <b>Esc</b> clears everything.
+          A <b>⭐ gold star</b> on a counter marks a formation led by a general. Each new turn a
+          banner gives the date, the weather, and — against the computer — what the enemy
+          did while you were away.</li>
       <li><b>✈ Air forces</b> (side panel): each air group can <b>Strike</b> an enemy unit — damage
           plus blasting away its dig-in — within <b>8 hexes of a city you control</b> (airfields) or of
           a friendly <b>aircraft carrier</b> in naval scenarios, or fly <b>Patrol</b> to intercept enemy
@@ -6158,6 +6176,7 @@ function minZoom(){
   return Math.min(0.35, Math.min(innerWidth/mapW(), (innerHeight-60)/mapH()) * 0.85);
 }
 function fitCamera(){
+  killGlides();
   const mw = mapW(), mh = mapH();
   const z = Math.min(innerWidth/mw, (innerHeight-60)/mh);
   cam.z = Math.max(minZoom(), Math.min(1.4, z));
@@ -6201,6 +6220,11 @@ let showSupply = false, supplyView = null;
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
+/* smooth camera: pan glides ease toward a target, wheel zoom eases toward a
+   target scale anchored under the cursor (the old camera teleported) */
+let camGlide = null;   // {x0,y0,x1,y1,t0,dur}
+let zoomGlide = null;  // {target, sx,sy, wx,wy} — keep world point (wx,wy) under screen point (sx,sy)
+function killGlides(){ camGlide = null; zoomGlide = null; }
 let _sunGrad = null, _sunW = 0, _clouds = null, _grainTile = null, _grainTried = false;
 
 /* High-quality cinematic pass — all guarded so the headless fake-DOM (whose
@@ -6399,6 +6423,7 @@ onCityTaken = function(c){
 onGameOver = function(){ recordResult(); setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
   boomAt(t.x, t.y, res.killed);
+  if (!res.killed && res.dmg > 0) flashUnit(t);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
 };
@@ -6846,6 +6871,7 @@ function drawMinimap(now, wx){
 }
 let mmDragging = false;
 function mmFly(e){
+  killGlides();
   const r = mmCv.getBoundingClientRect ? mmCv.getBoundingClientRect() : null;
   if (!r || !_mmScale) return;
   const wx = (e.clientX - r.left - 3)/_mmScale, wy = (e.clientY - r.top - 3)/_mmScale;   // 3 = css padding
@@ -6857,6 +6883,22 @@ window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
 
 function draw(){
+  // step the camera animations before the frame is transformed
+  const tnow = performance.now();
+  if (zoomGlide){
+    const dz = zoomGlide.target - cam.z;
+    cam.z = Math.abs(dz) < 0.0015 ? zoomGlide.target : cam.z + dz*0.28;
+    cam.x = zoomGlide.wx - zoomGlide.sx/cam.z;
+    cam.y = zoomGlide.wy - zoomGlide.sy/cam.z;
+    if (cam.z === zoomGlide.target) zoomGlide = null;
+  }
+  if (camGlide){
+    const p = Math.min(1, (tnow - camGlide.t0)/camGlide.dur);
+    const e = 1 - Math.pow(1-p, 3);                       // ease-out cubic
+    cam.x = camGlide.x0 + (camGlide.x1-camGlide.x0)*e;
+    cam.y = camGlide.y0 + (camGlide.y1-camGlide.y0)*e;
+    if (p >= 1) camGlide = null;
+  }
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = '#0a0c08'; ctx.fillRect(0,0,innerWidth,innerHeight);
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
@@ -7002,14 +7044,19 @@ function draw(){
     }
   }
 
-  // fog of war: dim every hex your troops can't currently see
+  // fog of war: dim every hex your troops can't currently see. The first ring
+  // of fog (touching visible ground) is shaded lighter, so the edge of your
+  // vision fades out instead of ending in a hard cliff.
   const fowSight = fowActive() ? sightFor(viewerSide()) : null;
   if (fowSight){
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
       if (fowSight.has(keyOf(x,y))) continue;
       const [cx,cy] = hexCenter(x,y);
       if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
-      hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(4,6,10,0.34)'; ctx.fill();
+      const soft = neighbors(x,y).some(([nx,ny]) => fowSight.has(keyOf(nx,ny)));
+      hexPath(cx,cy,S-0.6);
+      ctx.fillStyle = soft ? 'rgba(4,6,10,0.17)' : 'rgba(4,6,10,0.36)';
+      ctx.fill();
     }
   }
 
@@ -7105,6 +7152,23 @@ function draw(){
       if (p>=1) moveAnim = null;
     }
     drawUnit(u, cx, cy);
+    // a gold star marks a formation led by a general (top-left of the counter)
+    if (generalOf(u)){
+      ctx.fillStyle = '#ffd34d';
+      star(cx - S*0.52, cy - S*0.58, 4);
+      ctx.strokeStyle = '#5a4410'; ctx.lineWidth = 0.8; ctx.stroke();
+    }
+    // red damage flash while the hit lands
+    const hf = hitFlash.get(u.id);
+    if (hf !== undefined){
+      const hp = (now - hf)/340;
+      if (hp < 1){
+        ctx.globalAlpha = 0.5*(1-hp);
+        ctx.fillStyle = '#ff4535';
+        ctx.fillRect(cx - S*0.61, cy - S*0.46, S*1.22, S*0.92);
+        ctx.globalAlpha = 1;
+      } else hitFlash.delete(u.id);
+    }
     // amber "still has orders" pip, top-right of the counter — only your side, your turn
     if (showReady && u.side===G.phase && u.id!==sel && isActionable(u)){
       const px = cx + S*0.52, py = cy - S*0.58;
@@ -7187,6 +7251,10 @@ function draw(){
       ctx.restore();
     }
   }
+
+  // prune flashes whose units are gone (destroyed mid-flash), or the render
+  // scheduler would treat the scene as animating forever
+  if (hitFlash.size) for (const [id,t0] of hitFlash) if (now - t0 > 400) hitFlash.delete(id);
 
   // floating texts & explosions
   anims = anims.filter(a => now - a.t0 < 1100);
@@ -7420,6 +7488,10 @@ function boomAt(x,y,big){
   if (big) kickShake(5);                         // a kill rattles the camera a touch
 }
 
+/* a counter flashes red for a beat when the formation takes losses */
+const hitFlash = new Map();            // unit id -> flash start time
+function flashUnit(u){ if (u) hitFlash.set(u.id, performance.now()); requestRender(); }
+
 /* brief decaying camera shake — big explosions only, skipped on Low quality */
 let shakeT0 = 0, shakeMag = 0;
 function kickShake(mag){
@@ -7448,6 +7520,7 @@ function _sceneAnimating(){
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
+  if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
   return false;
 }
 (function loop(ts){
@@ -7464,7 +7537,7 @@ function _sceneAnimating(){
 
 /* ---------------- input ---------------- */
 let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
-canvas.addEventListener('mousedown', e=>{ dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
+canvas.addEventListener('mousedown', e=>{ killGlides(); dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
 window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); requestRender(); });
 window.addEventListener('mousemove', e=>{
   if (dragging){
@@ -7479,10 +7552,12 @@ window.addEventListener('mousemove', e=>{
 });
 canvas.addEventListener('wheel', e=>{
   e.preventDefault();
-  const f = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const f = e.deltaY < 0 ? 1.15 : 1/1.15;
+  const cur = zoomGlide ? zoomGlide.target : cam.z;         // stack notches onto the glide
+  const target = Math.max(minZoom(), Math.min(2.2, cur*f));
   const [wx,wy] = toWorld(e.clientX,e.clientY);
-  cam.z = Math.max(minZoom(), Math.min(2.2, cam.z*f));
-  cam.x = wx - e.clientX/cam.z; cam.y = wy - e.clientY/cam.z;
+  camGlide = null;
+  zoomGlide = {target, sx:e.clientX, sy:e.clientY, wx, wy};
   requestRender();
 }, {passive:false});
 
@@ -7600,10 +7675,12 @@ function finishAdvance(u){
   advanceChoice = null; deselect(); updateAll();
 }
 function cancelAdvance(){ advanceChoice = null; deselect(); updateAll(); }
-function zoomAt(cx, cy, f){            // zoom keeping the given screen point fixed
+function zoomAt(cx, cy, f){            // eased zoom keeping the given screen point fixed
+  const cur = zoomGlide ? zoomGlide.target : cam.z;
+  const target = Math.max(minZoom(), Math.min(2.2, cur*f));
   const [wx,wy] = toWorld(cx,cy);
-  cam.z = Math.max(minZoom(), Math.min(2.2, cam.z*f));
-  cam.x = wx - cx/cam.z; cam.y = wy - cy/cam.z;
+  camGlide = null;
+  zoomGlide = {target, sx:cx, sy:cy, wx, wy};
   requestRender();
 }
 window.addEventListener('keydown', e=>{
@@ -7614,10 +7691,10 @@ window.addEventListener('keydown', e=>{
   if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; reconTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
   // map navigation — arrow keys pan, +/- (and scroll wheel) zoom
   const pan = 90/cam.z;
-  if (k==='ArrowLeft'){  cam.x-=pan; requestRender(); e.preventDefault(); return; }
-  if (k==='ArrowRight'){ cam.x+=pan; requestRender(); e.preventDefault(); return; }
-  if (k==='ArrowUp'){    cam.y-=pan; requestRender(); e.preventDefault(); return; }
-  if (k==='ArrowDown'){  cam.y+=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowLeft'){  killGlides(); cam.x-=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowRight'){ killGlides(); cam.x+=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowUp'){    killGlides(); cam.y-=pan; requestRender(); e.preventDefault(); return; }
+  if (k==='ArrowDown'){  killGlides(); cam.y+=pan; requestRender(); e.preventDefault(); return; }
   if (k==='+' || k==='='){ zoomAt(innerWidth/2, innerHeight/2, 1.15); return; }
   if (k==='-' || k==='_'){ zoomAt(innerWidth/2, innerHeight/2, 1/1.15); return; }
   if (k==='n' || k==='N' || k===' ' || k==='Tab'){ selectNext(); e.preventDefault(); return; }
@@ -7630,6 +7707,8 @@ window.addEventListener('keydown', e=>{
     try { localStorage.setItem('barb-minimap', showMinimap ? '1' : '0'); } catch(err){}
     requestRender();
   }
+  if (k==='f' || k==='F'){ fitCamera(); requestRender(); return; }   // re-fit the whole map
+  if (k==='h' || k==='H'){ if ($('btn-help2').onclick) $('btn-help2').onclick(); return; }
 });
 
 function selectUnit(u){
@@ -7642,9 +7721,11 @@ function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestR
    it has actually SEEN (fog of war must not leak through the amber pips) */
 function isActionable(u){ return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
 function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
-function centerOn(x,y){
+function centerOn(x,y,instant){
   const [cx,cy] = hexCenter(x,y);
-  cam.x = cx - innerWidth/cam.z/2; cam.y = cy - innerHeight/cam.z/2;
+  const tx = cx - innerWidth/cam.z/2, ty = cy - innerHeight/cam.z/2;
+  if (instant){ killGlides(); cam.x = tx; cam.y = ty; }
+  else { zoomGlide = null; camGlide = {x0:cam.x, y0:cam.y, x1:tx, y1:ty, t0:performance.now(), dur:380}; }
   requestRender();
 }
 function selectNext(){
@@ -7679,7 +7760,8 @@ function playerAttack(att,def){
   const ev = resolveCombat(att,def);
   if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
-  if (ev.atkLoss>0) floatText(att.x,att.y,'-'+ev.atkLoss,'#ffd98a');
+  if (ev.atkLoss>0){ floatText(att.x,att.y,'-'+ev.atkLoss,'#ffd98a'); flashUnit(att); }
+  if (ev.defLoss>0 && !ev.destroyed) flashUnit(def);
   if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
   deselect(); updateAll();
 }
@@ -7691,6 +7773,8 @@ function playerGroupAttack(attackers, def){
   const ev = resolveCombat(lead, def, attackers.slice(1));
   if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], true);
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
+  if (ev.defLoss>0 && !ev.destroyed) flashUnit(def);
+  if (ev.atkLoss>0) flashUnit(lead);
   if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
   selSet = [];
   if (ev.choose && ev.choose.length){
@@ -7934,7 +8018,39 @@ function updateTop(){
   nb.classList.toggle('hidden', ready===0);
   nb.textContent = `⏭ Next · ${ready}`;
 }
-function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); requestRender(); }
+function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); maybeTurnBanner(); requestRender(); }
+
+/* ---- new-turn banner: date, weather, and what the enemy did while you were away ---- */
+let bannerTurn = 0, bannerTimer = 0, aiReport = null, _aiSnap = null;
+function maybeTurnBanner(){
+  if (!G || G.over || aiRunning) return;
+  if (!(G.mode==='hotseat' || G.phase===G.playerSide)) return;
+  if (G.turn === bannerTurn) return;
+  bannerTurn = G.turn;
+  const wx = weatherFor(G.turn);
+  const icon = {clear:'☀', mud:'🌧', freeze:'🌫', snow:'❄'}[wx] || '';
+  $('tb-main').textContent = `TURN ${G.turn} / ${MAX_TURN} · ${dateStr(G.turn)}`;
+  let sub = `${icon} ${wxLabelOf(wx)}`;
+  if (aiReport){
+    const bits = [];
+    if (aiReport.lost > 0)
+      bits.push(`<span class="bad">you lost ${aiReport.lost} strength${aiReport.dead ? ` — ${aiReport.dead} formation${aiReport.dead===1?'':'s'} destroyed` : ''}</span>`);
+    if (aiReport.cities.length)
+      bits.push(`<span class="bad">${aiReport.cities.join(', ')} fell</span>`);
+    if (aiReport.inflicted > 0)
+      bits.push(`your line cost them ${aiReport.inflicted} strength`);
+    if (bits.length) sub += ' &nbsp;·&nbsp; enemy turn: ' + bits.join(' · ');
+    aiReport = null;
+  }
+  $('tb-sub').innerHTML = sub;
+  const el = $('turn-banner');
+  el.classList.remove('hidden'); el.classList.remove('fade');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(()=>{
+    el.classList.add('fade');
+    bannerTimer = setTimeout(()=>{ el.classList.add('hidden'); }, 650);
+  }, 2800);
+}
 
 /* ---------------- objectives modal ---------------- */
 $('btn-objectives').onclick = ()=>{
@@ -8987,6 +9103,11 @@ function proceed(){
 function runAIPhase(){
   aiRunning = true;
   clearUndo();
+  // snapshot for the "while you were away" line on the new-turn banner
+  const my = G.playerSide;
+  _aiSnap = { lost: G.stats[my].lost, foeLost: G.stats[enemyOf(my)].lost,
+              units: unitsOf(my).length,
+              cities: G.cities.filter(c=>c.owner===my).map(c=>c.name) };
   show('ai-banner', true);
   $('ai-banner').textContent = flag(G.phase) + ' ' + sideName(G.phase).toUpperCase() + ' TURN…';
   clearAICache();
@@ -9013,6 +9134,8 @@ function runAIPhase(){
       const ev = res.ev;
       if (ev.defLoss>0 || ev.destroyed) boomAt(ev.defFrom[0], ev.defFrom[1], ev.destroyed);
       if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
+      if (ev.defLoss>0 && !ev.destroyed) flashUnit(res.def);
+      if (ev.atkLoss>0) flashUnit(res.att);
       if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
       updateAll();
       setTimeout(step, aDelay*mult);
@@ -9023,6 +9146,21 @@ function runAIPhase(){
   function finish(){
     show('ai-banner', false);
     aiRunning = false;
+    // tally what the enemy did to you this phase (accumulates across
+    // back-to-back AI phases, consumed by the next turn banner)
+    if (G.mode==='ai' && _aiSnap){
+      const my = G.playerSide;
+      const r = {
+        lost: G.stats[my].lost - _aiSnap.lost,
+        inflicted: G.stats[enemyOf(my)].lost - _aiSnap.foeLost,
+        dead: Math.max(0, _aiSnap.units - unitsOf(my).length),
+        cities: _aiSnap.cities.filter(n => G.cities.find(c=>c.name===n)?.owner !== my),
+      };
+      if (aiReport){ r.lost += aiReport.lost; r.inflicted += aiReport.inflicted;
+                     r.dead += aiReport.dead; r.cities = [...new Set([...aiReport.cities, ...r.cities])]; }
+      aiReport = r;
+      _aiSnap = null;
+    }
     if (!G.over){
       endPhase();
       saveGame();
@@ -9158,6 +9296,7 @@ $('btn-continue').onclick = ()=>{
 };
 function startCampaign(loaded){
   undoSnap = null;
+  bannerTurn = 0; aiReport = null;             // a fresh campaign gets a fresh turn banner
   $('game-title').textContent = '⚙ ' + SCN.short;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true);
