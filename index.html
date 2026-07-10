@@ -92,7 +92,8 @@
   .pick.sel{border-color:var(--amber);box-shadow:0 0 14px #e8b34b33;background:#242a1b;}
   .pick h4{font-size:15px;margin-bottom:4px;} .pick p{font-size:12px;color:var(--dim);line-height:1.4;}
   .pick.p-ger h4{color:#b9c4d2;} .pick.p-sov h4{color:#e88c80;}
-  #menu .opt-row{display:flex;gap:8px;justify-content:center;margin:8px 0 18px;flex-wrap:wrap;}
+  .opt-row{display:flex;gap:8px;justify-content:center;align-items:center;margin:8px 0;flex-wrap:wrap;}
+  #menu .opt-row{margin:8px 0 18px;}
   .opt{border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
     color:var(--dim);background:var(--panel2);}
   .opt.sel{color:var(--amber);border-color:var(--amber);}
@@ -291,6 +292,13 @@
       <span class="opt sel" data-d="normal">Normal</span>
       <span class="opt" data-d="hard">Hard</span>
     </div>
+    <div class="opt-row" id="rvar-row" style="justify-content:center;">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span class="opt" id="rvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
+      <span class="opt" id="rvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
+      <span class="opt" id="rvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+    </div>
+    <div id="rm-rec" style="color:var(--dim);font-size:12px;letter-spacing:1px;margin-top:2px;"></div>
     <div class="mrow" style="justify-content:center;margin-top:16px;">
       <button id="btn-back-realistic">← Back</button>
       <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
@@ -325,6 +333,12 @@
       <span class="opt" data-d="brutal">Brutal</span>
     </div>
     <div id="waw-diff-desc" style="color:var(--dim);font-size:12px;margin-top:2px;min-height:16px;"></div>
+    <div class="opt-row" id="wvar-row">
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span class="opt" id="wvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
+      <span class="opt" id="wvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
+      <span class="opt" id="wvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+    </div>
     <div class="mrow" style="justify-content:center;margin-top:18px;">
       <button id="waw-back">← Back</button>
       <button id="waw-continue" class="hidden">CONTINUE SAVED WAR</button>
@@ -364,10 +378,17 @@
       <span class="opt sel" data-d="normal">Normal</span>
       <span class="opt" data-d="hard">Hard</span>
     </div>
+    <div class="opt-row" id="var-row">
+      <span style="color:var(--dim);padding:6px 0;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span class="opt" id="var-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
+      <span class="opt" id="var-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
+      <span class="opt" id="var-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
+    </div>
     <div class="opt-row">
       <span class="opt sel" id="mode-ai">vs Computer</span>
       <span class="opt" id="mode-hotseat">2-Player Hotseat</span>
     </div>
+    <div id="menu-rec" style="color:var(--dim);font-size:12px;letter-spacing:1px;margin-top:2px;"></div>
     <div class="mrow" style="justify-content:center;">
       <button class="primary start-btn" id="btn-start">BEGIN CAMPAIGN</button>
       <button id="btn-continue" class="hidden start-btn">CONTINUE SAVE</button>
@@ -445,6 +466,14 @@
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
           speed (normal / fast / instant). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
+      <li><b>🎲 Variants &amp; your service record.</b> The <b>Variants</b> row on the campaign
+          menus mixes optional mutators into a new war: <b>Chaos weather</b> re-rolls the season
+          script (watch the campaign clock — it becomes this war's forecast), <b>Shuffled
+          reserves</b> moves every reinforcement up to two weeks early or late, and <b>Veteran
+          cadres</b> hands each side three battle-tested formations. Mix them freely — no two
+          campaigns play the same. Every finished game against the computer goes into your
+          <b>service record</b>, shown on the menu: campaigns fought and your best result on
+          each side. Beat your own history.</li>
       <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
           give. <b>N</b> / <b>Space</b> / <b>Tab</b> (or the <b>⏭ Next</b> button) jumps to the
           next one and centres it; the button also shows how many are left. <b>Arrow keys</b> pan,
@@ -1380,7 +1409,7 @@ SCENARIOS.stalingrad = {
 SCENARIOS.dday = {
   id: 'dday',
   title: 'D-DAY — NORMANDY', short: 'NORMANDY',
-  sub: 'THE WESTERN FRONT · JUNE — AUGUST 1944 · TURN-BASED STRATEGY',
+  sub: 'THE WESTERN FRONT · JUNE — OCTOBER 1944 · TURN-BASED STRATEGY',
   sides: {
     G: {name:'Allied', flag:'🟦', color:'#3f5d40', tint:'rgba(80,130,90,0.28)'},
     S: {name:'German', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
@@ -1497,6 +1526,12 @@ SCENARIOS.dday = {
     [6,'s_inf','276. Infanterie'],       [6,'g_inf','VIII Corps (US)'],
     [7,'s_inf','363. Infanterie'],       [8,'g_pz','Third Army (Patton)'],
     [9,'g_ally','First Canadian Army'],  [10,'g_pz','XV Corps Armored'],
+    // September: the pursuit meets the German recovery — Volksgrenadier waves
+    // and scraped-together panzer brigades against the last Allied follow-up
+    [12,'s_inf','Volksgrenadier Welle'], [13,'s_tank','Panzer-Brigade 106'],
+    [13,'g_ally','Polish 1st Armoured'], [14,'s_inf','559. Volksgrenadier'],
+    [15,'s_guard','II. SS (refitting)'], [15,'g_inf','Ninth US Army'],
+    [16,'s_inf','Festungs-Regimenter'],
   ],
   generals: [
     // — Allied —
@@ -1593,14 +1628,27 @@ SCENARIOS.dday = {
      text:'A second invasion — the Riviera. Army Group G begins a 700-kilometre retreat up the Rhône valley. Every German soldier in France is now thinking about the distance to the Reich.'},
     {turn:12, date:'21 August 1944', title:'THE FALAISE POCKET', pp:{G:2},
      text:'The pincers meet at Chambois: 50,000 prisoners, the roads west choked for miles with burned-out vehicles. In Paris the Resistance rises and the police seize the Préfecture. The Battle of Normandy is ending in catastrophe for the Westheer.'},
+    {turn:13, date:'28 August 1944', title:'PARIS IS FREE', pp:{G:1},
+     text:'Leclerc\'s 2e Division Blindée and the US 4th Infantry roll down streets awash with people. Von Choltitz surrenders the city he was ordered to burn. De Gaulle walks down the Champs-Élysées through sniper fire, upright, daring anyone to shoot.'},
+    {turn:14, date:'4 September 1944', title:'THE GREAT PURSUIT',
+     text:'Brussels one day, Antwerp with its port intact the next — the spearheads are covering fifty kilometres a day and the map cannot keep up. For one giddy week, staff officers allow themselves the words "the war in the West is won."'},
+    {turn:15, date:'11 September 1944', title:'THE MIRACLE IN THE WEST', pp:{S:2},
+     text:'It isn\'t won. Model scrapes stragglers, flak crews and Volksgrenadier divisions into a line, and the same day a US patrol wades the Our river to stand on German soil, the front begins to harden. The pursuit is running out of fuel — and out of France.'},
+    {turn:16, date:'18 September 1944', title:'MARKET GARDEN',
+     text:'Three airborne divisions carpet a sixty-mile corridor of Dutch road to seize the Rhine at Arnhem. The bridges at Eindhoven and Nijmegen fall — but two SS panzer divisions are refitting in the woods above the last bridge. It is a bridge too far.'},
+    {turn:17, date:'25 September 1944', title:'THE SUPPLY FAMINE',
+     text:'Every litre of petrol still lands over the Normandy sand and rides 500 kilometres of Red Ball Express to the front. Whole armies halt for want of fuel; the guns are rationed to shells per day. The pursuit is over — this is a war of logistics now.'},
+    {turn:18, date:'2 October 1944',  title:'THE WEST WALL',
+     text:'The autumn rains arrive together with the Siegfried Line — pillboxes, dragon\'s teeth and flooded fields. The armies that raced across France now measure gains in hedgerows again. Whatever is not finished by now will wait for 1945.'},
   ],
-  maxTurn: 12,                              // 12 weeks: 6 Jun → late Aug 1944
+  maxTurn: 18,                              // 18 weeks: 6 Jun → early Oct 1944
   startDate: Date.UTC(1944,5,6),
-  // one week of weather matters: the great Channel storm of 19-22 June
-  weather(turn){ return turn===3 ? 'mud' : 'clear'; },
+  // the great Channel storm of 19-22 June, and the October rains that end the pursuit
+  weather(turn){ return turn===3 || turn>=17 ? 'mud' : 'clear'; },
   pp(side, turn){
-    if (side==='G') return turn<=2 ? 10 : turn===3 ? 5 : turn<=8 ? 13 : 15;  // buildup; Red Ball Express after Cobra
-    return 5;                                                  // the Westheer, strained everywhere
+    // buildup · the storm · Red Ball Express after Cobra · then the supply famine
+    if (side==='G') return turn<=2 ? 10 : turn===3 ? 5 : turn<=8 ? 13 : turn<=13 ? 15 : 11;
+    return turn>=14 ? 7 : 5;    // the Westheer, strained everywhere — until the September recovery
   },
   // Allied objective points held at the end (19 total; history ≈ 17)
   victoryTiers: [
@@ -2769,7 +2817,12 @@ function loadScenario(id){
 loadScenario('barbarossa');
 
 /* ---- scenario-driven helpers ---- */
-function weatherFor(turn){ return SCN.weather(turn); }
+/* chaos-weather variant: a per-campaign plan (rolled in newGame) overrides the
+   scenario's fixed script; everything downstream reads through here */
+function weatherFor(turn){
+  if (G && G.wxPlan) return G.wxPlan[Math.max(0, Math.min(turn, G.wxPlan.length-1))];
+  return SCN.weather(turn);
+}
 function ppFor(side, turn){ return SCN.pp(side, turn); }
 function generalOf(u){ return GEN_BY_UNIT.get(u.side+'|'+u.name) || null; }
 function genBonusText(g){
@@ -2931,7 +2984,7 @@ function previewGroup(attackers, def){
            synergy, combinedArms:hasArm&&hasInf, count:attackers.length };
 }
 
-function newGame(playerSide, difficulty, mode, scenario){
+function newGame(playerSide, difficulty, mode, scenario, variants){
   loadScenario(scenario || (SCN && SCN.id) || 'barbarossa');
   nextId = 1;
   G = {
@@ -2951,12 +3004,58 @@ function newGame(playerSide, difficulty, mode, scenario){
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
   };
   if (SCN.setup) SCN.setup(G);                 // scenario-specific touches (fortresses etc.)
+  applyVariants(variants);                     // optional replayability mutators (rolled per campaign)
   G.pp.G = ppFor('G',1) + diffPP('G');
   G.pp.S = ppFor('S',1) + diffPP('S');
   refreshSupply();
   for (const line of SCN.opening(playerSide)) logMsg('sys', line);
   fireEvents();
   return G;
+}
+
+/* ---- CAMPAIGN VARIANTS (replayability mutators) ----
+   All optional, all rolled ONCE here and stored in G, so a save replays its own
+   war, not a re-rolled one. Everything downstream reads through weatherFor()
+   and (G.sched || SOV_SCHEDULE), so old saves and variant-free games are
+   untouched — and the AI-vs-AI balance sims never see them. */
+function applyVariants(v){
+  if (!v || !(v.wx || v.res || v.vet)) return;
+  G.variants = {wx:!!v.wx, res:!!v.res, vet:!!v.vet};
+  const on = [];
+  if (v.wx){
+    // chaos weather: the seasons themselves shift a little, and any week can
+    // bring a freak storm or an unexpected break in the clouds
+    const off = Math.floor(Math.random()*5) - 2;               // seasons run -2..+2 turns off script
+    const plan = [];
+    for (let t=0; t<=MAX_TURN; t++){
+      let w = SCN.weather(Math.max(1, Math.min(MAX_TURN, t + off))) || 'clear';
+      const r = Math.random();
+      if (w==='clear' && r < 0.15) w = 'mud';                  // a freak storm week
+      else if (w==='mud' && r < 0.25) w = 'clear';             // the clouds break early
+      plan.push(w);
+    }
+    G.wxPlan = plan;
+    on.push('🎲 chaos weather — the campaign clock shows this war\'s forecast');
+  }
+  if (v.res){
+    // shuffled reserves: every reinforcement still arrives, but up to two
+    // weeks early or late — a different buildup race each campaign
+    G.sched = SOV_SCHEDULE.map(([t,k,n]) =>
+      [Math.max(2, Math.min(MAX_TURN-1, t + Math.floor(Math.random()*5) - 2)), k, n]);
+    on.push('🔀 shuffled reserves — reinforcements arrive up to 2 weeks off schedule');
+  }
+  if (v.vet){
+    // veteran cadres: a few formations on each side have seen war before
+    for (const side of ['G','S']){
+      const pool = unitsOf(side).filter(u=>!KINDS[u.kind].hq);
+      for (let i=0; i<3 && pool.length; i++){
+        const u = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+        u.xp = XP_LEVELS[i===0 ? 1 : 0];                       // one Hardened, two Veterans
+      }
+    }
+    on.push('🎖 veteran cadres — three formations per side start battle-tested');
+  }
+  for (const line of on) logMsg('sys', 'VARIANT: ' + line);
 }
 
 function diffPP(side){
@@ -3813,7 +3912,7 @@ function endPhase(){
     const cd = SCN.capitalDefense;
     if (cd && G.turn === cd.turn && G.cities.find(c=>c.name===cd.city)?.owner==='S')
       logMsg('sys', cd.announce);
-    for (const [t,kind,name] of SOV_SCHEDULE){
+    for (const [t,kind,name] of (G.sched || SOV_SCHEDULE)){   // shuffled-reserves variant stores its own copy
       if (t === G.turn){
         const sd = KINDS[kind].side;                   // schedules can reinforce either side
         const spot = deploySpots(sd)[0];
@@ -5805,7 +5904,7 @@ onCityTaken = function(c){
   boomAt(c.x, c.y, true);
   floatText(c.x, c.y, '★ '+c.name+' taken', '#ffd34d');
 };
-onGameOver = function(){ if (ROG && ROG.active && G && G.scenario==='roguelike'){ setTimeout(rogBattleEnd, 600); } else { setTimeout(showEnd, 600); } };
+onGameOver = function(){ recordResult(); if (ROG && ROG.active && G && G.scenario==='roguelike'){ setTimeout(rogBattleEnd, 600); } else { setTimeout(showEnd, 600); } };
 onAirStrike = function(au, t, res){
   boomAt(t.x, t.y, res.killed);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
@@ -8213,7 +8312,7 @@ for (const el of document.querySelectorAll('#waw-diff-row .opt')) el.onclick = (
 $('waw-back').onclick = ()=>{ show('waw-menu', false); show('mode-select', true); };
 $('waw-play').onclick = ()=>{
   eventQueue.length = 0;
-  newGame(wawSide, wawDiff, 'ai', 'wawtest');
+  newGame(wawSide, wawDiff, 'ai', 'wawtest', mVar);
   show('waw-menu', false);
   startCampaign();
 };
@@ -8224,6 +8323,7 @@ $('waw-continue').onclick = ()=>{
 $('mc-arcade').onclick = ()=>{
   show('mode-select', false); show('menu', true); sClick();
   $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
+  applyScenarioMenu();                        // refresh the service-record line
 };
 let rmSide = 'G', rmDiff = 'normal', rmScenario = 'realistic', rmPendingUntil = 0;
 /* keep the side-pick cards and Continue button in step with the chosen scenario */
@@ -8239,6 +8339,7 @@ function syncRmMenu(){
   }
   $('btn-play-realistic').textContent = (sc ? sc.short : 'CAMPAIGN') + ' — BEGIN ▶';
   $('btn-continue-realistic').classList.toggle('hidden', !hasSaveSlot(saveSlotFor(rmScenario)));
+  $('rm-rec').textContent = recordLine(rmScenario);
 }
 $('mc-realistic').onclick = ()=>{
   show('mode-select', false); show('realistic-menu', true); sClick();
@@ -8260,7 +8361,7 @@ $('btn-play-realistic').onclick = ()=>{
   }
   rmPendingUntil = 0;
   eventQueue.length = 0;
-  newGame(rmSide, rmDiff, 'ai', rmScenario);
+  newGame(rmSide, rmDiff, 'ai', rmScenario, mVar);
   show('realistic-menu', false);
   startCampaign();
 };
@@ -8463,6 +8564,48 @@ function showEnd(){
 }
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false); showModeSelect(); $('btn-continue').classList.add('hidden'); };
 
+/* ---------------- campaign variants & service record ---------------- */
+const VAR_CHIPS = [['var-wx','wx'],['var-res','res'],['var-vet','vet'],
+                   ['rvar-wx','wx'],['rvar-res','res'],['rvar-vet','vet'],
+                   ['wvar-wx','wx'],['wvar-res','res'],['wvar-vet','vet']];
+let mVar = {wx:false, res:false, vet:false};
+try { mVar = {...mVar, ...JSON.parse(localStorage.getItem('barb-variants')||'{}')}; } catch(e){}
+function syncVarChips(){
+  for (const [id,key] of VAR_CHIPS) $(id).classList.toggle('sel', !!mVar[key]);
+}
+for (const [id,key] of VAR_CHIPS) $(id).onclick = ()=>{
+  mVar[key] = !mVar[key];
+  try { localStorage.setItem('barb-variants', JSON.stringify(mVar)); } catch(e){}
+  syncVarChips(); sClick();
+};
+syncVarChips();
+
+/* every finished vs-AI campaign goes in the books — best result per side kept */
+function loadRecord(){ try { return JSON.parse(localStorage.getItem('barb-record')||'{}'); } catch(e){ return {}; } }
+function recordResult(){
+  if (!G || !G.result || G.mode!=='ai' || G.scenario==='roguelike') return;
+  try {
+    const rec = loadRecord();
+    const r = rec[G.scenario] = rec[G.scenario] || {plays:0, best:{}};
+    r.plays++;
+    const side = G.playerSide, vp = G.result.vp;
+    const b = r.best[side];
+    // "better" = more objectives taken when attacking (G), fewer lost when defending (S)
+    if (!b || (side==='G' ? vp > b.vp : vp < b.vp))
+      r.best[side] = {title:G.result.title, vp, diff:G.difficulty};
+    localStorage.setItem('barb-record', JSON.stringify(rec));
+  } catch(e){}
+}
+function recordLine(scnId){
+  const r = loadRecord()[scnId];
+  if (!r || !r.plays) return 'Your first campaign here — the service record starts today.';
+  const sides = (SCENARIOS[scnId] && SCENARIOS[scnId].sides) || DEFAULT_SIDES;
+  const parts = [];
+  for (const side of ['G','S']) if (r.best[side])
+    parts.push(`best as ${sides[side].name}: ${r.best[side].title} · ${r.best[side].diff}`);
+  return `📜 ${r.plays} campaign${r.plays===1?'':'s'} fought — ${parts.join(' — ')}`;
+}
+
 /* ---------------- menu ---------------- */
 let mSide='G', mDiff='normal', mMode='ai', mScn='barbarossa';
 function applyScenarioMenu(){
@@ -8471,6 +8614,7 @@ function applyScenarioMenu(){
   $('menu-sub').textContent = s.sub;
   $('pick-ger').innerHTML = `<h4>${s.menu.ger.h}</h4><p>${s.menu.ger.p}</p>`;
   $('pick-sov').innerHTML = `<h4>${s.menu.sov.h}</h4><p>${s.menu.sov.p}</p>`;
+  $('menu-rec').textContent = recordLine(mScn);
 }
 for (const el of document.querySelectorAll('#scn-row .opt')){
   el.onclick = ()=>{
@@ -8505,7 +8649,7 @@ $('btn-start').onclick = ()=>{
   startPendingUntil = 0;
   $('btn-start').textContent = 'BEGIN CAMPAIGN';
   eventQueue.length = 0;                       // drop popups from a previous campaign
-  newGame(mSide, mDiff, mMode, mScn);          // fires the turn-1 event
+  newGame(mSide, mDiff, mMode, mScn, mVar);    // fires the turn-1 event
   startCampaign();
 };
 $('btn-continue').onclick = ()=>{

@@ -572,6 +572,37 @@ say('— events & winter gear —');
   check('unanswered offer expires', G3.winterGear === false, String(G3.winterGear));
 }
 
+/* ---------------- campaign variants (replayability mutators) ---------------- */
+say('— campaign variants —');
+{
+  E.newGame('G','normal','hotseat','barbarossa',{wx:true,res:true,vet:true});
+  const Gv = E.getState();
+  check('variants flag stored in the save state', Gv.variants && Gv.variants.wx && Gv.variants.res && Gv.variants.vet);
+  check('chaos weather rolls a full-campaign plan', Array.isArray(Gv.wxPlan) && Gv.wxPlan.length === E.MAX_TURN+1
+    && Gv.wxPlan.every(w=>['clear','mud','freeze','snow'].includes(w)));
+  check('weatherFor reads the rolled plan', E.weatherFor(5) === Gv.wxPlan[5]);
+  check('winter still comes in a chaos-weather Barbarossa', Gv.wxPlan.some(w=>w==='snow'));
+  check('shuffled reserves keep every reinforcement', Gv.sched && Gv.sched.length === E.SOV_SCHEDULE.length
+    && Gv.sched.every(([t])=>t>=2 && t<=E.MAX_TURN-1));
+  const jit = Gv.sched.map(([t],i)=>Math.abs(t - E.SOV_SCHEDULE[i][0]));
+  check('shuffle jitter stays within ±2 weeks', jit.every(d=>d<=2));
+  check('veteran cadres: three blooded formations per side',
+    ['G','S'].every(s=>E.unitsOf(s).filter(u=>(u.xp||0)>0).length===3));
+  check('no veteran HQs', E.getState().units.every(u=>!(u.xp>0 && E.KINDS[u.kind].hq)));
+  // a variant war survives save/load and plays on cleanly
+  const snap = E.serialize(); E.deserialize(snap);
+  const Gv2 = E.getState();
+  check('variant campaign round-trips through a save', Gv2.wxPlan && Gv2.wxPlan[5]===Gv.wxPlan[5]
+    && Gv2.sched && Gv2.sched.length===Gv.sched.length);
+  for (let i=0;i<6 && !Gv2.over;i++){ E.aiFullPhase(Gv2.phase); if (!Gv2.over) E.endPhase(); }
+  check('variant campaign plays cleanly', Gv2.turn >= 3 || Gv2.over);
+  // variant-free games must be completely untouched
+  E.newGame('G','normal','hotseat');
+  const Gp = E.getState();
+  check('no variants → vanilla state', !Gp.variants && !Gp.wxPlan && !Gp.sched
+    && Gp.units.every(u=>!(u.xp>0)));
+}
+
 /* ---------------- The World at War (native Europe strategic layer) ---------------- */
 say('— The World at War —');
 {
@@ -1319,6 +1350,9 @@ function uiSmoke(side){
   if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
   if ($('btn-next').onclick) $('btn-next').onclick();   // cycle to next unit with orders
   if ($('btn-undo').onclick) $('btn-undo').onclick();
+  // campaign-variant chips toggle on and back off cleanly (leave defaults untouched)
+  for (const vid of ['var-wx','var-res','var-vet','rvar-wx','rvar-res','rvar-vet','wvar-wx','wvar-res','wvar-vet'])
+    if ($(vid).onclick){ $(vid).onclick(); $(vid).onclick(); }
   $('btn-sound').onclick();                  // opens the settings modal
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }
   if ($('vol-sfx').oninput){ $('vol-sfx').value = 70; $('vol-sfx').oninput(); }
@@ -1359,6 +1393,12 @@ function uiSmoke(side){
     if ($('ww-back').onclick) $('ww-back').onclick();
   }
   const arcadeOver = UI.getState().over, arcadeResult = UI.getState().result;
+  // the finished vs-AI campaign must land in the service record
+  let recOk = false;
+  try {
+    const rec = JSON.parse(sb.localStorage.getItem('barb-record')||'{}');
+    recOk = !!(rec.barbarossa && rec.barbarossa.plays >= 1 && rec.barbarossa.best[side]);
+  } catch(e){}
   // realistic-mode routing: mode select → preview screen → launch → one enemy phase
   let realisticOk = true;
   if ($('mc-realistic').onclick && $('btn-play-realistic').onclick){
@@ -1379,7 +1419,7 @@ function uiSmoke(side){
     if ($('rog-fight').onclick){ $('rog-fight').onclick(); drain(); }   // build the battle scenario + startCampaign
     rogOk = UI.getState().scenario === 'roguelike' && !!(UI.rogState() && UI.rogState().active);
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, rogOk};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, rogOk, recOk};
 }
 
 for (const side of ['G','S']){
@@ -1388,6 +1428,7 @@ for (const side of ['G','S']){
     check(`UI campaign as ${side==='G'?'Germany':'Soviets'} reaches an ending`,
       r.over && r.uiErrors===0,
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
+    check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
     check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
     check(`UI Breakthrough roguelike launches a battle (${side})`, r.rogOk, 'scenario not roguelike');
