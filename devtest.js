@@ -1364,6 +1364,10 @@ function uiSmoke(side){
   if (side==='S') $('pick-sov').onclick();
   $('btn-start').onclick(); drain();         // begin campaign (AI opens if player is S)
   const UI = sb.module.exports;
+  // the replayability variants are always-on now — starting through the real
+  // menu must hand the campaign all four (proves the always-on wiring works)
+  const v0 = UI.getState().variants;
+  const variantsForced = !!(v0 && v0.wx && v0.res && v0.vet && v0.fow);
   let guard = 0;
   while (!UI.getState().over && guard++ < 40){
     // dismiss event popups and answer the winter question like a player would
@@ -1385,10 +1389,10 @@ function uiSmoke(side){
   if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
   if ($('btn-next').onclick) $('btn-next').onclick();   // cycle to next unit with orders
   if ($('btn-undo').onclick) $('btn-undo').onclick();
-  // campaign-variant chips toggle on and back off cleanly (leave defaults untouched)
-  for (const vid of ['var-wx','var-res','var-vet','var-fow','rvar-wx','rvar-res','rvar-vet','rvar-fow',
-                     'wvar-wx','wvar-res','wvar-vet','wvar-fow'])
-    if ($(vid).onclick){ $(vid).onclick(); $(vid).onclick(); }
+  // the variant chips are now lit-and-inert "always on" indicators — clicking
+  // them must NOT toggle anything (onclick removed)
+  const chipsInert = ['var-wx','var-res','var-vet','var-fow','rvar-wx','rvar-res','rvar-vet','rvar-fow',
+                      'wvar-wx','wvar-res','wvar-vet','wvar-fow'].every(vid => !$(vid).onclick);
   $('btn-sound').onclick();                  // opens the settings modal
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }
   if ($('vol-sfx').oninput){ $('vol-sfx').value = 70; $('vol-sfx').oninput(); }
@@ -1447,7 +1451,7 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert};
 }
 
 for (const side of ['G','S']){
@@ -1457,6 +1461,8 @@ for (const side of ['G','S']){
       r.over && r.uiErrors===0,
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
     check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
+    check(`UI variants are always-on through the menu (${side})`, r.variantsForced, 'campaign started without all variants');
+    check(`UI variant chips are inert indicators (${side})`, r.chipsInert, 'a variant chip is still clickable');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
     check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
   } catch(err){

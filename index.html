@@ -97,6 +97,7 @@
   .opt{border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
     color:var(--dim);background:var(--panel2);}
   .opt.sel{color:var(--amber);border-color:var(--amber);}
+  .opt.locked{cursor:default;pointer-events:none;opacity:.9;}
   #menu .start-btn{font-size:17px;padding:12px 44px;letter-spacing:2px;}
   #menu .foot{margin-top:14px;font-size:12px;color:var(--dim);}
 
@@ -286,7 +287,7 @@
       <span class="opt" data-d="hard">Hard</span>
     </div>
     <div class="opt-row" id="rvar-row" style="justify-content:center;">
-      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
       <span class="opt" id="rvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="rvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="rvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
@@ -328,7 +329,7 @@
     </div>
     <div id="waw-diff-desc" style="color:var(--dim);font-size:12px;margin-top:2px;min-height:16px;"></div>
     <div class="opt-row" id="wvar-row">
-      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
       <span class="opt" id="wvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="wvar-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="wvar-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
@@ -376,7 +377,7 @@
       <span class="opt" data-d="hard">Hard</span>
     </div>
     <div class="opt-row" id="var-row">
-      <span style="color:var(--dim);padding:6px 0;" title="Optional mutators — mix them freely; every campaign rolls its own war">Variants:</span>
+      <span style="color:var(--dim);padding:6px 0;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
       <span class="opt" id="var-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
       <span class="opt" id="var-res" title="Every reinforcement still comes, but up to two weeks early or late — a different buildup race each campaign">🔀 Shuffled reserves</span>
       <span class="opt" id="var-vet" title="Three random formations per side start battle-tested (one Hardened, two Veteran)">🎖 Veteran cadres</span>
@@ -464,17 +465,17 @@
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
           speed (normal / fast / instant). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
-      <li><b>🎲 Variants &amp; your service record.</b> The <b>Variants</b> row on the campaign
-          menus mixes optional mutators into a new war: <b>Chaos weather</b> re-rolls the season
+      <li><b>🎲 Every campaign is different &amp; your service record.</b> Four systems are
+          <b>always on</b>, so no two wars play the same: <b>Chaos weather</b> re-rolls the season
           script (watch the campaign clock — it becomes this war's forecast), <b>Shuffled
-          reserves</b> moves every reinforcement up to two weeks early or late, and <b>Veteran
-          cadres</b> hands each side three battle-tested formations. <b>Fog of war</b> hides
+          reserves</b> moves every reinforcement up to two weeks early or late, <b>Veteran
+          cadres</b> hands each side three battle-tested formations, and <b>Fog of war</b> hides
           every enemy your troops haven't spotted: units see 2 hexes (cavalry and carriers 3),
           cities you hold report around themselves, and air groups can fly <b>🔭 photo-recon</b>
           over anywhere your airfields cover. Enemies you lose track of leave a faded
           <b>? last-seen marker</b>, and marching into an unseen enemy's path halts your unit
-          on contact — probe with cavalry before you commit the panzers. Mix variants freely —
-          no two campaigns play the same. Every finished game against the computer goes into your
+          on contact — probe with cavalry before you commit the panzers.
+          Every finished game against the computer goes into your
           <b>service record</b>, shown on the menu: campaigns fought and your best result on
           each side. Beat your own history.</li>
       <li><b>Controls &amp; hotkeys.</b> An amber pip marks every unit that still has orders to
@@ -9062,21 +9063,22 @@ function showEnd(){
 }
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false); showModeSelect(); $('btn-continue').classList.add('hidden'); };
 
-/* ---------------- campaign variants & service record ---------------- */
-const VAR_CHIPS = [['var-wx','wx'],['var-res','res'],['var-vet','vet'],['var-fow','fow'],
-                   ['rvar-wx','wx'],['rvar-res','res'],['rvar-vet','vet'],['rvar-fow','fow'],
-                   ['wvar-wx','wx'],['wvar-res','res'],['wvar-vet','vet'],['wvar-fow','fow']];
-let mVar = {wx:false, res:false, vet:false};
-try { mVar = {...mVar, ...JSON.parse(localStorage.getItem('barb-variants')||'{}')}; } catch(e){}
-function syncVarChips(){
-  for (const [id,key] of VAR_CHIPS) $(id).classList.toggle('sel', !!mVar[key]);
+/* ---------------- campaign variants & service record ----------------
+   The replayability variants are no longer optional — every new campaign
+   gets all four (chaos weather, shuffled reserves, veteran cadres, fog of
+   war). The menu chips are kept purely as an "always on" indicator: shown
+   lit and inert so players know the systems are active. (Continuing a save
+   replays whatever that save was rolled with; the AI-vs-AI balance sims call
+   newGame WITHOUT variants, so they stay clean.) */
+const VAR_CHIPS = ['var-wx','var-res','var-vet','var-fow',
+                   'rvar-wx','rvar-res','rvar-vet','rvar-fow',
+                   'wvar-wx','wvar-res','wvar-vet','wvar-fow'];
+const mVar = {wx:true, res:true, vet:true, fow:true};
+for (const id of VAR_CHIPS){
+  const el = $(id); if (!el) continue;
+  el.classList.add('sel', 'locked');           // lit + non-interactive
+  el.onclick = null;
 }
-for (const [id,key] of VAR_CHIPS) $(id).onclick = ()=>{
-  mVar[key] = !mVar[key];
-  try { localStorage.setItem('barb-variants', JSON.stringify(mVar)); } catch(e){}
-  syncVarChips(); sClick();
-};
-syncVarChips();
 
 /* every finished vs-AI campaign goes in the books — best result per side kept */
 function loadRecord(){ try { return JSON.parse(localStorage.getItem('barb-record')||'{}'); } catch(e){ return {}; } }
