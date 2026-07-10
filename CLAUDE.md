@@ -32,6 +32,7 @@ deps, runs offline by double-clicking. Keep it that way.
 | `SCENARIOS.winter41 =` | Scenario 2 — Soviets attack, Road of Life supplySeeds |
 | `SCENARIOS.stalingrad =` | Scenario 3 — southern map, allied flank armies |
 | `SCENARIOS.kursk =` | Kursk 1943 — axis starts holding VP cities (score moves both ways), dug-in defenders |
+| `SCENARIOS.alamein =` | El Alamein 1942 — desert; `'q'` impassable-depression terrain, `terrainColors` palette, `wxLabel`/`wxFx`/`wxMsg` Khamsin relabel |
 | `SCENARIOS.dday =` | Scenario 4 — 36×22 map (18 turns), beach supplySeeds, edgeSupply off |
 | `SCENARIOS.midway =` | Scenario 5 — naval kinds, carriers, 1-day turns |
 | `DEFAULT_KINDS` / `DEFAULT_SIDES` | Eastern-front unit types; side names/flags/colors |

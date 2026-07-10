@@ -222,7 +222,7 @@
       <div class="mc-inner">
         <div class="mc-icon">⚔</div>
         <div class="mc-text">
-          <span class="mc-badge ready">7 CAMPAIGNS</span>
+          <span class="mc-badge ready">8 CAMPAIGNS</span>
           <h2>ARCADE MODE</h2>
           <p class="mc-desc">Historical battles from Operation Barbarossa to the Battle of the Bulge — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
         </div>
@@ -353,6 +353,7 @@
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
       <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
+      <span class="opt" data-s="alamein">🐪 El Alamein 1942</span>
       <span class="opt" data-s="dday">🟦 D-Day 1944</span>
       <span class="opt" data-s="bulge">🎄 The Bulge 1944</span>
     </div>
@@ -552,7 +553,7 @@
 <!-- ============ HISTORICAL EVENT ============ -->
 <div id="event-modal" class="modal-back hidden">
   <div class="modal" style="max-width:540px;">
-    <h2 style="font-size:14px;letter-spacing:4px;">📰 THIS WEEK IN 1941</h2>
+    <h2 id="event-head" style="font-size:14px;letter-spacing:4px;">📰 THIS WEEK IN THE WAR</h2>
     <div id="event-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
     <h3 id="event-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
     <p id="event-text"></p>
@@ -1607,6 +1608,247 @@ SCENARIOS.kursk = {
     playerSide==='G'
       ? '⬛ Cut the salient at Kursk before your shoulders crack — Orel, Belgorod and Kharkov are yours to lose.'
       : '🟥 Bleed the pincers white in the wire — then take Orel, Belgorod and Kharkov back.',
+  ]; },
+};
+
+/* ---------- Scenario: El Alamein — Egypt, July–September 1942 ----------
+   The desert war. Side G = the Axis (Panzerarmee Afrika, Rommel) driving
+   EAST for the Nile; side S = the British Eighth Army defending. The
+   engine's asymmetry fits the geography exactly: G attacks and supplies
+   from the west (Tobruk), S defends and supplies from the east (the
+   Delta), and the sea/Qattara flanks make it a pure frontal battle.
+   Introduces the 'q' (impassable depression) terrain, a desert palette,
+   and the Khamsin sandstorm (mechanically a 'mud' turn, relabelled). */
+SCENARIOS.alamein = {
+  id: 'alamein',
+  title: 'EL ALAMEIN — THE GATES OF EGYPT', short: 'EL ALAMEIN',
+  sub: 'THE WESTERN DESERT · JULY — SEPTEMBER 1942 · TURN-BASED STRATEGY',
+  sides: {
+    G: {name:'Axis',    flag:'⬛', color:'#7c7048', tint:'rgba(156,142,96,0.28)'},
+    S: {name:'British', flag:'🟦', color:'#5e6b3e', tint:'rgba(120,140,86,0.26)'},
+  },
+  menu: {
+    ger: {h:'⬛ Axis (Panzerarmee Afrika)', p:'Rommel is two hundred miles from the Nile with the last of his fuel. Break the Alamein line between the sea and the Qattara sands, take the ridges, and reach Alexandria and Cairo before the British buildup drowns you.'},
+    sov: {h:'🟦 Britain (Eighth Army)', p:'Egypt is at your back and there is nowhere left to retreat. Hold the boxes and the ridges, let the Desert Air Force and the Grants bleed the panzers in the minefields — and every week you hold, you grow stronger.'},
+  },
+  kinds: {
+    g_pz:   {side:'G', label:'Panzer Division',      atk:8, def:5, mp:6, maxStr:10, cost:18, sym:'arm'},
+    g_inf:  {side:'G', label:'leichte Division',     atk:6, def:5, mp:4, maxStr:10, cost:12, sym:'inf'},
+    g_it:   {side:'G', label:'Italian Armoured',     atk:5, def:4, mp:5, maxStr:8,  cost:12, sym:'arm', noBuy:true, color:'#8a8256'},
+    g_ally: {side:'G', label:'Italian Division',     atk:3, def:4, mp:2, maxStr:8,  cost:6,  sym:'inf', noBuy:true, color:'#8a8256'},
+    g_para: {side:'G', label:'Parachute Brigade',    atk:5, def:6, mp:3, maxStr:7,  cost:12, sym:'para', noBuy:true, color:'#5a5536'},
+    s_arm:  {side:'S', label:'Armoured Division',    atk:7, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
+    s_inf:  {side:'S', label:'Infantry Division',    atk:4, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    s_gd:   {side:'S', label:'Commonwealth Division',atk:6, def:6, mp:4, maxStr:10, cost:14, sym:'inf', noBuy:true, color:'#6b7a4a'},
+    g_hq:   {side:'G', label:'Army HQ', atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+    s_hq:   {side:'S', label:'Army HQ', atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#3f4a30'},
+  },
+  deployNames: {g_pz:'Panzer Reserve', g_inf:'Afrika Reinforcement', s_arm:'Armoured Reserve', s_inf:'Delta Reinforcement'},
+  // desert repaint + Khamsin relabel — mechanics unchanged, only the look & words
+  terrainColors: { '.':'#b39a5c', 'h':'#8f7d4e', 's':'#c6b079', 'q':'#cdc4a2', '~':'#1f4e64' },
+  wxLabel: { mud:'Sandstorm — Khamsin' },
+  wxFx: { mud:['Sandstorm — Khamsin','Blinding dust: +1 movement cost everywhere, attacks ×0.5–0.6, aircraft grounded.'] },
+  wxMsg: { mud:'A KHAMSIN rises — a wall of sand swallows the desert. Tanks blunder blind, the airfields shut down, every gun falls silent.' },
+  cols: 34, rows: 16,
+  /* The Alamein bottleneck: the Mediterranean (north), the impassable
+     Qattara Depression (south, 'q'), and between them a 40-mile corridor
+     with no flanks. Ridges (Miteiriya, Ruweisat, Alam Halfa) are the keys;
+     soft-sand 'deirs' channel the armour. West = Axis, east = the Nile. */
+  map: [
+  /*           0    5    10   15   20   25   30   */
+  /* 0*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 1*/ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  /* 2*/ "~~................................",
+  /* 3*/ "..........hh....hh................",
+  /* 4*/ "...........hh.....................",
+  /* 5*/ "............h.....................",
+  /* 6*/ ".................hhhhh............",
+  /* 7*/ ".................s......hhh.......",
+  /* 8*/ "..................s...s..hh.......",
+  /* 9*/ "............hh.........s..........",
+  /*10*/ "..................................",
+  /*11*/ "qqqq..ss....ss....................",
+  /*12*/ "qqqqqqqqqqqqqqq...ss..............",
+  /*13*/ "qqqqqqqqqqqqqqqqqqqq..............",
+  /*14*/ "qqqqqqqqqqqqqqqqqqqqqqqqq.........",
+  /*15*/ "qqqqqqqqqqqqqqqqqqqqqqqqqqqqq.....",
+  ],
+  /* vp>0 are Axis objectives, all British-held: the ridges that block the
+     drive and the great prizes beyond — Alexandria on the coast, Cairo on
+     the Nile. All of Egypt starts British. */
+  cities: [
+    {x:2, y:2,  name:'Mersa Matruh',       vp:0, owner:'G'},
+    {x:6, y:2,  name:'El Daba',            vp:0, owner:'G'},
+    {x:11,y:2,  name:'Sidi Abd el Rahman', vp:0, owner:'G'},
+    {x:12,y:9,  name:'Qaret el Himeimat',  vp:0, owner:'G'},
+    {x:15,y:2,  name:'El Alamein',         vp:1, owner:'S'},
+    {x:17,y:7,  name:'Deir el Shein',      vp:0, owner:'S'},
+    {x:19,y:6,  name:'Ruweisat Ridge',     vp:1, owner:'S'},
+    {x:25,y:7,  name:'Alam Halfa',         vp:2, owner:'S'},
+    {x:23,y:2,  name:'Burg el Arab',       vp:1, owner:'S'},
+    {x:27,y:3,  name:'El Hammam',          vp:1, owner:'S'},
+    {x:30,y:2,  name:'Alexandria',         vp:3, owner:'S'},
+    {x:31,y:10, name:'Cairo',              vp:4, owner:'S'},
+  ],
+  sovSpawns: [[30,4],[31,2],[29,6],[31,8],[27,9],[24,10]],
+  gerSpawns: [[0,3],[1,5],[0,7],[2,9],[4,10]],
+  /* Panzerarmee Afrika (west) vs the Eighth Army in its boxes (east). */
+  startUnits: [
+    // — Deutsches Afrikakorps —
+    ['g_pz','15. Panzer',   10,4, 9], ['g_pz','21. Panzer',   11,6, 9],
+    ['g_inf','90. leichte', 12,3, 9], ['g_inf','164. leichte', 10,7, 8],
+    ['g_para','Ramcke-Brigade', 11,8, 7],
+    // — Italian mobile & infantry corps —
+    ['g_it','Ariete',   12,5, 8], ['g_it','Littorio',  13,7, 7],
+    ['g_ally','Trieste',13,4, 7], ['g_ally','Bologna',  9,5, 6],
+    ['g_ally','Brescia', 9,8, 6], ['g_ally','Pavia',   10,9, 6],
+    ['g_ally','Trento', 12,2, 6], ['g_ally','Folgore', 13,9, 7],
+    ['g_hq','Panzerarmee Afrika HQ', 7,4, 6], ['g_hq','DAK HQ', 8,6, 6],
+    // — Eighth Army: the boxes, the ridges, the armoured reserve —
+    ['s_arm','1st Armoured',18,5, 9], ['s_arm','7th Armoured',22,7, 9], ['s_arm','10th Armoured',24,6, 9],
+    ['s_gd','9th Australian',16,2, 9], ['s_gd','2nd New Zealand',18,7, 9],
+    ['s_inf','5th Indian',19,5, 8], ['s_inf','1st South African',16,4, 8],
+    ['s_inf','50th Northumbrian',17,8, 7], ['s_inf','4th Indian',20,8, 8],
+    ['s_hq','Eighth Army HQ',28,4, 6], ['s_hq','XXX Corps HQ',22,3, 6],
+  ],
+  /* the British buildup outstrips the Axis: Delta reinforcements pour in,
+     the Axis get a starved trickle across a Malta-hunted Mediterranean */
+  sovSchedule: [
+    [2,'s_arm','8th Armoured'],
+    [3,'s_inf','44th Home Counties'], [3,'g_ally','Pistoia'],
+    [4,'s_inf','132nd Infantry Bde'],
+    [5,'s_arm','23rd Armoured Bde'],  [5,'g_inf','Kampfgruppe Afrika'],
+    [6,'s_inf','51st Highland'],
+    [7,'s_arm','9th Armoured Bde'],
+  ],
+  generals: [
+    // — Axis —
+    {side:'G', unit:'15. Panzer', name:'Rommel', atk:1.20,
+     bio:'The Desert Fox — audacious, exhausted, and two hundred miles from the Nile with tanks running on fumes.'},
+    {side:'G', unit:'21. Panzer', name:'von Thoma', atk:1.10,
+     bio:'Commands the Afrikakorps at the sharp end — a hard tanker who knows the fuel gauges better than the Führer does.'},
+    {side:'G', unit:'90. leichte', name:'Kleemann', atk:1.08,
+     bio:'His motorised infantry are the glue of the Panzerarmee — everywhere the line threatens to break.'},
+    {side:'G', unit:'Ariete', name:'De Stefanis', atk:1.08,
+     bio:'The Ariete is the best armour Italy fielded — and it dies covering the German retreat more than once.'},
+    // — British —
+    {side:'S', unit:'10th Armoured', name:'Montgomery', def:1.15,
+     bio:'New to the desert and utterly sure of himself: "no withdrawal and no surrender." He fights the battle Rommel wants to avoid — a set-piece.'},
+    {side:'S', unit:'2nd New Zealand', name:'Freyberg', def:1.12,
+     bio:'"Tiny" Freyberg — a giant of a man whose New Zealanders are the hardest infantry in the Eighth Army.'},
+    {side:'S', unit:'9th Australian', name:'Morshead', def:1.12,
+     bio:'"Ming the Merciless" — the Rat of Tobruk, whose Australians turn every position into a fortress.'},
+    {side:'S', unit:'7th Armoured', name:'Horrocks', atk:1.10,
+     bio:'Commands the Desert Rats holding the southern flank — coolly refusing to charge his tanks onto the German guns.'},
+  ],
+  decisions: [
+    {
+      id:'delta_dash', turn:4, side:'G',
+      date:'31 August 1942', title:'THE DASH FOR THE DELTA',
+      text:'The tanks are nearly dry — the Malta convoys have sunk the fuel again. Rommel can throw the whole Panzerarmee at Alam Halfa <b>now</b>, on the last drums of petrol, or break off and husband what is left. Kesselring promises fuel by air that everyone knows will not come. Gamble the last tank of petrol — or save the army?',
+      options:[
+        {label:'Attack now — one last throw at the ridge',
+         effect:'+1 strength to your 3 strongest panzer/armoured units — but the British bank +5 ⚙ as the RAF works the columns over',
+         blurb:'The panzers swing north into the Alam Halfa position on the last of the fuel, under a sky that belongs entirely to the Desert Air Force.',
+         log:'⬛ The Panzerarmee makes its last throw at Alam Halfa — on fumes, under the bombs.',
+         apply(G){
+           unitsOf('G').filter(u=>KINDS[u.kind].sym==='arm')
+             .sort((a,b)=>b.str-a.str).slice(0,3)
+             .forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+1); });
+           G.pp.S = Math.min(40, G.pp.S+5);
+         }},
+        {label:'Break off — save the army for another day',
+         effect:'+6 ⚙ banked as the front shortens and the panzers refit',
+         blurb:'Rommel calls it off and pulls back to the start line. The army lives — but the one window when Egypt lay open has closed for good.',
+         log:'⬛ "We could not maintain the attack." The panzers disengage and dig in.',
+         apply(G){ G.pp.G = Math.min(40, G.pp.G+6); }},
+      ],
+      ai(G){ return 1; },   // history: Rommel broke off at Alam Halfa
+    },
+    {
+      id:'stand_alamein', turn:2, side:'S',
+      date:'1 July 1942', title:'STAND, OR FALL BACK TO THE DELTA?',
+      text:'Rommel is at the wire and the staff at GHQ Cairo are burning their files — "Ash Wednesday." The safe move is to fall back behind the Nile and fight for the Delta. Auchinleck refuses: there is no line behind Alamein worth having. Hold on the Alamein line — or trade Egypt\'s desert for its river?',
+      options:[
+        {label:'Stand at Alamein — no withdrawal',
+         effect:'+1 strength and a dug-in bonus to your 4 units nearest El Alamein, and +3 ⚙',
+         blurb:'The order goes out: the Eighth Army stands where it is. The boxes are wired and mined, the guns registered. This is the ground.',
+         log:'🟦 "There will be no withdrawal and no surrender." The line holds at Alamein.',
+         apply(G){
+           const a = G.cities.find(c=>c.name==='El Alamein') || {x:15,y:2};
+           unitsOf('S').filter(u=>!KINDS[u.kind].hq)
+             .sort((p,q)=>hexDist(p.x,p.y,a.x,a.y)-hexDist(q.x,q.y,a.x,a.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+1); u.entrench = Math.max(u.entrench||0, 2); });
+           G.pp.S = Math.min(40, G.pp.S+3);
+         }},
+        {label:'Fall back to the Delta line',
+         effect:'+7 ⚙ banked to rebuild — but the Axis bank +5 ⚙ and gain ground as you cede the desert',
+         blurb:'The Eighth Army gives up the desert and digs in before the Nile. Safer — but it hands Rommel the one thing he cannot seize by force: room, and time.',
+         log:'🟦 The Eighth Army falls back toward the Delta. Cairo can hear the guns.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+7); G.pp.G = Math.min(40, G.pp.G+5); }},
+      ],
+      ai(G){ return 0; },   // history: the Auk stood
+    },
+  ],
+  events: [
+    {turn:1, date:'1 July 1942',      title:'TWO HUNDRED MILES FROM THE NILE',
+     text:'Rommel\'s panzers reach the last defensible bottleneck before Egypt: a forty-mile gap between the sea and the impassable Qattara sands. In Cairo the sky is grey with the ash of burning files — "Ash Wednesday" — and the fleet sails from Alexandria. Everything now hangs on this narrow strip of desert.'},
+    {turn:2, date:'10 July 1942',     title:'FIRST ALAMEIN',
+     text:'Auchinleck fights the battle himself and the first Axis rush breaks on the boxes. The Australians take Tel el Eisa; the line bends but does not snap. For the first time in the desert war, the German timetable simply stops.'},
+    {turn:3, date:'22 July 1942',     title:'THE KHAMSIN',
+     text:'A wall of sand rises out of the south and blots out the war. For days nothing moves and nothing flies; men navigate by compass between their own trenches. When it clears, both armies are exactly where they were — and a week nearer the British reinforcements.'},
+    {turn:4, date:'31 August 1942',   title:'ALAM HALFA', pp:{S:1},
+     text:'Rommel\'s last throw: the panzers swing south through the minefield gap and wheel for the Alam Halfa ridge — and find Montgomery\'s tanks dug in hull-down, waiting, while the Desert Air Force bombs the columns around the clock. The petrol runs out with the ridge still in British hands.'},
+    {turn:5, date:'7 September 1942', title:'MONTGOMERY\'S GRIP', pp:{S:2},
+     text:'The new commander will not be hurried and will not be moved: no counterattack, no pursuit, nothing improvised. The Eighth Army is being rebuilt into a sledgehammer — Sherman tanks, massed artillery, a plan for October — and it can afford to wait. Rommel cannot.'},
+    {turn:6, date:'14 September 1942',title:'THE SUPPLY WAR', pp:{S:2},
+     text:'The battle is being decided under the Mediterranean. Malta\'s submarines and bombers sink the tankers one by one; a third of Rommel\'s fuel never reaches Africa. Whole panzer battalions sit motionless for want of petrol while the Delta fills with American steel.'},
+    {turn:7, date:'23 September 1942',title:'THE DESERT FOX GOES HOME',
+     text:'Sick and exhausted, Rommel hands over and flies to Europe to convalesce. He leaves behind a Panzerarmee dug in on ground it cannot leave and cannot hold — a fortress line built by an army that lives to attack.'},
+    {turn:8, date:'30 September 1942',title:'THE END OF THE BEGINNING',
+     text:'The Alamein line has held through the worst of it, and the balance has tipped for good. Behind the British wire a thousand guns are ranging in for October. As Churchill will put it: not the end, nor even the beginning of the end — but, perhaps, the end of the beginning.'},
+  ],
+  maxTurn: 8,                               // 8 weeks: 1 Jul → 30 Sep 1942
+  startDate: Date.UTC(1942,6,1),
+  weather(turn){ return turn===3 ? 'mud' : 'clear'; },   // the July Khamsin
+  pp(side, turn){
+    if (side==='G') return turn<=2 ? 9 : turn<=4 ? 7 : 5;   // the fuel crisis bites deeper each week
+    return turn<=3 ? 8 : 11;                                // the Delta buildup surges after Montgomery
+  },
+  capitalDefense: {turn:1, range:4, def:1.2, city:'Alam Halfa',
+    announce:'🟦 The Alam Halfa ridge bristles with dug-in Grants and six-pounders — Montgomery will not be drawn off it.'},
+  /* Axis objective points held at the end (13 total; history ≈ 0 — Rommel was stopped) */
+  victoryTiers: [
+    [12,'THE PYRAMIDS IN SIGHT','Alexandria and Cairo have fallen, the Eighth Army is destroyed, and the Afrikakorps waters its tanks in the Nile. The road to Suez and the oil of the Middle East lies open — a catastrophe for the Allied cause.'],
+    [9, 'EGYPT FALLS','The Alamein line is shattered and the Delta breached — the British cling to a bridgehead at the Suez Canal while Rommel takes Cairo. The war in the Mediterranean is turned on its head.'],
+    [6, 'THE DELTA THREATENED','The panzers punch clean through the ridges and into open country — but the last drive for the Nile falls short of the great cities. A far deeper penetration than history ever saw.'],
+    [3, 'THE LINE DENTED','The Axis bite into the Alamein position and take a ridge or two, then grind to a halt in the wire and the sand. The desert war goes on — but the initiative is slipping.'],
+    [0, 'THE HIGH-WATER MARK','Rommel is stopped dead at Alamein, exactly as in history. The Panzerarmee has reached the limit of its fuel and its luck — and behind the British line, the guns are ranging in for October. The end of the beginning.'],
+  ],
+  sudden: {
+    axisCities: ['Alexandria','Cairo'], minAxisUnits: 6,
+    axisTitle: 'TO THE NILE',
+    axisText:  'Alexandria and Cairo have fallen — the Afrikakorps stands on the Nile and the whole British position in the Middle East collapses. Suez, and the oil beyond it, lie open.',
+    sovTitle:  'ROMMEL IS STOPPED',
+    sovText:   'The Panzerarmee Afrika is fought to a standstill in the sand and thrown back from the Alamein line. The high-water mark of the Axis in Africa has come and gone — the tide turns for good.',
+  },
+  airInit: [
+    ['G','Fliegerführer Afrika', 8],
+    ['G','Regia Aeronautica', 6],
+    ['S','Desert Air Force', 9],
+    ['S','RAF Middle East', 8],
+  ],
+  sovAirSchedule: [[5,'USAAF Middle East', 7]],
+  setup(st){
+    // the Alamein "boxes": British infantry start wired and mined into position
+    for (const u of st.units) if (u.side==='S' && KINDS[u.kind].sym==='inf') u.entrench = 2;
+  },
+  opening(playerSide){ return [
+    '⬛ 1 July 1942 — Rommel reaches El Alamein, the last gate before the Nile. Cairo burns its files.',
+    '🟦 Between the sea and the Qattara sands there is nowhere to flank and nowhere to run — only to hold.',
+    playerSide==='G'
+      ? '⬛ Break the line and take Alexandria and Cairo before the British buildup buries you — your fuel is already running out.'
+      : '🟦 Hold the boxes and the ridges. Every week you deny Rommel the Nile, the Delta hands you another armoured brigade.',
   ]; },
 };
 
@@ -3083,8 +3325,16 @@ const TERRAIN = {
   'r': {name:'River',   move:3, def:0.85, dig:0, color:'#33505e'},
   '~': {name:'Sea',     move:0, def:1.00, dig:0, color:'#1d2c38'},
   'o': {name:'Open Ocean', move:1, def:1.00, dig:0, color:'#16314a'}, // navigable, for naval theaters
+  'q': {name:'Depression', move:0, def:1.00, dig:0, color:'#c9bf9e', impass:true}, // impassable badlands/salt flat (Qattara)
   'c': {name:'City',    move:1, def:1.70, dig:3, color:'#5a5648'}, // virtual: hex with a city
 };
+/* per-scenario terrain repaint (e.g. the desert): char -> color, falls back to
+   the base palette. Kept as a plain lookup so the hot draw path stays cheap. */
+function terrColor(t){ return (SCN.terrainColors && SCN.terrainColors[t]) || (TERRAIN[t]||{color:'#333'}).color; }
+/* per-scenario weather relabelling (a 'mud' turn is a Rasputitsa in Russia, a
+   Khamsin sandstorm in the desert) — mechanics are unchanged, only the words */
+function wxLabelOf(w){ return (SCN.wxLabel && SCN.wxLabel[w]) || WX_LABEL[w] || w; }
+function wxFxOf(w){ return (SCN.wxFx && SCN.wxFx[w]) || WX_FX[w] || [wxLabelOf(w), '']; }
 
 /* ============================ RULES CONSTANTS ============================ */
 const ENTRENCH_DEF = 0.15;                 // +15% defense per dig-in pip
@@ -3092,11 +3342,17 @@ const CONCENTRIC = 0.12;                   // +12% attack per extra adjacent fri
 const OOS_ATK = 0.4, OOS_DEF = 0.65;       // encircled: savage combat penalties
 const RIVER_ATK = 0.6;                     // attacking out of a river hex
 const WX_LABEL = {clear:'Clear', mud:'Mud — Rasputitsa', freeze:'Hard Frost', snow:'Deep Snow'};
+const WX_FX = {
+  clear: ['Clear skies', 'Full marching speed. The attacker’s window — make your gains now.'],
+  mud:   ['Mud — Rasputitsa', 'Both sides: +1 movement cost everywhere, attacks ×0.5–0.6, air weakened.'],
+  freeze:['Hard frost', 'The ground hardens — movement is normal again, attacks ×0.9. A last window before the snow.'],
+  snow:  ['Deep snow', 'German attacks ×0.6 and defense ×0.8 (winter gear softens both), −1 German movement, the Luftwaffe nearly grounded. Winter-hardened troops attack ×1.2.'],
+};
 
 /* ============================ HEX MATH (odd-r offset, pointy-top) ============================ */
 function inMap(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
 function terrainAt(x,y){ return MAP_ROWS[y][x]; }
-function passable(x,y){ return inMap(x,y) && terrainAt(x,y) !== '~'; }
+function passable(x,y){ if (!inMap(x,y)) return false; const t = terrainAt(x,y); return t !== '~' && t !== 'q'; }
 function neighbors(x,y){
   const odd = y & 1;
   const d = odd ? [[1,0],[-1,0],[0,-1],[1,-1],[0,1],[1,1]]
@@ -4239,12 +4495,15 @@ function endPhase(){
     if (G.turn > MAX_TURN){ endGame(); return; }
     const wxNew = weatherFor(G.turn), wxOld = weatherFor(G.turn-1);
     if (wxNew !== wxOld){
-      const msg = {mud:'The autumn rains begin — the rasputitsa swallows roads, men and machines.',
+      // scenarios may supply their own weather-change dispatches (a Khamsin reads
+      // nothing like a Rasputitsa); fall back to the Eastern-Front messages
+      const msg = (SCN.wxMsg && SCN.wxMsg[wxNew]) ||
+                  {mud:'The autumn rains begin — the rasputitsa swallows roads, men and machines.',
                    freeze:'The ground freezes hard. Movement is possible again… and winter is close.',
                    snow: hasWinterGear()
                      ? 'DEEP SNOW. The army shivers — but it is clothed. The winter-equipment gamble pays off. Siberian divisions are arriving.'
                      : 'DEEP SNOW. German attacks falter in -30° cold — frostbite claims more men than bullets. Siberian divisions are arriving.'}[wxNew];
-      if (msg) logMsg('sys', '❄ ' + msg);
+      if (msg) logMsg('sys', (SCN.wxMsg ? '🌪 ' : '❄ ') + msg);
     }
     fireEvents();
     const cd = SCN.capitalDefense;
@@ -6156,6 +6415,9 @@ onDecision = function(){ if (G.mode!=='hotseat' && !eventQueue.length) maybeShow
 function showNextEvent(){
   if (!eventQueue.length){ show('event-modal', false); if (!maybeShowDecision()) maybeShowGear(); return; }
   const e = eventQueue[0];
+  const yr = (e.date && (e.date.match(/\b(19\d\d)\b/)||[])[1]) ||
+             (START_DATE ? new Date(START_DATE).getUTCFullYear() : '');
+  $('event-head').textContent = '📰 THIS WEEK IN ' + (yr || 'THE WAR');
   $('event-date').textContent = e.date;
   $('event-title').textContent = e.title;
   $('event-text').innerHTML = e.text;
@@ -6244,12 +6506,6 @@ aiSpeedLabel();
 
 $('wx-chip').onclick = ()=>{ if (!G) return; buildClock(); show('clock-modal', true); };
 $('btn-clock-close').onclick = ()=>show('clock-modal', false);
-const WX_FX = {
-  clear: ['Clear skies', 'Full marching speed. The attacker’s window — make your gains now.'],
-  mud:   ['Mud — Rasputitsa', 'Both sides: +1 movement cost everywhere, attacks ×0.5–0.6, air weakened.'],
-  freeze:['Hard frost', 'The ground hardens — movement is normal again, attacks ×0.9. A last window before the snow.'],
-  snow:  ['Deep snow', 'German attacks ×0.6 and defense ×0.8 (winter gear softens both), −1 German movement, the Luftwaffe nearly grounded. Winter-hardened troops attack ×1.2.'],
-};
 function buildClock(){
   // derive the weather phases from this scenario's calendar
   const segs = [];
@@ -6260,7 +6516,7 @@ function buildClock(){
   }
   let html = '';
   for (const {w, a, b} of segs){
-    const [name, fx] = WX_FX[w] || [WX_LABEL[w]||w, ''];
+    const [name, fx] = wxFxOf(w);
     const now = G.turn >= a && G.turn <= b;
     html += `<div class="clk${now?' now':''}">
       <span class="c-turns">Turns ${a}–${b} · from ${dateStr(a)}</span>
@@ -6315,9 +6571,9 @@ function renderTerrCache(wx){
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t=terrainAt(x,y), [cx,cy]=hexCenter(x,y);
     hexPathC(c,cx,cy,S-0.6);
-    let col=TERRAIN[t].color;
+    let col=terrColor(t);
     if (wx==='snow'&&t!=='~') col={'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
-    else if (wx==='mud'&&(t==='.'||t==='s')) col=t==='.'?'#54482e':'#463f2e';
+    else if (wx==='mud'&&(t==='.'||t==='s')&&!SCN.terrainColors) col=t==='.'?'#54482e':'#463f2e';
     c.fillStyle=col; c.fill();
     const hv=(x*2654435761 ^ y*40503)>>>0;
     c.fillStyle = (t==='~'||t==='o') ? `rgba(255,255,255,${(0.022+0.018*Math.sin(hv)).toFixed(3)})`
@@ -6533,10 +6789,10 @@ function minimapVisible(){
   return !!G && showMinimap && !$('topbar').classList.contains('hidden');
 }
 function mmSnowMudColor(t, wx){
-  let col = TERRAIN[t] ? TERRAIN[t].color : '#333';
+  let col = terrColor(t);
   if (wx==='snow' && t!=='~' && t!=='o')
     col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t] || col;
-  else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.' ? '#54482e' : '#463f2e';
+  else if (wx==='mud' && (t==='.'||t==='s') && !SCN.terrainColors) col = t==='.' ? '#54482e' : '#463f2e';
   return col;
 }
 function mmRebuild(wx, w, h){
@@ -6633,9 +6889,9 @@ function draw(){
     const t = terrainAt(x,y), [cx,cy] = hexCenter(x,y);
     if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
     hexPath(cx,cy,S-0.6);
-    let col = TERRAIN[t].color;
+    let col = terrColor(t);
     if (wx==='snow' && t!=='~') col = {'.':'#9aa295','f':'#6f7d6e','h':'#a8a89a','s':'#8b9389','r':'#7e93a0'}[t]||col;
-    else if (wx==='mud' && (t==='.'||t==='s')) col = t==='.'?'#54482e':'#463f2e';
+    else if (wx==='mud' && (t==='.'||t==='s') && !SCN.terrainColors) col = t==='.'?'#54482e':'#463f2e';
     ctx.fillStyle = col; ctx.fill();
     // subtle per-hex ground variation; living water shimmer
     if (GFX.variation){
@@ -7665,7 +7921,7 @@ function updateTop(){
   $('date-chip').innerHTML = `<b>Turn ${G.turn}/${MAX_TURN}</b> · ${dateStr(G.turn)}`;
   const wx = weatherFor(G.turn);
   const chip = $('wx-chip');
-  chip.innerHTML = `Weather: <b>${WX_LABEL[wx]}</b>`;
+  chip.innerHTML = `Weather: <b>${wxLabelOf(wx)}</b>`;
   chip.className = 't-chip ' + wx;
   $('vp-chip').innerHTML = `${sideName('G')} objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;

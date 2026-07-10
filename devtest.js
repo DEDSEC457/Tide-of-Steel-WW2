@@ -66,9 +66,9 @@ say('— scenario registry —');
 for (const id of Object.keys(E.SCENARIOS)){
   const s = E.SCENARIOS[id];
   const K = s.kinds || E.KINDS;
-  const land = (x,y) => s.map[y] && s.map[y][x] && s.map[y][x] !== '~';
+  const land = (x,y) => s.map[y] && s.map[y][x] && s.map[y][x] !== '~' && s.map[y][x] !== 'q';
   check(`[${id}] map is ${s.cols}x${s.rows}, legal terrain`,
-    s.map.length===s.rows && s.map.every(r=>r.length===s.cols && /^[.fhsro~]+$/.test(r)));
+    s.map.length===s.rows && s.map.every(r=>r.length===s.cols && /^[.fhsroq~]+$/.test(r)));
   check(`[${id}] cities on land, unique hexes`,
     s.cities.every(c=>land(c.x,c.y)) &&
     new Set(s.cities.map(c=>c.x+','+c.y)).size===s.cities.length);
@@ -125,8 +125,8 @@ say('— save slots —');
     E.hasSaveSlot('realistic') && E.hasSaveSlot('arcade'));
   E.loadSlot('realistic'); check('realistic slot restores realistic', E.getState().scenario === 'realistic');
   E.loadSlot('arcade');    check('arcade slot restores barbarossa',  E.getState().scenario === 'barbarossa');
-  check('all five arcade scenarios share the arcade slot',
-    ['barbarossa','winter41','stalingrad','midway','dday'].every(s => E.saveSlotFor(s)==='arcade'));
+  check('all arcade scenarios share the arcade slot',
+    ['barbarossa','winter41','stalingrad','kursk','alamein','dday','bulge','midway'].every(s => E.saveSlotFor(s)==='arcade'));
   // a pre-slots save migrates into the slot matching its own scenario
   memLS.removeItem(E.saveKeyFor('realistic'));
   E.newGame('G','normal','ai','realistic'); memLS.setItem('barbarossa-save-v1', E.serialize());
