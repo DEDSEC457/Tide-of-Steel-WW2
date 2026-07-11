@@ -353,6 +353,12 @@ say('— QoL —');
     (()=>{ const n=Grp.replay.length; E.deserialize(E.serialize()); return E.getState().replay.length===n; })());
   check('replay frames only use G/S/./~ codes',
     E.getState().replay.every(f => /^[GS.~]+$/.test(f.o)));
+  // "hold" keeps a unit in place: the flag clears at the start of its next turn
+  E.newGame('G','normal','hotseat');
+  const Ghold = E.getState();
+  Ghold.units[0].held = true;
+  E.startPhase('G');
+  check('hold clears at the start of your turn', !Ghold.units[0].held);
 }
 
 /* veterancy, HQ command, and combined arms */
@@ -1392,6 +1398,7 @@ function uiSmoke(side){
   // menu must hand the campaign all four (proves the always-on wiring works)
   const v0 = UI.getState().variants;
   const variantsForced = !!(v0 && v0.wx && v0.res && v0.vet && v0.fow);
+  if ($('btn-threat').onclick) $('btn-threat').onclick();   // exercise the threat overlay live during play
   let guard = 0;
   while (!UI.getState().over && guard++ < 40){
     // dismiss event popups and answer the winter question like a player would
@@ -1411,6 +1418,7 @@ function uiSmoke(side){
   if ($('wx-chip').onclick){ $('wx-chip').onclick(); $('btn-clock-close').onclick(); }
   if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();
   if ($('btn-supply').onclick){ $('btn-supply').onclick(); $('btn-supply').onclick(); }
+  if ($('btn-threat').onclick){ $('btn-threat').onclick(); $('btn-threat').onclick(); }   // threat overlay on/off
   if ($('btn-next').onclick) $('btn-next').onclick();   // cycle to next unit with orders
   if ($('btn-undo').onclick) $('btn-undo').onclick();
   // the variant chips are now lit-and-inert "always on" indicators — clicking

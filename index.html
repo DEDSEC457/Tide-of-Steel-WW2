@@ -210,6 +210,7 @@
   <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
   <span class="spacer"></span>
   <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚 Supply</button>
+  <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠ Threat</button>
   <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
   <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
   <button id="btn-help2" title="How to play">Help</button>
@@ -483,8 +484,13 @@
           (until anything else happens). <b>S</b> / the 🚚 Supply button shades every hex
           outside your supply network — see where your spearheads go dry <i>before</i> they do.
           With a unit selected, <b>hover any reachable hex</b> to see the exact route it will
-          march and the movement-point price. The <b>minimap</b> (bottom-left) shows the whole
-          front — click or drag it to fly the camera anywhere; <b>M</b> hides it.
+          march and the movement-point price. <b>T</b> / the ⚠ Threat button shades every hex the
+          enemy could strike next turn — deep red where several attackers can converge, so you
+          can see a kill-sack before you step into it. <b>🛡 Hold</b> (in the unit panel) leaves
+          a unit in place and stops it asking for orders — the amber pip clears and <b>N</b> /
+          End&nbsp;Turn skip it, so managing a long defensive line isn't a chore. The
+          <b>minimap</b> (bottom-left) shows the whole front — click or drag it to fly the camera
+          anywhere; <b>M</b> hides it.
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
           speed (normal / fast / instant). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
@@ -4446,7 +4452,7 @@ function startPhase(side){
   // the railhead creeps forward: engineers re-lay track behind the advance
   if (railSide(side) && G.railDepth)
     G.railDepth[side] = Math.min(COLS + 8, railDepthOf(side) + RAIL_RATE);
-  for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; }
+  for (const u of unitsOf(side)){ u.moved = false; u.attacked = false; u.held = false; }
   for (const a of airOf(side)) a.mission = 'ready';   // patrols land, bombers rearm
   refreshSupply();
   // attrition for cut-off units: pockets starve from the very first week. In
@@ -6283,6 +6289,8 @@ let muted = false;
 try { muted = localStorage.getItem('barb-muted')==='1'; } catch(e){}
 let undoSnap = null;       // serialized state before the player's last move
 let showSupply = false, supplyView = null;
+let showThreat = false, threatView = null, _threatKey = '';
+try { showThreat = localStorage.getItem('barb-threat')==='1'; } catch(e){}
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
@@ -6592,6 +6600,44 @@ $('btn-supply').onclick = ()=>{
   $('btn-supply').style.color = showSupply ? 'var(--cyan)' : '';
   refreshSupplyView();
 };
+
+/* THREAT overlay: shade every hex a SPOTTED enemy could reach and strike next
+   turn (deeper red = more attackers can converge there — a kill-sack). Fog-aware:
+   an enemy you can't see can't be shown threatening. Cached by board state. */
+function computeThreat(){
+  const side = viewerSide();
+  const count = new Map();
+  for (const f of unitsOf(enemyOf(side))){
+    if (KINDS[f.kind].hq || !isSpotted(f, side)) continue;
+    const rng = attackRange(f);
+    const hit = new Set();
+    for (const k of enemyReach(f)){                       // wherever it can move…
+      const [x,y] = k.split(',').map(Number);
+      if (rng <= 1){ for (const [nx,ny] of neighbors(x,y)) if (passable(nx,ny)) hit.add(keyOf(nx,ny)); }
+      else { for (let yy=Math.max(0,y-rng); yy<=Math.min(ROWS-1,y+rng); yy++)
+               for (let xx=Math.max(0,x-rng); xx<=Math.min(COLS-1,x+rng); xx++)
+                 if (passable(xx,yy) && hexDist(x,y,xx,yy)<=rng) hit.add(keyOf(xx,yy)); }
+    }
+    for (const k of hit) count.set(k, (count.get(k)||0)+1);
+  }
+  return count;
+}
+function refreshThreatView(){
+  if (!(showThreat && G && !G.over)){ threatView = null; _threatKey = ''; return; }
+  const side = viewerSide();
+  const key = side+'|'+G.turn+'|'+G.phase+'|'+(G.mv||0)+'|'+G.units.length;
+  if (key !== _threatKey){ threatView = computeThreat(); _threatKey = key; }
+}
+function syncThreatBtn(){
+  $('btn-threat').style.borderColor = showThreat ? 'var(--red)' : '';
+  $('btn-threat').style.color = showThreat ? 'var(--redL)' : '';
+}
+$('btn-threat').onclick = ()=>{
+  showThreat = !showThreat; sClick(); syncThreatBtn();
+  try { localStorage.setItem('barb-threat', showThreat ? '1' : '0'); } catch(e){}
+  refreshThreatView(); requestRender();
+};
+syncThreatBtn();
 
 const AI_SPEED_LABEL = ['AI: ▶', 'AI: ▶▶', 'AI: ⚡'];
 function aiSpeedLabel(){ $('btn-aispeed').textContent = AI_SPEED_LABEL[aiSpeed]; }
@@ -7224,6 +7270,19 @@ function draw(){
     }
   }
 
+  // threat overlay: red wash on every hex a spotted enemy could hit next turn
+  if (threatView){
+    const pulse = 0.85 + 0.15*Math.sin(now*0.004);
+    for (const [k,c] of threatView){
+      const [tx,ty] = k.split(',').map(Number);
+      const [cx,cy] = hexCenter(tx,ty);
+      if (cx<vL||cx>vR||cy<vT||cy>vB) continue;
+      hexPath(cx,cy,S-2);
+      ctx.fillStyle = `rgba(226,73,59,${(Math.min(0.34, 0.12 + c*0.07)*pulse).toFixed(3)})`; ctx.fill();
+      if (c >= 3){ ctx.strokeStyle = 'rgba(226,73,59,0.5)'; ctx.lineWidth = 1.2; ctx.stroke(); }   // convergence: 3+ attackers
+    }
+  }
+
   // cities
   for (const c of G.cities){
     const [cx,cy] = hexCenter(c.x,c.y);
@@ -7743,6 +7802,7 @@ function _sceneAnimating(){
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
+  if (threatView) return true;                                           // threat overlay pulse
   return false;
 }
 (function loop(ts){
@@ -7924,6 +7984,7 @@ window.addEventListener('keydown', e=>{
   if (k==='e' || k==='E') $('btn-endturn').click();
   if (k==='u' || k==='U'){ if (!$('btn-undo').classList.contains('hidden')) $('btn-undo').onclick(); }
   if (k==='s' || k==='S') $('btn-supply').onclick();
+  if (k==='t' || k==='T') $('btn-threat').onclick();
   if (k==='m' || k==='M'){
     showMinimap = !showMinimap;
     try { localStorage.setItem('barb-minimap', showMinimap ? '1' : '0'); } catch(err){}
@@ -7940,8 +8001,9 @@ function selectUnit(u){
 }
 function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
 /* a unit still has orders to give if it can move, or can still attack something
-   it has actually SEEN (fog of war must not leak through the amber pips) */
-function isActionable(u){ return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
+   it has actually SEEN (fog of war must not leak through the amber pips). A unit
+   the player set to Hold is deliberately done for the turn. */
+function isActionable(u){ if (u.held) return false; return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
 function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
 function centerOn(x,y,instant){
   const [cx,cy] = hexCenter(x,y);
@@ -8048,7 +8110,7 @@ function updateUnitCard(){
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
-    <div class="statrow"><span>This turn</span><span>${u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
+    <div class="statrow"><span>This turn</span><span>${u.held?'<span style="color:var(--cyan)">🛡 holding</span>':u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
   if (isHuman && u.side===G.phase){
     const r = canReinforce(u);
     if (r){
@@ -8056,6 +8118,20 @@ function updateUnitCard(){
       b.textContent = `Reinforce +${r.steps} (${r.cost*r.steps}⚙)`;
       b.onclick = ()=>{ clearUndo(); doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
       act.appendChild(b);
+    }
+    // Hold: leave a unit in place without it nagging for orders / being cycled by N
+    if (!k.hq){
+      const hb = document.createElement('button');
+      if (u.held){
+        hb.textContent = '🛡 Wake';
+        hb.title = 'Put this unit back into the rotation of units awaiting orders.';
+        hb.onclick = ()=>{ u.held = false; sClick(); updateAll(); updateUnitCard(); };
+      } else {
+        hb.textContent = '🛡 Hold';
+        hb.title = 'Leave this unit where it is — it stops asking for orders this turn (N and End Turn skip it). Resets next turn.';
+        hb.onclick = ()=>{ u.held = true; sClick(); deselect(); selectNext(); updateAll(); };
+      }
+      act.appendChild(hb);
     }
   }
 }
@@ -8257,7 +8333,7 @@ function updateTop(){
   nb.classList.toggle('hidden', ready===0);
   nb.textContent = `⏭ Next · ${ready}`;
 }
-function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); $('hint').innerHTML = defaultHint(); maybeTurnBanner(); requestRender(); }
+function updateAll(){ updateTop(); updateUnitCard(); updateAirCard(); onLog(); updateUndoBtn(); refreshSupplyView(); refreshThreatView(); $('hint').innerHTML = defaultHint(); maybeTurnBanner(); requestRender(); }
 
 /* ---- new-turn banner: date, weather, and what the enemy did while you were away ---- */
 let bannerTurn = 0, bannerTimer = 0, aiReport = null, _aiSnap = null;
