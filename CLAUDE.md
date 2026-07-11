@@ -52,6 +52,7 @@ deps, runs offline by double-clicking. Keep it that way.
 | `THE WINTER QUESTION` / `HISTORICAL EVENTS` / `DECISIONS` | choice + popup systems |
 | `============ TURN FLOW` | startPhase/endPhase (schedules, weather msgs, turnSnap) |
 | `============ VICTORY` | axisVP, checkSuddenDeath (SCN.sudden), endGame |
+| `recordReplay` / `openReplay` | turn-by-turn ownership snapshots in `G.replay` (bounded); end-screen 📽 Replay viewer (front replay + battle heatmap, `RP` state) |
 | `============ AI` | aiSpend, bestAttack, gerScoreHex/sovScoreHex, aiPlanHQ, posture |
 | `AI SKILL` / `diffCombat` | aiSkill (0/1/2 by difficulty), skillMinR, lineBonus, aiEscape — difficulty changes *play*, not just buffs |
 | `SAVE / LOAD` | serialize/deserialize (loads save's scenario; migrations live here) |

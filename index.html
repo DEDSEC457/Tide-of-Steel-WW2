@@ -541,8 +541,34 @@
     <p id="end-text"></p>
     <div id="end-stats"></div>
     <div class="mrow">
+      <button id="btn-end-replay" class="hidden">📽 Replay the Campaign</button>
       <button class="primary" id="btn-end-menu">Back to Menu</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ CAMPAIGN REPLAY ============ -->
+<div id="replay-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:920px;width:95%;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+      <h2 style="margin:0;">CAMPAIGN REPLAY</h2>
+      <span id="rp-result" style="color:var(--dim);font-size:12.5px;"></span>
+    </div>
+    <div class="opt-row" style="margin:10px 0 8px;">
+      <span class="opt sel" id="rp-mode-replay">▶ Front replay</span>
+      <span class="opt" id="rp-mode-heat">🔥 Battle heatmap</span>
+    </div>
+    <div style="width:100%;overflow-x:auto;">
+      <canvas id="rp-map" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--line);background:#0b0e08;"></canvas>
+    </div>
+    <div id="rp-transport" style="display:flex;align-items:center;gap:12px;margin:12px 2px 0;">
+      <button id="rp-play" class="primary" style="width:40px;height:40px;border-radius:50%;padding:0;flex:0 0 auto;" aria-label="Play or pause">❚❚</button>
+      <input type="range" id="rp-scrub" min="0" max="1" value="0" step="1" style="flex:1;accent-color:var(--amber);" aria-label="Turn">
+      <span id="rp-turn" style="font-variant-numeric:tabular-nums;font-size:13px;min-width:118px;text-align:right;"></span>
+    </div>
+    <div id="rp-legend" style="display:flex;flex-wrap:wrap;gap:7px 18px;align-items:center;margin:12px 2px 0;font-size:12.5px;color:var(--dim);"></div>
+    <div id="rp-caption" style="margin:9px 2px 0;font-size:12.5px;color:var(--dim);line-height:1.55;"></div>
+    <div class="mrow"><button class="primary" id="rp-close">Close</button></div>
   </div>
 </div>
 <!-- ============ SETTINGS ============ -->
@@ -3499,6 +3525,8 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
   };
   if (SCN.setup) SCN.setup(G);                 // scenario-specific touches (fortresses etc.)
   applyVariants(variants);                     // optional replayability mutators (rolled per campaign)
+  G.replay = [];                               // turn-by-turn ownership, for the end-screen replay
+  recordReplay(0);                             // the opening dispositions
   G.pp.G = ppFor('G',1) + diffPP('G');
   G.pp.S = ppFor('S',1) + diffPP('S');
   refreshSupply();
@@ -4524,6 +4552,7 @@ function endPhase(){
   if (side === 'G'){
     startPhase('S');
   } else {
+    recordReplay(G.turn);                      // snapshot the turn that just finished
     // Soviet reinforcements arrive at the top of the new turn
     G.turn++;
     if (G.turn > MAX_TURN){ endGame(); return; }
@@ -4582,8 +4611,28 @@ function checkSuddenDeath(){
     endGame('soviet-sudden'); return;
   }
 }
+/* ---- campaign replay: one packed ownership snapshot per turn (kept in the
+   save, so a finished game — or a loaded one — can be replayed). Bounded so a
+   long game on a giant map can't blow the localStorage quota. ---- */
+function recordReplay(turnLabel){
+  if (!G || !SCN) return;
+  if (!G.replay) G.replay = [];
+  const big = COLS*ROWS > 5000;
+  if (big && turnLabel > 0 && (turnLabel % 2)) return;      // half-rate on the giant maps (keep the opening)
+  if (G.replay.length >= (big ? 80 : 160)) return;          // hard cap
+  if (G.replay.length && G.replay[G.replay.length-1].t === turnLabel) return;
+  let s = '';
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (!passable(x,y)){ s += '~'; continue; }
+    const o = terrOwner(x,y);
+    s += o==='G' ? 'G' : o==='S' ? 'S' : '.';
+  }
+  G.replay.push({t: turnLabel, o: s});
+}
+
 function endGame(sudden){
   if (G.over) return;
+  recordReplay(Math.min(G.turn, MAX_TURN));    // capture the decisive final position
   G.over = true;
   const vp = axisVP();
   let title, text;
@@ -9385,11 +9434,163 @@ function showEnd(){
     <div class="statrow"><span>${flag('G')} ${sideName('G')} losses</span><span>${G.stats.G.lost} strength</span></div>
     <div class="statrow"><span>${flag('S')} ${sideName('S')} losses</span><span>${G.stats.S.lost} strength</span></div>
     <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${(SCN.turnDays||7)===7?'weeks':(SCN.turnDays||7)===1?'days':'turns'}</span></div>`;
+  $('btn-end-replay').classList.toggle('hidden', !(G.replay && G.replay.length >= 2));
   show('end-modal', true);
   if (cls==='win') sCity(); else sBoom();
   clearSave();
 }
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false); showModeSelect(); $('btn-continue').classList.add('hidden'); };
+
+/* ---------------- campaign replay viewer ---------------- */
+const RP = { cv:null, ctx:null, mode:'replay', frame:0, playing:false, raf:0, last:0, s:1, ox:0, oy:0, derived:null };
+function rpInit(){
+  if (RP.cv) return;
+  RP.cv = $('rp-map'); RP.ctx = RP.cv.getContext && RP.cv.getContext('2d');
+  $('rp-mode-replay').onclick = ()=>rpSetMode('replay');
+  $('rp-mode-heat').onclick   = ()=>rpSetMode('heat');
+  $('rp-close').onclick = ()=>{ rpStop(); show('replay-modal', false); };
+  $('rp-play').onclick = ()=>{ RP.playing = !RP.playing; RP.last = 0; rpSyncPlay(); if (RP.playing) rpLoop(performance.now()); };
+  $('rp-scrub').oninput = ()=>{ RP.frame = +$('rp-scrub').value || 0; RP.playing = false; rpSyncPlay(); rpRender(); rpReadout(); };
+}
+function rpFrames(){ return (G && G.replay) || []; }
+function rpLayout(){
+  const F = rpFrames(); if (!F.length) return;
+  const cssW = Math.min(880, (RP.cv.parentElement && RP.cv.parentElement.clientWidth) || 860) || 860;
+  const dpr = Math.min(2, (typeof devicePixelRatio!=='undefined' && devicePixelRatio) || 1);
+  RP.s = cssW / (Math.sqrt(3)*(COLS+0.5) + 0.6);
+  const HX = Math.sqrt(3)*RP.s, VY = 1.5*RP.s;
+  const w = HX*(COLS+0.5) + HX*0.3, h = VY*(ROWS-1) + 2*RP.s + RP.s*0.3;
+  RP.ox = HX*0.65; RP.oy = RP.s*1.15;
+  RP.cv.style.width = cssW+'px'; RP.cv.style.height = (h*cssW/w)+'px';
+  RP.cv.width = Math.round(w*dpr); RP.cv.height = Math.round(h*dpr);
+  if (RP.ctx && RP.ctx.setTransform) RP.ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+function rpCenter(x,y){ const HX=Math.sqrt(3)*RP.s, VY=1.5*RP.s; return [RP.ox + HX*(x + 0.5*(y&1)), RP.oy + VY*y]; }
+function rpHexPath(cx,cy,r){ const c=RP.ctx; c.beginPath();
+  for (let i=0;i<6;i++){ const a=Math.PI/180*(60*i-90), px=cx+r*Math.cos(a), py=cy+r*Math.sin(a); i?c.lineTo(px,py):c.moveTo(px,py); } c.closePath(); }
+function rpBuildDerived(){
+  const F = rpFrames(), n = COLS*ROWS;
+  const flips = new Int16Array(n); let maxFlip = 1;
+  for (let f=1; f<F.length; f++){ const a=F[f-1].o, b=F[f].o;
+    for (let i=0;i<n;i++){ const bi=b[i]; if ((bi==='G'||bi==='S') && a[i]!==bi && (a[i]==='G'||a[i]==='S')){ if(++flips[i]>maxFlip) maxFlip=flips[i]; } } }
+  RP.derived = { flips, maxFlip };
+}
+function rpHeat(t){
+  const mix=(c1,c2,k)=>{ const h=x=>[parseInt(x.slice(1,3),16),parseInt(x.slice(3,5),16),parseInt(x.slice(5,7),16)];
+    const a=h(c1),b=h(c2); return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(',')})`; };
+  if (t<0.34) return mix('#2a3a48','#4d7d5a', t/0.34);
+  if (t<0.67) return mix('#4d7d5a','#c9a23e', (t-0.34)/0.33);
+  return mix('#c9a23e','#e2493b', (t-0.67)/0.33);
+}
+function rpRender(){
+  const c = RP.ctx; if (!c || !c.clearRect) return;
+  const F = rpFrames(); if (!F.length) return;
+  c.clearRect(0,0,RP.cv.width,RP.cv.height);
+  const wx = weatherFor(1);
+  // terrain base (uses the scenario palette, so the desert looks like desert)
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = terrainAt(x,y), [cx,cy]=rpCenter(x,y);
+    rpHexPath(cx,cy, RP.s-0.4); c.fillStyle = terrColor(t); c.fill();
+    c.strokeStyle = '#00000030'; c.lineWidth = 1; c.stroke();
+  }
+  if (RP.mode==='heat'){
+    const d = RP.derived;
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      const fl = d.flips[y*COLS+x]; if (fl<=0) continue;
+      const [cx,cy]=rpCenter(x,y); rpHexPath(cx,cy, RP.s-0.4);
+      c.globalAlpha = 0.85; c.fillStyle = rpHeat(Math.min(1, fl/d.maxFlip)); c.fill(); c.globalAlpha = 1;
+    }
+  } else {
+    const own = F[Math.min(RP.frame, F.length-1)].o;
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      const o = own[y*COLS+x]; if (o!=='G'&&o!=='S') continue;
+      const [cx,cy]=rpCenter(x,y); rpHexPath(cx,cy, RP.s-0.4);
+      c.fillStyle = SIDES[o].tint; c.fill(); c.fill();
+    }
+    // the front line
+    c.lineCap='round';
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      const o = own[y*COLS+x]; if (o!=='G'&&o!=='S') continue;
+      const [cx,cy]=rpCenter(x,y);
+      for (const [nx,ny] of neighbors(x,y)){
+        if (nx<0||ny<0||nx>=COLS||ny>=ROWS) continue;
+        const no = own[ny*COLS+nx];
+        if ((no==='G'||no==='S') && no!==o){
+          const [bx,by]=rpCenter(nx,ny), mx=(cx+bx)/2, my=(cy+by)/2;
+          let ex=by-cy, ey=-(bx-cx); const L=Math.hypot(ex,ey)||1; ex/=L; ey/=L;
+          c.strokeStyle='#160d08'; c.lineWidth=Math.max(1.4,RP.s*0.12);
+          c.beginPath(); c.moveTo(mx-ex*RP.s*0.5,my-ey*RP.s*0.5); c.lineTo(mx+ex*RP.s*0.5,my+ey*RP.s*0.5); c.stroke();
+          c.strokeStyle='#e2493b'; c.lineWidth=Math.max(0.7,RP.s*0.06);
+          c.beginPath(); c.moveTo(mx-ex*RP.s*0.5,my-ey*RP.s*0.5); c.lineTo(mx+ex*RP.s*0.5,my+ey*RP.s*0.5); c.stroke();
+        }
+      }
+    }
+    c.lineCap='butt';
+  }
+  // objective cities as dots
+  for (const cc of G.cities){
+    const [cx,cy]=rpCenter(cc.x,cc.y);
+    c.beginPath(); c.arc(cx,cy, cc.vp>0?Math.max(2.4,RP.s*0.15):Math.max(1.5,RP.s*0.09), 0, Math.PI*2);
+    c.fillStyle = cc.vp>0 ? '#ffd34d' : '#cbc4a8'; c.fill();
+    if (cc.vp>0){ c.strokeStyle='#000a'; c.lineWidth=0.8; c.stroke(); }
+  }
+}
+function rpReadout(){
+  const F = rpFrames(); if (!F.length) return;
+  $('rp-turn').innerHTML = `Turn <b style="color:var(--amber)">${F[Math.min(RP.frame,F.length-1)].t}</b> / ${F[F.length-1].t}`;
+  $('rp-scrub').value = RP.frame;
+}
+function rpLegend(){
+  const g = SIDES.G, s = SIDES.S, gn = sideName('G'), sn = sideName('S');
+  if (RP.mode==='heat'){
+    $('rp-legend').innerHTML =
+      `<span style="display:inline-block;width:150px;height:11px;border-radius:6px;border:1px solid #0006;background:linear-gradient(90deg,#2a3a48,#4d7d5a,#c9a23e,#e2493b)"></span>` +
+      `<span>quiet → contested → <span style="color:#e2493b">fought over</span></span>` +
+      `<span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#ffd34d;vertical-align:-1px"></span> objective</span>`;
+    $('rp-caption').innerHTML = 'Where the war was decided: each hex is coloured by how many times it changed hands. Cool = quiet rear, hot = fought over again and again.';
+  } else {
+    const sw = col => `<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${col};vertical-align:-1px"></span>`;
+    $('rp-legend').innerHTML =
+      `<span>${sw(g.color)} ${gn} held</span><span>${sw(s.color)} ${sn} held</span>` +
+      `<span>${sw('#e2493b')} front line</span><span>${sw('#ffd34d')} objective</span>`;
+    $('rp-caption').innerHTML = 'The front line, week by week. Drag the slider or press play to watch the campaign unfold.';
+  }
+}
+function rpSetMode(m){
+  RP.mode = m;
+  $('rp-mode-replay').classList.toggle('sel', m==='replay');
+  $('rp-mode-heat').classList.toggle('sel', m==='heat');
+  $('rp-transport').style.display = (m==='replay') ? 'flex' : 'none';
+  if (m==='heat'){ RP.playing = false; rpSyncPlay(); }
+  rpLegend(); rpRender();
+}
+function rpSyncPlay(){ const b=$('rp-play'); if (b) b.textContent = RP.playing ? '❚❚' : '▶'; }
+function rpLoop(ts){
+  RP.raf = 0; if (!RP.playing) return;
+  if (!RP.last) RP.last = ts;
+  if (ts - RP.last > 560){ RP.last = ts;
+    const F = rpFrames();
+    if (RP.frame < F.length-1) RP.frame++;
+    else RP.frame = 0;                          // loop the campaign
+    rpRender(); rpReadout();
+  }
+  RP.raf = requestAnimationFrame(rpLoop);
+}
+function rpStop(){ RP.playing = false; if (RP.raf){ cancelAnimationFrame(RP.raf); RP.raf = 0; } }
+function openReplay(){
+  if (!G || !G.replay || G.replay.length < 2) return;
+  rpInit();
+  $('rp-result').textContent = (G.result ? G.result.title + ' · ' : '') + sideName('G') + ' ' + axisVP() + '/' + TOTAL_VP + ' objectives';
+  RP.frame = 0; RP.mode = 'replay';
+  rpBuildDerived();
+  $('rp-scrub').max = G.replay.length - 1;
+  $('rp-mode-replay').classList.add('sel'); $('rp-mode-heat').classList.remove('sel');
+  $('rp-transport').style.display = 'flex';
+  show('replay-modal', true);
+  rpLayout(); rpLegend(); rpRender(); rpReadout();
+  RP.playing = true; RP.last = 0; rpSyncPlay(); rpLoop(performance.now());
+}
+$('btn-end-replay').onclick = openReplay;
 
 /* ---------------- campaign variants & service record ----------------
    The replayability variants are no longer optional — every new campaign
@@ -9519,6 +9720,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
+    recordReplay,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,

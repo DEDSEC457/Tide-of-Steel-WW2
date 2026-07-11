@@ -341,6 +341,18 @@ say('— QoL —');
   check('city fighting scars the city (ruin level rises)', (town.ruin||0) > 0);
   check('ruin level survives a save round-trip',
     (()=>{ E.deserialize(E.serialize()); return (E.getState().cities.find(c=>c.name==='Minsk').ruin||0) > 0; })());
+  // campaign replay records a valid opening frame at newGame and grows each turn
+  E.newGame('G','normal','hotseat');
+  const Grp = E.getState();
+  check('replay seeds an opening frame', Array.isArray(Grp.replay) && Grp.replay.length===1
+    && Grp.replay[0].t===0 && Grp.replay[0].o.length === E.COLS*E.ROWS);
+  for (let i=0;i<8;i++){ E.aiFullPhase(Grp.phase); E.endPhase(); }   // 4 full turns
+  check('replay grows one frame per completed turn', Grp.replay.length >= 4
+    && Grp.replay[Grp.replay.length-1].t >= 3);
+  check('replay frames survive a save round-trip',
+    (()=>{ const n=Grp.replay.length; E.deserialize(E.serialize()); return E.getState().replay.length===n; })());
+  check('replay frames only use G/S/./~ codes',
+    E.getState().replay.every(f => /^[GS.~]+$/.test(f.o)));
 }
 
 /* veterancy, HQ command, and combined arms */
@@ -1405,6 +1417,16 @@ function uiSmoke(side){
   // them must NOT toggle anything (onclick removed)
   const chipsInert = ['var-wx','var-res','var-vet','var-fow','rvar-wx','rvar-res','rvar-vet','rvar-fow',
                       'wvar-wx','wvar-res','wvar-vet','wvar-fow'].every(vid => !$(vid).onclick);
+  // campaign replay: recorded turn-by-turn, opened from the end screen
+  const rep = UI.getState().replay;
+  const replayRecorded = Array.isArray(rep) && rep.length >= 2 &&
+    rep.every(f => typeof f.o === 'string' && f.o.length === UI.COLS*UI.ROWS);
+  if ($('btn-end-replay').onclick) $('btn-end-replay').onclick();        // open the replay viewer
+  if ($('rp-mode-heat').onclick){ $('rp-mode-heat').onclick(); $('rp-mode-replay').onclick(); }  // both views
+  if ($('rp-scrub').oninput){ $('rp-scrub').value = 1; $('rp-scrub').oninput(); }
+  if ($('rp-play').onclick){ $('rp-play').onclick(); $('rp-play').onclick(); }
+  drain();
+  if ($('rp-close').onclick) $('rp-close').onclick();
   $('btn-sound').onclick();                  // opens the settings modal
   if ($('vol-music').oninput){ $('vol-music').value = 55; $('vol-music').oninput(); }
   if ($('vol-sfx').oninput){ $('vol-sfx').value = 70; $('vol-sfx').oninput(); }
@@ -1463,7 +1485,7 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded};
 }
 
 for (const side of ['G','S']){
@@ -1475,6 +1497,7 @@ for (const side of ['G','S']){
     check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
     check(`UI variants are always-on through the menu (${side})`, r.variantsForced, 'campaign started without all variants');
     check(`UI variant chips are inert indicators (${side})`, r.chipsInert, 'a variant chip is still clickable');
+    check(`UI campaign replay recorded turn by turn (${side})`, r.replayRecorded, 'no valid replay frames');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
     check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
   } catch(err){
