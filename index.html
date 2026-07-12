@@ -491,7 +491,10 @@
           objective every turn, <b>🛡 Hold line</b> marches it to the front and digs it in — both run
           automatically at the start of each turn (a ► or ⊣ badge marks ordered units), so you command
           sectors and only micromanage the decisive point. <b>⏭ Skip</b> leaves a unit in place for
-          one turn without it nagging. The
+          one turn without it nagging. <b>Encirclements</b> show on the map: an enemy division you've
+          sealed off with no way back to its supply gets a <b>red dashed ring</b> (it's doomed — hold
+          the pocket and it starves), and one of your own divisions cut off with no escape gets a
+          <b>pulsing amber ring</b> and a turn-start warning — break it out before it's lost. The
           <b>minimap</b> (bottom-left) shows the whole front — click or drag it to fly the camera
           anywhere; <b>M</b> hides it.
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
@@ -3816,6 +3819,25 @@ function refreshSupply(){
   claimTerritory();
 }
 
+/* Encirclement: a unit is SEALED in a pocket when it is out of supply AND
+   cannot march to any hex still on its own supply network — i.e. there is no
+   way out. (A merely out-of-supply unit with open ground behind it can still
+   escape; a sealed one is doomed.) Pure detection — no mechanical effect, so
+   the balance sims are untouched; it drives the map rings and the warnings. */
+function encircledIds(side){
+  const net = computeSupply(side);
+  const out = new Set();
+  for (const u of unitsOf(side)){
+    if (KINDS[u.kind].hq || net.has(keyOf(u.x,u.y))) continue;   // HQs & supplied units aren't pocketed
+    const r = reachable(u);
+    let escape = false;
+    for (const k of r.keys()) if (net.has(k)){ escape = true; break; }
+    if (!escape) out.add(u.id);
+  }
+  return out;
+}
+function isEncircled(u){ return !!u && encircledIds(u.side).has(u.id); }
+
 /* ============================ TERRITORY ============================ */
 /* Every land hex remembers who holds it, and the map is tinted to match —
    grey ground behind the German advance, red behind Soviet lines.
@@ -4462,14 +4484,19 @@ function startPhase(side){
   // realistic mode a formation that stays cut off TWO turns or more collapses
   // twice as fast — so a deliberate encirclement is lethal, but a spearhead that
   // briefly outruns supply and then reconnects (or takes a city) survives.
+  const anyOOS = unitsOf(side).some(u => u.oos);
+  const sealed = anyOOS ? encircledIds(side) : null;    // who is truly cut off (flavour only)
   for (const u of [...unitsOf(side)]){
     if (u.oos){
       u.oosTurns++;
       const bleed = (SCN.harshOOS && u.oosTurns >= 2) ? 2 : 1;
       u.str -= bleed; G.stats[side].lost += bleed; G.stats[enemyOf(side)].killed += bleed;
       if (u.str <= 0){
+        const inPocket = sealed && sealed.has(u.id);
         killUnit(u);
-        logMsg('sys', `${flag(side)} ${u.name} surrenders — starved out in the pocket.`);
+        logMsg('sys', inPocket
+          ? `${flag(side)} ${u.name} surrenders in the pocket — the encirclement holds.`
+          : `${flag(side)} ${u.name} is destroyed, cut off from supply.`);
       }
     } else u.oosTurns = 0;
   }
@@ -6352,6 +6379,14 @@ let undoSnap = null;       // serialized state before the player's last move
 let showSupply = false, supplyView = null;
 let showThreat = false, threatView = null, _threatKey = '';
 try { showThreat = localStorage.getItem('barb-threat')==='1'; } catch(e){}
+// encirclement pockets, cached by board state (recomputing per frame is too costly)
+let _pocketKey = '', _pocketG = null, _pocketS = null;
+function pocketsFor(side){
+  if (!G) return null;
+  const key = G.turn+'|'+G.phase+'|'+(G.mv||0)+'|'+G.units.length;
+  if (key !== _pocketKey){ _pocketG = encircledIds('G'); _pocketS = encircledIds('S'); _pocketKey = key; }
+  return side==='G' ? _pocketG : _pocketS;
+}
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
@@ -7425,6 +7460,8 @@ function draw(){
   // units
   const showReady = !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
   const readyPulse = 0.5 + 0.5*Math.sin(now*0.005);
+  const vs = viewerSide();
+  const myPocket = pocketsFor(vs), foePocket = pocketsFor(enemyOf(vs));
   for (const u of G.units){
     // fog of war: unseen enemy formations simply aren't on your map
     if (fowSight && u.side!==viewerSide() && !fowSight.has(keyOf(u.x,u.y))) continue;
@@ -7434,6 +7471,21 @@ function draw(){
       const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
       cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
       if (p>=1) moveAnim = null;
+    }
+    // encirclement ring under the counter: red = an enemy you've trapped,
+    // pulsing amber = one of yours cut off with no way out
+    const trappedFoe = foePocket && u.side!==vs && foePocket.has(u.id) && isSpotted(u, vs);
+    const trappedMine = myPocket && u.side===vs && myPocket.has(u.id);
+    if (trappedFoe || trappedMine){
+      ctx.save();
+      if (ctx.setLineDash) ctx.setLineDash([4,4]);
+      ctx.lineDashOffset = -(now*0.02)%16;
+      const r = S*0.82 + (trappedMine ? Math.sin(now*0.006)*1.6 : 0);
+      ctx.strokeStyle = trappedMine ? '#ffd23f' : '#e2493b';
+      ctx.globalAlpha = trappedMine ? 0.6 + 0.3*Math.sin(now*0.006) : 0.9;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
     }
     drawUnit(u, cx, cy);
     // a gold star marks a formation led by a general (top-left of the counter)
@@ -7877,6 +7929,8 @@ function _sceneAnimating(){
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
   if (threatView) return true;                                           // threat overlay pulse
+  const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
+  if ((mp && mp.size) || (fp && fp.size)) return true;
   return false;
 }
 (function loop(ts){
@@ -8208,7 +8262,7 @@ function updateUnitCard(){
     ${!k.hq ? `<div class="statrow"><span>Experience</span><span>${unitLevel(u)>0?'✚'.repeat(unitLevel(u))+' ':''}${RANK_NAME[unitLevel(u)]}${unitLevel(u)<3?` <span style="color:var(--dim)">(${u.xp||0}/${XP_LEVELS[unitLevel(u)]} xp)</span>`:''}</span></div>` : ''}
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
-    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
+    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':'In supply'}</span></div>
     <div class="statrow"><span>This turn</span><span>${
       u.order ? `<span style="color:var(--amber)">${u.order==='attack'?'⚔ advance order':'🛡 hold-line order'}</span>`
       : u.held ? '<span style="color:var(--cyan)">⏭ skipped</span>'
@@ -8477,6 +8531,14 @@ function maybeTurnBanner(){
     if (bits.length) sub += ' &nbsp;·&nbsp; enemy turn: ' + bits.join(' · ');
     aiReport = null;
   }
+  // encirclement status: warn about your cut-off divisions, celebrate trapped enemies
+  const mine = pocketsFor(G.phase), foe = pocketsFor(enemyOf(G.phase));
+  const nMine = mine ? mine.size : 0;
+  let nFoe = 0; if (foe) for (const id of foe){ const u = G.units.find(t=>t.id===id); if (u && isSpotted(u, G.phase)) nFoe++; }
+  const enc = [];
+  if (nMine) enc.push(`<span class="bad">⚠ ${nMine} of your division${nMine===1?'':'s'} cut off — break out!</span>`);
+  if (nFoe)  enc.push(`<span style="color:#8fbf62">☒ ${nFoe} enemy division${nFoe===1?'':'s'} trapped</span>`);
+  if (enc.length) sub += ' &nbsp;·&nbsp; ' + enc.join(' · ');
   $('tb-sub').innerHTML = sub;
   const el = $('turn-banner');
   el.classList.remove('hidden'); el.classList.remove('fade');
@@ -9921,7 +9983,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
-    recordReplay, executeOrder, orderObjective, onFront, stepToward,
+    recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,

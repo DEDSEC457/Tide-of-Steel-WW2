@@ -400,6 +400,39 @@ say('— standing orders —');
     E.getState().units[0].order==='attack' && E.getState().units[1].order==='hold');
 }
 
+/* ---------------- encirclement detection ---------------- */
+say('— encirclement —');
+{
+  E.newGame('G','normal','hotseat');
+  const Ge = E.getState();
+  // a unit safely in its own rear is not encircled
+  const rear = E.unitsOf('S').find(u=>!E.KINDS[u.kind].hq);
+  check('a supplied rear unit is not encircled', !E.isEncircled(rear));
+  // seal one Soviet unit off: ring it with German units on every open neighbour
+  E.newGame('G','normal','hotseat');
+  const Ge2 = E.getState();
+  const victim = E.unitsOf('S').find(u=>!E.KINDS[u.kind].hq && !u.oos);
+  // move it somewhere open, then wall it in with movable German units
+  const spot = [Math.floor(E.COLS/2), Math.floor(E.ROWS/2)];
+  if (E.passable(spot[0],spot[1]) && !E.unitAt(spot[0],spot[1])){ victim.x=spot[0]; victim.y=spot[1]; }
+  const wall = E.unitsOf('G').filter(u=>!E.KINDS[u.kind].hq);
+  let wi = 0;
+  for (const [nx,ny] of E.neighbors(victim.x,victim.y)){
+    if (!E.passable(nx,ny) || E.unitAt(nx,ny)) continue;
+    if (wi < wall.length){ wall[wi].x = nx; wall[wi].y = ny; wi++; }
+  }
+  E.startPhase('S');   // recompute supply/oos with the new positions
+  const enc = E.encircledIds('S');
+  check('a fully walled-in unit is detected as encircled', enc.has(victim.id));
+  check('the surrounding attackers are not themselves encircled',
+    wall.slice(0,wi).every(w => !enc.has(w.id)));
+  // detection never mutates the game (pure): strengths unchanged by the call
+  const strBefore = E.unitsOf('S').reduce((a,u)=>a+u.str,0);
+  E.encircledIds('S'); E.encircledIds('G');
+  check('encirclement detection is side-effect free',
+    E.unitsOf('S').reduce((a,u)=>a+u.str,0) === strBefore);
+}
+
 /* veterancy, HQ command, and combined arms */
 say('— veterancy · HQ · combined arms —');
 {
