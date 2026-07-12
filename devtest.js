@@ -361,6 +361,45 @@ say('— QoL —');
   check('hold clears at the start of your turn', !Ghold.units[0].held);
 }
 
+/* ---------------- standing orders (battle plans) ---------------- */
+say('— standing orders —');
+{
+  E.newGame('G','normal','hotseat');
+  const Gs = E.getState();
+  const objDist = u => Math.min(...Gs.cities.filter(c=>c.vp>0 && c.owner!=='G').map(c=>E.hexDist(u.x,u.y,c.x,c.y)));
+  // an Advance order marches a panzer toward the nearest enemy objective
+  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
+  pz.order = 'attack';
+  const before = objDist(pz);
+  const r = E.executeOrder(pz);
+  check('Advance order moves a unit toward an enemy objective', (r.moved && objDist(pz) < before) || !!r.atk);
+  check('executeOrder marks the unit as acted', pz.moved || pz.attacked);
+  // no order → executeOrder is a clean no-op
+  const idle = E.unitsOf('G').find(u=>!u.order && !E.KINDS[u.kind].hq && u.id!==pz.id);
+  const r2 = E.executeOrder(idle);
+  check('no order → executeOrder does nothing', !r2.moved && !r2.atk && !idle.moved);
+  // orderObjective points an attacker at a real enemy-held objective
+  const obj = E.orderObjective(pz);
+  check('orderObjective returns an enemy objective for an attacker',
+    Array.isArray(obj) && Gs.cities.some(c=>c.vp>0 && c.owner!=='G' && c.x===obj[0] && c.y===obj[1]));
+  // a hold unit already on the front is recognised as holding the line
+  E.newGame('G','normal','hotseat');
+  const Gs2 = E.getState();
+  const foe = E.unitsOf('S')[0];
+  const spot = E.neighbors(foe.x,foe.y).find(([x,y])=>E.passable(x,y) && !E.unitAt(x,y));
+  const guard = E.unitsOf('G').find(u=>!E.KINDS[u.kind].hq);
+  guard.x = spot[0]; guard.y = spot[1]; guard.order = 'hold';
+  check('onFront detects a unit up against the enemy', E.onFront(guard));
+  const r3 = E.executeOrder(guard);
+  check('a hold unit already on the line does not wander off', !r3.moved || E.onFront(guard));
+  // orders persist through a save
+  E.newGame('G','normal','hotseat');
+  E.getState().units[0].order = 'attack'; E.getState().units[1].order = 'hold';
+  E.deserialize(E.serialize());
+  check('standing orders survive a save round-trip',
+    E.getState().units[0].order==='attack' && E.getState().units[1].order==='hold');
+}
+
 /* veterancy, HQ command, and combined arms */
 say('— veterancy · HQ · combined arms —');
 {

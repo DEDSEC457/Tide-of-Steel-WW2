@@ -53,6 +53,7 @@ deps, runs offline by double-clicking. Keep it that way.
 | `============ TURN FLOW` | startPhase/endPhase (schedules, weather msgs, turnSnap) |
 | `============ VICTORY` | axisVP, checkSuddenDeath (SCN.sudden), endGame |
 | `recordReplay` / `openReplay` | turn-by-turn ownership snapshots in `G.replay` (bounded); end-screen 📽 Replay viewer (front replay + battle heatmap, `RP` state) |
+| `STANDING ORDERS` | executeOrder/orderObjective/onFront/stepToward (per-unit `u.order` 'attack'/'hold'); UI runStandingOrders runs them at each human turn-start — AI never sets orders |
 | `============ AI` | aiSpend, bestAttack, gerScoreHex/sovScoreHex, aiPlanHQ, posture |
 | `AI SKILL` / `diffCombat` | aiSkill (0/1/2 by difficulty), skillMinR, lineBonus, aiEscape — difficulty changes *play*, not just buffs |
 | `SAVE / LOAD` | serialize/deserialize (loads save's scenario; migrations live here) |

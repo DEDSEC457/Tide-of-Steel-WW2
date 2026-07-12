@@ -486,9 +486,12 @@
           With a unit selected, <b>hover any reachable hex</b> to see the exact route it will
           march and the movement-point price. <b>T</b> / the ⚠ Threat button shades every hex the
           enemy could strike next turn — deep red where several attackers can converge, so you
-          can see a kill-sack before you step into it. <b>🛡 Hold</b> (in the unit panel) leaves
-          a unit in place and stops it asking for orders — the amber pip clears and <b>N</b> /
-          End&nbsp;Turn skip it, so managing a long defensive line isn't a chore. The
+          can see a kill-sack before you step into it. <b>Standing orders</b> (in the unit panel) are
+          set-and-forget battle plans: <b>⚔ Advance</b> makes a division push toward the nearest enemy
+          objective every turn, <b>🛡 Hold line</b> marches it to the front and digs it in — both run
+          automatically at the start of each turn (a ► or ⊣ badge marks ordered units), so you command
+          sectors and only micromanage the decisive point. <b>⏭ Skip</b> leaves a unit in place for
+          one turn without it nagging. The
           <b>minimap</b> (bottom-left) shows the whole front — click or drag it to fly the camera
           anywhere; <b>M</b> hides it.
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
@@ -4654,6 +4657,64 @@ function endGame(sudden){
   if (typeof onGameOver === 'function') onGameOver();
 }
 
+/* ============================ STANDING ORDERS (battle plans) ============================
+   A unit can carry a persistent order the player paints on: 'attack' (push toward
+   the nearest enemy objective, taking fights at lenient odds) or 'hold' (advance to
+   the front, then dig in and only strike when clearly winning). Ordered units
+   auto-execute at the start of each of the player's turns — so you command sectors,
+   not every hex (HOI4 battle plans). Reuses the tactical primitives (reachable,
+   previewCombat, resolveCombat); the AI never sets orders, so the sims are untouched. */
+function onFront(u){                                  // adjacent to an enemy unit or enemy-held ground
+  for (const [nx,ny] of neighbors(u.x,u.y)){
+    if (!inMap(nx,ny)) continue;
+    const t = unitAt(nx,ny);
+    if (t && t.side!==u.side) return true;
+    if (passable(nx,ny) && terrOwner(nx,ny)===enemyOf(u.side)) return true;
+  }
+  return false;
+}
+function orderObjective(u){
+  const foe = enemyOf(u.side);
+  if (u.order==='attack'){                             // aim at the nearest enemy objective city
+    let best=null, bd=1e9;
+    for (const c of G.cities) if (c.vp>0 && c.owner!==u.side){ const d=hexDist(u.x,u.y,c.x,c.y); if (d<bd){ bd=d; best=[c.x,c.y]; } }
+    if (best) return best;
+  }
+  let best=null, bd=1e9;                               // hold (or attack fallback): nearest enemy-held ground
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++)
+    if (passable(x,y) && terrOwner(x,y)===foe){ const d=hexDist(u.x,u.y,x,y); if (d<bd){ bd=d; best=[x,y]; } }
+  if (!best) for (const t of unitsOf(foe)){ const d=hexDist(u.x,u.y,t.x,t.y); if (d<bd){ bd=d; best=[t.x,t.y]; } }
+  return best;
+}
+function stepToward(u, obj){                           // the reachable hex that gets closest to the objective
+  const r = reachable(u);
+  let best=[u.x,u.y], bd = hexDist(u.x,u.y,obj[0],obj[1]);
+  for (const k of r.keys()){ const [x,y]=k.split(',').map(Number);
+    const d = hexDist(x,y,obj[0],obj[1]); if (d<bd){ bd=d; best=[x,y]; } }
+  return best;
+}
+/* execute one unit's standing order: returns {moved, atk:{ev,x,y,def}|null} */
+function executeOrder(u){
+  const out = {moved:false, atk:null};
+  if (!u || !u.order || KINDS[u.kind].hq || G.over) return out;
+  if (!u.attacked){                                    // strike a spotted foe at good enough odds
+    const foes = enemiesInRange(u).filter(t => isSpotted(t, u.side));
+    let best=null, bestR=0;
+    for (const t of foes){ const p = previewCombat(u,t); if (p.ratio>bestR){ bestR=p.ratio; best=t; } }
+    if (best && bestR >= (u.order==='attack' ? 0.9 : 1.5)){
+      const fx=best.x, fy=best.y;
+      const ev = resolveCombat(u, best);
+      out.atk = {ev, x:fx, y:fy, def:best};
+    }
+  }
+  if (!u.moved && !(u.order==='hold' && onFront(u))){   // hold units already on the line stay & dig in
+    const obj = orderObjective(u);
+    if (obj){ const dest = stepToward(u, obj);
+      if (dest && !(dest[0]===u.x && dest[1]===u.y)){ doMove(u, dest[0], dest[1]); out.moved = true; } }
+  }
+  return out;
+}
+
 /* ============================ AI ============================ */
 /* The AI plans ONE action at a time so the browser can animate each step.
    aiPlanAction(side) -> {type:'move'|'attack'|'hold', ...} or null when done. */
@@ -7392,6 +7453,19 @@ function draw(){
         ctx.globalAlpha = 1;
       } else hitFlash.delete(u.id);
     }
+    // standing-order badge, bottom-centre of the counter (your own units only)
+    if (u.order && u.side===viewerSide()){
+      const by = cy + S*0.5;
+      if (u.order==='attack'){                        // amber ► advance
+        ctx.fillStyle = '#ffd23f';
+        ctx.beginPath(); ctx.moveTo(cx-3.6, by-3.4); ctx.lineTo(cx+4, by); ctx.lineTo(cx-3.6, by+3.4); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#5a4410'; ctx.lineWidth = 0.7; ctx.stroke();
+      } else {                                         // cyan ⊣ hold the line
+        ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx-4, by-3.4); ctx.lineTo(cx-4, by+3.4); ctx.moveTo(cx-4, by); ctx.lineTo(cx+4, by); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+    }
     // amber "still has orders" pip, top-right of the counter — only your side, your turn
     if (showReady && u.side===G.phase && u.id!==sel && isActionable(u)){
       const px = cx + S*0.52, py = cy - S*0.58;
@@ -8002,8 +8076,33 @@ function selectUnit(u){
 function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
 /* a unit still has orders to give if it can move, or can still attack something
    it has actually SEEN (fog of war must not leak through the amber pips). A unit
-   the player set to Hold is deliberately done for the turn. */
-function isActionable(u){ if (u.held) return false; return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
+   the player Skipped, or one running a standing order, is deliberately off the
+   roster — it won't nag or be cycled by Next. */
+function isActionable(u){ if (u.held || u.order) return false; return !u.moved || (!u.attacked && enemiesInRange(u).some(t=>isSpotted(t, viewerSide()))); }
+
+/* paint the boom/float for an executed order attack; batch runs stay silent */
+function orderVisuals(r, sound){
+  if (r.atk){
+    const ev = r.atk.ev;
+    if (ev.defLoss>0 || ev.destroyed) boomAt(r.atk.x, r.atk.y, ev.destroyed);
+    if (ev.defLoss>0) floatText(r.atk.x, r.atk.y, '-'+ev.defLoss, '#ff8d80');
+    if (ev.destroyed) floatText(r.atk.x, r.atk.y, '✕', '#ff5340');
+    else if (ev.defLoss>0 && !ev.retreated) flashUnit(r.atk.def);
+    if (sound) sShot();
+  } else if (r.moved && sound) sMove();
+}
+/* run every ordered unit of a side at the start of its turn */
+function runStandingOrders(side){
+  if (!G || G.over || aiRunning) return;
+  let m=0, a=0, k=0;
+  for (const u of unitsOf(side)){
+    if (!u.order) continue;
+    const r = executeOrder(u); orderVisuals(r, false);
+    if (r.moved) m++;
+    if (r.atk){ a++; if (r.atk.ev.destroyed) k++; }
+  }
+  if (m||a) logMsg('sys', `📋 Standing orders — ${m} division${m===1?'':'s'} advanced${a?`, ${a} attacked`:''}${k?` (${k} destroyed)`:''}.`);
+}
 function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
 function centerOn(x,y,instant){
   const [cx,cy] = hexCenter(x,y);
@@ -8110,7 +8209,10 @@ function updateUnitCard(){
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${u.oos?'⚠ CUT OFF':'In supply'}</span></div>
-    <div class="statrow"><span>This turn</span><span>${u.held?'<span style="color:var(--cyan)">🛡 holding</span>':u.moved? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
+    <div class="statrow"><span>This turn</span><span>${
+      u.order ? `<span style="color:var(--amber)">${u.order==='attack'?'⚔ advance order':'🛡 hold-line order'}</span>`
+      : u.held ? '<span style="color:var(--cyan)">⏭ skipped</span>'
+      : u.moved ? (u.attacked?'done':'moved') : 'ready'}</span></div>`;
   if (isHuman && u.side===G.phase){
     const r = canReinforce(u);
     if (r){
@@ -8119,19 +8221,37 @@ function updateUnitCard(){
       b.onclick = ()=>{ clearUndo(); doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
       act.appendChild(b);
     }
-    // Hold: leave a unit in place without it nagging for orders / being cycled by N
+    // standing battle-plan orders: paint a persistent order the unit runs each turn
     if (!k.hq){
-      const hb = document.createElement('button');
-      if (u.held){
-        hb.textContent = '🛡 Wake';
-        hb.title = 'Put this unit back into the rotation of units awaiting orders.';
-        hb.onclick = ()=>{ u.held = false; sClick(); updateAll(); updateUnitCard(); };
-      } else {
-        hb.textContent = '🛡 Hold';
-        hb.title = 'Leave this unit where it is — it stops asking for orders this turn (N and End Turn skip it). Resets next turn.';
-        hb.onclick = ()=>{ u.held = true; sClick(); deselect(); selectNext(); updateAll(); };
+      const mkOrd = (label, ord, hintOn) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.title = 'Standing order — the division runs this at the start of every turn. Click again to cancel.';
+        if (u.order===ord){ b.style.borderColor = 'var(--amber)'; b.style.color = '#ffd98a'; b.style.background = '#4a3b18'; }
+        b.onclick = ()=>{
+          const setting = u.order !== ord;
+          u.order = setting ? ord : null; sClick(); clearUndo();
+          if (setting){ orderVisuals(executeOrder(u), true); $('hint').innerHTML = hintOn; }
+          updateAll(); updateUnitCard();
+        };
+        act.appendChild(b);
+      };
+      mkOrd('⚔ Advance', 'attack', '⚔ <b>Advance order set</b> — this division pushes toward the nearest enemy objective at the start of every turn. Click again to cancel.');
+      mkOrd('🛡 Hold line', 'hold', '🛡 <b>Hold-the-line order set</b> — this division advances to the front and digs in each turn. Click again to cancel.');
+      // one-turn Skip — only when the unit isn't already on a standing order
+      if (!u.order){
+        const hb = document.createElement('button');
+        if (u.held){
+          hb.textContent = '⏭ Awaken';
+          hb.title = 'Put this unit back into the rotation of units awaiting orders.';
+          hb.onclick = ()=>{ u.held = false; sClick(); updateAll(); updateUnitCard(); };
+        } else {
+          hb.textContent = '⏭ Skip';
+          hb.title = 'Leave this unit this turn — it stops asking for orders (N and End Turn skip it). Resets next turn.';
+          hb.onclick = ()=>{ u.held = true; sClick(); deselect(); selectNext(); updateAll(); };
+        }
+        act.appendChild(hb);
       }
-      act.appendChild(hb);
     }
   }
 }
@@ -9482,6 +9602,8 @@ function runAIPhase(){
       if (!G.over){
         const human = G.phase===G.playerSide;
         if (!human){ runAIPhase(); return; }
+        runStandingOrders(G.phase);              // the player's battle plans execute first
+        saveGame();
       }
     }
     updateAll();
@@ -9489,7 +9611,8 @@ function runAIPhase(){
   setTimeout(step, aiSpeed===2 ? 0 : 350);
 }
 
-$('btn-pass-go').onclick = ()=>{ show('pass-modal', false); updateAll();
+$('btn-pass-go').onclick = ()=>{ show('pass-modal', false);
+  runStandingOrders(G.phase); saveGame(); updateAll();   // the incoming player's battle plans execute
   if (!maybeShowDecision()) maybeShowGear(); };   // the new player faces any pending choice
 
 /* ---------------- end screen ---------------- */
@@ -9770,6 +9893,8 @@ function startCampaign(loaded){
   fitCamera();
   updateAll();
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
+  // resuming a save exactly at the start of your turn: run any standing orders
+  if (loaded && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide)){ runStandingOrders(G.phase); updateAll(); }
   if (!loaded) saveGame();
   // if the human plays the Soviets, the German AI opens the war
   if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
@@ -9796,7 +9921,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
-    recordReplay,
+    recordReplay, executeOrder, orderObjective, onFront, stepToward,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
