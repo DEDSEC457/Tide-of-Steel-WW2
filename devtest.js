@@ -136,6 +136,37 @@ say('— save slots —');
   E.newGame('G','normal','hotseat','barbarossa');
 }
 
+/* AMPHIBIOUS WARFARE — embark, naval reach, assault, beachhead supply (Italy) */
+say('— amphibious warfare —');
+{
+  const G = E.newGame('S','normal','ai','italy');   // human Axis; AI runs the Allied invasion
+  check('amphibious enabled for the invader only',
+    E.amphibOn() && E.amphibCanSide('G') && !E.amphibCanSide('S'));
+  check('the Strait of Messina is a water gap (no land bridge to Sicily)',
+    E.isWater(17,32) && !E.passable(17,32));
+  const corps = G.units.find(u=>u.name==='US II Corps');
+  check('a Tunisian corps can embark from its coastal hex', !!corps && E.canEmbark(corps));
+  const beaches = E.navalReach(corps);
+  check('naval reach finds beaches across the sea', beaches.size > 0);
+  check('Gela is among the reachable landing beaches', beaches.has('12,37'));
+  // no production → no landing craft
+  G.pp.G = 0;
+  const openBeach = [...beaches.keys()].map(k=>k.split(',').map(Number)).find(([x,y])=>!E.unitAt(x,y));
+  check('a landing needs production (blocked at 0 PP)',
+    E.amphibiousAssault(corps, openBeach[0], openBeach[1]) === null);
+  // fund it and storm an empty beach
+  G.pp.G = 20;
+  const ev = E.amphibiousAssault(corps, openBeach[0], openBeach[1]);
+  check('an unopposed landing puts the division ashore',
+    ev && ev.landed && corps.x===openBeach[0] && corps.y===openBeach[1]);
+  check('the landing plants a beachhead',
+    (G.beachheads||[]).some(b=>b.x===openBeach[0] && b.y===openBeach[1] && b.side==='G'));
+  check('the beachhead projects its own supply',
+    E.computeSupply('G').has(openBeach[0]+','+openBeach[1]));
+  check('a landed division has spent its turn', corps.moved && corps.attacked);
+  E.newGame('G','normal','hotseat','barbarossa');
+}
+
 /* coastal sanity: Riga, Odessa near sea; Moscow not */
 say('— rules sanity —');
 {

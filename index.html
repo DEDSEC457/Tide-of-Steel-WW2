@@ -295,6 +295,9 @@
       <div class="pick" data-scn="france" style="max-width:248px;">
         <h4>🗺 Battle of France</h4><p>Fall Gelb, May 1940 — the sickle cut through the Ardennes and the race to the Channel.</p>
       </div>
+      <div class="pick" data-scn="italy" style="max-width:248px;">
+        <h4>🗺 The Italian Campaign</h4><p>Operation Husky, 1943 — storm Sicily from North Africa, then fight up the peninsula by sea and land.</p>
+      </div>
     </div>
     <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:14px 0 0;">
       <div class="pick p-ger sel" id="rm-pick-ger" style="max-width:240px;">
@@ -3120,6 +3123,281 @@ SCENARIOS.france = (function buildFrance(){
 })();
 
 
+/* ============================ SCENARIOS.italy ============================
+   THE ITALIAN CAMPAIGN — Operation Husky and the long road up the peninsula,
+   July 1943 → 1945. The Allies (G — they move first, they carry the offensive
+   AI) stage in North Africa and must ASSAULT ashore: Sicily first, then across
+   the Strait of Messina and up the boot against a German defence that trades
+   ground for blood at every river and mountain line. Realistic mode: fuel,
+   harsh out-of-supply, no map-edge supply — the invader lives off its beach-
+   heads and the ports it can seize (SCN.amphibious). Corsica, Sardinia and
+   Malta sit off the west coast; Tunisia is the springboard. */
+SCENARIOS.italy = (function buildItaly(){
+  const map = [
+    "~~~~~~~~~~.hhhhhhhhhhhhhhhhhhhh.~~~~~~",
+    "~~~~~~~~~~..h..h..h..h..h..h..h.~~~~~~",
+    "~~~~~~~~~~......................~~~~~~",
+    "~~~~~~~~~~..rrrrrrrrrrrrrrrrr...~~~~~~",
+    "~~~~~~~~~~......................~~~~~~",
+    "~~~~~~~~~~......................~~~~~~",
+    "~~~~~~~~~~......................~~~~~~",
+    "~~~~~~~~~~~~..................~~~~~~~~",
+    "~~~~~~~~~~~~..................~~~~~~~~",
+    "~~~~~~.~~~~~~~~~~........~~~~~~~~~~~~~",
+    "~~~~~...~~~~~~~~~....h...~~~~~~~~~~~~~",
+    "~~~~.....~~~~~~~~........~~~~~~~~~~~~~",
+    "~~~~.....~~~~~~~~...h....~~~~~~~~~~~~~",
+    "~~~~.....~~~~~~~~........~~~~~~~~~~~~~",
+    "~~~~~...~~~~~~~~~...h.f..~~~~~~~~~~~~~",
+    "~~~~~~.~~~~~~~~~~........~~~~~~~~~~~~~",
+    "~~~~~...~~~~~~~~....h....~~~~~~~~~~~~~",
+    "~~~~.....~~~~~~~........~~~~~~~~~~~~~~",
+    "~~~~.....~~~~~~~....h...~~~~~~~~~~~~~~",
+    "~~~.......~~~~~~rrrrrr..~~~~~~~~~~~~~~",
+    "~~~.......~~~~~~hhhhhhh.~~.....~~~~~~~",
+    "~~~.......~~~~~~........~.......~~~~~~",
+    "~~~.......~~~~~~...h.............~~~~~",
+    "~~~.......~~~~~~.................~~~~~",
+    "~~~~.....~~~~~~~...h.............~~~~~",
+    "~~~~.....~~~~~~~.................~~~~~",
+    "~~~~~...~~~~~~~....h.............~~~~~",
+    "~~~~~~~~~~~~~~~........~~.......~~~~~~",
+    "~~~~~~~~~~~~~~~....h...~~~.....~~~~~~~",
+    "~~~~~~~~~~~~~~~....f...~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~...f....~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~........~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~.............~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~..........~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~.....h..~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~......~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~....~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~.......~~~~~~~~~~~~~~~~~~~~~~",
+    ".......................~~~~~~~~~~~~~~~",
+    ".......................~~~~~~~~~~~~~~~",
+    ".......................~~~~~~~~~~~~~~~",
+    ".......................~~~~~~~~~~~~~~~",
+  ];
+  return {
+  id: 'italy', realistic: true,
+  title: 'THE ITALIAN CAMPAIGN', short: 'ITALY 1943',
+  sub: 'OPERATION HUSKY & THE SOFT UNDERBELLY · 1943–45 · REALISTIC MODE',
+  sides: {
+    G: {name:'Allied', flag:'🟦', color:'#3a4f7a', tint:'rgba(70,100,170,0.24)'},
+    S: {name:'Axis',   flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+  },
+  fuel: true, harshOOS: true, supplyRange: 12,
+  aiMaxUnits: { G:22, S:18, Garm:6 },      // the Allies field an overwhelming force; the Axis defence is finite
+  portDeploy: true,                         // reinforcements can land at captured coastal ports, not just Tunisia
+  amphibious: { sides:['G'], range:7, cost:4, beachLife:4 },
+  edgeSupply: { G:false, S:false },        // nobody is fed from a map edge — ports & beachheads only
+  supplySeeds: {
+    // the Allied springboard: the three Tunisian ports feed the invasion until
+    // beachheads and captured Italian ports take over
+    G: [[6,42],[3,42],[16,42]],
+    // the Axis rear: supply flows south from the Po valley (and re-sources at every
+    // Axis-held city), plus the sea-lifelines to the islands — cut when their ports fall
+    S: [[12,2],[20,2],[28,2],[17,33],[6,25],[7,10]],
+  },
+  menu: {
+    ger: {h:'🟦 Allies (15th Army Group)', p:'Launch Operation Husky from Tunisia: storm the beaches of Sicily, take the ports to feed the invasion, then vault the Strait of Messina and grind up the peninsula — Salerno, the Gustav Line, Rome, and the long road north. The sea is your manoeuvre; every landing needs a port before the beachhead dies.'},
+    sov: {h:'⬛ Axis (Heeresgruppe C)', p:'Kesselring\'s defence. You cannot hold the beaches — trade Sicily for time, blow the bridges, and make the Allies pay for every river and ridge. The Gustav Line at Cassino is your fortress; the mountains and the autumn rains are your allies.'},
+  },
+  kinds: {
+    // ---- Allies (G) — the invader ----
+    g_inf:  {side:'G', label:'Infantry Corps',   atk:6, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
+    g_arm:  {side:'G', label:'Armoured Division', atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true},
+    g_mtn:  {side:'G', label:'Mountain Corps',    atk:6, def:6, mp:2, maxStr:9,  cost:13, sym:'inf', winter:true, color:'#3f5540'},
+    g_hq:   {side:'G', label:'Army Group HQ',     atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#28406e'},
+    // ---- Axis (S) — the defender ----
+    s_inf:  {side:'S', label:'German Infantry',   atk:5, def:7, mp:2, maxStr:10, cost:10, sym:'inf'},
+    s_pz:   {side:'S', label:'Panzer Division',   atk:8, def:6, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true, color:'#23262b'},
+    s_para: {side:'S', label:'Fallschirmjäger',   atk:6, def:8, mp:2, maxStr:9,  cost:15, sym:'para', color:'#3a4038'},
+    s_cst:  {side:'S', label:'Coastal Division',  atk:2, def:4, mp:1, maxStr:6,  cost:4,  sym:'inf', noAmphib:true, color:'#5a5040'},
+    s_hq:   {side:'S', label:'Heeresgruppe HQ',   atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+  },
+  deployNames: {g_inf:'Follow-up Corps', g_arm:'Armoured Reserve', g_mtn:'Mountain Reserve',
+    s_inf:'Reserve Division', s_pz:'Panzer Reserve', s_para:'Fallschirm Reserve', s_cst:'Fortress Battalion'},
+  cols: 38, rows: 46, map,
+  cities: [
+    // ---- Sicily ----
+    {x:11, y:33, name:'Palermo',  vp:1, owner:'S'},
+    {x:17, y:33, name:'Messina',  vp:1, owner:'S'},
+    {x:16, y:36, name:'Catania',  vp:1, owner:'S'},
+    {x:15, y:37, name:'Siracusa', vp:0, owner:'S'},
+    {x:12, y:37, name:'Gela',     vp:0, owner:'S'},
+    {x:8,  y:33, name:'Trapani',  vp:0, owner:'S'},
+    // ---- the toe & the south ----
+    {x:18, y:31, name:'Reggio',   vp:0, owner:'S'},
+    {x:19, y:28, name:'Cosenza',  vp:0, owner:'S'},
+    {x:28, y:26, name:'Taranto',  vp:1, owner:'S'},
+    {x:31, y:24, name:'Brindisi', vp:1, owner:'S'},
+    {x:30, y:23, name:'Bari',     vp:1, owner:'S'},
+    {x:25, y:21, name:'Foggia',   vp:1, owner:'S'},
+    {x:20, y:23, name:'Napoli',   vp:3, owner:'S'},
+    // ---- the centre — the Gustav Line & Rome ----
+    {x:23, y:17, name:'Pescara',  vp:0, owner:'S'},
+    {x:17, y:17, name:'Roma',     vp:5, owner:'S'},
+    {x:24, y:13, name:'Ancona',   vp:1, owner:'S'},
+    {x:20, y:11, name:'Firenze',  vp:2, owner:'S'},
+    // ---- the north — the Po & the Alps ----
+    {x:13, y:6,  name:'Genova',   vp:1, owner:'S'},
+    {x:21, y:6,  name:'Bologna',  vp:2, owner:'S'},
+    {x:28, y:3,  name:'Venezia',  vp:2, owner:'S'},
+    {x:14, y:2,  name:'Milano',   vp:3, owner:'S'},
+    {x:11, y:4,  name:'Torino',   vp:2, owner:'S'},
+    // ---- the islands ----
+    {x:6,  y:25, name:'Cagliari', vp:1, owner:'S'},
+    {x:5,  y:18, name:'Sassari',  vp:0, owner:'S'},
+    {x:5,  y:13, name:'Ajaccio',  vp:0, owner:'S'},
+    {x:7,  y:10, name:'Bastia',   vp:0, owner:'S'},
+    // ---- North Africa — the Allied springboard ----
+    {x:6,  y:42, name:'Tunis',    vp:0, owner:'G'},
+    {x:3,  y:42, name:'Bizerte',  vp:0, owner:'G'},
+    {x:16, y:42, name:'Sousse',   vp:0, owner:'G'},
+  ],
+  gerSpawns: [[6,43],[10,43],[14,43],[8,44],[18,42]],           // Allied staging in Tunisia
+  sovSpawns: [[14,4],[20,4],[26,4],[18,2],[24,2]],              // Axis rear — the Po valley
+  /* 10 July 1943 — Husky. The Allied armies wait in Tunisia; the Axis holds
+     Sicily with weak Italian coastal divisions stiffened by two German mobile
+     formations, and keeps its real strength on the mainland. */
+  startUnits: [
+    // ---- Allies (G) — staged along the Tunisian coast, ready to embark ----
+    ['g_inf','US II Corps',        12, 41],
+    ['g_inf','US 3rd Division',    10, 41],
+    ['g_arm','US 2nd Armored',     8,  42],
+    ['g_inf','British XIII Corps', 15, 42],
+    ['g_inf','British XXX Corps',  17, 42],
+    ['g_inf','Canadian 1st Div',   19, 42],
+    ['g_mtn','French Expeditionary',6, 43],
+    ['g_arm','British 7th Armoured',20,43],
+    ['g_hq', '15th Army Group',    13, 44],
+    // ---- Axis (S) — Sicily garrison: thin, meant to delay and withdraw ----
+    ['s_cst','206ª Costiera',      12, 37, 5],   // Gela beaches
+    ['s_cst','Napoli Division',    15, 37, 5],   // Siracusa
+    ['s_cst','Aosta Division',     11, 33, 5],   // Palermo
+    ['s_pz', 'Hermann Göring',     16, 35, 7],   // the German armour on Sicily — a fighting withdrawal to Messina
+    // ---- Axis (S) — Naples & the operational reserve behind Rome ----
+    ['s_inf','29. Pz.Gren.',       20, 23, 9],   // Naples
+    ['s_inf','15. Pz.Gren.',       20, 15, 8],   // a mobile reserve between Rome and the Gustav Line
+    // ---- Axis (S) — the GUSTAV LINE: the wall in the mountains at Cassino ----
+    ['s_para','1. Fallschirmjäger',18, 20, 9],   // Monte Cassino itself
+    ['s_inf','94. Infanterie',     16, 20, 9],   // the Garigliano, west
+    ['s_inf','305. Infanterie',    20, 20, 9],   // the Rapido, east
+    ['s_pz', '26. Panzer',         19, 18, 9],   // the mobile reserve behind the line
+    ['s_inf','362. Infanterie',    17, 17, 8],   // Rome garrison
+    // ---- Axis (S) — the northern reserves ----
+    ['s_pz', '16. Panzer',         22, 13, 9],   // Kesselring's operational reserve
+    ['s_inf','44. Infanterie',     20, 11, 8],   // Florence — the Gothic Line to come
+    ['s_inf','65. Infanterie',     21, 6,  8],   // Bologna & the Po
+    ['s_cst','Sardinia Garrison',  6,  25, 5],   // Cagliari
+    ['s_hq', 'Heeresgruppe C',     19, 9],
+  ],
+  generals: [
+    {side:'G', unit:'US II Corps', name:'Patton', atk:1.15,
+     bio:'"Old Blood and Guts" drives the US 7th Army in a headlong dash across Sicily to Messina — as much a race against Montgomery as against the Germans.'},
+    {side:'G', unit:'British XXX Corps', name:'Montgomery', atk:1.10,
+     bio:'The victor of Alamein lands the 8th Army on Sicily\'s south-east and grinds up the east coast toward Messina and, beyond it, the Italian mainland.'},
+    {side:'G', unit:'British 7th Armoured', name:'Alexander', atk:1.08,
+     bio:'Army-group commander for the whole campaign — the patient orchestrator of Husky, Salerno and the long grind to the Gothic Line.'},
+    {side:'S', unit:'1. Fallschirmjäger', name:'Heidrich', def:1.15,
+     bio:'His paratroopers turn the rubble of Monte Cassino into a fortress that holds four Allied offensives across the winter of 1943–44.'},
+    {side:'S', unit:'Hermann Göring', name:'Conrath', def:1.08,
+     bio:'Commands the German armour thrown at the Gela beachhead on the first day of Husky — the counter-stroke that nearly reached the sea.'},
+    {side:'S', unit:'16. Panzer', name:'Kesselring', def:1.12,
+     bio:'"Smiling Albert" — the airman who becomes the war\'s master of the defensive, contesting every ridge from Salerno to the Alps.'},
+  ],
+  sovSchedule: [
+    // Allied build-up (G): fresh armies ferry into Tunisia through the campaign
+    [3, 'g_inf','US VI Corps'],   [4, 'g_inf','British V Corps'],
+    [6, 'g_arm','US 1st Armored'],[8, 'g_inf','Polish II Corps'],
+    [10,'g_arm','South African Arm.'],[11,'g_inf','US IV Corps'],
+    [14,'g_mtn','Brazilian Force'],[16,'g_inf','New Zealand Corps'],
+    // Axis reinforcements (S): divisions pulled south to hold the line
+    [5, 's_inf','71. Infanterie'],[9, 's_inf','356. Infanterie'],
+    [13,'s_inf','Gothic Garrison'],
+  ],
+  events: [
+    {turn:1, date:'10 July 1943', title:'OPERATION HUSKY',
+     text:'2,500 ships stand off the beaches of Sicily. In darkness the first waves go ashore between Gela and Siracusa as gliders and paratroops seize the ground behind. The largest amphibious assault yet mounted has begun — the soft underbelly of Europe is open.'},
+    {turn:2, date:'22 July 1943', title:'PALERMO & THE RACE TO MESSINA', pp:{G:2},
+     text:'Patton wheels his army across the island and takes Palermo; Montgomery grinds up the east coast toward Etna. The Germans fight a skilful rearguard back to the Strait — and behind them, in Rome, the Fascist Grand Council votes Mussolini out of power.'},
+    {turn:3, date:'3 Sept 1943', title:'ARMISTICE & SALERNO', pp:{G:3},
+     text:'Italy surrenders — and the Germans seize the country overnight. As the Allies vault the Strait of Messina and land at Salerno, Kesselring races to throw them back into the sea. The mainland campaign begins in a knife-fight on the beaches.'},
+    {turn:5, date:'1 Oct 1943',  title:'NAPLES & THE VOLTURNO',
+     text:'Naples falls, its port sabotaged and its people in revolt. But the rains come, the rivers rise, and beyond every one the Germans wait on the next ridge. The war of movement is over; the war of the mountains begins.'},
+    {turn:7, date:'22 Jan 1944', title:'CASSINO & ANZIO',
+     text:'The Gustav Line holds at Monte Cassino through blood and winter. To break it, the Allies land behind it at Anzio — and are promptly sealed into their own beachhead. "We hoped to land a wild cat; instead we have a stranded whale."'},
+    {turn:10,date:'4 June 1944', title:'ROME',
+     text:'Cassino falls at last and the line breaks; the German armies stream north. Two days before Normandy, the first Axis capital is liberated — Allied troops march into Rome to cheering crowds.'},
+    {turn:13,date:'25 Aug 1944', title:'THE GOTHIC LINE',
+     text:'Florence is freed and the pursuit reaches the Apennines north of the Arno — where Kesselring has prepared his last great barrier. The autumn closes in again, and the front congeals in the mountains short of the Po.'},
+    {turn:17,date:'9 April 1945',title:'SPRING OFFENSIVE',
+     text:'The final offensive breaks into the Po valley. The German front in Italy, starved of fuel and reserves, at last comes apart — the race is on for the northern cities and the Alpine passes before the war itself ends.'},
+  ],
+  maxTurn: 24,
+  startDate: Date.UTC(1943,6,10),
+  // the Italian autumn and winter — the rains that stopped the Allied advance cold
+  weather(turn){
+    if (turn>=5 && turn<=6) return 'mud';        // the autumn rains on the Volturno
+    if (turn>=7 && turn<=9) return 'freeze';      // the Cassino winter
+    if (turn>=15 && turn<=16) return 'mud';       // the second winter's mud short of the Po
+    return 'clear';
+  },
+  wxLabel: {mud:'Autumn Rains', freeze:'Mountain Winter', snow:'Alpine Snow', clear:'Clear'},
+  wxFx: {
+    clear:  ['Clear skies', 'Campaigning weather — the Allied matériel advantage tells. Press the advance.'],
+    mud:    ['Autumn rains', 'The rivers rise and the valleys turn to mud: +1 movement everywhere, attacks ×0.5–0.6. The German rearguard\'s season.'],
+    freeze: ['Mountain winter', 'Snow and freezing fog grip the high passes — attacks ×0.9. The Gustav Line at its most impregnable.'],
+  },
+  wxMsg: {
+    mud:   'The autumn rains break over the Apennines — the rivers flood and the advance drowns in mud.',
+    freeze:'Winter locks the mountains. On the peaks above Cassino, men freeze in their foxholes.',
+    clear: 'The weather clears — and the Allied guns and aircraft come back into their own.',
+  },
+  pp(side, turn){ return side==='G' ? 18 : (turn<=2 ? 5 : 5); },
+  victoryTiers: [
+    [20,'DECISIVE ALLIED VICTORY','The whole peninsula is overrun — Sicily, Rome, and the cities of the Po. The Italian front collapses well ahead of history, freeing armies for France and the Reich itself.'],
+    [13,'ALLIED VICTORY','Rome is liberated and the armies drive on into the north, much as history ran — a hard year up the length of Italy, but won.'],
+    [7, 'THE HARD SLOG','Sicily and the southern third of Italy are taken, but the Gustav Line and the mountains bleed the offensive white and the front congeals short of Rome. The soft underbelly proves to be a tough old gut — exactly as it did in 1944.'],
+    [0, 'STALLED AT THE BEACHES','The invasion is contained on Sicily and the toe. Kesselring\'s defence holds the gates of Italy — the underbelly stays shut.'],
+  ],
+  sudden: {
+    axisCities: ['Roma','Milano','Napoli'], minAxisUnits: 3,
+    axisTitle: 'DECISIVE ALLIED VICTORY',
+    axisText:  'Rome, Naples and Milan are all in Allied hands — the German front in Italy has disintegrated and the whole peninsula is lost.',
+    sovTitle:  'STALLED AT THE BEACHES',
+    sovText:   'The Allied armies are spent against the mountains and the sea. The invasion of Italy is contained.',
+  },
+  airInit: [
+    ['G','Tactical Air Force', 9],
+    ['G','Desert Air Force',   8],
+    ['S','Luftflotte 2',       4],
+  ],
+  sovAirSchedule: [ [6,'Mediterranean Air', 5, 'G'] ],
+  setup(st){
+    for (const u of st.units){
+      // the Gustav-Line defenders start dug into the mountains
+      if (u.side==='S' && u.y>=17 && u.y<=20 && u.x>=15 && u.x<=22) u.entrench = 2;
+      // the coastal divisions are static and half-ready
+      if (u.kind==='s_cst') u.entrench = 1;
+      // garrisons of the great cities hold their ground
+      if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>=2)) u.entrench = Math.max(u.entrench||0, 1);
+    }
+  },
+  opening(playerSide){ return [
+    '10 July 1943 — Operation Husky. The Allied armies wait in Tunisia; across the water lies Sicily, and beyond it the whole length of Italy.',
+    playerSide==='G'
+      ? 'Storm Sicily, seize its ports to feed the invasion, then cross to the mainland and fight your way north — Salerno, Cassino, Rome. Every landing is a race to take a port before the beachhead dies.'
+      : 'You cannot hold the beaches. Trade Sicily for time, fall back on the Gustav Line, and make the mountains and the rains cost the Allies a year for every hundred miles.',
+  ]; },
+  };
+})();
+
+
 /* ---- GRAND EASTERN FRONT: the Realistic eastern front, programmatically scaled
    up 2× into a larger operational map and a longer 1941–43 campaign. Same engine,
    rules, rendering, units, generals and events — just more room to
@@ -3531,6 +3809,7 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
     railDepth: {G: RAIL_START, S: RAIL_START},  // railhead reach from each home edge (realistic mode)
     decisions: {},                             // decision id -> chosen option index (or 'pending')
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
+    beachheads: [],                            // active invasion lodgements (amphibious scenarios)
     log: [],
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
@@ -3793,6 +4072,12 @@ function computeSupply(side){
     const c = cityAt(sx,sy);
     if (c && c.owner !== side) continue;
     if (passable(sx,sy) && occ[keyOf(sx,sy)] !== foe) seed(sx,sy);
+  }
+  // invasion beachheads: a fresh lodgement is fed over the beach for a few turns
+  // (landing craft, DUKWs, an emergency pier) until a real port is taken
+  for (const b of (G.beachheads || [])){
+    if (b.side !== side) continue;
+    if (passable(b.x,b.y) && occ[keyOf(b.x,b.y)] !== foe) seed(b.x,b.y);
   }
   while (heap.size()){
     const [c,x,y] = heap.pop();
@@ -4289,6 +4574,134 @@ function killUnit(u){
   G.units = G.units.filter(t => t.id !== u.id);
 }
 
+/* ============================ AMPHIBIOUS WARFARE ============================ */
+/* Sea-borne invasion, gated by SCN.amphibious. A land formation standing on a
+   friendly coastal hex embarks, sails across the water, and storms an enemy (or
+   empty) beach: a one-shot leap that wins a lodgement or is thrown back into the
+   surf. The landing itself uses the normal combat math — with a heavy assault
+   penalty — and the beachhead projects its OWN supply for a few turns (G.beach-
+   heads seeds in computeSupply), just long enough to seize a port. Miss the port
+   and the lodgement starves. That is the whole historical pressure of Husky /
+   Salerno / Anzio, and because it re-uses supply + combat wholesale, the AI-vs-AI
+   balance model still holds. Nothing here runs unless a scenario opts in. */
+const AMPHIB = { range:6, cost:6, penalty:0.7, beachLife:4, landLoss:1 };
+function amphibCfg(){ return (SCN && SCN.amphibious) || null; }
+function amphibOn(){ return !!amphibCfg(); }
+function amphibSides(){ const a = amphibCfg(); return (a && a.sides) || ['G']; }
+function amphibCanSide(side){ return amphibOn() && amphibSides().indexOf(side) !== -1; }
+function amphibRange(){ const a = amphibCfg(); return (a && a.range) || AMPHIB.range; }
+function amphibCost(){ const a = amphibCfg(); return (a && a.cost != null) ? a.cost : AMPHIB.cost; }
+function amphibBeachLife(){ const a = amphibCfg(); return (a && a.beachLife) || AMPHIB.beachLife; }
+function isWater(x,y){ if (!inMap(x,y)) return false; const t = terrainAt(x,y); return t==='~' || t==='o'; }
+function isCoast(x,y){ if (!inMap(x,y) || !passable(x,y)) return false; return neighbors(x,y).some(([nx,ny])=>isWater(nx,ny)); }
+function canEmbark(u){
+  if (!u || u.moved || u.attacked || u.oos) return false;
+  if (!amphibCanSide(u.side)) return false;
+  if (KINDS[u.kind].noAmphib) return false;       // flagged kinds can't take ship (e.g. static coastal)
+  return isCoast(u.x,u.y);                         // must launch from a coastal hex
+}
+/* Beaches this unit could assault: BFS over water from the hexes adjacent to the
+   unit (embark = 1), sailing up to `range` sea-steps; every coastal land hex
+   touching a reached water hex is a landing, keyed by the shortest sea distance. */
+function navalReach(u){
+  const beaches = new Map();
+  if (!canEmbark(u)) return beaches;
+  const range = amphibRange();
+  const seaDist = new Map();
+  const heap = makeHeap();
+  for (const [nx,ny] of neighbors(u.x,u.y))
+    if (isWater(nx,ny)){ const k=keyOf(nx,ny); if (!seaDist.has(k)){ seaDist.set(k,1); heap.push(1,nx,ny); } }
+  while (heap.size()){
+    const [d,x,y] = heap.pop();
+    if (d > (seaDist.get(keyOf(x,y)) ?? 1e9)) continue;
+    if (d >= range) continue;                       // no fuel/escort to sail further
+    for (const [nx,ny] of neighbors(x,y)){
+      if (!isWater(nx,ny)) continue;
+      const k = keyOf(nx,ny), nd = d+1;
+      if (nd < (seaDist.get(k) ?? 1e9)){ seaDist.set(k,nd); heap.push(nd,nx,ny); }
+    }
+  }
+  for (const [wk,d] of seaDist){
+    const [wx,wy] = wk.split(',').map(Number);
+    for (const [nx,ny] of neighbors(wx,wy)){
+      if (!passable(nx,ny)) continue;               // must be land to wade ashore
+      const occ = unitAt(nx,ny);
+      if (occ && occ.side===u.side) continue;       // can't land atop our own troops
+      const lk = keyOf(nx,ny), cost = d;            // sea distance to the adjacent water
+      if (cost < (beaches.get(lk) ?? 1e9)) beaches.set(lk, cost);
+    }
+  }
+  beaches.delete(keyOf(u.x,u.y));
+  return beaches;
+}
+/* Storm the beach at (tx,ty). Empty beach ⇒ costly-but-certain lodgement; a
+   defended one ⇒ a bloody assault (attacker at AMPHIB.penalty) that either clears
+   the hex and lands, or founders and is repelled — losing the unit outright if
+   the surf swallows it. Any landing plants a beachhead that feeds supply for a
+   few turns. Returns an events object the UI narrates/animates. */
+function amphibiousAssault(u, tx, ty){
+  if (!canEmbark(u)) return null;
+  if (!navalReach(u).has(keyOf(tx,ty))) return null;
+  if (KINDS[u.kind].hq && unitAt(tx,ty)) return null;   // an HQ ferries into a cleared beach, never storms one
+  if (G.pp[u.side] < amphibCost()) return null;
+  G.pp[u.side] -= amphibCost();
+  const fromX = u.x, fromY = u.y;
+  const def = unitAt(tx,ty);
+  const ev = { type:'amphib', from:[fromX,fromY], to:[tx,ty], att:u, def:def||null,
+               landed:false, destroyed:false, repelled:false, defLoss:0, atkLoss:0 };
+  u.moved = true; u.attacked = true; u.entrench = 0;
+  const land = () => {
+    u.x = tx; u.y = ty;
+    u.str = Math.max(1, u.str - AMPHIB.landLoss);   // surf, mines, lost kit
+    const c = cityAt(tx,ty);
+    if (c && c.owner!==u.side && !KINDS[u.kind].noCapture){
+      c.owner = u.side; c.ruin = Math.min(1,(c.ruin||0)+0.14);
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} seized in the landing by ${u.name}!`);
+      if (typeof onCityTaken === 'function') onCityTaken(c);
+    }
+    ev.landed = true;
+    G.beachheads = G.beachheads || [];
+    G.beachheads.push({ x:tx, y:ty, side:u.side, turns:amphibBeachLife() });
+  };
+  if (!def){
+    land();
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} lands unopposed at ${beachName(tx,ty)} — a beachhead is won.`);
+  } else {
+    const m = combatMods(u, def);
+    const A = KINDS[u.kind].atk * (u.str/10) * m.aMul * AMPHIB.penalty;
+    const D = KINDS[def.kind].def * (def.str/10) * m.dMul;
+    const rnd = () => 0.75 + Math.random()*0.5;
+    const r = (A*rnd()) / (Math.max(D,0.1)*rnd());
+    const defLoss = Math.min(def.str, Math.max(r>0.9?1:0, Math.round(1.9*r*(0.8+Math.random()*0.4))));
+    const atkLoss = Math.round(1.9/Math.max(r,0.3)*(0.8+Math.random()*0.4));  // assaults bleed the attacker
+    ev.defLoss = defLoss; ev.atkLoss = Math.min(u.str, atkLoss);
+    def.str -= defLoss; G.stats[def.side].lost += defLoss; G.stats[u.side].killed += defLoss;
+    u.str  -= atkLoss; G.stats[u.side].lost += atkLoss;  G.stats[def.side].killed += Math.min(atkLoss,ev.atkLoss);
+    def.entrench = Math.max(0, def.entrench-1);
+    gainXP(u, 2); if (def.str > 0) gainXP(def, 2);
+    if (u.str <= 0){
+      killUnit(u); ev.repelled = true; ev.destroyed = true;
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is annihilated in the surf at ${beachName(tx,ty)} — the landing fails.`);
+    } else if (def.str <= 0){
+      killUnit(def); land();
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} destroys ${def.name} and storms ashore at ${beachName(tx,ty)}!`);
+    } else if (r >= RETREAT_RATIO && defLoss >= 2){
+      const rh = retreatHex(def, {x:tx,y:ty,side:u.side});
+      if (rh){ const c=cityAt(def.x,def.y); def.x=rh[0]; def.y=rh[1]; def.entrench=0;
+        const c2=cityAt(rh[0],rh[1]); if (c2 && c2.owner!==def.side) c2.owner=def.side; }
+      land();
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} throws ${def.name} off the beach and lands at ${beachName(tx,ty)}!`);
+    } else {
+      ev.repelled = true;                            // bounced — survivors cling to the boats
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name}'s assault on ${beachName(tx,ty)} is thrown back — ${ev.atkLoss} lost in the water.`);
+    }
+  }
+  refreshSupply();
+  checkSuddenDeath();
+  return ev;
+}
+function beachName(x,y){ const c = cityAt(x,y); return c ? c.name : `the beach (${x},${y})`; }
+
 /* ============================ PRODUCTION ============================ */
 function canReinforce(u){
   if (u.str >= KINDS[u.kind].maxStr || u.oos || u.moved || u.attacked) return false;
@@ -4307,11 +4720,19 @@ function doReinforce(u){
 function deploySpots(side){
   const spawns = side==='G' ? GER_SPAWNS : SOV_SPAWNS;
   const net = computeSupply(side);
-  return spawns.filter(([x,y]) => {
+  const spots = spawns.filter(([x,y]) => {
     const c = cityAt(x,y);
     if (c && c.owner!==side) return false;
     return passable(x,y) && !unitAt(x,y) && net.has(keyOf(x,y));
   });
+  // captured ports as forward landing-points: the invader lands reinforcements
+  // straight onto a coastal city it has taken, instead of shipping every division
+  // from its home base (the historical use of Naples, Anzio, the Sicilian ports)
+  if (SCN.portDeploy) for (const c of G.cities){
+    if (c.owner!==side || !isCoast(c.x,c.y) || unitAt(c.x,c.y)) continue;
+    if (net.has(keyOf(c.x,c.y)) && !spots.some(s=>s[0]===c.x&&s[1]===c.y)) spots.push([c.x,c.y]);
+  }
+  return spots;
 }
 function buyableKinds(side){
   return Object.keys(KINDS).filter(k => KINDS[k].side===side && k!=='g_ally' && k!=='s_guard' && !KINDS[k].noBuy)
@@ -4592,6 +5013,12 @@ function endPhase(){
     // Soviet reinforcements arrive at the top of the new turn
     G.turn++;
     if (G.turn > MAX_TURN){ endGame(); return; }
+    // beachheads run down each week: grab a port (a self-sustaining depot) before
+    // the emergency supply over the sand expires, or the lodgement withers
+    if (G.beachheads && G.beachheads.length){
+      for (const b of G.beachheads) b.turns--;
+      G.beachheads = G.beachheads.filter(b => b.turns > 0 && !cityAt(b.x,b.y));  // a captured port supersedes its beachhead
+    }
     const wxNew = weatherFor(G.turn), wxOld = weatherFor(G.turn-1);
     if (wxNew !== wxOld){
       // scenarios may supply their own weather-change dispatches (a Khamsin reads
@@ -4913,13 +5340,20 @@ function aiSpend(side){
     const spots = deploySpots(side);
     if (!spots.length) break;
     let kind = null;
+    // per-side fielded-force caps: default keeps historical behaviour (G:15, S:uncapped),
+    // scenarios can raise the invader's ceiling or rein in the defender's (Italy)
+    const capG  = (SCN.aiMaxUnits && SCN.aiMaxUnits.G) || 15;
+    const capS  = (SCN.aiMaxUnits && SCN.aiMaxUnits.S) || 999;
+    const armCap = (SCN.aiMaxUnits && SCN.aiMaxUnits[side+'arm']) || 5;
     if (side==='S'){
-      if (G.pp.S >= 12 && unitsOf('S').filter(u=>u.kind==='s_tank').length < 5 && G.turn>=8) kind='s_tank';
-      else if (G.pp.S >= 8) kind='s_inf';
-      else if (G.pp.S >= 4 && G.turn >= 4) kind='s_mil';
+      if (KINDS.s_tank && G.pp.S >= 12 && unitsOf('S').filter(u=>u.kind==='s_tank').length < 5 && G.turn>=8) kind='s_tank';
+      else if (KINDS.s_pz && G.pp.S >= 18 && unitsOf('S').filter(u=>u.kind==='s_pz').length < armCap) kind='s_pz';   // defensive scenarios with a panzer reserve (Italy)
+      else if (KINDS.s_inf && G.pp.S >= 8 && unitsOf('S').length < capS) kind='s_inf';
+      else if (KINDS.s_mil && G.pp.S >= 4 && G.turn >= 4) kind='s_mil';
     } else {
-      if (G.pp.G >= 22 && unitsOf('G').filter(u=>u.kind==='g_pz').length < 5) kind='g_pz';
-      else if (G.pp.G >= 16 && unitsOf('G').length < 15) kind='g_inf';
+      if (KINDS.g_pz && G.pp.G >= 22 && unitsOf('G').filter(u=>u.kind==='g_pz').length < 5) kind='g_pz';
+      else if (KINDS.g_arm && G.pp.G >= 18 && unitsOf('G').filter(u=>u.kind==='g_arm').length < armCap) kind='g_arm';  // scenarios with an armoured division (Italy)
+      else if (KINDS.g_inf && G.pp.G >= 16 && unitsOf('G').length < capG) kind='g_inf';
     }
     if (!kind) break;
     if (!doDeploy(side, kind, spots[0][0], spots[0][1])) break;
@@ -5124,8 +5558,92 @@ function aiBestCombinedAssault(side){
   return bestAction;
 }
 
+/* ---- amphibious planner (shared) ----
+   Ships an invasion when a formation has NO land route to the enemy — staging in
+   North Africa, or mopped up on a cleared island — and a worthwhile beach is in
+   reach. Never ships a unit that can already march to the front (that would strand
+   the advance at sea), and never assaults into a hopeless slaughter. Returns the
+   best {type:'amphib'} action or null. */
+function aiEnemyLandField(side){
+  // multi-source land-distance field FROM every enemy objective & unit, so we can
+  // ask "can THIS hex reach the enemy on foot?" in O(1). Cached per AI sub-phase.
+  if (!dfCache) dfCache = {};
+  const ck = 'elf:'+side;
+  if (dfCache[ck]) return dfCache[ck];
+  const foe = enemyOf(side);
+  const f = new Map();
+  const heap = makeHeap();
+  const push0 = (x,y)=>{ const k=keyOf(x,y); if (passable(x,y) && !f.has(k)){ f.set(k,0); heap.push(0,x,y); } };
+  for (const c of G.cities) if (c.owner===foe) push0(c.x,c.y);
+  for (const t of unitsOf(foe)) push0(t.x,t.y);
+  while (heap.size()){
+    const [c,x,y] = heap.pop();
+    if (c > (f.get(keyOf(x,y)) ?? 1e9)) continue;
+    for (const [nx,ny] of neighbors(x,y)){
+      if (!passable(nx,ny)) continue;
+      const k = keyOf(nx,ny), nc = c + TERRAIN[terrainAt(nx,ny)].move;
+      if (nc < (f.get(k) ?? 1e9)){ f.set(k,nc); heap.push(nc,nx,ny); }
+    }
+  }
+  dfCache[ck] = f;
+  return f;
+}
+function nearestEnemyObjDist(side, x, y){
+  let d = 1e9;
+  for (const c of G.cities) if (c.vp>0 && c.owner!==side) d = Math.min(d, hexDist(x,y,c.x,c.y));
+  return d;
+}
+function aiAmphibPlan(side){
+  if (!amphibCanSide(side) || G.pp[side] < amphibCost()) return null;
+  const elf = aiEnemyLandField(side);
+  let best=null, bestScore=0;
+  for (const u of unitsOf(side)){
+    if (!canEmbark(u)) continue;
+    if (adjacentEnemies(u).length) continue;          // in a fight — don't sail away from it
+    // ship a unit only when the sea is its real path forward: either it's stranded
+    // with no land route to the enemy (staging in Africa / a cleared island), or a
+    // landing vaults it decisively closer to an objective than it stands now.
+    const stranded = (elf.get(keyOf(u.x,u.y)) ?? 1e9) >= 24;
+    const dNow = nearestEnemyObjDist(side, u.x, u.y);
+    const reach = navalReach(u);
+    if (!reach.size) continue;
+    const isHQ = KINDS[u.kind].hq;
+    for (const [k,cost] of reach){
+      const [x,y] = k.split(',').map(Number);
+      if (!stranded && !isHQ && !(nearestEnemyObjDist(side,x,y) + 4 <= dNow)) continue;  // not a real leap forward
+      const def = unitAt(x,y);
+      if (isHQ){
+        // an HQ only follows the army ashore: an empty beach beside friendly troops
+        if (def) continue;
+        const nearFriend = neighbors(x,y).some(([nx,ny])=>{ const f=unitAt(nx,ny); return f && f.side===side; });
+        if (!nearFriend) continue;
+      }
+      let obj = 1e9;                                     // distance from beach to nearest enemy objective
+      for (const c of G.cities) if (c.vp>0 && c.owner!==side) obj = Math.min(obj, hexDist(x,y,c.x,c.y));
+      let s = 34 - obj*2.2 - cost*0.4;
+      const c = cityAt(x,y);
+      if (c && c.owner!==side) s += 9 + c.vp*3;          // land straight onto a port/city
+      // build up an existing lodgement rather than scattering penny-packets
+      for (const b of (G.beachheads||[])) if (b.side===side && hexDist(x,y,b.x,b.y)<=2) s += 5;
+      if (def){
+        const m = combatMods(u, def);
+        const A = KINDS[u.kind].atk*(u.str/10)*m.aMul*AMPHIB.penalty;
+        const D = KINDS[def.kind].def*(def.str/10)*m.dMul;
+        const r = A/Math.max(D,0.1);
+        if (r < 1.0) continue;                           // don't feed a slaughter
+        s += Math.min(r,2.5)*2;
+      } else s += 7;                                     // an open beach is gold
+      if (s > bestScore){ bestScore=s; best={type:'amphib', u:u.id, x, y}; }
+    }
+  }
+  return best;
+}
+
 function aiPlanGerman(){
   aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
+  // sea-borne invasion: ship the units that have no other way to the enemy
+  const land = aiAmphibPlan('G');
+  if (land) return land;
   // mass on a single target when multiple German units are already in range
   const combo = aiBestCombinedAssault('G');
   if (combo) return combo;
@@ -5235,6 +5753,8 @@ function sovPickOffensiveTarget(u){
 }
 
 function aiPlanSoviet(){
+  const land = aiAmphibPlan('S');             // only if the scenario lets S invade
+  if (land) return land;
   // mass on a single target when multiple Soviet units are already in range
   const combo = aiBestCombinedAssault('S');
   if (combo) return combo;
@@ -5323,6 +5843,11 @@ function applyAction(a){
     if (lead && def){ const ev = resolveCombat(lead, def, helpers); clearAICache(); return {type:'attack', att:lead, def, ev}; }
     return {type:'hold'};
   }
+  if (a.type==='amphib'){
+    const u = G.units.find(t=>t.id===a.u);
+    if (u){ const ev = amphibiousAssault(u, a.x, a.y); clearAICache(); return {type:'amphib', unit:u, ev}; }
+    return {type:'hold'};
+  }
   return null;
 }
 
@@ -5342,9 +5867,9 @@ function aiFullPhase(side){
 /* Two independent slots — Arcade and Realistic — so starting (or autosaving)
    a game in one mode never clobbers the other's campaign. A pre-slots save is
    migrated into the slot matching its own scenario. */
-const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1' };
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', italy:'hoi5-save-italy-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
-function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : 'arcade'; }
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'italy' ? 'italy' : 'arcade'; }
 function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
@@ -5356,6 +5881,7 @@ function deserialize(json){
   if (SCN.fuel) for (const u of G.units)                            // migrate pre-fuel saves
     if (KINDS[u.kind].fuel && u.fuel == null) u.fuel = FUEL_MAX;
   if (SCN.railhead && !G.railDepth) G.railDepth = {G: RAIL_START, S: RAIL_START}; // pre-rail saves
+  if (!G.beachheads) G.beachheads = [];                             // pre-amphibious saves
   refreshSupply();
 }
 function saveGame(){
@@ -6369,6 +6895,7 @@ let hover = null;          // [x,y] under mouse
 let deployKind = null;     // kind being placed
 let airTarget = null;      // air group id picking a strike target
 let reconTarget = null;    // air group id picking a photo-recon hex (fog of war)
+let amphibTarget = null;   // {id, beaches:Map} — unit picking a landing beach (amphibious)
 let anims = [];            // floating texts / flashes
 let scars = [];            // lingering scorched ground & smoke at battle sites
 let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
@@ -7452,6 +7979,35 @@ function draw(){
       hexPath(ux,uy,S-3); ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.5; ctx.stroke();
     }
   }
+  // amphibious landing targeting: blue = open beach, red = defended landing
+  if (amphibTarget){
+    const su2 = G.units.find(t=>t.id===amphibTarget.id);
+    const pulse = 0.5 + 0.5*Math.sin(now*0.006);
+    for (const k of amphibTarget.beaches.keys()){
+      const [bx,by] = k.split(',').map(Number);
+      const [cx,cy] = hexCenter(bx,by);
+      const defended = !!unitAt(bx,by);
+      hexPath(cx,cy,S-3);
+      ctx.fillStyle = defended ? `rgba(255,90,90,${0.20+0.16*pulse})` : `rgba(90,180,240,${0.18+0.16*pulse})`;
+      ctx.fill();
+      ctx.strokeStyle = defended ? '#ff6b6b' : '#7fc4f0'; ctx.lineWidth = 2.2; ctx.stroke();
+      ctx.fillStyle = defended ? '#ffd2d2' : '#d6efff';
+      ctx.font = `${Math.round(S*0.62)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⚓', cx, cy);
+    }
+    if (su2){ const [ux,uy]=hexCenter(su2.x,su2.y); hexPath(ux,uy,S-3); ctx.strokeStyle='#7fc4f0'; ctx.lineWidth=2.6; ctx.stroke(); }
+  }
+  // active invasion beachheads: a pulsing anchor + the turns of supply left
+  if (G.beachheads && G.beachheads.length){
+    for (const b of G.beachheads){
+      if (fowSight && b.side!==viewerSide() && !fowSight.has(keyOf(b.x,b.y))) continue;
+      const [cx,cy] = hexCenter(b.x,b.y);
+      const pr = 0.5+0.5*Math.sin(now*0.004 + b.x);
+      hexPath(cx,cy,S-4); ctx.strokeStyle = `rgba(120,200,255,${0.35+0.35*pr})`; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#bfe6ff'; ctx.font=`bold ${Math.round(S*0.4)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⚓'+b.turns, cx, cy - S*0.6);
+    }
+  }
   if (hover){
     const [cx,cy] = hexCenter(hover[0],hover[1]);
     hexPath(cx,cy,S-1.5); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1.5; ctx.stroke();
@@ -8002,6 +8558,23 @@ canvas.addEventListener('click', e=>{
     $('hint').innerHTML = defaultHint();
     updateAll(); return;
   }
+  // amphibious landing targeting mode
+  if (amphibTarget){
+    const u = G.units.find(t=>t.id===amphibTarget.id);
+    const canLand = amphibTarget.beaches.has(keyOf(x,y));
+    amphibTarget = null;
+    if (u && canLand){
+      clearUndo();
+      const ev = amphibiousAssault(u, x, y);
+      if (ev){
+        if (ev.landed){ sBoom(); floatText(x, y, ev.destroyed?'⚓ STORMED':'⚓ ASHORE', '#9fd8ff'); }
+        else { sShot(); floatText(x, y, '✖ REPELLED', '#ff6b6b'); }
+        deselect();
+      }
+    }
+    $('hint').innerHTML = defaultHint();
+    updateAll(); return;
+  }
   // deploy mode
   if (deployKind){
     if (doDeploy(G.phase, deployKind, x, y)){ clearUndo(); sCity(); updateAll(); }
@@ -8037,8 +8610,8 @@ canvas.addEventListener('click', e=>{
 canvas.addEventListener('contextmenu', e=>{
   e.preventDefault();
   if (!G || G.over) return;
-  if (deployKind || airTarget || reconTarget || advanceChoice || selSet.length || sel){
-    deselect(); deployKind=null; airTarget=null; reconTarget=null; advanceChoice=null; selSet=[];
+  if (deployKind || airTarget || reconTarget || amphibTarget || advanceChoice || selSet.length || sel){
+    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; advanceChoice=null; selSet=[];
     $('hint').innerHTML = defaultHint(); updateAll();
   }
 });
@@ -8098,7 +8671,7 @@ window.addEventListener('keydown', e=>{
   // don't hijack typing or keys meant for an open dialog
   if (document.querySelector('.modal-back:not(.hidden)')) return;
   const k = e.key;
-  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; reconTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
+  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
   // map navigation — arrow keys pan, +/- (and scroll wheel) zoom
   const pan = 90/cam.z;
   if (k==='ArrowLeft'){  killGlides(); cam.x-=pan; requestRender(); e.preventDefault(); return; }
@@ -8127,7 +8700,7 @@ function selectUnit(u){
   reach = (!u.moved) ? reachable(u) : new Map();
   updateUnitCard();
 }
-function deselect(){ sel=null; reach=null; selSet=[]; updateUnitCard(); requestRender(); }
+function deselect(){ sel=null; reach=null; selSet=[]; amphibTarget=null; updateUnitCard(); requestRender(); }
 /* a unit still has orders to give if it can move, or can still attack something
    it has actually SEEN (fog of war must not leak through the amber pips). A unit
    the player Skipped, or one running a standing order, is deliberately off the
@@ -8274,6 +8847,29 @@ function updateUnitCard(){
       b.textContent = `Reinforce +${r.steps} (${r.cost*r.steps}⚙)`;
       b.onclick = ()=>{ clearUndo(); doReinforce(u); sCity(); updateAll(); updateUnitCard(); };
       act.appendChild(b);
+    }
+    // amphibious invasion: embark from a coastal hex and storm a beach across the sea
+    if (canEmbark(u) && amphibOn()){
+      const eb = document.createElement('button');
+      const affordable = G.pp[u.side] >= amphibCost();
+      eb.textContent = `⚓ Naval invasion (${amphibCost()}⚙)`;
+      eb.title = 'Embark this division and assault a beach across the water. Empty beaches are taken outright; defended ones are a bloody landing. A beachhead feeds itself for a few turns — take a port before it fades.';
+      if (amphibTarget && amphibTarget.id===u.id){ eb.style.borderColor='var(--cyan)'; eb.style.color='#9fd8ff'; eb.style.background='#183a4a'; }
+      if (!affordable){ eb.disabled = true; eb.style.opacity = 0.5; }
+      eb.onclick = ()=>{
+        sClick();
+        if (amphibTarget && amphibTarget.id===u.id){ amphibTarget=null; $('hint').innerHTML=defaultHint(); }
+        else {
+          const beaches = navalReach(u);
+          amphibTarget = beaches.size ? {id:u.id, beaches} : null;
+          airTarget=null; reconTarget=null; deployKind=null;
+          $('hint').innerHTML = amphibTarget
+            ? '⚓ Click a <b>highlighted beach</b> to land — blue is open, red is defended. Esc cancels.'
+            : 'No beach is in range of this division.';
+        }
+        updateAll(); updateUnitCard();
+      };
+      act.appendChild(eb);
     }
     // standing battle-plan orders: paint a persistent order the unit runs each turn
     if (!k.hq){
@@ -9984,6 +10580,7 @@ if (typeof module !== 'undefined' && module.exports){
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
+    isWater, isCoast, canEmbark, navalReach, amphibiousAssault, amphibOn, amphibCanSide, aiAmphibPlan,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
