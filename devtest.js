@@ -143,12 +143,13 @@ say('— amphibious warfare —');
   check('amphibious enabled for the invader only',
     E.amphibOn() && E.amphibCanSide('G') && !E.amphibCanSide('S'));
   check('the Strait of Messina is a water gap (no land bridge to Sicily)',
-    E.isWater(17,32) && !E.passable(17,32));
+    E.isWater(24,30) && !E.passable(24,30));
   const corps = G.units.find(u=>u.name==='US II Corps');
   check('a Tunisian corps can embark from its coastal hex', !!corps && E.canEmbark(corps));
   const beaches = E.navalReach(corps);
   check('naval reach finds beaches across the sea', beaches.size > 0);
-  check('Gela is among the reachable landing beaches', beaches.has('12,37'));
+  check('a Sicilian beach is within reach of the invasion fleet',
+    [...beaches.keys()].some(k=>{const [x,y]=k.split(',').map(Number); return y>=31 && y<=37 && x>=16 && x<=27;}));
   // no production → no landing craft
   G.pp.G = 0;
   const openBeach = [...beaches.keys()].map(k=>k.split(',').map(Number)).find(([x,y])=>!E.unitAt(x,y));

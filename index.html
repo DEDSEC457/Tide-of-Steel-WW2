@@ -3134,52 +3134,50 @@ SCENARIOS.france = (function buildFrance(){
    Malta sit off the west coast; Tunisia is the springboard. */
 SCENARIOS.italy = (function buildItaly(){
   const map = [
-    "~~~~~~~~~~.hhhhhhhhhhhhhhhhhhhh.~~~~~~",
-    "~~~~~~~~~~..h..h..h..h..h..h..h.~~~~~~",
-    "~~~~~~~~~~......................~~~~~~",
-    "~~~~~~~~~~..rrrrrrrrrrrrrrrrr...~~~~~~",
-    "~~~~~~~~~~......................~~~~~~",
-    "~~~~~~~~~~......................~~~~~~",
-    "~~~~~~~~~~......................~~~~~~",
-    "~~~~~~~~~~~~..................~~~~~~~~",
-    "~~~~~~~~~~~~..................~~~~~~~~",
-    "~~~~~~.~~~~~~~~~~........~~~~~~~~~~~~~",
-    "~~~~~...~~~~~~~~~....h...~~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~~........~~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~~...h....~~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~~........~~~~~~~~~~~~~",
-    "~~~~~...~~~~~~~~~...h.f..~~~~~~~~~~~~~",
-    "~~~~~~.~~~~~~~~~~........~~~~~~~~~~~~~",
-    "~~~~~...~~~~~~~~....h....~~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~........~~~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~....h...~~~~~~~~~~~~~~",
-    "~~~.......~~~~~~rrrrrr..~~~~~~~~~~~~~~",
-    "~~~.......~~~~~~hhhhhhh.~~.....~~~~~~~",
-    "~~~.......~~~~~~........~.......~~~~~~",
-    "~~~.......~~~~~~...h.............~~~~~",
-    "~~~.......~~~~~~.................~~~~~",
-    "~~~~.....~~~~~~~...h.............~~~~~",
-    "~~~~.....~~~~~~~.................~~~~~",
-    "~~~~~...~~~~~~~....h.............~~~~~",
-    "~~~~~~~~~~~~~~~........~~.......~~~~~~",
-    "~~~~~~~~~~~~~~~....h...~~~.....~~~~~~~",
-    "~~~~~~~~~~~~~~~....f...~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~...f....~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~........~~~~~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~.............~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~..........~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~.....h..~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~......~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~....~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~.......~~~~~~~~~~~~~~~~~~~~~~",
-    ".......................~~~~~~~~~~~~~~~",
-    ".......................~~~~~~~~~~~~~~~",
-    ".......................~~~~~~~~~~~~~~~",
-    ".......................~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~.h.h~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~..h..h..h..~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~..rrrrrrrrr.~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~............~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~.............~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~...........f~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~............~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~...h...~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~...h..~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~...~~~......~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~.....~~~..h...~~~~~~~~~~~~~~~~~~",
+    "~~~~~~.....~~~...h..~~~~~~~~~~~~~~~~~~",
+    "~~~~~~.....~~~~.....~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~...~~~~~..h...~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~..h...~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~..hh..~~~~~~.~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~hhhh..~~~.....~~~~~~~",
+    "~~~~~~~.~~~~~~~~~~rrrh.~~.......~~~~~~",
+    "~~~~~~...~~~~~~~~~~..............~~~~~",
+    "~~~~~.....~~~~~~~~~~............~~~~~~",
+    "~~~~~.....~~~~~~~~~~~..........~~~~~~~",
+    "~~~~~.....~~~~~~~~~~~~...f~~.~~~~~~~~~",
+    "~~~~~.....~~~~~~~~~~~~~.h..~~~~~~~~~~~",
+    "~~~~~.....~~~~~~~~~~~~~..h.~~~~~~~~~~~",
+    "~~~~~~...~~~~~~~~~~~~~~~..h.~~~~~~~~~~",
+    "~~~~~~~.~~~~~~~~~~~~~~~~....~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~.h.~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~...~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~...........~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~......h..~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~.......~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~.....~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~...~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~..............~~~~~~~~~~~~~~~~~~~~",
+    "~~~~..............~~~~~~~~~~~~~~~~~~~~",
+    "~~~~..............~~~~~~~~~~~~~~~~~~~~",
+    "~~~~..............~~~~~~~~~~~~~~~~~~~~",
+    "~~~~..............~~~~~~~~~~~~~~~~~~~~",
   ];
   return {
   id: 'italy', realistic: true,
@@ -3197,10 +3195,10 @@ SCENARIOS.italy = (function buildItaly(){
   supplySeeds: {
     // the Allied springboard: the three Tunisian ports feed the invasion until
     // beachheads and captured Italian ports take over
-    G: [[6,42],[3,42],[16,42]],
+    G: [[8,39],[5,39],[15,39]],
     // the Axis rear: supply flows south from the Po valley (and re-sources at every
     // Axis-held city), plus the sea-lifelines to the islands — cut when their ports fall
-    S: [[12,2],[20,2],[28,2],[17,33],[6,25],[7,10]],
+    S: [[10,3],[13,3],[16,3],[24,32],[7,26],[8,11]],
   },
   menu: {
     ger: {h:'🟦 Allies (15th Army Group)', p:'Launch Operation Husky from Tunisia: storm the beaches of Sicily, take the ports to feed the invasion, then vault the Strait of Messina and grind up the peninsula — Salerno, the Gustav Line, Rome, and the long road north. The sea is your manoeuvre; every landing needs a port before the beachhead dies.'},
@@ -3221,80 +3219,80 @@ SCENARIOS.italy = (function buildItaly(){
   },
   deployNames: {g_inf:'Follow-up Corps', g_arm:'Armoured Reserve', g_mtn:'Mountain Reserve',
     s_inf:'Reserve Division', s_pz:'Panzer Reserve', s_para:'Fallschirm Reserve', s_cst:'Fortress Battalion'},
-  cols: 38, rows: 46, map,
+  cols: 38, rows: 44, map,
   cities: [
     // ---- Sicily ----
-    {x:11, y:33, name:'Palermo',  vp:1, owner:'S'},
-    {x:17, y:33, name:'Messina',  vp:1, owner:'S'},
-    {x:16, y:36, name:'Catania',  vp:1, owner:'S'},
-    {x:15, y:37, name:'Siracusa', vp:0, owner:'S'},
-    {x:12, y:37, name:'Gela',     vp:0, owner:'S'},
-    {x:8,  y:33, name:'Trapani',  vp:0, owner:'S'},
+    {x:19, y:32, name:'Palermo',  vp:1, owner:'S'},
+    {x:24, y:32, name:'Messina',  vp:1, owner:'S'},
+    {x:24, y:34, name:'Catania',  vp:1, owner:'S'},
+    {x:23, y:35, name:'Siracusa', vp:0, owner:'S'},
+    {x:19, y:35, name:'Gela',     vp:0, owner:'S'},
+    {x:17, y:32, name:'Trapani',  vp:0, owner:'S'},
     // ---- the toe & the south ----
-    {x:18, y:31, name:'Reggio',   vp:0, owner:'S'},
-    {x:19, y:28, name:'Cosenza',  vp:0, owner:'S'},
-    {x:28, y:26, name:'Taranto',  vp:1, owner:'S'},
-    {x:31, y:24, name:'Brindisi', vp:1, owner:'S'},
-    {x:30, y:23, name:'Bari',     vp:1, owner:'S'},
-    {x:25, y:21, name:'Foggia',   vp:1, owner:'S'},
-    {x:20, y:23, name:'Napoli',   vp:3, owner:'S'},
+    {x:25, y:28, name:'Reggio',   vp:0, owner:'S'},
+    {x:24, y:24, name:'Cosenza',  vp:0, owner:'S'},
+    {x:28, y:22, name:'Taranto',  vp:1, owner:'S'},
+    {x:31, y:19, name:'Brindisi', vp:1, owner:'S'},
+    {x:28, y:18, name:'Bari',     vp:1, owner:'S'},
+    {x:22, y:18, name:'Foggia',   vp:1, owner:'S'},
+    {x:20, y:20, name:'Napoli',   vp:3, owner:'S'},
     // ---- the centre — the Gustav Line & Rome ----
-    {x:23, y:17, name:'Pescara',  vp:0, owner:'S'},
-    {x:17, y:17, name:'Roma',     vp:5, owner:'S'},
-    {x:24, y:13, name:'Ancona',   vp:1, owner:'S'},
-    {x:20, y:11, name:'Firenze',  vp:2, owner:'S'},
+    {x:20, y:15, name:'Pescara',  vp:0, owner:'S'},
+    {x:17, y:16, name:'Roma',     vp:5, owner:'S'},
+    {x:18, y:11, name:'Ancona',   vp:1, owner:'S'},
+    {x:15, y:10, name:'Firenze',  vp:2, owner:'S'},
     // ---- the north — the Po & the Alps ----
-    {x:13, y:6,  name:'Genova',   vp:1, owner:'S'},
-    {x:21, y:6,  name:'Bologna',  vp:2, owner:'S'},
-    {x:28, y:3,  name:'Venezia',  vp:2, owner:'S'},
-    {x:14, y:2,  name:'Milano',   vp:3, owner:'S'},
-    {x:11, y:4,  name:'Torino',   vp:2, owner:'S'},
+    {x:9,  y:8,  name:'Genova',   vp:1, owner:'S'},
+    {x:14, y:7,  name:'Bologna',  vp:2, owner:'S'},
+    {x:17, y:4,  name:'Venezia',  vp:2, owner:'S'},
+    {x:10, y:3,  name:'Milano',   vp:3, owner:'S'},
+    {x:7,  y:5,  name:'Torino',   vp:2, owner:'S'},
     // ---- the islands ----
-    {x:6,  y:25, name:'Cagliari', vp:1, owner:'S'},
-    {x:5,  y:18, name:'Sassari',  vp:0, owner:'S'},
-    {x:5,  y:13, name:'Ajaccio',  vp:0, owner:'S'},
-    {x:7,  y:10, name:'Bastia',   vp:0, owner:'S'},
+    {x:7,  y:26, name:'Cagliari', vp:1, owner:'S'},
+    {x:6,  y:20, name:'Sassari',  vp:0, owner:'S'},
+    {x:7,  y:15, name:'Ajaccio',  vp:0, owner:'S'},
+    {x:8,  y:11, name:'Bastia',   vp:0, owner:'S'},
     // ---- North Africa — the Allied springboard ----
-    {x:6,  y:42, name:'Tunis',    vp:0, owner:'G'},
-    {x:3,  y:42, name:'Bizerte',  vp:0, owner:'G'},
-    {x:16, y:42, name:'Sousse',   vp:0, owner:'G'},
+    {x:8,  y:39, name:'Tunis',    vp:0, owner:'G'},
+    {x:5,  y:39, name:'Bizerte',  vp:0, owner:'G'},
+    {x:15, y:39, name:'Sousse',   vp:0, owner:'G'},
   ],
-  gerSpawns: [[6,43],[10,43],[14,43],[8,44],[18,42]],           // Allied staging in Tunisia
-  sovSpawns: [[14,4],[20,4],[26,4],[18,2],[24,2]],              // Axis rear — the Po valley
+  gerSpawns: [[10,40],[13,40],[7,40],[15,40],[11,41]],          // Allied staging in Tunisia
+  sovSpawns: [[10,3],[13,3],[16,3],[9,5],[12,5]],               // Axis rear — the Po valley
   /* 10 July 1943 — Husky. The Allied armies wait in Tunisia; the Axis holds
      Sicily with weak Italian coastal divisions stiffened by two German mobile
      formations, and keeps its real strength on the mainland. */
   startUnits: [
     // ---- Allies (G) — staged along the Tunisian coast, ready to embark ----
-    ['g_inf','US II Corps',        12, 41],
-    ['g_inf','US 3rd Division',    10, 41],
-    ['g_arm','US 2nd Armored',     8,  42],
-    ['g_inf','British XIII Corps', 15, 42],
-    ['g_inf','British XXX Corps',  17, 42],
-    ['g_inf','Canadian 1st Div',   19, 42],
-    ['g_mtn','French Expeditionary',6, 43],
-    ['g_arm','British 7th Armoured',20,43],
-    ['g_hq', '15th Army Group',    13, 44],
+    ['g_inf','US II Corps',        11, 39],
+    ['g_inf','US 3rd Division',    13, 39],
+    ['g_arm','US 2nd Armored',     7,  39],
+    ['g_inf','British XIII Corps', 16, 39],
+    ['g_inf','British XXX Corps',  14, 39],
+    ['g_inf','Canadian 1st Div',   9,  39],
+    ['g_mtn','French Expeditionary',6, 40],
+    ['g_arm','British 7th Armoured',10,39],
+    ['g_hq', '15th Army Group',    12, 41],
     // ---- Axis (S) — Sicily garrison: thin, meant to delay and withdraw ----
-    ['s_cst','206ª Costiera',      12, 37, 5],   // Gela beaches
-    ['s_cst','Napoli Division',    15, 37, 5],   // Siracusa
-    ['s_cst','Aosta Division',     11, 33, 5],   // Palermo
-    ['s_pz', 'Hermann Göring',     16, 35, 7],   // the German armour on Sicily — a fighting withdrawal to Messina
-    // ---- Axis (S) — Naples & the operational reserve behind Rome ----
-    ['s_inf','29. Pz.Gren.',       20, 23, 9],   // Naples
-    ['s_inf','15. Pz.Gren.',       20, 15, 8],   // a mobile reserve between Rome and the Gustav Line
+    ['s_cst','206ª Costiera',      19, 35, 5],   // Gela beaches
+    ['s_cst','Napoli Division',    23, 35, 5],   // Siracusa
+    ['s_cst','Aosta Division',     19, 32, 5],   // Palermo
+    ['s_pz', 'Hermann Göring',     22, 33, 7],   // the German armour on Sicily (Etna) — a fighting withdrawal to Messina
+    // ---- Axis (S) — Naples & the operational reserve ----
+    ['s_inf','29. Pz.Gren.',       20, 20, 9],   // Naples
+    ['s_inf','15. Pz.Gren.',       19, 17, 8],   // the Salerno / Volturno counter-attack division
     // ---- Axis (S) — the GUSTAV LINE: the wall in the mountains at Cassino ----
-    ['s_para','1. Fallschirmjäger',18, 20, 9],   // Monte Cassino itself
-    ['s_inf','94. Infanterie',     16, 20, 9],   // the Garigliano, west
-    ['s_inf','305. Infanterie',    20, 20, 9],   // the Rapido, east
-    ['s_pz', '26. Panzer',         19, 18, 9],   // the mobile reserve behind the line
-    ['s_inf','362. Infanterie',    17, 17, 8],   // Rome garrison
+    ['s_para','1. Fallschirmjäger',18, 18, 9],   // Monte Cassino itself
+    ['s_inf','94. Infanterie',     17, 18, 9],   // the Garigliano, west
+    ['s_inf','305. Infanterie',    19, 18, 9],   // the Rapido, east
+    ['s_pz', '26. Panzer',         18, 16, 9],   // the mobile reserve behind the line, toward Rome
+    ['s_inf','362. Infanterie',    17, 16, 8],   // Rome garrison
     // ---- Axis (S) — the northern reserves ----
-    ['s_pz', '16. Panzer',         22, 13, 9],   // Kesselring's operational reserve
-    ['s_inf','44. Infanterie',     20, 11, 8],   // Florence — the Gothic Line to come
-    ['s_inf','65. Infanterie',     21, 6,  8],   // Bologna & the Po
-    ['s_cst','Sardinia Garrison',  6,  25, 5],   // Cagliari
-    ['s_hq', 'Heeresgruppe C',     19, 9],
+    ['s_pz', '16. Panzer',         16, 10, 9],   // Kesselring's operational reserve (Florence)
+    ['s_inf','44. Infanterie',     15, 10, 8],   // Florence — the Gothic Line to come
+    ['s_inf','65. Infanterie',     14, 7,  8],   // Bologna & the Po
+    ['s_cst','Sardinia Garrison',  7,  26, 5],   // Cagliari
+    ['s_hq', 'Heeresgruppe C',     15, 8],
   ],
   generals: [
     {side:'G', unit:'US II Corps', name:'Patton', atk:1.15,
@@ -3381,7 +3379,7 @@ SCENARIOS.italy = (function buildItaly(){
   setup(st){
     for (const u of st.units){
       // the Gustav-Line defenders start dug into the mountains
-      if (u.side==='S' && u.y>=17 && u.y<=20 && u.x>=15 && u.x<=22) u.entrench = 2;
+      if (u.side==='S' && u.y>=16 && u.y<=19 && u.x>=16 && u.x<=21) u.entrench = 2;
       // the coastal divisions are static and half-ready
       if (u.kind==='s_cst') u.entrench = 1;
       // garrisons of the great cities hold their ground
