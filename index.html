@@ -52,6 +52,23 @@
   .supply-help{font-size:11.5px;line-height:1.45;color:var(--redL);background:#2a1511cc;
     border-left:2px solid var(--red);padding:4px 8px;margin:3px 0 5px;border-radius:0 4px 4px 0;}
   .supply-help b{color:#ffb8ab;}
+  /* army roster rows */
+  .ros{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;cursor:pointer;
+    border:1px solid transparent;}
+  .ros:hover{background:var(--panel2);border-color:var(--line);}
+  .ros .ros-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ros .ros-nm b{color:var(--ink);font-weight:600;}
+  .ros .ros-nm small{color:var(--dim);}
+  .ros .ros-str{font-weight:700;width:44px;text-align:right;font-variant-numeric:tabular-nums;}
+  .ros .ros-tag{font-size:11px;padding:1px 6px;border-radius:10px;background:#2a2f22;color:var(--dim);white-space:nowrap;}
+  .ros .ros-tag.oos{background:#3a1712;color:var(--redL);}
+  .ros .ros-tag.rdy{background:#20301a;color:var(--grn);}
+  .ros .ros-tag.ord{background:#2f2a13;color:var(--amber);}
+  /* controls cheat-sheet */
+  #keys-list .krow{display:flex;justify-content:space-between;gap:14px;padding:3px 0;border-bottom:1px solid #ffffff08;}
+  #keys-list .krow span:first-child{color:var(--ink);}
+  #keys-list kbd{display:inline-block;background:#0d100a;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:4px;padding:1px 6px;font:600 12px/1.4 "Segoe UI",monospace;color:var(--amber);margin-left:3px;}
   #unit-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   #unit-actions button{padding:4px 10px;font-size:12px;}
   #preview-card .vs{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
@@ -263,6 +280,7 @@
   <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠ Threat</button>
   <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
   <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
+  <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋 Units</button>
   <button id="btn-help2" title="How to play">Help</button>
   <button id="btn-sound" title="Sound & graphics settings">🔊</button>
   <button id="btn-menu" title="Save and return to the menu">Menu</button>
@@ -598,6 +616,30 @@
        enemy line — that's an encirclement. As the Soviets, keep a straight front, garrison cities,
        and always have an escape route east.</p>
     <div class="mrow"><button class="primary" id="btn-help-close">Got it</button></div>
+  </div>
+</div>
+
+<!-- ============ ARMY ROSTER ============ -->
+<div id="roster-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:520px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;">
+      <h2 style="margin:0;">YOUR DIVISIONS</h2>
+      <span id="roster-sum" style="color:var(--dim);font-size:12px;"></span>
+    </div>
+    <div id="roster-list" style="margin:10px 0;max-height:56vh;overflow-y:auto;"></div>
+    <div class="mrow">
+      <button id="btn-roster-reinforce">⚙ Reinforce all</button>
+      <button class="primary" id="btn-roster-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ KEYBOARD SHORTCUTS (?) ============ -->
+<div id="keys-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:460px;">
+    <h2>CONTROLS</h2>
+    <div id="keys-list" style="font-size:13.5px;"></div>
+    <div class="mrow"><button class="primary" id="btn-keys-close">Got it</button></div>
   </div>
 </div>
 
@@ -5279,6 +5321,17 @@ function doReinforce(u){
   logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} reinforced to strength ${u.str}.`);
   return true;
 }
+/* Top up every damaged, in-supply division that hasn't acted, spending production
+   most-damaged-first so scarce PP goes where it matters. Returns how many were
+   topped up and the strength/PP spent. */
+function reinforceAll(side){
+  const list = unitsOf(side)
+    .filter(u => canReinforce(u))
+    .sort((a,b) => a.str/KINDS[a.kind].maxStr - b.str/KINDS[b.kind].maxStr);
+  let count = 0, before = G.pp[side];
+  for (const u of list) if (doReinforce(u)) count++;
+  return { count, spent: before - G.pp[side] };
+}
 function deploySpots(side){
   const spawns = side==='G' ? GER_SPAWNS : SOV_SPAWNS;
   const net = computeSupply(side);
@@ -9363,7 +9416,13 @@ window.addEventListener('keydown', e=>{
   if (!G || G.over) return;
   // don't hijack typing or keys meant for an open dialog — but Esc still closes the pause menu
   const openModal = document.querySelector('.modal-back:not(.hidden)');
-  if (openModal){ if (e.key==='Escape' && openModal.id==='pause-modal') closePause(); return; }
+  if (openModal){
+    if (e.key==='Escape'){
+      if (openModal.id==='pause-modal') closePause();
+      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal') show(openModal.id, false);
+    }
+    return;
+  }
   const k = e.key;
   if (k==='Escape'){
     // first Esc clears any active selection/targeting; a "clean" Esc opens the pause menu
@@ -9393,6 +9452,8 @@ window.addEventListener('keydown', e=>{
   }
   if (k==='f' || k==='F'){ fitCamera(); requestRender(); return; }   // re-fit the whole map
   if (k==='h' || k==='H'){ if ($('btn-help2').onclick) $('btn-help2').onclick(); return; }
+  if (k==='r' || k==='R'){ doReinforceAll(); return; }
+  if (k==='?'){ openKeys(); return; }
 });
 
 function selectUnit(u){
@@ -9560,15 +9621,89 @@ function supplyHelp(u){
   return `<div class="supply-help">⚠ <b>Cut off</b> — it ${bleed}. ${where}${fix} <span style="color:var(--dim)">Press <b>S</b> to shade the break.</span></div>`;
 }
 
+function isHumanTurn(){ return G && !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide); }
+
+/* ---- reinforce-all (R / panel button / roster) ---- */
+function doReinforceAll(){
+  if (!isHumanTurn()) return;
+  const r = reinforceAll(G.phase);
+  if (r.count){ clearUndo(); sCity(); } else sClick();
+  updateAll(); updateUnitCard();
+  if (!$('roster-modal').classList.contains('hidden')) renderRoster();
+  $('hint').innerHTML = r.count
+    ? `⚙ Reinforced <b>${r.count}</b> division${r.count===1?'':'s'} — <b>${r.spent}⚙</b> spent.`
+    : 'No division could be reinforced — all at full strength, cut off, or out of production.';
+}
+
+/* ---- army roster ---- */
+function rosterStatus(u){
+  if (u.oos) return {tag:'⚠ cut off', cls:'oos', rank:0};
+  if (u.order) return {tag: u.order==='attack'?'⚔ advance':'🛡 hold', cls:'ord', rank:2};
+  if (!(u.moved || u.attacked || u.held)) return {tag:'ready', cls:'rdy', rank:1};
+  return {tag:'done', cls:'', rank:3};
+}
+function renderRoster(){
+  const side = G.phase, box = $('roster-list'); if (!box) return;
+  const list = unitsOf(side).slice().sort((a,b)=>{
+    const sa=rosterStatus(a), sb=rosterStatus(b);
+    return sa.rank-sb.rank || (b.str/KINDS[b.kind].maxStr < a.str/KINDS[a.kind].maxStr ? 1 : -1);
+  });
+  box.innerHTML = '';
+  for (const u of list){
+    const st = rosterStatus(u), k = KINDS[u.kind], frac = u.str/k.maxStr;
+    const scls = frac>0.55?'good':frac>0.3?'':'bad';
+    const row = document.createElement('div'); row.className = 'ros';
+    row.innerHTML = `<span class="ros-nm"><b>${u.name}</b> <small>· ${k.label}${u.entrench?' · '+'▮'.repeat(u.entrench):''}</small></span>`
+      + `<span class="ros-tag ${st.cls}">${st.tag}</span>`
+      + `<span class="ros-str ${scls}">${u.str}/${k.maxStr}</span>`;
+    row.onclick = ()=>{ show('roster-modal', false); selectUnit(u); sClick(); centerOn(u.x,u.y); };
+    box.appendChild(row);
+  }
+  const oos = list.filter(u=>u.oos).length, rdy = actionableUnits(side).length;
+  $('roster-sum').innerHTML = `${list.length} divisions · <span style="color:var(--grn)">${rdy} ready</span>`
+    + (oos ? ` · <span style="color:var(--redL)">${oos} cut off</span>` : '');
+  const rb = $('btn-roster-reinforce'), n = unitsOf(side).filter(u=>canReinforce(u)).length;
+  if (rb){ rb.textContent = `⚙ Reinforce all${n?` (${n})`:''}`; rb.disabled = !n || !isHumanTurn(); rb.style.opacity = rb.disabled?0.5:1; }
+}
+function openRoster(){ if (!G || G.over) return; renderRoster(); show('roster-modal', true); sClick(); }
+
+/* ---- controls cheat-sheet (?) ---- */
+const KEYS_HELP = [
+  ['Next unit with orders','N / Space / Tab'],['Centre on selected unit','C'],
+  ['Reinforce all in supply','R'],['End the turn','E'],['Undo last move','U'],
+  ['Supply overlay','S'],['Threat overlay','T'],['Toggle minimap','M'],['Fit whole map','F'],
+  ['Pan the map','Arrows / drag'],['Zoom','+ / − / scroll'],['Gang up (combined assault)','Shift-click'],
+  ['Your divisions list','📋 Units'],['This list','?'],['How to play','H'],['Pause / clear selection','Esc'],
+];
+function openKeys(){
+  $('keys-list').innerHTML = KEYS_HELP.map(([d,k])=>
+    `<div class="krow"><span>${d}</span><span>${k.split(' / ').map(x=>`<kbd>${x}</kbd>`).join(' ')}</span></div>`).join('');
+  show('keys-modal', true); sClick();
+}
+$('btn-roster').onclick = openRoster;
+$('btn-roster-close').onclick = ()=>{ sClick(); show('roster-modal', false); };
+$('btn-roster-reinforce').onclick = ()=> doReinforceAll();
+$('roster-modal').addEventListener('click', e=>{ if (e.target === $('roster-modal')) show('roster-modal', false); });
+$('btn-keys-close').onclick = ()=>{ sClick(); show('keys-modal', false); };
+$('keys-modal').addEventListener('click', e=>{ if (e.target === $('keys-modal')) show('keys-modal', false); });
+
 function updateUnitCard(){
   const body = $('unit-body'), act = $('unit-actions');
   act.innerHTML = '';
   const u = sel && G.units.find(t=>t.id===sel);
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
   if (!u){
-    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · E end turn · U undo · S supply · Esc menu</span>';
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · R reinforce all · S supply · ? controls</span>';
     body.innerHTML = html;
     if (isHuman){
+      const rn = unitsOf(G.phase).filter(x=>canReinforce(x)).length;
+      if (rn){
+        const rb = document.createElement('button');
+        rb.textContent = `⚙ Reinforce all (${rn})`;
+        rb.title = 'Top up every damaged division in supply, most-damaged first (R)';
+        rb.onclick = ()=> doReinforceAll();
+        act.appendChild(rb);
+      }
       for (const k of buyableKinds(G.phase)){
         const b = document.createElement('button');
         b.textContent = `Deploy ${KINDS[k].label} (${KINDS[k].cost}⚙)`;
@@ -10968,11 +11103,15 @@ $('btn-endturn').onclick = ()=>{
   if (!human) return;
   // a strategic decision must be answered before the turn can end
   if (maybeShowDecision()) return;
-  // safeguard: units still have orders? ask for a second click
+  // safeguard: units still have orders, or divisions starving? ask for a second click
   const ready = actionableUnits(G.phase).length;
-  if (ready > 0 && performance.now() > endPendingUntil){
+  const oos = unitsOf(G.phase).filter(u=>u.oos).length;
+  if ((ready > 0 || oos > 0) && performance.now() > endPendingUntil){
     endPendingUntil = performance.now() + 2500;
-    $('btn-endturn').textContent = `⚠ ${ready} still ready — end anyway?`;
+    const parts = [];
+    if (ready > 0) parts.push(`${ready} still ready`);
+    if (oos > 0) parts.push(`${oos} cut off`);
+    $('btn-endturn').textContent = `⚠ ${parts.join(' · ')} — end anyway?`;
     setTimeout(()=>{ if (performance.now() >= endPendingUntil) $('btn-endturn').textContent = 'End Turn ▶'; }, 2600);
     return;
   }
