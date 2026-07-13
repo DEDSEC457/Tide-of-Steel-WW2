@@ -3318,6 +3318,110 @@ SCENARIOS.italy = (function buildItaly(){
     [5, 's_inf','71. Infanterie'],[9, 's_inf','356. Infanterie'],
     [13,'s_inf','Gothic Garrison'],
   ],
+  decisions: [
+    {
+      id:'husky_evac', turn:2, side:'S',
+      date:'17 August 1943', title:'OPERATION LEHRGANG',
+      text:'Sicily is lost — Patton is in Palermo, Montgomery closes on Messina. Kesselring can fight to the last man on the island, or run Operation <b>Lehrgang</b>: ferry the German divisions back across the Strait to fight another day on the mainland. Save the army, or sell Sicily dear?',
+      options:[
+        {label:'Evacuate across the Strait — save the army',
+         effect:'The German armour escapes to the mainland (+6⚙ of saved veterans) — Sicily falls faster',
+         blurb:'Under a nightly umbrella of flak, 40,000 Germans and their guns slip across the Strait of Messina. Sicily is abandoned — but the divisions that will hold the Gustav Line are saved intact.',
+         log:'⬛ Operation Lehrgang: the German divisions evacuate Sicily in good order.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+6); const hg=G.units.find(u=>u.name==='Hermann Göring'); if(hg&&hg.y>=31){ const sp=(SCN.sovSpawns||[])[0]; if(sp){ hg.x=sp[0]; hg.y=sp[1]; } } }},
+        {label:'Fight for every ridge on Sicily',
+         effect:'The Sicily garrison digs in (+1 entrenchment) and sells the island dearly',
+         blurb:'No withdrawal. The garrison contests Etna and the mountain roads to the last — buying time, but the divisions are ground up where they stand.',
+         log:'⬛ Kesselring orders Sicily held to the last defensible line.',
+         apply(G){ for(const u of unitsOf('S')) if(u.y>=31) u.entrench = Math.min(2, (u.entrench||0)+1); }},
+      ],
+      ai(G){ return 0; },
+    },
+    {
+      id:'avalanche', turn:3, side:'G',
+      date:'3 September 1943', title:'THE MAINLAND — WHERE?',
+      text:'Italy is about to surrender and the mainland lies open. Montgomery crosses the Strait into Calabria; but where does the main blow fall? A cautious build-up from the toe — or a bold leap to <b>Salerno</b>, within reach of Naples, and within reach of the panzers too?',
+      options:[
+        {label:'Salerno — the bold stroke (Avalanche)',
+         effect:'Your four strongest divisions storm ashore near Naples (+2 strength) — but the panzers counter-attack',
+         blurb:'The assault convoys turn for Salerno. Four divisions hit the beaches in the shadow of Vesuvius — a lunge for Naples that lands you deep, but squarely in the path of the German armoured reserve.',
+         log:'🟦 Operation Avalanche: the Fifth Army storms ashore at Salerno.',
+         apply(G){
+           unitsOf('G').filter(u=>!KINDS[u.kind].hq).sort((a,b)=>b.str-a.str).slice(0,4)
+             .forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+2));
+           ['15. Pz.Gren.','26. Panzer'].forEach(n=>{const u=G.units.find(x=>x.name===n); if(u)u.str=Math.min(KINDS[u.kind].maxStr,u.str+1);});
+         }},
+        {label:'Calabria — the methodical build-up (Baytown)',
+         effect:'A cautious advance from the toe: +7⚙ and every division digs in',
+         blurb:'No gamble. The Eighth Army grinds up from Reggio while the supply dumps grow — slower, but the beachhead is never in doubt.',
+         log:'🟦 The advance goes methodically up the toe from Reggio.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+7); for(const u of unitsOf('G')) u.entrench=Math.min(effTerrain(u.x,u.y).dig,(u.entrench||0)+1); }},
+      ],
+      ai(G){ return 1; },
+    },
+    {
+      id:'armistice', turn:4, side:'G',
+      date:'8 September 1943', title:'THE ITALIAN ARMISTICE',
+      text:'General Eisenhower announces Italy\'s surrender over the radio. Across the peninsula the Italian army dissolves overnight — but the Germans move to disarm them and seize the country. Rush to exploit the collapse before the Wehrmacht restores order, or consolidate what you hold?',
+      options:[
+        {label:'Exploit the collapse — race for the ports',
+         effect:'Italy\'s coastal divisions desert and melt away (each loses 2 strength)',
+         blurb:'Allied columns race inland as the Italian garrisons throw down their arms. The coastal divisions that ringed the beaches simply evaporate — but the Germans are already moving.',
+         log:'🟦 The Italian army dissolves; the Allies race to exploit the surrender.',
+         apply(G){ for(const u of unitsOf('S')) if(u.kind==='s_cst') u.str=Math.max(1,u.str-2); }},
+        {label:'Consolidate the beachheads first',
+         effect:'Play it safe and build up: +4⚙',
+         blurb:'Rather than overreach into the chaos, the beachheads are secured and stocked. The chance to bounce the disarmed garrisons passes — but nothing is risked.',
+         log:'🟦 The Allies consolidate their lodgements as Italy changes sides.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+4); }},
+      ],
+      ai(G){ return 0; },
+    },
+    {
+      id:'cassino', turn:8, side:'G',
+      date:'15 February 1944', title:'THE ABBEY OF MONTE CASSINO',
+      text:'The Gustav Line holds and the offensive drowns in blood below the ancient Benedictine abbey crowning Monte Cassino. The troops are convinced the Germans use it as an observation post. Level the 1,400-year-old monastery with everything you have — or spare it and send the infantry up the bare rock?',
+      options:[
+        {label:'Bomb the monastery to rubble',
+         effect:'Your assault troops surge (+1 strength) — but the ruins become a fortress: the defenders dig in harder',
+         blurb:'229 tons of bombs reduce the abbey to rubble. The troops cheer — then discover the paratroopers have turned the ruins into a stronghold no intact building could have made. A grim historical irony.',
+         log:'🟦 Monte Cassino abbey is bombed flat — and the rubble is fortified by morning.',
+         apply(G){
+           for(const u of unitsOf('S')) if((u.entrench||0)>=2 && u.y>=14 && u.y<=20){ u.str=Math.max(1,u.str-1); u.entrench=Math.min(3,u.entrench+1); }
+           unitsOf('G').filter(u=>nearestEnemyDist(u)<=2).slice(0,4).forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+1));
+         }},
+        {label:'Spare the abbey — send the infantry up',
+         effect:'The monastery stands; you conserve your strength: +4⚙',
+         blurb:'The abbey is left untouched and the infantry claw up the mountain unaided. The assault fails again, but the guns and shells are saved for the next attempt.',
+         log:'🟦 The abbey is spared; the assault goes in without the bombers.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+4); }},
+      ],
+      ai(G){ return 0; },
+    },
+    {
+      id:'anzio', turn:10, side:'G',
+      date:'22 January 1944', title:'OPERATION SHINGLE — ANZIO',
+      text:'To unhinge the Gustav Line, the plan is a landing behind it at <b>Anzio</b>, a short march from Rome. Land boldly and drive inland to cut Highway 6 — a knife at the enemy\'s back? Or land cautiously and dig in, and risk being sealed into the beachhead?',
+      options:[
+        {label:'Drive inland from Anzio — go for Rome',
+         effect:'The three divisions nearest Rome push hard (+2 strength) and the flanking threat opens the front (+3⚙)',
+         blurb:'The Anzio force strikes for the Alban Hills and Highway 6. The gamble threatens to cut the whole German front in two — Kesselring must strip the Gustav Line to hold.',
+         log:'🟦 The Anzio force drives inland toward Rome and Highway 6.',
+         apply(G){
+           const r=G.cities.find(c=>c.name==='Roma');
+           unitsOf('G').filter(u=>!KINDS[u.kind].hq).sort((a,b)=>hexDist(a.x,a.y,r.x,r.y)-hexDist(b.x,b.y,r.x,r.y)).slice(0,3)
+             .forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+2));
+           G.pp.G=Math.min(40,G.pp.G+3);
+         }},
+        {label:'Dig in on the beachhead — play safe',
+         effect:'"We hoped to land a wildcat; instead we have a stranded whale." Hold and build: +5⚙',
+         blurb:'The beachhead is consolidated instead of exploited — and promptly sealed off by German reserves. Safe, but the war of movement is lost and the guns must grind it out.',
+         log:'🟦 The Anzio beachhead digs in — and is promptly bottled up.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+5); }},
+      ],
+      ai(G){ return 0; },
+    },
+  ],
   events: [
     {turn:1, date:'10 July 1943', title:'OPERATION HUSKY',
      text:'2,500 ships stand off the beaches of Sicily. In darkness the first waves go ashore between Gela and Siracusa as gliders and paratroops seize the ground behind. The largest amphibious assault yet mounted has begun — the soft underbelly of Europe is open.'},
