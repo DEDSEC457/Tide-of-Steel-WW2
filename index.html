@@ -132,6 +132,17 @@
     background:#1b1410ee;border:1px solid var(--red);color:var(--redL);border-radius:8px;
     padding:8px 22px;font-size:14px;letter-spacing:2px;}
   #pass-banner{font-size:16px;}
+  #coach-amphib{position:absolute;z-index:60;width:246px;background:#10202bf5;
+    border:1px solid #3f7fa8;border-radius:12px;padding:14px 15px 13px;
+    box-shadow:0 8px 30px #000a, 0 0 22px #3f7fa855;
+    animation:coachIn .3s cubic-bezier(.2,.9,.3,1.3);}
+  #coach-amphib .coach-h{color:#9fd8ff;font-size:12px;letter-spacing:2px;font-weight:700;margin-bottom:6px;}
+  #coach-amphib p{color:#d7e6f2;font-size:12.5px;line-height:1.5;margin:0 0 11px;}
+  #coach-amphib b{color:#ffd98a;}
+  #coach-amphib button{width:100%;font-size:12px;padding:7px;}
+  #coach-amphib::after{content:"";position:absolute;right:-9px;top:24px;width:0;height:0;
+    border:8px solid transparent;border-left-color:#3f7fa8;}
+  @keyframes coachIn{from{opacity:0;transform:translate(8px,0) scale(.96);}to{opacity:1;transform:none;}}
   .pulse{animation:pulse 1.2s infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
@@ -237,6 +248,11 @@
 </div>
 
 <div id="hint" class="hidden"></div>
+<div id="coach-amphib" class="hidden">
+  <div class="coach-h">⚓ NEW — INVADE BY SEA</div>
+  <p>This division sits on the coast. Click <b>⚓ Naval&nbsp;invasion</b> in the unit panel, then a <span style="color:#7fc4f0">lit beach</span> to storm ashore across the water.</p>
+  <button id="coach-amphib-ok" class="primary">Got it ✓</button>
+</div>
 <canvas id="minimap" class="hidden" title="Click or drag to jump the camera · M hides the minimap"></canvas>
 <div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
 <div id="turn-banner" class="hidden"><div id="tb-main"></div><div id="tb-sub"></div></div>
@@ -6350,11 +6366,12 @@ function applyAction(a){
   if (a.type==='evac'){
     const u = G.units.find(t=>t.id===a.u);
     if (u && !unitAt(a.x,a.y)){
+      const from=[u.x,u.y];
       u.x=a.x; u.y=a.y; u.moved=true; u.attacked=true; u.entrench=0;
       u.str = Math.max(1, u.str-1);                 // losses in the crossing
       logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is evacuated across the water to hold the mainland.`);
       refreshSupply(); clearAICache();
-      return {type:'evac', unit:u};
+      return {type:'evac', unit:u, from, to:[a.x,a.y]};
     }
     return {type:'hold'};
   }
@@ -7615,6 +7632,8 @@ const sMove  = ()=>tone(220,0.1,'triangle',0.05,-80);
 const sShot  = ()=>{ noise(0.18,0.1); tone(120,0.15,'sawtooth',0.05,-60); };
 const sBoom  = ()=>{ noise(0.4,0.18); tone(70,0.4,'sawtooth',0.08,-40); };
 const sCity  = ()=>{ tone(523,0.12,'square',0.05); setTimeout(()=>tone(659,0.12,'square',0.05),120); setTimeout(()=>tone(784,0.2,'square',0.05),240); };
+const sLaunch= ()=>{ noise(0.55,0.05); tone(150,0.5,'sine',0.05,90); };          // landing craft under way — surf & a rising swell
+const sSurf  = ()=>{ noise(0.3,0.09); tone(200,0.22,'triangle',0.04,-60); };     // waves hitting the beach (unopposed landing)
 
 /* ---------------- engine hooks ---------------- */
 onLog = function(){
@@ -8672,9 +8691,33 @@ function draw(){
   if (hitFlash.size) for (const [id,t0] of hitFlash) if (now - t0 > 400) hitFlash.delete(id);
 
   // floating texts & explosions
-  anims = anims.filter(a => now - a.t0 < 1100);
+  anims = anims.filter(a => now - a.t0 < (a.life || 1100));
   for (const a of anims){
     const p = (now-a.t0)/1100;
+    if (a.type === 'wake'){
+      const dur = a.life - 300;
+      const raw = Math.min(1, (now-a.t0)/dur);
+      const e = raw<0.5 ? 2*raw*raw : 1-((-2*raw+2)**2)/2;        // ease in-out across the water
+      const bx = a.x0 + (a.x1-a.x0)*e, by = a.y0 + (a.y1-a.y0)*e;
+      const ang = Math.atan2(a.y1-a.y0, a.x1-a.x0);
+      const cos = Math.cos(ang), sin = Math.sin(ang);
+      // foaming wake trailing the craft
+      ctx.globalAlpha = 0.45*(1-raw*0.4);
+      ctx.strokeStyle = '#dbeaf8'; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(bx - cos*S*0.95, by - sin*S*0.95); ctx.lineTo(bx - cos*3, by - sin*3); ctx.stroke();
+      ctx.globalAlpha = 0.5*(1-raw);
+      ctx.fillStyle = '#eef6ff';
+      for (let i=0;i<3;i++){ const off=(i+1)*5; ctx.fillRect(bx-cos*off + (i%2?2:-2)*sin, by-sin*off - (i%2?2:-2)*cos, 1.6,1.6); }
+      // the landing craft — a dark hull, bow forward, fading as it grounds
+      ctx.globalAlpha = raw<0.9 ? 1 : Math.max(0,(1-(raw-0.9)/0.1));
+      ctx.save(); ctx.translate(bx,by); ctx.rotate(ang);
+      ctx.fillStyle = '#242a31';
+      ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(-5,-4.2); ctx.lineTo(-5,4.2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#4c5a67'; ctx.fillRect(-4.5,-2.4,5.5,4.8);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      continue;
+    }
     if (a.type === 'arrow'){
       const pr = Math.min(1, p*2.4);
       const gx = a.x1 + (a.x2-a.x1)*pr, gy = a.y1 + (a.y2-a.y1)*pr;
@@ -8976,6 +9019,24 @@ function attackArrow(att, def){
   const [x1,y1] = hexCenter(att.x,att.y), [x2,y2] = hexCenter(def.x,def.y);
   anims.push({type:'arrow', x1, y1, x2, y2, t0:performance.now()});
 }
+/* the game's best moment: a landing craft crosses the water from the launch hex
+   to the beach, trailing a wake, and the shore erupts as it grounds. Used for
+   both the player's invasions and the AI's (and the defender's evacuation). */
+function landingAnim(fromX, fromY, toX, toY, opts){
+  opts = opts || {};
+  const [fx,fy] = hexCenter(fromX,fromY), [tx,ty] = hexCenter(toX,toY);
+  const cross = 780;
+  anims.push({type:'wake', x0:fx, y0:fy, x1:tx, y1:ty, t0:performance.now(), life:cross+300});
+  sLaunch();
+  requestRender();
+  setTimeout(()=>{
+    if (opts.repelled){ sShot(); boomAt(toX,toY,false); floatText(toX,toY,'✖ REPELLED','#ff6b6b'); kickShake(3); }
+    else if (opts.evac){ sSurf(); floatText(toX,toY,'⚓ EVACUATED','#cfe0a0'); }
+    else if (opts.opposed){ sBoom(); boomAt(toX,toY,true); floatText(toX,toY, opts.stormed?'⚓ STORMED':'⚓ ASHORE','#9fd8ff'); kickShake(4); }
+    else { sSurf(); floatText(toX,toY,'⚓ ASHORE','#9fd8ff'); }
+    requestRender();
+  }, cross);
+}
 
 
 /* render scheduler: cap to ~30fps and only repaint when something is actually
@@ -9039,6 +9100,7 @@ canvas.addEventListener('wheel', e=>{
 
 canvas.addEventListener('click', e=>{
   if (dragMoved || !G || G.over || aiRunning) return;
+  { const c=$('coach-amphib'); if (c && !c.classList.contains('hidden')) c.classList.add('hidden'); }   // any map click retires the coach
   const isHuman = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!isHuman) return;
   const [wx,wy] = toWorld(e.clientX,e.clientY);
@@ -9077,8 +9139,9 @@ canvas.addEventListener('click', e=>{
       clearUndo();
       const ev = amphibiousAssault(u, x, y);
       if (ev){
-        if (ev.landed){ sBoom(); floatText(x, y, ev.destroyed?'⚓ STORMED':'⚓ ASHORE', '#9fd8ff'); }
-        else { sShot(); floatText(x, y, '✖ REPELLED', '#ff6b6b'); }
+        landingAnim(ev.from[0], ev.from[1], ev.to[0], ev.to[1],
+                    { opposed: !!ev.def, stormed: ev.destroyed, repelled: !ev.landed });
+        if (ev.landed) flashUnit(u);
         deselect();
       }
     }
@@ -9308,6 +9371,30 @@ function playerGroupAttack(attackers, def){
 }
 
 /* ---------------- side panel ---------------- */
+/* one-time "how to invade" coach-mark: the first time the player selects a
+   coastal division that can launch a landing, a bubble points at the Naval
+   invasion button. Shown once ever (remembered in localStorage). */
+const COACH_KEY = 'hoi5-coach-amphib-v1';
+let _coachShown = false;
+function coachSeen(){ try { return !!localStorage.getItem(COACH_KEY); } catch(e){ return true; } }
+function dismissCoachAmphib(){
+  const c = $('coach-amphib'); if (c) c.classList.add('hidden');
+  try { localStorage.setItem(COACH_KEY,'1'); } catch(e){}
+}
+function maybeCoachAmphib(anchor){
+  if (_coachShown || coachSeen() || !anchor) return;
+  const c = $('coach-amphib'); if (!c) return;
+  let r; try { r = anchor.getBoundingClientRect(); } catch(e){ return; }
+  if (!r || typeof r.top !== 'number' || (!r.width && !r.height)) return;   // no real layout (headless) — skip
+  _coachShown = true;
+  c.classList.remove('hidden');
+  // place it just left of the button, arrow pointing right at it
+  const cw = c.offsetWidth || 246;
+  c.style.top  = Math.max(8, r.top - 6) + 'px';
+  c.style.left = Math.max(8, r.left - cw - 16) + 'px';
+}
+{ const ok = $('coach-amphib-ok'); if (ok) ok.onclick = ()=>{ sClick(); dismissCoachAmphib(); }; }
+
 function updateUnitCard(){
   const body = $('unit-body'), act = $('unit-actions');
   act.innerHTML = '';
@@ -9367,7 +9454,7 @@ function updateUnitCard(){
       if (amphibTarget && amphibTarget.id===u.id){ eb.style.borderColor='var(--cyan)'; eb.style.color='#9fd8ff'; eb.style.background='#183a4a'; }
       if (!affordable){ eb.disabled = true; eb.style.opacity = 0.5; }
       eb.onclick = ()=>{
-        sClick();
+        sClick(); dismissCoachAmphib();
         if (amphibTarget && amphibTarget.id===u.id){ amphibTarget=null; $('hint').innerHTML=defaultHint(); }
         else {
           const beaches = navalReach(u);
@@ -9379,7 +9466,9 @@ function updateUnitCard(){
         }
         updateAll(); updateUnitCard();
       };
+      eb.id = 'btn-naval-invasion';
       act.appendChild(eb);
+      if (isHuman && affordable) maybeCoachAmphib(eb);        // one-time "how to invade" nudge
     }
     // standing battle-plan orders: paint a persistent order the unit runs each turn
     if (!k.hq){
@@ -10728,7 +10817,17 @@ function runAIPhase(){
     const n = unitsOf(G.phase).length;
     const mDelay = Math.max(40, 150 - n*2), aDelay = Math.max(120, 300 - n*3);
     const res = applyAction(a);
-    if (res && res.type==='move'){
+    if (res && res.type==='amphib' && res.ev){
+      const ev = res.ev;
+      landingAnim(ev.from[0], ev.from[1], ev.to[0], ev.to[1],
+                  { opposed: !!ev.def, stormed: ev.destroyed, repelled: !ev.landed });
+      updateAll();
+      setTimeout(step, mult ? Math.max(aDelay, 650)*mult : 0);      // let the craft land before the next move
+    } else if (res && res.type==='evac' && res.from){
+      landingAnim(res.from[0], res.from[1], res.to[0], res.to[1], { evac:true });
+      updateAll();
+      setTimeout(step, mult ? Math.max(aDelay, 550)*mult : 0);
+    } else if (res && res.type==='move'){
       if (mult) sMove();
       setTimeout(step, mDelay*mult);
     } else if (res && res.type==='attack'){
