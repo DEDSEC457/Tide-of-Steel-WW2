@@ -176,6 +176,12 @@
     padding:2px 7px;border-radius:4px;font-weight:700;}
   .mc-badge.ready{background:#1c2e0f;color:var(--grn);border:1px solid #4a7a28;}
   .mc-badge.wip{background:#2a1e0c;color:#c8923a;border:1px solid #8a5a18;}
+  .mc-badge.fresh{background:#3a2a0c;color:#ffd98a;border:1px solid #a8792a;left:12px;right:auto;
+    animation:mcpulse 1.6s ease-in-out infinite;}
+  @keyframes mcpulse{0%,100%{box-shadow:0 0 0 #ffd98a00;}50%{box-shadow:0 0 10px #ffd98a66;}}
+  .mode-card .mc-new{font-size:11px;letter-spacing:.5px;color:#8fe0a0;line-height:1.45;
+    margin:-6px 0 12px;font-weight:600;}
+  .mode-card .mc-new b{color:#ffd98a;}
   .mode-card .mc-icon{font-size:34px;margin-bottom:8px;line-height:1;}
   .mode-card h2{font-size:16px;letter-spacing:3px;color:var(--amber);margin-bottom:6px;}
   .mode-card .mc-desc{font-size:12px;color:var(--ink);line-height:1.5;margin-bottom:14px;}
@@ -257,10 +263,12 @@
     <!-- Three secondary modes -->
     <div class="mode-row">
       <div class="mode-card" id="mc-realistic">
-        <span class="mc-badge ready">2 SCENARIOS</span>
+        <span class="mc-badge fresh">✦ NEW UPDATE</span>
+        <span class="mc-badge ready">4 SCENARIOS</span>
         <div class="mc-icon">🗺</div>
         <h2>REALISTIC MODE</h2>
-        <p class="mc-desc">The full Eastern Front 1941–45 with fuel logistics, railheads and historical OOB — inspired by the great wargames.</p>
+        <p class="mc-desc">Operational wargames with fuel, supply and historical OOB — the Eastern Front, France 1940, and now the amphibious campaigns in Italy and Normandy.</p>
+        <div class="mc-new">✦ NEW: <b>Husky</b> &amp; <b>Overlord</b> — naval invasions, beachheads &amp; historical decisions</div>
         <button class="primary mc-btn">PLAY ▶</button>
       </div>
       <div class="mode-card" id="mc-wawtest">
