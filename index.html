@@ -8051,6 +8051,28 @@ function ensureBigCache(wx){
   if (_tintDirty || !_tintCacheCv) renderTintCache();
 }
 
+/* Fog-of-war overlay cache. The fog dims every un-scouted hex — on the big maps
+   that's ~1500 hex fills a frame, and it was recomputed even while just panning
+   the camera. It only changes when your sight changes (a unit moves, the turn
+   flips, a city falls), which sightFor already tracks via _sightKey — so we bake
+   the whole overlay to an offscreen image keyed on that and blit it each frame. */
+let _fogCacheCv=null, _fogCacheKey='';
+function renderFogCache(sight){
+  const {cv,c} = _cacheCtx(_fogCacheCv); _fogCacheCv = cv;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (sight.has(keyOf(x,y))) continue;
+    const [cx,cy]=hexCenter(x,y);
+    const soft = neighbors(x,y).some(([nx,ny])=>sight.has(keyOf(nx,ny)));
+    hexPathC(c,cx,cy,S-0.6);
+    c.fillStyle = soft ? 'rgba(4,6,10,0.17)' : 'rgba(4,6,10,0.36)';
+    c.fill();
+  }
+}
+function ensureFogCache(sight){
+  const key = _sightKey+'|'+COLS+'x'+ROWS;
+  if (key!==_fogCacheKey || !_fogCacheCv){ _fogCacheKey=key; renderFogCache(sight); }
+}
+
 /* Style A railhead overlay: a warm wash over the railed corridor, a rail line
    with sleepers tracing from the home edge out to each forward depot, gold
    diamonds on railed depot cities and hollow ones on captured-but-not-yet-railed
@@ -8300,6 +8322,7 @@ mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation();
 window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
 
+let _unitLOD = false;   // draw simplified counters this frame (camera moving, or Low & zoomed out)
 function draw(){
   // step the camera animations before the frame is transformed
   const tnow = performance.now();
@@ -8340,9 +8363,21 @@ function draw(){
   // visible hex (colors, relief, trees/hills/rivers, coastlines) a frame. The
   // static terrain never changes between frames, so during any animation — booms,
   // landing craft, the threat pulse, weather — this is the whole per-frame cost
-  // avoided. Zoomed in past 1.05 we fall through to the crisp, water-animated live
-  // draw (where culling keeps the hex count low anyway).
-  const useCache = cam.z <= 1.05;
+  // avoided.
+  //
+  // "Low detail while moving, full detail at rest": we ALSO blit the cache while
+  // the camera is in motion (dragging, or a zoom/pan glide) at ANY zoom, so panning
+  // and zooming a weak GPU stays a single cheap image blit instead of hundreds of
+  // live hex paths. When the camera settles we fall back to the crisp live draw
+  // (culling keeps the on-screen hex count low when zoomed in). The brief softness
+  // while moving is hidden by the motion and snaps sharp the instant you stop.
+  const camMoving = (typeof dragging !== 'undefined' && dragging) || !!camGlide || !!zoomGlide;
+  const useCache = cam.z <= 1.05 || camMoving;
+  // Level-of-detail for unit counters: while the camera is moving nobody can read a
+  // NATO symbol anyway, and on Low zoomed out the counters are tiny — so draw a
+  // minimal marker (body + strength) instead of the full ~20-op counter. Full
+  // detail returns the instant the camera settles.
+  _unitLOD = camMoving || (GFX.level === 'low' && cam.z < 0.85);
   if (useCache){
     ensureBigCache(wx);
     ctx.drawImage(_terrCacheCv, 0, 0, mapW(), mapH());
@@ -8512,15 +8547,8 @@ function draw(){
   // vision fades out instead of ending in a hard cliff.
   const fowSight = fowActive() ? sightFor(viewerSide()) : null;
   if (fowSight){
-    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      if (fowSight.has(keyOf(x,y))) continue;
-      const [cx,cy] = hexCenter(x,y);
-      if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
-      const soft = neighbors(x,y).some(([nx,ny]) => fowSight.has(keyOf(nx,ny)));
-      hexPath(cx,cy,S-0.6);
-      ctx.fillStyle = soft ? 'rgba(4,6,10,0.17)' : 'rgba(4,6,10,0.36)';
-      ctx.fill();
-    }
+    ensureFogCache(fowSight);                       // ~1500 hex fills → one cached blit
+    ctx.drawImage(_fogCacheCv, 0, 0, mapW(), mapH());
   }
 
   // threat overlay: red wash on every hex a spotted enemy could hit next turn
@@ -8969,6 +8997,17 @@ function star(x,y,r){
 function drawUnit(u, cx, cy){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
+  // low-detail counter while panning/zooming or tiny on Low: ~5 canvas ops, not ~20
+  if (_unitLOD){
+    ctx.fillStyle = 'rgba(0,0,0,0.38)'; roundRect(-w/2+2,-h/2+3,w,h,5); ctx.fill();
+    ctx.fillStyle = k.color || SIDES[u.side].color; roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+    ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
+    ctx.lineWidth = (sel===u.id) ? 2.5 : 1.2; ctx.stroke();
+    ctx.fillStyle = u.str<=3 ? '#ff8d80' : '#ffe9a8';
+    ctx.font = '700 10px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(u.str, 0, 3.5);
+    ctx.restore(); return;
+  }
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
   // blurred shadow; otherwise a cheap hard-offset shadow
   if (GFX.softShadow && cam.z >= 0.62){
@@ -9156,9 +9195,14 @@ function _sceneAnimating(){
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
-  if (threatView) return true;                                           // threat overlay pulse
-  const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
-  if ((mp && mp.size) || (fp && fp.size)) return true;
+  // The threat wash and pocket rings only *pulse* — pure eye-candy. On Low we skip
+  // that so the scene can go fully idle (0 draws) instead of pegging the frame cap
+  // forever whenever an overlay is on; the overlays still render, just static.
+  if (GFX.level !== 'low'){
+    if (threatView) return true;                                         // threat overlay pulse
+    const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
+    if ((mp && mp.size) || (fp && fp.size)) return true;
+  }
   return false;
 }
 (function loop(ts){
