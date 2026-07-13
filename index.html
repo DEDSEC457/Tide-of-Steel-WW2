@@ -143,6 +143,22 @@
   /* ---------- end screen ---------- */
   #end-modal h2.win{color:var(--grn);} #end-modal h2.lose{color:var(--redL);}
   #end-stats{margin:10px 0;font-size:14px;}
+  .end-medal{text-align:center;margin:8px 0 12px;padding:12px 10px;border-radius:10px;
+    background:linear-gradient(#1c2214,#12160e);border:1px solid var(--line);}
+  .end-medal.win{border-color:#5c7a3a;box-shadow:0 0 22px #7a9d5426 inset;}
+  .end-medal.lose{border-color:#7d3a33;}
+  .end-stars{font-size:27px;letter-spacing:5px;color:var(--amber);line-height:1;text-shadow:0 0 14px #e8b34b55;}
+  .end-stars .off{color:#43402f;text-shadow:none;}
+  .end-rank{font-size:16px;letter-spacing:2px;color:var(--ink);margin-top:5px;font-weight:600;}
+  .end-score{font-size:12px;color:var(--dim);margin-top:3px;}
+  .end-score b{color:var(--amber);font-size:15px;}
+  .end-ladder-h{color:var(--dim);font-size:11px;letter-spacing:1px;margin:12px 0 4px;
+    border-top:1px solid var(--line);padding-top:8px;}
+  .end-ladder{display:flex;flex-direction:column;gap:2px;}
+  .end-tier{display:flex;justify-content:space-between;font-size:12.5px;color:#6d6a58;padding:2px 7px;border-radius:4px;}
+  .end-tier.hit{color:var(--ink);}
+  .end-tier.mine{background:#2a2413;color:var(--amber);font-weight:600;}
+  .end-record{color:var(--dim);font-size:11.5px;margin-top:11px;font-style:italic;}
 
   /* AI banner */
   #ai-banner{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:25;
@@ -11098,11 +11114,53 @@ function showEnd(){
   $('end-title').textContent = r.title;
   $('end-title').className = cls;
   $('end-text').textContent = r.text;
-  $('end-stats').innerHTML = `
+
+  // ---- after-action report ----
+  const won = cls==='win', draw = cls==='';
+  const meSide = (G.mode==='hotseat') ? 'G' : (youAxis ? 'G' : 'S');
+  const yourLost = G.stats[meSide].lost, enemyLost = G.stats[enemyOf(meSide)].lost;
+  const exch = yourLost>0 ? enemyLost/yourLost : enemyLost;
+  // objective performance for the player: attacker wants high VP, defender wants low.
+  // Drives the medal directly (robust across scenarios whose titles don't contain
+  // "AXIS"/"SOVIET", unlike the title-colour heuristic).
+  const objFrac = TOTAL_VP ? (youAxis ? r.vp/TOTAL_VP : (TOTAL_VP-r.vp)/TOTAL_VP) : 0;
+  const RANKS = ['Relieved of Command','Brigadier','Major-General','Lieutenant-General','General','Field Marshal'];
+  const stars = (G.mode==='hotseat') ? -1
+    : objFrac>=0.85?5 : objFrac>=0.68?4 : objFrac>=0.5?3 : objFrac>=0.3?2 : objFrac>=0.14?1 : 0;
+  const medalCls = stars>=3 ? 'win' : stars<=1 ? 'lose' : '';
+  const diffMul = ({easy:0.85, normal:1, hard:1.2})[G.difficulty] || 1;
+  const speedFrac = 1 - Math.min(1, (Math.min(G.turn,MAX_TURN)-1) / Math.max(1, MAX_TURN-1));
+  const speed = (youAxis && objFrac>=0.5) ? speedFrac*250 : 0;   // only a swift, winning attacker earns tempo
+  const score = Math.max(0, Math.round((objFrac*1000 + Math.min(exch,4)*180 + speed) * diffMul));
+  // most-decorated surviving division on the player's side
+  let deco = null;
+  for (const u of unitsOf(meSide)){
+    if (u.str<=0 || KINDS[u.kind].hq) continue;
+    const lv = unitLevel(u);
+    if (!deco || lv>deco.lv || (lv===deco.lv && (u.xp||0)>deco.xp)) deco = {u, lv, xp:u.xp||0};
+  }
+  const turnsWord = (SCN.turnDays||7)===7?'weeks':(SCN.turnDays||7)===1?'days':'turns';
+  const medal = stars<0 ? '' :
+    `<div class="end-medal ${medalCls}">
+       <div class="end-stars">${stars>0 ? '★'.repeat(stars)+'<span class="off">'+'★'.repeat(5-stars)+'</span>' : '—'}</div>
+       <div class="end-rank">${RANKS[stars]}</div>
+       <div class="end-score">Campaign score <b>${score.toLocaleString()}</b> <span style="opacity:.7">· ${G.difficulty}</span></div>
+     </div>`;
+  const ladder = (VICTORY_TIERS||[]).map(([min,title])=>{
+    const hit = r.vp>=min, mine = title===r.title;
+    return `<div class="end-tier ${mine?'mine':''} ${hit?'hit':''}"><span>${mine?'▶ ':''}${title}</span><span>${min} obj</span></div>`;
+  }).join('');
+  const fx = v => v.toFixed(v>=10 ? 0 : 1);
+  $('end-stats').innerHTML = medal + `
     <div class="statrow"><span>${sideName('G')} objective points</span><span>${r.vp} / ${TOTAL_VP}</span></div>
-    <div class="statrow"><span>${flag('G')} ${sideName('G')} losses</span><span>${G.stats.G.lost} strength</span></div>
-    <div class="statrow"><span>${flag('S')} ${sideName('S')} losses</span><span>${G.stats.S.lost} strength</span></div>
-    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${(SCN.turnDays||7)===7?'weeks':(SCN.turnDays||7)===1?'days':'turns'}</span></div>`;
+    <div class="statrow"><span>Enemy losses inflicted</span><span class="good">${enemyLost} str</span></div>
+    <div class="statrow"><span>Your losses</span><span class="bad">${yourLost} str</span></div>
+    <div class="statrow"><span>Exchange ratio</span><span class="${exch>=1?'good':'bad'}">${fx(exch)} : 1</span></div>
+    ${deco ? `<div class="statrow"><span>🎖 Most decorated</span><span>${flag(deco.u.side)} ${deco.u.name} <span style="color:var(--dim)">· ${RANK_NAME[deco.lv]}</span></span></div>` : ''}
+    <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${turnsWord}</span></div>
+    <div class="end-ladder-h">CAMPAIGN LADDER — where you finished</div>
+    <div class="end-ladder">${ladder}</div>
+    <div class="end-record">${recordLine(G.scenario)}</div>`;
   $('btn-end-replay').classList.toggle('hidden', !(G.replay && G.replay.length >= 2));
   show('end-modal', true);
   if (cls==='win') sCity(); else sBoom();
