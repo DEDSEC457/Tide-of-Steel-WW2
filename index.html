@@ -298,6 +298,9 @@
       <div class="pick" data-scn="italy" style="max-width:248px;">
         <h4>🗺 The Italian Campaign</h4><p>Operation Husky, 1943 — storm Sicily from North Africa, then fight up the peninsula by sea and land.</p>
       </div>
+      <div class="pick" data-scn="normandy" style="max-width:248px;">
+        <h4>🗺 Operation Overlord</h4><p>D-Day, 1944 — cross the Channel, storm the Norman beaches, break out of the bocage and race for Paris.</p>
+      </div>
     </div>
     <div class="pick-row" style="display:flex;gap:14px;justify-content:center;margin:14px 0 0;">
       <div class="pick p-ger sel" id="rm-pick-ger" style="max-width:240px;">
@@ -3500,6 +3503,326 @@ SCENARIOS.italy = (function buildItaly(){
 })();
 
 
+/* ============================ SCENARIOS.normandy ============================
+   OPERATION OVERLORD — D-Day and the Battle of Normandy, June–August 1944.
+   The Allies (G) stage in southern England and storm the Norman coast across
+   the Channel: seize the beaches, take Cherbourg and Caen, claw through the
+   bocage, and break out at Avranches for the race to the Seine and Paris. The
+   Germans (S) man the Atlantic Wall and feed their panzers into the line.
+   Realistic amphibious mode — the same sea-invasion, supply and evacuation
+   engine as Italy, a single Channel crossing instead of a two-hop campaign. */
+SCENARIOS.normandy = (function buildNormandy(){
+  const map = [
+    "~~~~...............................~~~~~",
+    "~~~~..............................~~~~~~",
+    "~~~~...............................~~~~~",
+    "~~~~..............................~~~~~~",
+    "~~~~~~.........~~~.......~~~.......~~~~~",
+    "~~~~~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~...~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~....~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~.....~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~....~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~....~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "~~.....~~...............~~~...........~~",
+    "~~.....~~.....f.f.f......~~............~",
+    "~~...........f.f.f.f.......r..........~~",
+    "~~........f.f.f.f.f.f.......r..........~",
+    "~~.......f.f.f.f.f.f.........r........~~",
+    "~~........f.f.f.f.f...........r........~",
+    "~~.......f.f.f........................~~",
+    "~~........f.f.f........................~",
+    "~~....................................~~",
+    "~~...........................h...h.....~",
+    "~~...........................h........~~",
+    "~~.........hh..........................~",
+    "~........hhh.....h.h..................~~",
+    "~~.......hhh.....hhh...................~",
+    "~~..........h.........................~~",
+    "~~................................h....~",
+    "~~....................hh..............~~",
+    "~~.....................................~",
+    "~~....................................~~",
+    "~~....hhh........hhh...................~",
+    "~~....hhh........hhh..................~~",
+    "~~h...hhh..............................~",
+    "~~hhh.................................~~",
+    "~~.................h.....hhh...........~",
+    "~~.......................hhh..........~~",
+  ];
+  return {
+  id: 'normandy', realistic: true,
+  title: 'OPERATION OVERLORD', short: 'NORMANDY 1944',
+  sub: 'D-DAY & THE BATTLE OF NORMANDY · JUNE–AUGUST 1944 · REALISTIC MODE',
+  sides: {
+    G: {name:'Allied', flag:'🟦', color:'#3a4f7a', tint:'rgba(70,100,170,0.24)'},
+    S: {name:'German', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+  },
+  fuel: true, harshOOS: true, supplyRange: 12,
+  aiMaxUnits: { G:22, S:16, Garm:6 },
+  portDeploy: true,
+  amphibious: { sides:['G'], range:9, cost:2, beachLife:6 },
+  edgeSupply: { G:false, S:false },
+  supplySeeds: {
+    G: [[19,4],[15,3],[7,4]],                 // the English embarkation ports
+    S: [[34,13],[32,20],[30,26],[36,18]],     // supply flows from the east — the Reich and Paris
+  },
+  menu: {
+    ger: {h:'🟦 Allies (21st Army Group)', p:'Overlord. Cross the Channel and storm the five beaches; link the lodgements, take Cherbourg for its port and grind through the bocage for Caen and Saint-Lô. Then punch the breakout at Avranches (Cobra), close the Falaise pocket, and race for the Seine and Paris before the front congeals.'},
+    sov: {h:'⬛ Germans (Heeresgruppe B)', p:'Rommel\'s wall. You cannot be strong everywhere — hold the crust, then seal the beachhead with the panzers before it grows. Fight for every hedgerow; make the bocage a graveyard. But watch your flank: once they break out at Avranches, the whole front can unravel toward the Seine.'},
+  },
+  kinds: {
+    g_inf:  {side:'G', label:'Infantry Corps',    atk:6, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
+    g_arm:  {side:'G', label:'Armoured Division',  atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true},
+    g_ab:   {side:'G', label:'Airborne Division',  atk:6, def:7, mp:2, maxStr:9,  cost:14, sym:'para', color:'#3d5570'},
+    g_hq:   {side:'G', label:'Army Group HQ',      atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#28406e'},
+    s_inf:  {side:'S', label:'German Infantry',    atk:5, def:7, mp:2, maxStr:10, cost:10, sym:'inf'},
+    s_pz:   {side:'S', label:'Panzer Division',    atk:8, def:6, mp:4, maxStr:10, cost:18, sym:'arm', fuel:true, color:'#23262b'},
+    s_ss:   {side:'S', label:'SS-Panzer Division', atk:9, def:7, mp:4, maxStr:10, cost:22, sym:'arm', fuel:true, color:'#1c1e22'},
+    s_cst:  {side:'S', label:'Static Division',    atk:2, def:5, mp:1, maxStr:6,  cost:4,  sym:'inf', noAmphib:true, color:'#5a5040'},
+    s_hq:   {side:'S', label:'Heeresgruppe HQ',    atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+  },
+  deployNames: {g_inf:'Follow-up Corps', g_arm:'Armoured Reserve', g_ab:'Airborne Reserve',
+    s_inf:'Infanterie-Division', s_pz:'Panzer Reserve', s_ss:'SS Reserve', s_cst:'Festung Battalion'},
+  cols: 40, rows: 38, map,
+  cities: [
+    // ---- England (the Allied springboard) ----
+    {x:19, y:4,  name:'Portsmouth',   vp:0, owner:'G'},
+    {x:15, y:3,  name:'Southampton',  vp:0, owner:'G'},
+    {x:7,  y:4,  name:'Plymouth',     vp:0, owner:'G'},
+    {x:31, y:4,  name:'Dover',        vp:0, owner:'G'},
+    // ---- the beachhead & the Cotentin ----
+    {x:11, y:8,  name:'Cherbourg',    vp:2, owner:'S'},
+    {x:17, y:13, name:'Bayeux',       vp:0, owner:'S'},
+    {x:14, y:13, name:'Carentan',     vp:0, owner:'S'},
+    {x:21, y:13, name:'Caen',         vp:3, owner:'S'},
+    {x:16, y:18, name:'Saint-Lô',     vp:1, owner:'S'},
+    // ---- the breakout ----
+    {x:8,  y:15, name:'Avranches',    vp:1, owner:'S'},
+    {x:22, y:18, name:'Falaise',      vp:1, owner:'S'},
+    // ---- Brittany & the west ----
+    {x:9,  y:26, name:'Rennes',       vp:1, owner:'S'},
+    {x:2,  y:26, name:'Brest',        vp:1, owner:'S'},
+    {x:2,  y:31, name:'Saint-Nazaire',vp:1, owner:'S'},
+    // ---- the east & the drive on Paris ----
+    {x:24, y:14, name:'Le Havre',     vp:2, owner:'S'},
+    {x:29, y:17, name:'Rouen',        vp:2, owner:'S'},
+    {x:27, y:23, name:'Chartres',     vp:1, owner:'S'},
+    {x:19, y:27, name:'Le Mans',      vp:1, owner:'S'},
+    {x:30, y:26, name:'Orléans',      vp:1, owner:'S'},
+    {x:32, y:20, name:'Paris',        vp:5, owner:'S'},
+    {x:34, y:13, name:'Amiens',       vp:1, owner:'S'},
+  ],
+  gerSpawns: [[10,4],[14,4],[24,4],[28,4],[18,3]],           // Allied build-up in England
+  sovSpawns: [[34,13],[32,20],[30,26],[36,18],[35,24]],      // German reserves from the east
+  /* 6 June 1944 — the Atlantic Wall thinly held by static divisions, the panzers
+     ranged behind Caen, and 15th Army pinned at Calais by the deception. */
+  startUnits: [
+    // ---- Allies (G) — the invasion fleet, off the English south coast ----
+    ['g_arm','US 2nd Armored',     10, 4],
+    ['g_inf','US VII Corps',       12, 4],   // Utah
+    ['g_ab', '82nd Airborne',      14, 4],
+    ['g_inf','US V Corps',         18, 4],   // Omaha
+    ['g_inf','British XXX Corps',  20, 4],   // Gold
+    ['g_inf','Canadian 3rd Div',   22, 4],   // Juno
+    ['g_inf','British I Corps',    24, 4],   // Sword
+    ['g_ab', '6th Airborne',       28, 4],
+    ['g_arm','Guards Armoured',    30, 4],
+    ['g_hq', '21st Army Group',    16, 3],
+    // ---- Germans (S) — the Atlantic Wall (static coastal crust) ----
+    ['s_cst','709. Static',        12, 10, 5],  // Cotentin
+    ['s_cst','716. Static',        19, 13, 5],  // Calvados beaches
+    ['s_cst','Cherbourg Festung',  11, 8,  5],  // the fortress port
+    ['s_inf','352. Infanterie',    16, 14, 9],  // the Omaha defender — the tough one
+    // ---- Germans (S) — the panzer reserve behind the coast ----
+    ['s_pz', '21. Panzer',         21, 15, 9],  // the immediate Caen reserve
+    ['s_ss', '12. SS Hitlerjugend',23, 16, 9],  // thrown at Caen
+    ['s_pz', 'Panzer Lehr',        17, 17, 9],  // the bocage, Saint-Lô
+    // ---- Germans (S) — the deeper reserves & the rear ----
+    ['s_ss', '2. SS Das Reich',    12, 22, 9],  // up from the south
+    ['s_pz', '116. Panzer',        28, 18, 8],  // held east of the Seine
+    ['s_inf','84. Korps',          20, 20, 8],  // the interior line
+    ['s_cst','Rennes Garrison',    9,  26, 5],
+    ['s_inf','Paris Garrison',     32, 20, 8],
+    ['s_inf','15. Armee (Calais)', 34, 13, 8],  // pinned north by the deception
+    ['s_hq', 'Heeresgruppe B',     27, 20],
+  ],
+  generals: [
+    {side:'G', unit:'21st Army Group', name:'Montgomery', def:1.08,
+     bio:'Ground-force commander for Overlord — draws the German armour onto the British at Caen so the Americans can break out in the west.'},
+    {side:'G', unit:'US V Corps', name:'Bradley', atk:1.12,
+     bio:'Commands the US First Army from bloody Omaha through the bocage to the Cobra breakout — the quiet architect of the American war in Normandy.'},
+    {side:'G', unit:'Guards Armoured', name:'Patton', atk:1.18,
+     bio:'His Third Army is the whip of the breakout: once Avranches opens, he pours armour into Brittany and races east for the Seine before the Germans can form a line.'},
+    {side:'S', unit:'Panzer Lehr', name:'Rommel', def:1.12,
+     bio:'"The invasion must be defeated on the beaches — the first 24 hours will be decisive." The Desert Fox knows the Allied air power leaves him no war of movement.'},
+    {side:'S', unit:'12. SS Hitlerjugend', name:'Meyer', def:1.10,
+     bio:'His teenage fanatics fight Caen to rubble and hold it for six weeks against everything Montgomery throws at them.'},
+    {side:'S', unit:'2. SS Das Reich', name:'von Kluge', def:1.06,
+     bio:'Commands the West as the front cracks — caught between Hitler\'s no-retreat orders and the reality of the Falaise pocket closing behind his armies.'},
+  ],
+  sovSchedule: [
+    // Allied build-up (G): the follow-on armies, incl. Patton's Third Army
+    [3, 'g_inf','US XIX Corps'],  [4, 'g_arm','US 3rd Armored'],
+    [5, 'g_inf','British VIII Corps'],[6, 'g_arm','French 2nd Armoured'],
+    [7, 'g_inf','US XV Corps'],   [9, 'g_inf','Canadian II Corps'],
+    // German reinforcements (S), fed piecemeal under the bombing
+    [4, 's_inf','3. Fallschirm'], [6, 's_pz','9. Panzer'],
+    [8, 's_inf','Kampfgruppe'],
+  ],
+  events: [
+    {turn:1, date:'6 June 1944',  title:'D-DAY',
+     text:'In the grey dawn 5,000 ships stand off Normandy and 130,000 men wade ashore across Utah, Omaha, Gold, Juno and Sword while three airborne divisions seize the flanks. The Atlantic Wall is breached in a day — but the beachhead is shallow, and the panzers are coming.'},
+    {turn:2, date:'12 June 1944', title:'THE LODGEMENT', pp:{G:2},
+     text:'The five beaches link into one continuous front and the follow-up divisions pour ashore over the Mulberry harbours. Ahead lies the bocage — a maze of sunken lanes and hedgerow banks where every field is a fortress.'},
+    {turn:4, date:'27 June 1944', title:'CHERBOURG',
+     text:'The Cotentin is cut and Cherbourg falls — but the Germans wreck the port so thoroughly it will be weeks before it works. In the hedgerows the advance is measured in fields, and the cost in men.'},
+    {turn:6, date:'18 July 1944', title:'CAEN & GOODWOOD',
+     text:'After six weeks and a firestorm of bombing, the ruins of Caen finally fall. The German armour is massed against the British in the east — which is exactly the point: the American west is thinly held now.'},
+    {turn:8, date:'25 July 1944', title:'OPERATION COBRA',
+     text:'West of Saint-Lô, 1,500 heavy bombers carpet a narrow strip of front and the American armour pours through the gap. After seven weeks of yards, the breakout is measured in miles — and Avranches opens the door to Brittany and the south.'},
+    {turn:10,date:'19 August 1944',title:'THE FALAISE POCKET',
+     text:'The German armies in Normandy are all but encircled in a shrinking pocket around Falaise. Under a sky owned by Allied fighter-bombers, two armies try to escape through a gap a few miles wide — the killing ground of the campaign.'},
+    {turn:12,date:'25 August 1944',title:'THE LIBERATION OF PARIS',
+     text:'The front is broken and the Germans stream back toward the Seine and the frontier. The French 2nd Armoured Division rolls into a Paris already rising against its garrison — and the Battle of Normandy is won.'},
+  ],
+  decisions: [
+    {
+      id:'panzer_release', turn:1, side:'S',
+      date:'6 June 1944', title:'RELEASE THE PANZERS?',
+      text:'The invasion is ashore and Rommel demands the armoured reserve be thrown at the beaches AT ONCE, before the lodgement grows — but the panzer divisions are Hitler\'s to release, and OKW believes the real blow is still coming at Calais. Commit the armour now, or hold it back?',
+      options:[
+        {label:'Commit the panzers to the beaches now',
+         effect:'21. Panzer and 12. SS surge forward (+2 strength) to hit the shallow beachhead',
+         blurb:'The armour rolls for the coast in daylight — straight under the guns of the fleet and the fighter-bombers. It hits the beachhead hard while it is still shallow, but pays a fearful price to the air.',
+         log:'⬛ The panzer reserve is committed to the coast at once.',
+         apply(G){ ['21. Panzer','12. SS Hitlerjugend'].forEach(n=>{const u=G.units.find(x=>x.name===n); if(u)u.str=Math.min(KINDS[u.kind].maxStr,u.str+2);}); }},
+        {label:'Hold the armour back — wait for Calais',
+         effect:'The panzers wait (the deception holds): +8⚙ husbanded, but the beachhead is left to grow',
+         blurb:'OKW keeps the reserve leashed, certain the true invasion will fall at the Pas-de-Calais. The armour is intact and rested — but the Allied lodgement is never hit while it is weak, and it swells by the hour.',
+         log:'⬛ The panzers are held back; the Calais deception holds.',
+         apply(G){ G.pp.S=Math.min(40,G.pp.S+8); }},
+      ],
+      ai(G){ return 1; },
+    },
+    {
+      id:'goodwood', turn:6, side:'G',
+      date:'18 July 1944', title:'CAEN — HOW HARD TO PUSH?',
+      text:'Caen has held for six weeks and the German armour is massed in front of it. Montgomery can hurl the British armour at it in a set-piece (Goodwood) to pin the panzers east — bleeding your own tanks to keep the American west open — or hold and let the attrition do its work.',
+      options:[
+        {label:'Goodwood — hurl the armour at Caen',
+         effect:'Your eastern divisions attack hard (+2 str near Caen) and pin the panzers — but take losses',
+         blurb:'A thousand tanks roll behind the heaviest bombing of the war. The German armour is fixed in the east, exactly as intended — at a bitter cost in British Shermans that the west will be glad of.',
+         log:'🟦 Operation Goodwood: the armour charges the Caen ridges to pin the panzers.',
+         apply(G){
+           const caen=G.cities.find(c=>c.name==='Caen');
+           unitsOf('G').filter(u=>!KINDS[u.kind].hq).sort((a,b)=>hexDist(a.x,a.y,caen.x,caen.y)-hexDist(b.x,b.y,caen.x,caen.y)).slice(0,3)
+             .forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+2));
+           const p21=G.units.find(u=>u.name==='21. Panzer'); if(p21)p21.str=Math.max(1,p21.str-1);
+         }},
+        {label:'Hold at Caen, conserve the armour',
+         effect:'Bank the strength for the western breakout instead: +6⚙',
+         blurb:'No costly set-piece. The line holds at Caen and the tanks are saved — the pressure that pins the panzers eases a little, but the breakout force grows.',
+         log:'🟦 The British hold at Caen and husband their armour.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+6); }},
+      ],
+      ai(G){ return 0; },
+    },
+    {
+      id:'cobra', turn:8, side:'G',
+      date:'25 July 1944', title:'OPERATION COBRA — THE BREAKOUT',
+      text:'West of Saint-Lô the German line is stretched to breaking. The plan is to carpet-bomb a narrow strip with the heavy bombers and pour the armour through the gap. Unleash the breakout — accepting the risk of short bombing on your own men — or widen the front and grind on methodically?',
+      options:[
+        {label:'Unleash Cobra — carpet-bomb and pour through',
+         effect:'The western front is blown open: German troops there lose 1 str, and your spearheads surge (+2 str) toward Avranches',
+         blurb:'2,500 tons of bombs fall on a strip two miles wide. Some fall short and kill your own — but the German front simply ceases to exist there, and the armour is through into open country. The war of movement is back.',
+         log:'🟦 Operation Cobra: the carpet bombing blows the western front wide open.',
+         apply(G){
+           for(const u of unitsOf('S')) if(u.x<=18 && u.y>=13 && u.y<=22) u.str=Math.max(1,u.str-1);
+           const av=G.cities.find(c=>c.name==='Avranches');
+           unitsOf('G').filter(u=>!KINDS[u.kind].hq).sort((a,b)=>hexDist(a.x,a.y,av.x,av.y)-hexDist(b.x,b.y,av.x,av.y)).slice(0,3)
+             .forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+2));
+         }},
+        {label:'Grind on with a broad-front advance',
+         effect:'No gamble — a steady push everywhere: +5⚙',
+         blurb:'Rather than risk everything on one narrow thrust, the whole front leans forward together. Slower, safer — the breakout will have to wait for the line to crack of its own weight.',
+         log:'🟦 The advance grinds forward on a broad front.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+5); }},
+      ],
+      ai(G){ return 0; },
+    },
+    {
+      id:'falaise', turn:10, side:'G',
+      date:'19 August 1944', title:'THE FALAISE GAP',
+      text:'The German armies are nearly encircled at Falaise, with only a few miles of gap left open. Drive hard to slam it shut and trap two armies — risking your spearheads meeting head-on in confusion — or keep the pocket under the guns and let the airpower do the killing?',
+      options:[
+        {label:'Close the gap — trap the German armies',
+         effect:'The encircling divisions push hard (+2 str) and the trapped Germans are mauled (units in the pocket lose 2 str)',
+         blurb:'Poles and Canadians from the north, Americans from the south, drive to seal the gap. Tens of thousands are trapped; the roads become a graveyard of burnt-out columns. The German army in the west is broken.',
+         log:'🟦 The Falaise pocket is slammed shut — the German armies are trapped.',
+         apply(G){
+           const fa=G.cities.find(c=>c.name==='Falaise');
+           for(const u of unitsOf('S')) if(hexDist(u.x,u.y,fa.x,fa.y)<=4) u.str=Math.max(1,u.str-2);
+           unitsOf('G').filter(u=>!KINDS[u.kind].hq && hexDist(u.x,u.y,fa.x,fa.y)<=6).slice(0,4)
+             .forEach(u=>u.str=Math.min(KINDS[u.kind].maxStr,u.str+2));
+         }},
+        {label:'Let the airpower grind the pocket',
+         effect:'Play it safe and shell the pocket: +6⚙, but many Germans slip through the gap',
+         blurb:'Rather than risk friendly units colliding, the pocket is left to the artillery and the fighter-bombers. The slaughter is terrible — but the gap stays open a day too long, and the cadres that will fight on the Siegfried Line escape.',
+         log:'🟦 The Falaise gap is left to the guns; many Germans escape east.',
+         apply(G){ G.pp.G=Math.min(40,G.pp.G+6); }},
+      ],
+      ai(G){ return 0; },
+    },
+  ],
+  maxTurn: 16,
+  startDate: Date.UTC(1944,5,6),
+  weather(turn){ return turn===3 ? 'mud' : 'clear'; },   // the great Channel storm of 19–22 June
+  wxLabel: {mud:'The Channel Storm', clear:'Clear'},
+  wxFx: {
+    clear:['Clear skies','Allied air supremacy rules the battlefield — press the advance.'],
+    mud:  ['The Channel storm','The worst Channel storm in 40 years wrecks a Mulberry harbour and halts the build-up: +1 movement cost, attacks weakened.'],
+  },
+  wxMsg: { mud:'A great storm lashes the Channel — a Mulberry harbour is wrecked and the build-up stalls on the beaches.',
+           clear:'The storm blows out and the skies clear — and Allied air power returns in full force.' },
+  pp(side, turn){ return side==='G' ? 18 : (turn<=1 ? 6 : 6); },
+  victoryTiers: [
+    [18,'DECISIVE ALLIED VICTORY','Normandy is not just won but shattered — the German armies are trapped at Falaise and the Allies are over the Seine and into Paris well ahead of schedule, with the whole German west in ruins.'],
+    [11,'ALLIED VICTORY','The beachhead becomes a breakout: Cherbourg and Caen fall, Cobra tears the front open, and the drive carries to the Seine and Paris — the campaign won as history ran it.'],
+    [5, 'THE HARD SLOG','The lodgement holds and the ports are taken, but the bocage swallows the offensive — the front congeals in the hedgerows short of the breakout, as it so nearly did.'],
+    [0, 'STALLED ON THE BEACHES','The Atlantic Wall and the panzers pen the invasion into a shallow coastal strip. The great gamble is contained.'],
+  ],
+  sudden: {
+    axisCities: ['Paris','Caen','Cherbourg'], minAxisUnits: 3,
+    axisTitle: 'DECISIVE ALLIED VICTORY',
+    axisText:  'Cherbourg, Caen and Paris are all taken — the German front in the west has collapsed and the road to the Reich lies open.',
+    sovTitle:  'STALLED ON THE BEACHES',
+    sovText:   'The Allied armies are held to a shallow lodgement. Rommel\'s wall has contained the invasion.',
+  },
+  airInit: [
+    ['G','2nd Tactical Air Force', 9],
+    ['G','US Ninth Air Force',     9],
+    ['S','Luftflotte 3',           3],
+  ],
+  sovAirSchedule: [ [4,'Allied Air Reserve', 5, 'G'] ],
+  setup(st){
+    for (const u of st.units){
+      if (u.kind==='s_cst') u.entrench = 2;                              // the Atlantic Wall starts fortified
+      if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>=2)) u.entrench = Math.max(u.entrench||0,1);
+    }
+  },
+  opening(playerSide){ return [
+    '6 June 1944 — D-Day. The greatest amphibious operation in history goes in against the Atlantic Wall.',
+    playerSide==='G'
+      ? 'Storm the beaches and link them, take Cherbourg and Caen, then break out at Avranches and race for the Seine before the front can re-form.'
+      : 'Hold the crust and seal the beachhead with the panzers before it grows — and make the bocage cost the Allies a summer.',
+  ]; },
+  };
+})();
+
+
 /* ---- GRAND EASTERN FRONT: the Realistic eastern front, programmatically scaled
    up 2× into a larger operational map and a longer 1941–43 campaign. Same engine,
    rules, rendering, units, generals and events — just more room to
@@ -6046,9 +6369,9 @@ function aiFullPhase(side){
 /* Two independent slots — Arcade and Realistic — so starting (or autosaving)
    a game in one mode never clobbers the other's campaign. A pre-slots save is
    migrated into the slot matching its own scenario. */
-const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', italy:'hoi5-save-italy-v1' };
+const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', italy:'hoi5-save-italy-v1', normandy:'hoi5-save-normandy-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
-function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'italy' ? 'italy' : 'arcade'; }
+function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'italy' ? 'italy' : scnId === 'normandy' ? 'normandy' : 'arcade'; }
 function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
