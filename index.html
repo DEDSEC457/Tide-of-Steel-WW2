@@ -7873,7 +7873,10 @@ function hexPathC(c,cx,cy,s){
   c.closePath();
 }
 function _cacheCtx(prev){
-  const f = Math.min(1, GFX.cacheMax/mapW()); _cacheF = f;
+  // Bake at device resolution (up to the quality cap) so the cache blits crisp
+  // even on the small maps viewed near 1:1. On big maps cacheMax/mapW is already
+  // < 1 < DPR, so the min still picks the memory-bounded downscale — unchanged there.
+  const f = Math.min(DPR, GFX.cacheMax/mapW()); _cacheF = f;
   const W = Math.max(1,Math.ceil(mapW()*f)), H = Math.max(1,Math.ceil(mapH()*f));
   const cv = prev || document.createElement('canvas');
   cv.width = W; cv.height = H;
@@ -8257,9 +8260,13 @@ function draw(){
   const vL = cam.x - S, vT = cam.y - S,
         vR = cam.x + innerWidth/cam.z + S, vB = cam.y + innerHeight/cam.z + S;
 
-  // big maps: blit the cached terrain + front-line images instead of re-drawing
-  // ~19,000 hexes a frame. Zoomed in close, fall through to the crisp live draw.
-  const useCache = _bigMap() && cam.z <= 1.05;
+  // Blit the cached terrain + front-line images instead of re-rasterizing every
+  // visible hex (colors, relief, trees/hills/rivers, coastlines) a frame. The
+  // static terrain never changes between frames, so during any animation — booms,
+  // landing craft, the threat pulse, weather — this is the whole per-frame cost
+  // avoided. Zoomed in past 1.05 we fall through to the crisp, water-animated live
+  // draw (where culling keeps the hex count low anyway).
+  const useCache = cam.z <= 1.05;
   if (useCache){
     ensureBigCache(wx);
     ctx.drawImage(_terrCacheCv, 0, 0, mapW(), mapH());
