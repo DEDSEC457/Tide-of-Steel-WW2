@@ -49,6 +49,9 @@
   .statrow{display:flex;justify-content:space-between;margin:1px 0;}
   .statrow span:last-child{color:var(--amber);font-weight:600;}
   .bad{color:var(--redL)!important;} .good{color:var(--grn)!important;}
+  .supply-help{font-size:11.5px;line-height:1.45;color:var(--redL);background:#2a1511cc;
+    border-left:2px solid var(--red);padding:4px 8px;margin:3px 0 5px;border-radius:0 4px 4px 0;}
+  .supply-help b{color:#ffb8ab;}
   #unit-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   #unit-actions button{padding:4px 10px;font-size:12px;}
   #preview-card .vs{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
@@ -9503,6 +9506,44 @@ function maybeCoachAmphib(anchor){
 }
 { const ok = $('coach-amphib-ok'); if (ok) ok.onclick = ()=>{ sClick(); dismissCoachAmphib(); }; }
 
+/* Why is this unit cut off, and where's the fix? Finds the nearest hex still on
+   the side's supply network and the nearest friendly depot city, so the unit card
+   can explain a starving division instead of leaving the player guessing. Only
+   called for an already-out-of-supply unit (one Dijkstra on select, never a hot
+   path). Returns null if the unit is actually supplied. */
+function compass8(fromX,fromY,toX,toY){
+  const dy = toY-fromY, dx = toX-fromX;
+  const ns = dy < -0.5 ? 'north' : dy > 0.5 ? 'south' : '';
+  const ew = dx < -0.5 ? 'west' : dx > 0.5 ? 'east' : '';
+  return (ns+ew) || 'next to you';
+}
+function supplyGapInfo(u){
+  const net = computeSupply(u.side);
+  if (net.has(keyOf(u.x,u.y))) return null;                 // actually in supply
+  let gap = 1e9, toward = null;
+  for (const key of net){
+    const [x,y] = key.split(',').map(Number);
+    const d = hexDist(u.x,u.y,x,y);
+    if (d < gap){ gap = d; toward = [x,y]; }
+  }
+  return { gap: gap===1e9 ? null : gap, dir: toward ? compass8(u.x,u.y,toward[0],toward[1]) : null };
+}
+/* the plain-language note shown under the Supply row for a cut-off division */
+function supplyHelp(u){
+  const sealed = pocketsFor(u.side) && pocketsFor(u.side).has(u.id);
+  const bleed = SCN.harshOOS ? 'bleeds −2 strength a turn' : 'loses strength every turn';
+  if (sealed)
+    return `<div class="supply-help">☒ <b>Sealed in a pocket</b> — no route back to supply, so it ${bleed}. Break the ring with a relief attack from outside, or pull it out before it starves.</div>`;
+  const info = supplyGapInfo(u);
+  const where = (info && info.gap!=null)
+    ? `Your nearest supplied ground is <b>${info.gap} hex${info.gap===1?'':'es'}</b> to the <b>${info.dir}</b>. `
+    : '';
+  const fix = amphibCanSide(u.side)
+    ? `Hold a <b>coastal port</b> to feed this sector — captured ports are your supply, not the cities inland — and clear any enemy sitting on the line between.`
+    : `Close the gap back to a supplied city, and clear any enemy whose zone of control is cutting the line.`;
+  return `<div class="supply-help">⚠ <b>Cut off</b> — it ${bleed}. ${where}${fix} <span style="color:var(--dim)">Press <b>S</b> to shade the break.</span></div>`;
+}
+
 function updateUnitCard(){
   const body = $('unit-body'), act = $('unit-actions');
   act.innerHTML = '';
@@ -9541,6 +9582,7 @@ function updateUnitCard(){
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':'In supply'}</span></div>
+    ${u.oos ? supplyHelp(u) : ''}
     <div class="statrow"><span>This turn</span><span>${
       u.order ? `<span style="color:var(--amber)">${u.order==='attack'?'⚔ advance order':'🛡 hold-line order'}</span>`
       : u.held ? '<span style="color:var(--cyan)">⏭ skipped</span>'
