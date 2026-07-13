@@ -61,6 +61,20 @@
   .odds i.bad{background:linear-gradient(#a86048,#7d4433);}
   .odds::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:#00000088;}
   @keyframes oddsIn{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+  /* forecast: headline outcome, casualty bars, grouped WHY */
+  .fc-take{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0 1px;}
+  .fc-take b{font-size:19px;line-height:1;}
+  .fc-sub{color:var(--dim);font-size:11px;margin-bottom:5px;}
+  .fc-sub s{text-decoration:none;}
+  .lossrow{display:flex;justify-content:space-between;font-size:12px;margin-top:5px;}
+  .lossbar{position:relative;height:8px;border-radius:4px;background:#0d100a;
+    border:1px solid #2a3320;overflow:hidden;margin:2px 0 1px;}
+  .lossbar i{display:block;height:100%;transform-origin:left;animation:oddsIn .5s cubic-bezier(.2,.8,.3,1);}
+  .lossbar i.d{background:linear-gradient(#8fbf62,#557f36);}
+  .lossbar i.a{background:linear-gradient(#d06a5c,#8a3a30);}
+  .why-h{border-top:1px solid var(--line);margin:6px 0 3px;padding-top:4px;
+    color:var(--dim);font-size:11px;letter-spacing:1px;}
+  .why-col{color:var(--dim);font-size:10px;letter-spacing:1px;margin:3px 0 1px;}
   #log-card{overflow-y:auto;min-height:60px;}
   #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
   #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys{color:var(--amber);}
@@ -4920,6 +4934,60 @@ function previewCombat(att, def){
   return {ratio:r, defLoss, atkLoss, retreat: r>=RETREAT_RATIO && defLoss>=2, factors:cp.factors};
 }
 
+/* Monte-Carlo forecast for the preview card — replays resolveCombat's actual dice
+   (two 0.75–1.25 rolls) and loss/retreat rules a few hundred times, so the card
+   can show honest outcome odds and a casualty RANGE, not a bare point estimate.
+   Cached per-matchup by updatePreview's _pvKey, so the cost is paid once on hover. */
+function forecastOutcome(attackers, def){
+  const D = combatPower(attackers[0], def).D;
+  let Abase = 0, hasArm=false, hasInf=false, atkStr=0;
+  for (const u of attackers){
+    Abase += combatPower(u, def).A;
+    const s = KINDS[u.kind].sym;
+    if (s==='arm') hasArm=true;
+    if (s==='inf'||s==='para'||s==='mot'||s==='cav') hasInf=true;
+    atkStr += u.str;
+  }
+  let synergy = 1;
+  if (attackers.length>1){ synergy*=1.10; if (hasArm&&hasInf) synergy*=1.15; }
+  const A = Abase*synergy;
+  const lead = attackers[0];
+  const defCity = cityAt(def.x,def.y);
+  const fortress = defCity && defCity.vp>=3 && defCity.owner===def.side;
+  const canRetreat = !!retreatHex(def, lead);
+  const single = attackers.length===1;
+  const rnd = () => 0.75 + Math.random()*0.5;
+  const N = 500;
+  let kill=0, retreat=0, attLost=0, dSum=0, aSum=0;
+  const dArr=[], aArr=[];
+  for (let i=0;i<N;i++){
+    const r = (A*rnd())/(D*rnd());
+    const rawDefLoss = Math.min(def.str, Math.max(r>0.8?1:0, Math.round(1.9*r*(0.8+Math.random()*0.4))));
+    const atkLoss = Math.round(1.7/Math.max(r,0.35)*(0.8+Math.random()*0.4));
+    let dstr = def.str - rawDefLoss, destroyed=false, retreated=false;
+    if (dstr<=0) destroyed=true;
+    else if (r>=RETREAT_RATIO && rawDefLoss>=2){
+      if (fortress){ dstr-=1; if (dstr<=0) destroyed=true; }
+      else if (canRetreat) retreated=true;
+      else { dstr-=2; if (dstr<=0) destroyed=true; }
+    }
+    if (destroyed) kill++; else if (retreated) retreat++;
+    if (single && atkLoss>=lead.str) attLost++;
+    const dl = def.str - Math.max(dstr,0), al = Math.min(atkLoss, atkStr);
+    dSum+=dl; aSum+=al; dArr.push(dl); aArr.push(al);
+  }
+  dArr.sort((a,b)=>a-b); aArr.sort((a,b)=>a-b);
+  const pc = (arr,q)=>arr[Math.min(arr.length-1, Math.floor(q*arr.length))];
+  return {
+    ratio: A/Math.max(D,0.1), single,
+    pKill: kill/N, pRetreat: retreat/N, pTake: (kill+retreat)/N, pAttLost: attLost/N,
+    defLoss:{mean:dSum/N, lo:pc(dArr,0.1), hi:pc(dArr,0.9)},
+    atkLoss:{mean:aSum/N, lo:pc(aArr,0.1), hi:pc(aArr,0.9)},
+    defStr:def.str, atkStr, canRetreat, fortress,
+    factors: single ? previewCombat(lead, def).factors : combatMods(lead, def).factors,
+  };
+}
+
 function retreatHex(def, att){
   // best adjacent hex: empty, passable, away from attacker, ideally out of enemy ZOC
   const foeZOC = computeZOC(att.side);
@@ -9668,6 +9736,43 @@ function oddsBar(ratio){
   const cls = ratio >= 1.2 ? '' : ratio >= 0.8 ? ' class="even"' : ' class="bad"';
   return `<div class="odds" title="Your share of the combat power"><i${cls} style="width:${share}%"></i></div>`;
 }
+/* forecast render helpers: a casualty bar, a % pill, the grouped WHY block */
+function pct(p){ return Math.round(p*100)+'%'; }
+function lossBar(loss, maxStr, kind){
+  const w = Math.max(0, Math.min(100, Math.round(100*loss.mean/Math.max(maxStr,1))));
+  const rng = loss.hi>loss.lo ? `${loss.lo}–${loss.hi}` : `${Math.round(loss.mean)}`;
+  const label = kind==='d' ? 'They lose' : 'You lose';
+  const cls = kind==='d' ? 'good' : 'bad';
+  return `<div class="lossrow"><span style="color:var(--dim)">${label}</span>`
+    + `<span class="${cls}">≈ ${loss.mean.toFixed(1)} <span style="color:var(--dim);font-weight:400">(${rng})</span></span></div>`
+    + `<div class="lossbar"><i class="${kind}" style="width:${w}%"></i></div>`;
+}
+/* WHY: split factors into the ones that help you vs help them, biggest first */
+function whyBlock(factors){
+  if (!factors.length) return '<div class="why-h">WHY</div><div style="color:var(--dim);font-size:12px;">Even ground — no modifiers.</div>';
+  const fmt = m => (m>=1?'+':'−') + Math.round(Math.abs(m-1)*100) + '%';
+  const helpsAtk = f => (f.who==='atk') === (f.mul>=1);
+  const mag = f => Math.abs(f.mul-1);
+  const yours = factors.filter(helpsAtk).sort((a,b)=>mag(b)-mag(a));
+  const theirs = factors.filter(f=>!helpsAtk(f)).sort((a,b)=>mag(b)-mag(a));
+  const line = (f,cls) => `<div class="statrow" style="font-size:12px"><span style="color:var(--dim)">${f.label}</span><span class="${cls}">${fmt(f.mul)}</span></div>`;
+  let h = '<div class="why-h">WHY</div>';
+  if (yours.length)  h += '<div class="why-col good">▲ YOUR EDGE</div>' + yours.map(f=>line(f,'good')).join('');
+  if (theirs.length) h += '<div class="why-col bad">▼ THEIR EDGE</div>' + theirs.map(f=>line(f,'bad')).join('');
+  return h;
+}
+/* the shared headline: chance to take the hex + the outcome breakdown */
+function outcomeHead(fo){
+  const takeCls = fo.pTake>=0.6 ? 'good' : fo.pTake>=0.35 ? '' : 'bad';
+  const pHold = Math.max(0, 1 - fo.pKill - fo.pRetreat);
+  const parts = [`<s class="good">Destroy ${pct(fo.pKill)}</s>`];
+  if (fo.canRetreat && !fo.fortress) parts.push(`<s>Retreat ${pct(fo.pRetreat)}</s>`);
+  parts.push(`<s>Hold ${pct(pHold)}</s>`);
+  if (fo.single && fo.pAttLost>=0.02) parts.push(`<s class="bad">You're lost ${pct(fo.pAttLost)}</s>`);
+  return `<div class="fc-take"><span style="color:var(--dim);font-size:12px">Chance to take the hex</span>`
+    + `<b class="${takeCls}">${pct(fo.pTake)}</b></div>`
+    + `<div class="fc-sub">${parts.join(' · ')}</div>`;
+}
 function updatePreview(){
   if (!G || aiRunning){ show('preview-card', false); _pvKey=''; return; }   // no game yet — unitAt would crash
   const t = hover && unitAt(hover[0],hover[1]);
@@ -9680,6 +9785,10 @@ function updatePreview(){
   if (key === _pvKey){ show('preview-card', true); return; }
   _pvKey = key;
   show('preview-card', true);
+  const fo = forecastOutcome(attackers, t);
+  const maxDef = Math.max(t.str, 1);
+  const maxAtk = Math.max(fo.atkStr, 1);
+  const oddsCls = fo.ratio>=1.2 ? 'good' : fo.ratio<0.8 ? 'bad' : '';
   // combined-arms assault forecast
   if (attackers.length >= 2){
     const g = previewGroup(attackers, t);
@@ -9688,33 +9797,28 @@ function updatePreview(){
       <div style="color:var(--cyan);font-weight:600;margin-bottom:3px;">⚔ COMBINED ASSAULT ×${attackers.length}</div>
       <div style="font-size:12px;margin-bottom:3px;">${list}</div>
       <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
-      <div class="statrow"><span>Combined odds</span><span class="${g.ratio>=1.2?'good':g.ratio<0.8?'bad':''}">${g.ratio.toFixed(2)} : 1</span></div>
-      ${oddsBar(g.ratio)}
-      <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${g.defLoss}</span></div>
-      <div class="statrow"><span>Coordination bonus</span><span class="good">+${Math.round((g.synergy-1)*100)}%${g.combinedArms?' · combined arms!':''}</span></div>
-      <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack together. If it falls, you choose who advances.</div>`;
+      ${outcomeHead(fo)}
+      ${oddsBar(fo.ratio)}
+      <div class="statrow" style="font-size:12px"><span style="color:var(--dim)">Combined power</span><span class="${oddsCls}">${fo.ratio.toFixed(2)} : 1</span></div>
+      <div class="statrow" style="font-size:12px"><span style="color:var(--dim)">Coordination</span><span class="good">+${Math.round((g.synergy-1)*100)}%${g.combinedArms?' · combined arms!':''}</span></div>
+      ${lossBar(fo.defLoss, maxDef, 'd')}
+      ${lossBar(fo.atkLoss, maxAtk, 'a')}
+      ${whyBlock(fo.factors)}
+      <div style="color:var(--dim);margin-top:5px;">Click the enemy to attack together. If it falls, you choose who advances.</div>`;
     return;
   }
   const su = attackers[0];
-  const p = previewCombat(su, t);
-  // legible modifier breakdown — green helps the attacker, red helps the defender
-  const fmt = m => (m>=1?'+':'−') + Math.round(Math.abs(m-1)*100) + '%';
-  const rows = p.factors.map(f=>{
-    const helpsAtk = (f.who==='atk') === (f.mul>=1);   // atk×>1 or def×<1 both favor us
-    const cls = helpsAtk ? 'good' : 'bad';
-    const tag = f.who==='atk' ? 'atk' : 'def';
-    return `<div class="statrow" style="font-size:12px"><span style="color:var(--dim)">${f.label} <i>(${tag})</i></span><span class="${cls}">${fmt(f.mul)}</span></div>`;
-  }).join('');
   $('preview-body').innerHTML = `
     <div class="vs"><span>${flag(su.side)} ${su.name}</span><span>str ${su.str}</span></div>
     <div class="vs"><span>${flag(t.side)} ${t.name}</span><span>str ${t.str}</span></div>
-    <div class="statrow"><span>Odds</span><span class="${p.ratio>=1.2?'good':p.ratio<0.8?'bad':''}">${p.ratio.toFixed(2)} : 1</span></div>
-    ${oddsBar(p.ratio)}
-    <div class="statrow"><span>Their expected losses</span><span class="good">≈ ${p.defLoss}</span></div>
-    <div class="statrow"><span>Our expected losses</span><span class="bad">≈ ${p.atkLoss}</span></div>
-    ${rows ? `<div style="border-top:1px solid var(--line);margin:5px 0 2px;padding-top:3px;color:var(--dim);font-size:11px;letter-spacing:1px;">WHY</div>${rows}` : '<div style="color:var(--dim);font-size:12px;">Even ground, no modifiers.</div>'}
-    ${p.retreat ? '<div style="color:var(--amber);margin-top:3px;">Likely to force a retreat'+(retreatHex(t,su)?'':' — NO ESCAPE ROUTE!')+'</div>' : ''}
-    <div style="color:var(--dim);margin-top:3px;">Click the enemy to attack.</div>`;
+    ${outcomeHead(fo)}
+    ${oddsBar(fo.ratio)}
+    <div class="statrow" style="font-size:12px"><span style="color:var(--dim)">Power ratio</span><span class="${oddsCls}">${fo.ratio.toFixed(2)} : 1</span></div>
+    ${lossBar(fo.defLoss, maxDef, 'd')}
+    ${lossBar(fo.atkLoss, maxAtk, 'a')}
+    ${whyBlock(fo.factors)}
+    ${fo.pTake>=0.5 && !fo.canRetreat && !fo.fortress && fo.pRetreat+fo.pKill>0.4 ? '<div style="color:var(--amber);margin-top:5px;">⚠ NO ESCAPE ROUTE — a beaten defender is destroyed in place.</div>' : ''}
+    <div style="color:var(--dim);margin-top:5px;">Click the enemy to attack.</div>`;
 }
 
 function defaultHint(){
