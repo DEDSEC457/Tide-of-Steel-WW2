@@ -143,7 +143,7 @@ say('— amphibious warfare —');
   check('amphibious enabled for the invader only',
     E.amphibOn() && E.amphibCanSide('G') && !E.amphibCanSide('S'));
   check('the Strait of Messina is a water gap (no land bridge to Sicily)',
-    E.isWater(24,30) && !E.passable(24,30));
+    E.isWater(24,31) && !E.passable(24,31));
   const corps = G.units.find(u=>u.name==='US II Corps');
   check('a Tunisian corps can embark from its coastal hex', !!corps && E.canEmbark(corps));
   const beaches = E.navalReach(corps);
