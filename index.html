@@ -3137,7 +3137,7 @@ SCENARIOS.italy = (function buildItaly(){
     "~~~~~hhhhhhhhhhhhhhhh~~~~~~~~~~~~~~~~~",
     "~~~~~.h.h.h.h.h.h.h.h~~~~~~~~~~~~~~~~~",
     "~~~~~.h..h..h..h..h..~~~~~~~~~~~~~~~~~",
-    "~~~~~~~.h...h...h.~~~~~~~~~~~~~~~~~~~~",
+    "~~~~~~.............~~~~~~~~~~~~~~~~~~~",
     "~~~~~~~..rrrrrrrrr.~~~~~~~~~~~~~~~~~~~",
     "~~~~~~.............~~~~~~~~~~~~~~~~~~~",
     "~~~~~~~............~~~~~~~~~~~~~~~~~~~",
@@ -3147,37 +3147,37 @@ SCENARIOS.italy = (function buildItaly(){
     "~~~~~~~~~~~...h...~~~~~~~~~~~~~~~~~~~~",
     "~~~~~~...~~....h..~~~~~~~~~~~~~~~~~~~~",
     "~~~~~~....~~....h..~~~~~~~~~~~~~~~~~~~",
-    "~~~~~.....~~~......~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~....~~~~..h...~~~~~~~~~~~~~~~~~~",
-    "~~~~~~...~~~~~...h..~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~..~~~~~~...h..~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~...h..~~~.......~~~~~~~",
-    "~~~~~~~~~~~~~~~~.hhhh.~..........~~~~~",
-    "~~~~~~..~~~~~~~~..rhr............~~~~~",
-    "~~~~~....~~~~~~~~...h............~~~~~",
-    "~~~~.....~~~~~~~~....h.........~~~~~~~",
-    "~~~~~.....~~~~~~~~~...h..~~...~~~~~~~~",
-    "~~~~.....~~~~~~~~~~......~~..~~~~~~~~~",
-    "~~~~~.....~~~~~~~~~~~...f.~~~~~~~~~~~~",
-    "~~~~.....~~~~~~~~~~~~..h..~~~~~~~~~~~~",
-    "~~~~~....~~~~~~~~~~~~~..h..~~~~~~~~~~~",
-    "~~~~~~..~~~~~~~~~~~~~~...h.~~~~~~~~~~~",
+    "~~~~~.....~~~......~~~~~~...~~~~~~~~~~",
+    "~~~~~~....~~~~..h...~~~~~.f..~~~~~~~~~",
+    "~~~~~~....~~~~...h..~~~~~....~~~~~~~~~",
+    "~~~~~~~..~~~~~~...h..~~~~~.......~~~~~",
+    "~~~~~~~~~~~~~~~...h..~~~~........~~~~~",
+    "~~~~~~~~~~~~~~~~.hhhh.~~~~.......~~~~~",
+    "~~~~~~..~~~~~~~~..rh..~~~~......~~~~~~",
+    "~~~~~....~~~~~~~~...h...~~~...~~~~~~~~",
+    "~~~~.....~~~~~~~~....h..~~...~~~~~~~~~",
+    "~~~~~.....~~~~~~~~~...h.......~~~~~~~~",
+    "~~~~.....~~~~~~~~~~......f...~~~~~~~~~",
+    "~~~~~.....~~~~~~~~~~~...f..~~~~~~~~~~~",
+    "~~~~~....~~~~~~~~~~~~..h..~~~~~~~~~~~~",
+    "~~~~~~...~~~~~~~~~~~~~..h..~~~~~~~~~~~",
+    "~~~~~~..~~~~~~~~~~~~~~...h~~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~~~~~~....~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~~~~~~..h.~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~~~~~~~...~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~~~~.......~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~~.......h~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~~~~......~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~........~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~........~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~....h.~~~~~~~~~~~~~~~",
     "~~~~~~~~~~~~~~~~~~....~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~~~~~~~~~~..~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~...~~~~~~.~~~~~~~~~~~~~~~~~",
-    "~~~~~~~~~~~...~~~~~~~~~~~~~~~~~~~~~~~~",
-    "....................................~~",
-    "....................................~~",
-    "....................................~~",
-    "....................................~~",
-    "....................................~~",
+    "~~~~~~~~~~~~~~~~~~~...~~~~~~~~~~~~~~~~",
+    "~~~~~~~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~~",
+    "~~~~.~~~~~~~...~~~~~~~~~...~~~~~~~~~~~",
+    "........~~~...~~~.....................",
+    "...............~~.....................",
+    "......................................",
+    ".........................~~~~~~~......",
+    "........................~~~~~~~~......",
   ];
   return {
   id: 'italy', realistic: true,
@@ -3190,12 +3190,12 @@ SCENARIOS.italy = (function buildItaly(){
   fuel: true, harshOOS: true, supplyRange: 12,
   aiMaxUnits: { G:22, S:15, Garm:6 },      // the Allies field an overwhelming force; the Axis defence is finite
   portDeploy: true,                         // reinforcements can land at captured coastal ports, not just Tunisia
-  amphibious: { sides:['G'], range:9, cost:3, beachLife:6 },
+  amphibious: { sides:['G'], range:9, cost:2, beachLife:6 },
   edgeSupply: { G:false, S:false },        // nobody is fed from a map edge — ports & beachheads only
   supplySeeds: {
     // the Allied springboard: the three Tunisian ports feed the invasion until
     // beachheads and captured Italian ports take over
-    G: [[8,39],[5,39],[15,39]],
+    G: [[7,39],[5,39],[14,38]],
     // the Axis rear: supply flows south from the Po valley (and re-sources at every
     // Axis-held city), plus the sea-lifelines to the islands — cut when their ports fall
     S: [[10,3],[13,3],[16,3],[24,32],[6,26],[8,11]],
@@ -3224,16 +3224,16 @@ SCENARIOS.italy = (function buildItaly(){
     // ---- Sicily ----
     {x:19, y:32, name:'Palermo',  vp:1, owner:'S'},
     {x:24, y:32, name:'Messina',  vp:1, owner:'S'},
-    {x:23, y:34, name:'Catania',  vp:1, owner:'S'},
+    {x:23, y:33, name:'Catania',  vp:1, owner:'S'},
     {x:22, y:34, name:'Siracusa', vp:0, owner:'S'},
-    {x:19, y:35, name:'Gela',     vp:0, owner:'S'},
+    {x:18, y:35, name:'Gela',     vp:0, owner:'S'},
     {x:18, y:32, name:'Trapani',  vp:0, owner:'S'},
     // ---- the toe & the south ----
     {x:26, y:28, name:'Reggio',   vp:0, owner:'S'},
     {x:24, y:24, name:'Cosenza',  vp:0, owner:'S'},
-    {x:27, y:22, name:'Taranto',  vp:1, owner:'S'},
-    {x:31, y:18, name:'Brindisi', vp:1, owner:'S'},
-    {x:28, y:17, name:'Bari',     vp:1, owner:'S'},
+    {x:26, y:22, name:'Taranto',  vp:1, owner:'S'},
+    {x:32, y:18, name:'Brindisi', vp:1, owner:'S'},
+    {x:29, y:16, name:'Bari',     vp:1, owner:'S'},
     {x:21, y:18, name:'Foggia',   vp:1, owner:'S'},
     {x:21, y:19, name:'Napoli',   vp:3, owner:'S'},
     // ---- the centre — the Gustav Line & Rome ----
@@ -3242,36 +3242,36 @@ SCENARIOS.italy = (function buildItaly(){
     {x:17, y:11, name:'Ancona',   vp:1, owner:'S'},
     {x:15, y:10, name:'Firenze',  vp:2, owner:'S'},
     // ---- the north — the Po & the Alps ----
-    {x:9,  y:8,  name:'Genova',   vp:1, owner:'S'},
-    {x:14, y:7,  name:'Bologna',  vp:2, owner:'S'},
-    {x:17, y:4,  name:'Venezia',  vp:2, owner:'S'},
-    {x:10, y:3,  name:'Milano',   vp:3, owner:'S'},
-    {x:7,  y:5,  name:'Torino',   vp:2, owner:'S'},
+    {x:9, y:8, name:'Genova',   vp:1, owner:'S'},
+    {x:14, y:7, name:'Bologna',  vp:2, owner:'S'},
+    {x:17, y:4, name:'Venezia',  vp:2, owner:'S'},
+    {x:10, y:3, name:'Milano',   vp:3, owner:'S'},
+    {x:7, y:5, name:'Torino',   vp:2, owner:'S'},
     // ---- the islands ----
-    {x:6,  y:26, name:'Cagliari', vp:1, owner:'S'},
-    {x:6,  y:20, name:'Sassari',  vp:0, owner:'S'},
-    {x:6,  y:15, name:'Ajaccio',  vp:0, owner:'S'},
-    {x:8,  y:11, name:'Bastia',   vp:0, owner:'S'},
+    {x:6, y:26, name:'Cagliari', vp:1, owner:'S'},
+    {x:6, y:20, name:'Sassari',  vp:0, owner:'S'},
+    {x:6, y:15, name:'Ajaccio',  vp:0, owner:'S'},
+    {x:8, y:11, name:'Bastia',   vp:0, owner:'S'},
     // ---- North Africa — the Allied springboard ----
-    {x:8,  y:39, name:'Tunis',    vp:0, owner:'G'},
-    {x:5,  y:39, name:'Bizerte',  vp:0, owner:'G'},
-    {x:15, y:39, name:'Sousse',   vp:0, owner:'G'},
+    {x:7, y:39, name:'Tunis',    vp:0, owner:'G'},
+    {x:5, y:39, name:'Bizerte',  vp:0, owner:'G'},
+    {x:14, y:38, name:'Sousse',   vp:0, owner:'G'},
   ],
-  gerSpawns: [[10,40],[13,40],[7,40],[15,40],[11,41]],          // Allied staging in Tunisia
+  gerSpawns: [[10,40],[13,40],[7,40],[17,40],[11,41]],          // Allied staging in Tunisia
   sovSpawns: [[10,3],[13,3],[16,3],[9,5],[12,5]],               // Axis rear — the Po valley
   /* 10 July 1943 — Husky. The Allied armies wait in Tunisia; the Axis holds
      Sicily with weak Italian coastal divisions stiffened by two German mobile
      formations, and keeps its real strength on the mainland. */
   startUnits: [
     // ---- Allies (G) — staged along the Tunisian coast, ready to embark ----
-    ['g_inf','US II Corps',        12, 37],   // Cap Bon — the spearhead nearest Sicily
-    ['g_inf','US 3rd Division',    14, 39],
+    ['g_inf','US II Corps',        12, 38],   // Cap Bon — the spearhead nearest Sicily
+    ['g_inf','US 3rd Division',    13, 38],   // Cap Bon
     ['g_arm','US 2nd Armored',     7,  39],
-    ['g_inf','British XIII Corps', 16, 39],
+    ['g_inf','British XIII Corps', 11, 39],
     ['g_inf','British XXX Corps',  17, 39],
-    ['g_inf','Canadian 1st Div',   9,  39],
-    ['g_mtn','French Expeditionary',6, 39],
-    ['g_arm','British 7th Armoured',10,39],
+    ['g_inf','Canadian 1st Div',   6,  39],
+    ['g_mtn','French Expeditionary',4, 39],
+    ['g_arm','British 7th Armoured',14,38],   // Cap Bon
     ['g_hq', '15th Army Group',    12, 41],
     // ---- Axis (S) — Sicily garrison: thin coastal troops that trade the island for time ----
     ['s_cst','206ª Costiera',      19, 35, 4],   // Gela beaches
