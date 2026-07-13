@@ -5703,6 +5703,60 @@ function nearestEnemyObjDist(side, x, y){
   for (const c of G.cities) if (c.vp>0 && c.owner!==side) d = Math.min(d, hexDist(x,y,c.x,c.y));
   return d;
 }
+
+/* ---- NAVAL EVACUATION (defender AI) ----
+   Connected land components (terrain only, so cached for the whole scenario). */
+let _landComps = null, _landCompsFor = null;
+function landComponents(){
+  if (_landComps && _landCompsFor === MAP_ROWS) return _landComps;
+  _landCompsFor = MAP_ROWS;
+  const comp = new Map(); let id = 0;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (!passable(x,y) || comp.has(keyOf(x,y))) continue;
+    id++; const st=[[x,y]]; comp.set(keyOf(x,y),id);
+    while (st.length){ const [cx,cy]=st.pop();
+      for (const [nx,ny] of neighbors(cx,cy)) if (passable(nx,ny) && !comp.has(keyOf(nx,ny))){ comp.set(keyOf(nx,ny),id); st.push([nx,ny]); }
+    }
+  }
+  return _landComps = comp;
+}
+function defenderSide(){ return amphibOn() ? enemyOf(amphibSides()[0]) : null; }
+/* When the invader has clearly won an outlying island, the defender doesn't die
+   in place — it ferries its survivors back across the water to hold the mainland
+   line (Operation Lehrgang off Sicily, and the like). Returns an {type:'evac'}
+   action or null. Gated to amphibious scenarios and the defending side. */
+function aiEvacuate(side){
+  if (!amphibOn() || side !== defenderSide()) return null;
+  const comps = landComponents();
+  // the mainland = the land component holding the most of the defender's cities
+  const held = new Map();
+  for (const c of G.cities){ if (c.owner!==side) continue; const k=comps.get(keyOf(c.x,c.y)); if (k!=null) held.set(k,(held.get(k)||0)+1); }
+  let mainComp=null, mainN=-1; for (const [k,n] of held) if (n>mainN){ mainN=n; mainComp=k; }
+  if (mainComp==null) return null;
+  const foe = enemyOf(side);
+  for (const u of unitsOf(side)){
+    // only mobile formations can be ferried off; static coastal troops (noAmphib)
+    // are left to fight it out on the island, as they historically were
+    if (u.moved || u.attacked || KINDS[u.kind].hq || KINDS[u.kind].noAmphib) continue;
+    const c = comps.get(keyOf(u.x,u.y));
+    if (c==null || c===mainComp) continue;                   // already on the mainland
+    // is this island CLEARLY lost? (fight a delaying action first — bail only when
+    // truly overwhelmed): the enemy outnumbers us 2:1 on it, or holds more of its cities
+    let ec=0, mc=0, eu=0, mu=0;
+    for (const ct of G.cities){ if (comps.get(keyOf(ct.x,ct.y))!==c) continue; ct.owner===foe?ec++:ct.owner===side?mc++:0; }
+    for (const t of G.units){ if (comps.get(keyOf(t.x,t.y))!==c) continue; t.side===foe?eu++:mu++; }
+    if (!(eu >= mu*2 || ec > mc)) continue;                  // still worth contesting
+    // nearest empty, non-enemy-city coastal refuge on the mainland, a short hop away
+    let best=null, bd=1e9;
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (comps.get(keyOf(x,y))!==mainComp || !isCoast(x,y) || unitAt(x,y)) continue;
+      const cc=cityAt(x,y); if (cc && cc.owner===foe) continue;
+      const d=hexDist(u.x,u.y,x,y); if (d<bd){ bd=d; best=[x,y]; }
+    }
+    if (best && bd <= amphibRange()+3) return {type:'evac', u:u.id, x:best[0], y:best[1]};
+  }
+  return null;
+}
 function aiAmphibPlan(side){
   if (!amphibCanSide(side) || G.pp[side] < amphibCost()) return null;
   const elf = aiEnemyLandField(side);
@@ -5929,6 +5983,8 @@ function aiPlanSoviet(){
 }
 
 function aiPlanAction(side){
+  const ev = aiEvacuate(side);          // pull survivors off a lost island before anything else
+  if (ev) return ev;
   return side==='G' ? aiPlanGerman() : aiPlanSoviet();
 }
 
@@ -5958,6 +6014,17 @@ function applyAction(a){
   if (a.type==='amphib'){
     const u = G.units.find(t=>t.id===a.u);
     if (u){ const ev = amphibiousAssault(u, a.x, a.y); clearAICache(); return {type:'amphib', unit:u, ev}; }
+    return {type:'hold'};
+  }
+  if (a.type==='evac'){
+    const u = G.units.find(t=>t.id===a.u);
+    if (u && !unitAt(a.x,a.y)){
+      u.x=a.x; u.y=a.y; u.moved=true; u.attacked=true; u.entrench=0;
+      u.str = Math.max(1, u.str-1);                 // losses in the crossing
+      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is evacuated across the water to hold the mainland.`);
+      refreshSupply(); clearAICache();
+      return {type:'evac', unit:u};
+    }
     return {type:'hold'};
   }
   return null;
