@@ -4546,6 +4546,14 @@ function computeSupply(side){
     if (b.side !== side) continue;
     if (passable(b.x,b.y) && occ[keyOf(b.x,b.y)] !== foe) seed(b.x,b.y);
   }
+  // captured coastal ports are self-sustaining depots for the seaborne invader:
+  // the navy runs supply into any port it holds. This is the whole premise of the
+  // campaign ("take the ports to feed the invasion") — without it the army starves
+  // the moment its landing beachheads expire, however many ports it owns.
+  if (SCN.portDeploy && amphibCanSide(side)){
+    for (const c of myCities)
+      if (isCoast(c.x,c.y) && occ[keyOf(c.x,c.y)] !== foe) seed(c.x,c.y);
+  }
   while (heap.size()){
     const [c,x,y] = heap.pop();
     if (c > (dist.get(keyOf(x,y)) ?? 1e9)) continue;
