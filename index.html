@@ -528,7 +528,9 @@
           <b>minimap</b> (bottom-left) shows the whole front — click or drag it to fly the camera
           anywhere; <b>M</b> hides it.
           Click the <b>weather chip</b> for the campaign clock. <b>AI: ▶</b> cycles enemy turn
-          speed (normal / fast / instant). Ending your turn with units still ready asks for a
+          speed (normal / fast / instant). <b>Esc</b> opens the <b>pause menu</b> — quick-save,
+          jump to How-to-Play, or save &amp; quit to the main menu (a first Esc just clears your
+          current selection). Ending your turn with units still ready asks for a
           second click, and so does overwriting a saved campaign.</li>
       <li><b>🎲 Every campaign is different &amp; your service record.</b> Four systems are
           <b>always on</b>, so no two wars play the same: <b>Chaos weather</b> re-rolls the season
@@ -563,6 +565,22 @@
        enemy line — that's an encirclement. As the Soviets, keep a straight front, garrison cities,
        and always have an escape route east.</p>
     <div class="mrow"><button class="primary" id="btn-help-close">Got it</button></div>
+  </div>
+</div>
+
+<!-- ============ PAUSE MENU (Esc) ============ -->
+<div id="pause-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:380px;text-align:center;">
+    <h2>PAUSED</h2>
+    <p id="pause-sub" style="color:var(--dim);margin-bottom:4px;">The war waits for you.</p>
+    <div id="pause-menu-btns" style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
+      <button class="primary" id="btn-pause-resume">▶ Resume</button>
+      <button id="btn-pause-save">💾 Quick Save</button>
+      <button id="btn-pause-help">❔ How to Play</button>
+      <button id="btn-pause-menu">🚪 Save &amp; Quit to Menu</button>
+    </div>
+    <p id="pause-hint" style="color:var(--grn);min-height:18px;margin-top:12px;font-size:13px;"></p>
+    <p style="color:var(--dim);font-size:12px;margin-top:2px;">Press <b>Esc</b> to resume</p>
   </div>
 </div>
 
@@ -9241,10 +9259,17 @@ function zoomAt(cx, cy, f){            // eased zoom keeping the given screen po
 }
 window.addEventListener('keydown', e=>{
   if (!G || G.over) return;
-  // don't hijack typing or keys meant for an open dialog
-  if (document.querySelector('.modal-back:not(.hidden)')) return;
+  // don't hijack typing or keys meant for an open dialog — but Esc still closes the pause menu
+  const openModal = document.querySelector('.modal-back:not(.hidden)');
+  if (openModal){ if (e.key==='Escape' && openModal.id==='pause-modal') closePause(); return; }
   const k = e.key;
-  if (k==='Escape'){ deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; selSet=[]; advanceChoice=null; updateAll(); return; }
+  if (k==='Escape'){
+    // first Esc clears any active selection/targeting; a "clean" Esc opens the pause menu
+    const busy = sel || (selSet&&selSet.length) || deployKind || airTarget || reconTarget || amphibTarget || advanceChoice;
+    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; selSet=[]; advanceChoice=null; updateAll();
+    if (!busy) openPause();
+    return;
+  }
   // map navigation — arrow keys pan, +/- (and scroll wheel) zoom
   const pan = 90/cam.z;
   if (k==='ArrowLeft'){  killGlides(); cam.x-=pan; requestRender(); e.preventDefault(); return; }
@@ -9401,7 +9426,7 @@ function updateUnitCard(){
   const u = sel && G.units.find(t=>t.id===sel);
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
   if (!u){
-    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · E end turn · U undo · S supply</span>';
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · E end turn · U undo · S supply · Esc menu</span>';
     body.innerHTML = html;
     if (isHuman){
       for (const k of buyableKinds(G.phase)){
@@ -10740,6 +10765,23 @@ $('btn-menu').onclick = ()=>{
   saveGame();                        // autosave into this game's own slot
   showModeSelect();                  // continue buttons are set when each sub-menu opens
 };
+
+/* ---------------- pause menu (Esc) ---------------- */
+function openPause(){
+  if (!G || G.over || aiRunning) return;              // don't pause mid-AI turn
+  const h = $('pause-hint'); if (h) h.textContent = '';
+  sClick(); show('pause-modal', true);
+}
+function closePause(){ show('pause-modal', false); }
+$('btn-pause-resume').onclick = ()=>{ sClick(); closePause(); };
+$('btn-pause-save').onclick = ()=>{
+  saveGame(); sCity();
+  const h = $('pause-hint');
+  if (h) h.textContent = `✓ Saved — ${sideName(G.playerSide)}, turn ${G.turn}. Reload the menu's Continue to resume here.`;
+};
+$('btn-pause-help').onclick = ()=>{ sClick(); closePause(); show('help-modal', true); };
+$('btn-pause-menu').onclick = ()=>{ sClick(); closePause(); $('btn-menu').onclick(); };
+$('pause-modal').addEventListener('click', e=>{ if (e.target === $('pause-modal')) closePause(); });
 
 /* ---------------- end turn & AI driver ---------------- */
 let endPendingUntil = 0;
