@@ -3681,6 +3681,7 @@ SCENARIOS.normandy = (function buildNormandy(){
   aiMaxUnits: { G:22, S:16, Garm:6 },
   portDeploy: true,
   amphibious: { sides:['G'], range:9, cost:2, beachLife:6 },
+  airborne: { sides:['G'], range:12, cost:3, dropLife:3 },   // the three D-Day airborne divisions can drop inland
   edgeSupply: { G:false, S:false },
   supplySeeds: {
     G: [[19,4],[15,3],[7,4]],                 // the English embarkation ports
@@ -4352,6 +4353,7 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
     decisions: {},                             // decision id -> chosen option index (or 'pending')
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
     beachheads: [],                            // active invasion lodgements (amphibious scenarios)
+    airdrops: [],                              // active airborne drop pockets (airborne scenarios)
     log: [],
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
@@ -4618,6 +4620,12 @@ function computeSupply(side){
   // invasion beachheads: a fresh lodgement is fed over the beach for a few turns
   // (landing craft, DUKWs, an emergency pier) until a real port is taken
   for (const b of (G.beachheads || [])){
+    if (b.side !== side) continue;
+    if (passable(b.x,b.y) && occ[keyOf(b.x,b.y)] !== foe) seed(b.x,b.y);
+  }
+  // airborne drop pockets: aerial resupply feeds an isolated para lodgement for a
+  // few turns — link it up to the main line before the air bridge runs dry
+  for (const b of (G.airdrops || [])){
     if (b.side !== side) continue;
     if (passable(b.x,b.y) && occ[keyOf(b.x,b.y)] !== foe) seed(b.x,b.y);
   }
@@ -5306,6 +5314,89 @@ function amphibiousAssault(u, tx, ty){
 }
 function beachName(x,y){ const c = cityAt(x,y); return c ? c.name : `the beach (${x},${y})`; }
 
+/* ============================ AIRBORNE OPERATIONS ============================ */
+/* Parachute assault, gated by SCN.airborne — a player's tool (the AI never drops,
+   so the AI-vs-AI balance model is untouched, exactly like standing orders). An
+   airborne division (sym 'para') that is in supply and hasn't acted is flown from
+   its base and dropped onto any empty land hex within flight range — over water,
+   over the front, deep behind the lines. The drop scatters (a strength loss, worse
+   into a hot DZ next to the enemy), can seize an undefended town by coup de main,
+   and plants a small self-supplying pocket for a few turns so the isolated paras
+   hold until the ground troops link up. Drop too deep and the pocket withers — the
+   Arnhem gamble. Nothing runs unless a scenario opts in. */
+const AIRBORNE = { range:12, cost:3, dropLife:3, scatter:1, hotDZ:2 };
+function airborneCfg(){ return (SCN && SCN.airborne) || null; }
+function airborneOn(){ return !!airborneCfg(); }
+function airborneSides(){ const a=airborneCfg(); return (a&&a.sides)||['G']; }
+function airborneCanSide(side){ return airborneOn() && airborneSides().indexOf(side)!==-1; }
+function airborneRange(){ const a=airborneCfg(); return (a&&a.range)||AIRBORNE.range; }
+function airborneCost(){ const a=airborneCfg(); return (a&&a.cost!=null)?a.cost:AIRBORNE.cost; }
+function airborneDropLife(){ const a=airborneCfg(); return (a&&a.dropLife)||AIRBORNE.dropLife; }
+function isAirborneKind(kind){ return !!(KINDS[kind] && KINDS[kind].sym==='para'); }
+function canParadrop(u){
+  if (!u || u.moved || u.attacked || u.oos) return false;   // must fly from a supplied base, unspent
+  if (!airborneCanSide(u.side)) return false;
+  return isAirborneKind(u.kind);                             // paratroopers only
+}
+function dzName(x,y){ const c=cityAt(x,y); return c ? c.name : `the drop zone (${x},${y})`; }
+/* A drop is "contested" (a hot DZ, heavier scatter) if it lands next to an enemy
+   or onto enemy-controlled ground. */
+function dzContested(x,y,side){
+  if (terrOwner(x,y) === enemyOf(side)) return true;
+  return neighbors(x,y).some(([nx,ny])=>{ const t=unitAt(nx,ny); return t && t.side!==side; });
+}
+/* Every empty, passable land hex within flight range — planes ignore terrain, so
+   this is a straight radius, not a march. Map value: 1 = hot DZ, 0 = clear. */
+function paraReach(u){
+  const dz = new Map();
+  if (!canParadrop(u)) return dz;
+  const range = airborneRange();
+  for (let y=Math.max(0,u.y-range); y<=Math.min(ROWS-1,u.y+range); y++)
+    for (let x=Math.max(0,u.x-range); x<=Math.min(COLS-1,u.x+range); x++){
+      if (x===u.x && y===u.y) continue;
+      if (!passable(x,y) || isWater(x,y) || unitAt(x,y)) continue;   // open ground only
+      if (hexDist(u.x,u.y,x,y) <= range) dz.set(keyOf(x,y), dzContested(x,y,u.side)?1:0);
+    }
+  return dz;
+}
+/* Execute the drop. Scatter costs strength (worse into a hot DZ); a catastrophic
+   scatter wipes the stick outright. A successful drop can seize an undefended town
+   and plants a self-supplying pocket for a few turns. Returns an events object the
+   UI narrates/animates. */
+function paradropAssault(u, tx, ty){
+  if (!canParadrop(u)) return null;
+  if (!paraReach(u).has(keyOf(tx,ty))) return null;
+  if (G.pp[u.side] < airborneCost()) return null;
+  G.pp[u.side] -= airborneCost();
+  const fromX=u.x, fromY=u.y;
+  const contested = dzContested(tx,ty,u.side);
+  const ev = { type:'airdrop', from:[fromX,fromY], to:[tx,ty], att:u, contested,
+               landed:false, destroyed:false, scatter:0, tookCity:false };
+  u.moved=true; u.attacked=true; u.entrench=0;
+  let loss = AIRBORNE.scatter + (contested?AIRBORNE.hotDZ:0) + (Math.random()<0.5?1:0);
+  loss = Math.min(loss, u.str);
+  u.str -= loss; ev.scatter = loss;
+  G.stats[u.side].lost += loss; G.stats[enemyOf(u.side)].killed += loss;
+  if (u.str <= 0){
+    killUnit(u); ev.destroyed = true;
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is scattered to the winds over ${dzName(tx,ty)} — the drop is a catastrophe.`);
+    refreshSupply(); checkSuddenDeath(); return ev;
+  }
+  u.x=tx; u.y=ty;
+  const c=cityAt(tx,ty);
+  if (c && c.owner!==u.side && !KINDS[u.kind].noCapture){
+    c.owner=u.side; c.ruin=Math.min(1,(c.ruin||0)+0.06); ev.tookCity=true;
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} seized by coup de main — ${u.name} drops straight onto it!`);
+    if (typeof onCityTaken==='function') onCityTaken(c);
+  }
+  ev.landed=true;
+  G.airdrops = G.airdrops || [];
+  G.airdrops.push({ x:tx, y:ty, side:u.side, turns:airborneDropLife() });
+  logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} drops ${contested?'into a hot DZ':'behind the lines'} at ${dzName(tx,ty)}${loss?` — ${loss} lost in the scatter`:''}.`);
+  refreshSupply(); checkSuddenDeath();
+  return ev;
+}
+
 /* ============================ PRODUCTION ============================ */
 function canReinforce(u){
   if (u.str >= KINDS[u.kind].maxStr || u.oos || u.moved || u.attacked) return false;
@@ -5633,6 +5724,11 @@ function endPhase(){
     if (G.beachheads && G.beachheads.length){
       for (const b of G.beachheads) b.turns--;
       G.beachheads = G.beachheads.filter(b => b.turns > 0 && !cityAt(b.x,b.y));  // a captured port supersedes its beachhead
+    }
+    // air-bridge to a para pocket runs down each turn — link up before it's gone
+    if (G.airdrops && G.airdrops.length){
+      for (const b of G.airdrops) b.turns--;
+      G.airdrops = G.airdrops.filter(b => b.turns > 0);
     }
     const wxNew = weatherFor(G.turn), wxOld = weatherFor(G.turn-1);
     if (wxNew !== wxOld){
@@ -6575,6 +6671,7 @@ function deserialize(json){
     if (KINDS[u.kind].fuel && u.fuel == null) u.fuel = FUEL_MAX;
   if (SCN.railhead && !G.railDepth) G.railDepth = {G: RAIL_START, S: RAIL_START}; // pre-rail saves
   if (!G.beachheads) G.beachheads = [];                             // pre-amphibious saves
+  if (!G.airdrops) G.airdrops = [];                                 // pre-airborne saves
   refreshSupply();
 }
 function saveGame(){
@@ -7589,6 +7686,7 @@ let deployKind = null;     // kind being placed
 let airTarget = null;      // air group id picking a strike target
 let reconTarget = null;    // air group id picking a photo-recon hex (fog of war)
 let amphibTarget = null;   // {id, beaches:Map} — unit picking a landing beach (amphibious)
+let paraTarget = null;     // {id, dz:Map} — airborne unit picking a drop zone
 let anims = [];            // floating texts / flashes
 let scars = [];            // lingering scorched ground & smoke at battle sites
 let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
@@ -7800,6 +7898,7 @@ const sBoom  = ()=>{ noise(0.4,0.18); tone(70,0.4,'sawtooth',0.08,-40); };
 const sCity  = ()=>{ tone(523,0.12,'square',0.05); setTimeout(()=>tone(659,0.12,'square',0.05),120); setTimeout(()=>tone(784,0.2,'square',0.05),240); };
 const sLaunch= ()=>{ noise(0.55,0.05); tone(150,0.5,'sine',0.05,90); };          // landing craft under way — surf & a rising swell
 const sSurf  = ()=>{ noise(0.3,0.09); tone(200,0.22,'triangle',0.04,-60); };     // waves hitting the beach (unopposed landing)
+const sDrop  = ()=>{ noise(0.6,0.035); tone(260,0.55,'sawtooth',0.028,-70); };   // transport drone fading as the sticks jump
 
 /* ---------------- engine hooks ---------------- */
 onLog = function(){
@@ -8699,6 +8798,47 @@ function draw(){
     }
     if (su2){ const [ux,uy]=hexCenter(su2.x,su2.y); hexPath(ux,uy,S-3); ctx.strokeStyle='#7fc4f0'; ctx.lineWidth=2.6; ctx.stroke(); }
   }
+  // airborne drop targeting: outline the flight range, mark the hovered DZ + flight line
+  if (paraTarget){
+    const dz = paraTarget.dz;
+    for (const [k,hot] of dz){                              // gentle wash over the reachable ground
+      const [bx,by] = k.split(',').map(Number), [cx,cy] = hexCenter(bx,by);
+      hexPath(cx,cy,S-3);
+      ctx.fillStyle = hot ? 'rgba(232,179,75,0.10)' : 'rgba(120,200,140,0.09)'; ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(143,208,160,0.6)'; ctx.lineWidth = 1.8;
+    for (const k of dz.keys()){                             // and a firm outline round the drop range
+      const [bx,by] = k.split(',').map(Number);
+      const nbs = neighbors(bx,by);
+      if (nbs.length===6 && nbs.every(([nx,ny])=>dz.has(keyOf(nx,ny)))) continue;
+      const [cx,cy] = hexCenter(bx,by); hexPath(cx,cy,S-3); ctx.stroke();
+    }
+    const su2 = G.units.find(t=>t.id===paraTarget.id);
+    if (hover && dz.has(keyOf(hover[0],hover[1]))){
+      const hot = dz.get(keyOf(hover[0],hover[1])), [cx,cy] = hexCenter(hover[0],hover[1]);
+      if (su2){ const [ux,uy]=hexCenter(su2.x,su2.y);
+        ctx.strokeStyle='rgba(143,208,160,0.6)'; ctx.lineWidth=1.6; if(ctx.setLineDash)ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.moveTo(ux,uy); ctx.lineTo(cx,cy); ctx.stroke(); if(ctx.setLineDash)ctx.setLineDash([]); }
+      hexPath(cx,cy,S-3);
+      ctx.fillStyle = hot ? 'rgba(232,179,75,0.28)' : 'rgba(120,200,140,0.28)'; ctx.fill();
+      ctx.strokeStyle = hot ? '#e8b34b' : '#8fd0a0'; ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.fillStyle = hot ? '#ffe0a0' : '#d6ffe0';
+      ctx.font = `${Math.round(S*0.6)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✈', cx, cy);
+    }
+    if (su2){ const [ux,uy]=hexCenter(su2.x,su2.y); hexPath(ux,uy,S-3); ctx.strokeStyle='#8fd0a0'; ctx.lineWidth=2.6; ctx.stroke(); }
+  }
+  // active airborne drop pockets: a pulsing chute + the turns of air-bridge left
+  if (G.airdrops && G.airdrops.length){
+    for (const b of G.airdrops){
+      if (fowSight && b.side!==viewerSide() && !fowSight.has(keyOf(b.x,b.y))) continue;
+      const [cx,cy] = hexCenter(b.x,b.y);
+      const pr = 0.5+0.5*Math.sin(now*0.004 + b.y);
+      hexPath(cx,cy,S-4); ctx.strokeStyle = `rgba(150,220,170,${0.35+0.35*pr})`; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#c8f0d4'; ctx.font=`bold ${Math.round(S*0.4)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✈'+b.turns, cx, cy - S*0.6);
+    }
+  }
   // active invasion beachheads: a pulsing anchor + the turns of supply left
   if (G.beachheads && G.beachheads.length){
     for (const b of G.beachheads){
@@ -8889,6 +9029,34 @@ function draw(){
       ctx.fillStyle = '#4c5a67'; ctx.fillRect(-4.5,-2.4,5.5,4.8);
       ctx.restore();
       ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'para'){
+      const dur = a.life - 500;
+      const raw = Math.min(1, (now-a.t0)/dur);
+      const ang = Math.atan2(a.y1-a.y0, a.x1-a.x0), cos = Math.cos(ang), sin = Math.sin(ang);
+      if (raw < 0.55){                                     // the transport runs in to the DZ
+        const e = raw/0.55, px = a.x0 + (a.x1-a.x0)*e, py = a.y0 + (a.y1-a.y0)*e;
+        ctx.globalAlpha = 0.4*(1-e*0.3); ctx.strokeStyle = '#cfd8e2'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(px-cos*S*1.5, py-sin*S*1.5); ctx.lineTo(px-cos*4, py-sin*4); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.save(); ctx.translate(px,py); ctx.rotate(ang);
+        ctx.fillStyle = '#2c3138';
+        ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(-6,-3); ctx.lineTo(-6,3); ctx.closePath(); ctx.fill();
+        ctx.fillRect(-2.5,-6,2,12);                        // wings
+        ctx.restore(); ctx.globalAlpha = 1;
+      } else {                                             // canopies bloom over the DZ and descend
+        const e = (raw-0.55)/0.45;
+        for (let i=0;i<5;i++){
+          const s = (i*97)%13, ox = ((s%5)-2)*6, oy = ((s%3)-1)*5;
+          const cx = a.x1 + ox, cy = a.y1 + oy - (1-e)*24;
+          ctx.globalAlpha = 0.85*(1-e*0.15);
+          ctx.fillStyle = a.hot ? '#e8dcc0' : '#dfe8e0';
+          ctx.beginPath(); ctx.arc(cx, cy, 3.4, Math.PI, 0); ctx.fill();      // canopy dome
+          ctx.strokeStyle = 'rgba(120,120,110,0.6)'; ctx.lineWidth = 0.7;
+          ctx.beginPath(); ctx.moveTo(cx-3,cy); ctx.lineTo(cx,cy+4); ctx.lineTo(cx+3,cy); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
       continue;
     }
     if (a.type === 'arrow'){
@@ -9210,6 +9378,21 @@ function landingAnim(fromX, fromY, toX, toY, opts){
     requestRender();
   }, cross);
 }
+/* airborne drop: a transport flies to the DZ, then canopies bloom and settle */
+function dropAnim(fromX, fromY, toX, toY, opts){
+  opts = opts || {};
+  const [fx,fy] = hexCenter(fromX,fromY), [tx,ty] = hexCenter(toX,toY);
+  const fly = 700;
+  anims.push({ type:'para', x0:fx, y0:fy, x1:tx, y1:ty, t0:performance.now(), life:fly+500, hot:!!opts.contested });
+  sDrop();
+  requestRender();
+  setTimeout(()=>{
+    if (opts.destroyed){ sShot(); boomAt(toX,toY,false); floatText(toX,toY,'✖ SCATTERED','#ff6b6b'); kickShake(3); }
+    else if (opts.contested){ sBoom(); floatText(toX,toY,'✈ HOT DZ','#ffd98a'); kickShake(3); }
+    else { sSurf(); floatText(toX,toY,'✈ DROPPED','#bfe6c8'); }
+    requestRender();
+  }, fly);
+}
 
 
 /* render scheduler: cap to ~30fps and only repaint when something is actually
@@ -9321,6 +9504,23 @@ canvas.addEventListener('click', e=>{
     $('hint').innerHTML = defaultHint();
     updateAll(); return;
   }
+  // airborne drop targeting mode
+  if (paraTarget){
+    const u = G.units.find(t=>t.id===paraTarget.id);
+    const canDrop = paraTarget.dz.has(keyOf(x,y));
+    paraTarget = null;
+    if (u && canDrop){
+      clearUndo();
+      const ev = paradropAssault(u, x, y);
+      if (ev){
+        dropAnim(ev.from[0], ev.from[1], ev.to[0], ev.to[1], { contested: ev.contested, destroyed: ev.destroyed });
+        if (ev.landed) flashUnit(u);
+        deselect();
+      }
+    }
+    $('hint').innerHTML = defaultHint();
+    updateAll(); return;
+  }
   // deploy mode
   if (deployKind){
     if (doDeploy(G.phase, deployKind, x, y)){ clearUndo(); sCity(); updateAll(); }
@@ -9356,8 +9556,8 @@ canvas.addEventListener('click', e=>{
 canvas.addEventListener('contextmenu', e=>{
   e.preventDefault();
   if (!G || G.over) return;
-  if (deployKind || airTarget || reconTarget || amphibTarget || advanceChoice || selSet.length || sel){
-    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; advanceChoice=null; selSet=[];
+  if (deployKind || airTarget || reconTarget || amphibTarget || paraTarget || advanceChoice || selSet.length || sel){
+    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; paraTarget=null; advanceChoice=null; selSet=[];
     $('hint').innerHTML = defaultHint(); updateAll();
   }
 });
@@ -9426,8 +9626,8 @@ window.addEventListener('keydown', e=>{
   const k = e.key;
   if (k==='Escape'){
     // first Esc clears any active selection/targeting; a "clean" Esc opens the pause menu
-    const busy = sel || (selSet&&selSet.length) || deployKind || airTarget || reconTarget || amphibTarget || advanceChoice;
-    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; selSet=[]; advanceChoice=null; updateAll();
+    const busy = sel || (selSet&&selSet.length) || deployKind || airTarget || reconTarget || amphibTarget || paraTarget || advanceChoice;
+    deselect(); deployKind=null; airTarget=null; reconTarget=null; amphibTarget=null; paraTarget=null; selSet=[]; advanceChoice=null; updateAll();
     if (!busy) openPause();
     return;
   }
@@ -9461,7 +9661,7 @@ function selectUnit(u){
   reach = (!u.moved) ? reachable(u) : new Map();
   updateUnitCard();
 }
-function deselect(){ sel=null; reach=null; selSet=[]; amphibTarget=null; updateUnitCard(); requestRender(); }
+function deselect(){ sel=null; reach=null; selSet=[]; amphibTarget=null; paraTarget=null; updateUnitCard(); requestRender(); }
 /* a unit still has orders to give if it can move, or can still attack something
    it has actually SEEN (fog of war must not leak through the amber pips). A unit
    the player Skipped, or one running a standing order, is deliberately off the
@@ -9770,6 +9970,30 @@ function updateUnitCard(){
       eb.id = 'btn-naval-invasion';
       act.appendChild(eb);
       if (isHuman && affordable) maybeCoachAmphib(eb);        // one-time "how to invade" nudge
+    }
+    // airborne drop: fly this para division from base and drop it onto open ground inland
+    if (canParadrop(u) && airborneOn()){
+      const pb = document.createElement('button');
+      const affordable = G.pp[u.side] >= airborneCost();
+      pb.textContent = `✈ Airborne drop (${airborneCost()}⚙)`;
+      pb.title = 'Fly this airborne division from its base and drop it onto any open ground in range — over the front, behind the lines. The drop scatters (worse into a hot DZ) and lands isolated: a drop pocket feeds it for a few turns, so link up with the main line before the air bridge runs dry.';
+      if (paraTarget && paraTarget.id===u.id){ pb.style.borderColor='var(--cyan)'; pb.style.color='#9fd8ff'; pb.style.background='#183a4a'; }
+      if (!affordable){ pb.disabled = true; pb.style.opacity = 0.5; }
+      pb.onclick = ()=>{
+        sClick();
+        if (paraTarget && paraTarget.id===u.id){ paraTarget=null; $('hint').innerHTML=defaultHint(); }
+        else {
+          const dz = paraReach(u);
+          paraTarget = dz.size ? {id:u.id, dz} : null;
+          amphibTarget=null; airTarget=null; reconTarget=null; deployKind=null;
+          $('hint').innerHTML = paraTarget
+            ? '✈ Click a <b>highlighted drop zone</b> to jump — green is clear, amber is a hot DZ. Esc cancels.'
+            : 'No drop zone is in range of this division.';
+        }
+        updateAll(); updateUnitCard();
+      };
+      pb.id = 'btn-airborne-drop';
+      act.appendChild(pb);
     }
     // standing battle-plan orders: paint a persistent order the unit runs each turn
     if (!k.hq){
@@ -11590,6 +11814,7 @@ if (typeof module !== 'undefined' && module.exports){
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
     isWater, isCoast, canEmbark, navalReach, amphibiousAssault, amphibOn, amphibCanSide, aiAmphibPlan,
+    canParadrop, paraReach, paradropAssault, airborneOn, airborneCanSide,
     saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
