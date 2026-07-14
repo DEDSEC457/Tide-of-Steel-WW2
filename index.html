@@ -6414,6 +6414,40 @@ function aiAmphibPlan(side){
   return best;
 }
 
+/* AI airborne drop: fling a para division behind the enemy line to seize or menace
+   an objective — the Allied airborne on D-Day night. Deliberately cautious: it only
+   drops near an objective, prefers a clear DZ within reach of friendly support, and
+   won't jump a unit so weak the scatter would gut it. Player-facing scenarios where
+   the human defends now get airborne landing in their rear. Returns {type:'airdrop'}
+   or null. */
+function aiParaPlan(side){
+  if (!airborneCanSide(side) || G.pp[side] < airborneCost()) return null;
+  let best=null, bestScore=7;                          // threshold: don't drop for a marginal gain
+  for (const u of unitsOf(side)){
+    if (!canParadrop(u)) continue;
+    if (adjacentEnemies(u).length) continue;           // already in the fight — don't fly off
+    const dz = paraReach(u);
+    if (!dz.size) continue;
+    const dNow = nearestEnemyObjDist(side, u.x, u.y);
+    for (const [k,hot] of dz){
+      const [x,y] = k.split(',').map(Number);
+      let obj = 1e9, objVp = 0;                         // nearest enemy objective to the DZ
+      for (const c of G.cities) if (c.vp>0 && c.owner!==side){ const d=hexDist(x,y,c.x,c.y); if (d<obj){ obj=d; objVp=c.vp; } }
+      if (obj > 4) continue;                            // only drop to grab or threaten an objective
+      if (nearestEnemyObjDist(side,x,y) + 3 > dNow) continue;   // must be a real leap forward
+      let s = 24 - obj*4 + objVp*2;
+      const c = cityAt(x,y);
+      if (c && c.owner!==side) s += 10 + c.vp*4;        // coup de main onto an undefended objective
+      if (hot) s -= 6;                                  // a hot DZ scatters hard
+      const nearFriend = unitsOf(side).some(f=>f.id!==u.id && hexDist(x,y,f.x,f.y)<=4);
+      if (!nearFriend) s -= 5;                          // dropping unsupported risks a wasted division
+      if (u.str - (hot?3:1) < 3) s -= 6;               // too weak to survive the scatter
+      if (s > bestScore){ bestScore=s; best={type:'airdrop', u:u.id, x, y}; }
+    }
+  }
+  return best;
+}
+
 function aiPlanGerman(){
   aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
   // sea-borne invasion: ship the units that have no other way to the enemy
@@ -6594,6 +6628,8 @@ function aiPlanSoviet(){
 function aiPlanAction(side){
   const ev = aiEvacuate(side);          // pull survivors off a lost island before anything else
   if (ev) return ev;
+  const drop = aiParaPlan(side);        // fling the airborne behind the enemy line
+  if (drop) return drop;
   return side==='G' ? aiPlanGerman() : aiPlanSoviet();
 }
 
@@ -6623,6 +6659,11 @@ function applyAction(a){
   if (a.type==='amphib'){
     const u = G.units.find(t=>t.id===a.u);
     if (u){ const ev = amphibiousAssault(u, a.x, a.y); clearAICache(); return {type:'amphib', unit:u, ev}; }
+    return {type:'hold'};
+  }
+  if (a.type==='airdrop'){
+    const u = G.units.find(t=>t.id===a.u);
+    if (u){ const ev = paradropAssault(u, a.x, a.y); clearAICache(); return {type:'airdrop', unit:u, ev}; }
     return {type:'hold'};
   }
   if (a.type==='evac'){
@@ -11405,6 +11446,11 @@ function runAIPhase(){
                   { opposed: !!ev.def, stormed: ev.destroyed, repelled: !ev.landed });
       updateAll();
       setTimeout(step, mult ? Math.max(aDelay, 650)*mult : 0);      // let the craft land before the next move
+    } else if (res && res.type==='airdrop' && res.ev){
+      const ev = res.ev;
+      dropAnim(ev.from[0], ev.from[1], ev.to[0], ev.to[1], { contested: ev.contested, destroyed: ev.destroyed });
+      updateAll();
+      setTimeout(step, mult ? Math.max(aDelay, 650)*mult : 0);      // let the sticks land before the next move
     } else if (res && res.type==='evac' && res.from){
       landingAnim(res.from[0], res.from[1], res.to[0], res.to[1], { evac:true });
       updateAll();
