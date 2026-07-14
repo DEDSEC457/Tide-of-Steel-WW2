@@ -4369,6 +4369,7 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
     missions: [],                              // active short-term side-objectives (player-facing)
     dynNextTurn: 3,                            // earliest turn a dynamic dispatch may fire
     dynSeen: {},                               // one-shot dispatch ids already fired
+    dynFlags: {},                              // pending story-chain follow-ups: flag -> turn it comes due
     log: [],
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
@@ -6740,6 +6741,7 @@ function deserialize(json){
   if (!G.missions) G.missions = [];                                 // pre-dispatch saves
   if (G.dynNextTurn == null) G.dynNextTurn = G.turn + 2;
   if (!G.dynSeen) G.dynSeen = {};
+  if (!G.dynFlags) G.dynFlags = {};
   refreshSupply();
 }
 function saveGame(){
@@ -8103,10 +8105,16 @@ function dynFriendlyFrontVP(side){
   }
   return best;
 }
-function dynMission(side, kind, city, turns, reward, title){
-  G.missions.push({ kind, city, deadline:G.turn+turns, reward, title, born:G.turn, side });
+function dynMission(side, kind, city, turns, reward, title, tier){
+  G.missions.push({ kind, city, deadline:G.turn+turns, reward, title, born:G.turn, side, tier:tier||1 });
 }
-/* resolve timed side-objectives at the owner's turn-start */
+/* story-chain flags: an option sets a flag due in a few turns; a follow-up dispatch
+   fires once it's due, so choices echo turns later (a two-part arc). */
+function dynFlag(key, turns){ G.dynFlags[key] = G.turn + (turns||2); }
+function dynFlagDue(key){ return G.dynFlags && G.dynFlags[key] != null && G.turn >= G.dynFlags[key]; }
+function dynFlagClear(key){ if (G.dynFlags) delete G.dynFlags[key]; }
+/* resolve timed side-objectives at the owner's turn-start; success on a "take"
+   objective escalates into a bigger next objective (a rolling campaign of goals). */
 function checkMissions(side){
   if (!G.missions || !G.missions.length) return;
   const keep = [];
@@ -8118,8 +8126,13 @@ function checkMissions(side){
     else if (m.kind==='take'){ if (c.owner===side) done=true; else if (G.turn>m.deadline) done=false; }
     else { if (c.owner!==side) done=false; else if (G.turn>=m.deadline) done=true; }
     if (done===null){ keep.push(m); continue; }
-    if (done){ dynAddPP(side, m.reward); logMsg(side==='G'?'l-g':'l-s', `✅ Objective met — ${m.title}: +${m.reward}⚙.`); }
-    else logMsg('sys', `❌ Objective failed — ${m.title}.`);
+    if (done){ dynAddPP(side, m.reward); logMsg(side==='G'?'l-g':'l-s', `✅ Objective met — ${m.title}: +${m.reward}⚙.`);
+      if (m.kind==='take' && (m.tier||1) < 3){        // press the advantage: HQ names the next prize
+        const nx = dynNearestEnemyVP(side);
+        if (nx){ const rw = m.reward + 5;
+          dynMission(side, 'take', nx.name, 4, rw, `Take ${nx.name}`, (m.tier||1)+1);
+          logMsg(side==='G'?'l-g':'l-s', `▶ HQ presses the advantage — next objective: <b>${nx.name}</b> for +${rw}⚙.`); } }
+    } else logMsg('sys', `❌ Objective failed — ${m.title}.`);
   }
   G.missions = keep;
 }
@@ -8159,13 +8172,68 @@ const DYN_EVENTS = [
       return {title:'Hold at all costs', text:`<b>${c.name}</b> must not fall. Hold it for <b>${turns} turns</b> and command will reward the sector with <b>+8 ⚙</b>.`}; } },
   { id:'clear_weather', weight:2, ok:s=>true, build:s=>{ dynAddPP(s,3);
       return {title:'A break in the weather', text:'Clear skies let the trucks roll and the guns register. Staff work catches up — <b>+3 ⚙ production.</b>'}; } },
+  // ---- more variety ----
+  { id:'prisoners', weight:2, ok:s=>true, build:s=>{ dynAddPP(s,4);
+      return {title:'A haul of prisoners', text:'A local collapse nets thousands of prisoners and their stores. The interrogations and captured kit are worth <b>+4 ⚙.</b>'}; } },
+  { id:'ammo_shortage', weight:2, ok:s=>G.pp[s]>=3, build:s=>{ dynAddPP(s,-3);
+      return {title:'Ammunition shortage', text:'The forward dumps run low and the guns fall silent at the worst moment. Rationing shells costs you <b>−3 ⚙.</b>'}; } },
+  { id:'artillery', weight:3, ok:s=>unitsOf(enemyOf(s)).some(u=>onFront(u)), build:s=>({ title:'The guns are ranged in',
+      text:'Your artillery has a forward enemy division registered. Pound it now, or hold your shells for the offensive.',
+      options:[
+        { label:'Open a barrage', effect:'a front-line enemy division is shelled — loses strength and dig-in', apply:()=>{ const e=unitsOf(enemyOf(s)).filter(u=>onFront(u)&&u.str>1).sort(()=>Math.random()-0.5)[0]; if(e){ e.str-=1; e.entrench=0; } } },
+        { label:'Hoard the shells', effect:'+3 ⚙ saved for the push', apply:()=>{ dynAddPP(s,3); } },
+      ] }) },
+  { id:'partisans_help', weight:2, ok:s=>unitsOf(enemyOf(s)).some(u=>u.str>1), build:s=>{ const e=unitsOf(enemyOf(s)).filter(u=>u.str>1).sort(()=>Math.random()-0.5)[0]; if(e){ e.str-=1; }
+      return {title:'The resistance rises', text:`Behind enemy lines the partisans strike — ambushes and cut wires bleed <b>${e?e.name:'an enemy division'}</b> of a strength point.`}; } },
+  { id:'field_promotion', weight:2, ok:s=>!!dynRandFrontUnit(s), build:s=>{ const u=dynRandFrontUnit(s); if(!u) return null; gainXP(u,8); u.entrench=Math.min((u.entrench||0)+1, effTerrain(u.x,u.y).dig||1);
+      return {title:'A field promotion', text:`A bold junior officer takes over <b>${u.name}</b> and shakes it into shape — the division seasons and digs in.`}; } },
+  // ---- a two-part story: the double agent ----
+  { id:'defector', weight:2, once:true, ok:s=>true, build:s=>({ title:'A defector offers the enemy’s plans',
+      text:'An enemy staff officer slips across the line with a folder of dispositions. Genuine windfall — or a plant meant to walk you into a trap?',
+      options:[
+        { label:'Trust the intelligence', effect:'act on it — the payoff (or the price) lands in a couple of turns', apply:()=>{ dynFlag('defector_trust', 2); } },
+        { label:'Treat him as a plant', effect:'ignore it and keep your dispositions — +2 ⚙ for the caution', apply:()=>{ dynAddPP(s,2); } },
+      ] }) },
+  { id:'defector_payoff', weight:9, priority:true, ok:s=>dynFlagDue('defector_trust'), build:s=>{ dynFlagClear('defector_trust');
+      const good = Math.random() < 0.65;
+      if (good){ dynAddPP(s,7); const e=unitsOf(enemyOf(s)).filter(u=>u.str>1).sort(()=>Math.random()-0.5)[0]; if(e){e.str-=1;e.entrench=0;}
+        return {title:'The defector was genuine', text:'His folder was real. You catch an enemy division out of position and off-balance — and command releases <b>+7 ⚙</b> on the strength of the coup.'}; }
+      const u=dynRandFrontUnit(s); if(u&&u.str>1)u.str-=1;
+      return {title:'It was a trap', text:`The “plans” were bait; a spoiling attack catches <b>${u?u.name:'a forward division'}</b> where it shouldn’t have been. A hard lesson, cheaply learned.`}; } },
+  // ---- a two-part story: the grand offensive ----
+  { id:'buildup', weight:2, once:true, ok:s=>true, build:s=>({ title:'Stockpile for a grand offensive?',
+      text:'The staff proposes husbanding everything for one decisive blow, or keeping up steady pressure across the front.',
+      options:[
+        { label:'Stockpile for the blow', effect:'+2 ⚙ now, and a surge of production when it goes in', apply:()=>{ dynAddPP(s,2); dynFlag('offensive_ready', 3); } },
+        { label:'Keep steady pressure', effect:'+5 ⚙ now', apply:()=>{ dynAddPP(s,5); } },
+      ] }) },
+  { id:'offensive_go', weight:9, priority:true, ok:s=>dynFlagDue('offensive_ready'), build:s=>{ dynFlagClear('offensive_ready'); dynAddPP(s,8); const r=dynSpawn(s, dynInfKind(s), 'Assault Corps', 6);
+      return {title:'The offensive goes in', text:`Weeks of stockpiling pay off: <b>+8 ⚙</b> of shells and fuel released${r?`, and a fresh assault formation forms up at <b>${r.at}</b>`:''}. Everything is ready — press it home.`}; } },
+  // ---- scenario-flavoured dispatches (gated by scenario) ----
+  { id:'kursk_armour', weight:4, once:true, ok:s=>SCN.id==='kursk', build:s=>({ title:'The armour reserve — commit or husband?',
+      text:'The greatest tank battle in history is building. Feed the panzer reserve into the salient now, or hold it back for the counter-stroke you know is coming.',
+      options:[
+        { label:'Commit the reserve now', effect:'a fresh armoured formation joins the battle', apply:()=>{ const k=buyableKinds(s).find(x=>KINDS[x].sym==='arm')||dynInfKind(s); dynSpawn(s, k, 'Panzer Reserve', 4); } },
+        { label:'Husband it for the counter-blow', effect:'+7 ⚙ banked for the decisive moment', apply:()=>{ dynAddPP(s,7); } },
+      ] }) },
+  { id:'stalingrad_rats', weight:4, once:true, ok:s=>SCN.id==='stalingrad', build:s=>({ title:'Rattenkrieg — the war of the rats',
+      text:'The fighting has descended into the cellars and sewers, room by room. Hug the enemy so his guns and planes cannot fire — or pull back and let the artillery flatten the block.',
+      options:[
+        { label:'Hug the enemy close', effect:'a front-line enemy division is bled in the rubble', apply:()=>{ const e=unitsOf(enemyOf(s)).filter(u=>onFront(u)&&u.str>1).sort(()=>Math.random()-0.5)[0]; if(e){e.str-=1;e.entrench=0;} } },
+        { label:'Flatten it with guns', effect:'+4 ⚙, but the ruins favour the defender', apply:()=>{ dynAddPP(s,4); } },
+      ] }) },
+  { id:'barb_rasputitsa', weight:3, once:true, ok:s=>SCN.id==='barbarossa'&&G.turn>=10, build:s=>{ dynAddPP(s,-2);
+      return {title:'The rasputitsa — the sea of mud', text:'The autumn rains turn every road to a bottomless bog. Trucks sink to their axles and the advance crawls — <b>−2 ⚙</b> as supply falters in the mire.'}; } },
 ];
 
 function eligibleDyn(side){
-  return DYN_EVENTS.filter(e => (!e.once || !G.dynSeen[e.id]) && e.ok(side));
+  const pool = DYN_EVENTS.concat((SCN && SCN.dispatches) || []);   // scenarios can add their own flavour
+  return pool.filter(e => (!e.once || !G.dynSeen[e.id]) && e.ok(side));
 }
 function pickDyn(side){
-  const pool = eligibleDyn(side); if (!pool.length) return null;
+  let pool = eligibleDyn(side); if (!pool.length) return null;
+  const prio = pool.filter(e => e.priority);           // a due story-chain payoff resolves before anything else
+  if (prio.length) pool = prio;
   let tot=0; for (const e of pool) tot += e.weight;
   let r = Math.random()*tot;
   for (const e of pool){ r -= e.weight; if (r<=0) return e; }
