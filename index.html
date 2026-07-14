@@ -6202,7 +6202,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   // don't outrun the supply net — fast units on the attack accept a little risk
   // (capturing a city restores supply, so the capture hex is exempt)
   let oosPen = (isArm && offensive) ? 6 : 7;
-  if (offensive && aiSkill(u.side) >= 2) oosPen -= 2.5;         // a bold commander presses past the supply line
+  if (offensive) oosPen -= aiSkill(u.side) * 1.2;              // a competent attacker presses past the supply line (sharper the higher the skill)
   if (myNet && !myNet.has(keyOf(x,y)) && !(c && c.owner!=='G')) s -= oosPen;
   let friendsNear = 0, adjEnemy = 0;
   for (const f of unitsOf('G')) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=2) friendsNear++;
@@ -6215,7 +6215,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
   // (no adjacent enemy) that gets meaningfully closer to its objective pours
   // through the gap. Suppressed on the defensive so we don't over-extend.
-  if ((isArm || aiSkill(u.side) >= 2) && offensive && adjEnemy===0){   // sharp AI marches its infantry through gaps too
+  if ((isArm || aiSkill(u.side) >= 1) && offensive && adjEnemy===0){   // any competent AI marches infantry through gaps, not just armour
     const here = df.get(keyOf(u.x,u.y)) ?? 60, there = df.get(keyOf(x,y)) ?? 60;
     if (there < here - 1) s += 3 + Math.min(5, (here-there)*0.5);   // pour through the gap
   }
@@ -6550,7 +6550,7 @@ function sovScoreHex(u, x, y, df, myNet){
   let s = -(df.get(keyOf(x,y)) ?? 60) * 1.8;
   s += (effTerrain(x,y).def - 1) * 6;                           // dig into good ground
   let sovOosPen = 7;
-  if (SCN.sovAI==='attack' && aiSkill(u.side) >= 2) sovOosPen -= 2.5;   // a bold offensive presses past supply
+  if (SCN.sovAI==='attack') sovOosPen -= aiSkill(u.side) * 1.2;   // a competent offensive presses past supply
   if (myNet && !myNet.has(keyOf(x,y))) s -= sovOosPen;         // stay supplied
   const c = cityAt(x,y);
   if (c && c.owner==='S' && c.vp>0 && !unitAt(x,y)) s += 7;     // garrison objectives
