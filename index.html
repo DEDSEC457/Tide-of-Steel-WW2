@@ -4707,6 +4707,10 @@ function isEncircled(u){ return !!u && encircledIds(u.side).has(u.id); }
    Territory is rebuilt from scratch on every call via a simultaneous
    multi-source BFS from all unit + city anchors, so the whole map
    updates correctly even when units advance many hexes at once. */
+// Territory-tint cache-invalidation flag. Declared here in the shared outer
+// scope (not inside the browser IIFE) so claimTerritory can actually flip it —
+// the draw layer's zoomed-out tint cache reads/clears it. Harmless in headless.
+let _tintDirty = true;
 function seedTerritory(){ claimTerritory(); }   // legacy alias — BFS handles this now
 function terrOwner(x,y){
   if (!G || !G.terr) return null;
@@ -4714,7 +4718,7 @@ function terrOwner(x,y){
   return v===1 ? 'G' : v===2 ? 'S' : null;
 }
 function claimTerritory(){
-  if (typeof _tintDirty !== 'undefined') _tintDirty = true;
+  _tintDirty = true;   // invalidate the zoomed-out tint cache (declared in outer scope, below)
   const n = COLS*ROWS;
   if (!G.terr || G.terr.length !== n) G.terr = new Array(n).fill(0);
   else G.terr.fill(0);
@@ -8392,7 +8396,7 @@ function hexPath(cx,cy,s){
    moving front line to a second one (rebuilt only when territory changes), then
    blit those two images each frame. Zoom in close and we fall back to the live
    per-hex draw (few hexes survive the cull) so the detail stays crisp. */
-let _terrCacheCv=null, _tintCacheCv=null, _cacheKey='', _cacheF=1, _tintDirty=true;
+let _terrCacheCv=null, _tintCacheCv=null, _cacheKey='', _cacheF=1;   // _tintDirty is in outer scope (see claimTerritory)
 function _bigMap(){ return COLS*ROWS > 6000; }
 function hexPathC(c,cx,cy,s){
   c.beginPath();
