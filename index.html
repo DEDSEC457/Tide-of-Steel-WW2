@@ -786,6 +786,16 @@
   </div>
 </div>
 
+<!-- ============ DYNAMIC DISPATCH (random events / side-missions) ============ -->
+<div id="dyn-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:560px;">
+    <div style="color:var(--dim);letter-spacing:3px;font-size:11px;">📻 FIELD DISPATCH</div>
+    <h3 id="dyn-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:6px 0 8px;"></h3>
+    <p id="dyn-text"></p>
+    <div id="dyn-options" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
 <!-- ============ HOTSEAT PASS ============ -->
 <div id="pass-modal" class="modal-back hidden">
   <div class="modal" style="text-align:center;">
@@ -4354,6 +4364,9 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
     turnSnap: {G:null, S:null},                // hotseat: state when each player handed over
     beachheads: [],                            // active invasion lodgements (amphibious scenarios)
     airdrops: [],                              // active airborne drop pockets (airborne scenarios)
+    missions: [],                              // active short-term side-objectives (player-facing)
+    dynNextTurn: 3,                            // earliest turn a dynamic dispatch may fire
+    dynSeen: {},                               // one-shot dispatch ids already fired
     log: [],
     over: false, result: null,
     stats: {G:{lost:0,killed:0}, S:{lost:0,killed:0}},
@@ -6713,6 +6726,9 @@ function deserialize(json){
   if (SCN.railhead && !G.railDepth) G.railDepth = {G: RAIL_START, S: RAIL_START}; // pre-rail saves
   if (!G.beachheads) G.beachheads = [];                             // pre-amphibious saves
   if (!G.airdrops) G.airdrops = [];                                 // pre-airborne saves
+  if (!G.missions) G.missions = [];                                 // pre-dispatch saves
+  if (G.dynNextTurn == null) G.dynNextTurn = G.turn + 2;
+  if (!G.dynSeen) G.dynSeen = {};
   refreshSupply();
 }
 function saveGame(){
@@ -8028,6 +8044,150 @@ function maybeShowGear(){
   if (!G || G.winterGear !== 'pending' || G.phase !== 'G') return;
   if (G.mode !== 'hotseat' && G.playerSide !== 'G') return;   // AI Germany decides itself
   show('gear-modal', true);
+}
+
+/* ============================ FIELD DISPATCHES ============================
+   A deck of dynamic events that fire through the mid-game to break the rhythm —
+   windfalls, setbacks, quick dilemmas and timed side-objectives. Player-facing
+   ONLY (rolled at the human's turn-start), so the AI-vs-AI balance model is
+   untouched, exactly like standing orders and player paradrops. Every campaign
+   grows its own story. */
+function anyModalOpen(){ try { return !!(document.querySelector && document.querySelector('.modal-back:not(.hidden)')); } catch(e){ return false; } }
+function dynAddPP(side, n){ G.pp[side] = Math.max(0, Math.min(40, G.pp[side] + n)); }
+function dynInfKind(side){
+  const buy = buyableKinds(side);
+  return buy.find(k => KINDS[k].sym==='inf') || buy[0] || null;
+}
+function dynSpawn(side, kind, name, xp){
+  if (!kind) return null;
+  const spot = deploySpots(side)[0];
+  if (!spot) return null;
+  const u = makeUnit(kind, name, spot[0], spot[1]);
+  if (xp) gainXP(u, xp);
+  G.units.push(u);
+  return { u, at: cityAt(spot[0],spot[1])?.name || 'the rear' };
+}
+function dynRandFrontUnit(side){                       // a unit near the enemy, for a boon/setback
+  const list = unitsOf(side).filter(u => !KINDS[u.kind].hq);
+  const front = list.filter(u => onFront(u));
+  const pool = front.length ? front : list;
+  return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+}
+function dynNearestEnemyVP(side){
+  let best=null, bd=1e9;
+  // nearest enemy VP city to any of my units
+  for (const c of G.cities){
+    if (!(c.vp>0 && c.owner!==side)) continue;
+    let dmin=1e9; for (const u of unitsOf(side)) dmin=Math.min(dmin, hexDist(u.x,u.y,c.x,c.y));
+    if (dmin<bd){ bd=dmin; best=c; }
+  }
+  return best;
+}
+function dynFriendlyFrontVP(side){
+  let best=null, bd=1e9;
+  for (const c of G.cities){
+    if (!(c.owner===side)) continue;
+    let dmin=1e9; for (const u of unitsOf(enemyOf(side))) dmin=Math.min(dmin, hexDist(u.x,u.y,c.x,c.y));
+    if (dmin<bd){ bd=dmin; best=c; }                   // the friendly city closest to the enemy
+  }
+  return best;
+}
+function dynMission(side, kind, city, turns, reward, title){
+  G.missions.push({ kind, city, deadline:G.turn+turns, reward, title, born:G.turn, side });
+}
+/* resolve timed side-objectives at the owner's turn-start */
+function checkMissions(side){
+  if (!G.missions || !G.missions.length) return;
+  const keep = [];
+  for (const m of G.missions){
+    if (m.side !== side){ keep.push(m); continue; }
+    const c = G.cities.find(cc=>cc.name===m.city);
+    let done=null;                                      // true = success, false = fail, null = ongoing
+    if (!c) done=false;
+    else if (m.kind==='take'){ if (c.owner===side) done=true; else if (G.turn>m.deadline) done=false; }
+    else { if (c.owner!==side) done=false; else if (G.turn>=m.deadline) done=true; }
+    if (done===null){ keep.push(m); continue; }
+    if (done){ dynAddPP(side, m.reward); logMsg(side==='G'?'l-g':'l-s', `✅ Objective met — ${m.title}: +${m.reward}⚙.`); }
+    else logMsg('sys', `❌ Objective failed — ${m.title}.`);
+  }
+  G.missions = keep;
+}
+
+/* Each dispatch: ok(side) gates eligibility; build(side) applies any immediate
+   effect and returns {title, text, options:[{label, effect?, apply?}]}. */
+const DYN_EVENTS = [
+  { id:'supply_cache', weight:3, ok:s=>true, build:s=>{ dynAddPP(s,5);
+      return {title:'Captured supply dump', text:'Your quartermasters overrun an enemy depot — crates of rations, fuel and shells fall into your hands. <b>+5 ⚙ production.</b>'}; } },
+  { id:'reinforcements', weight:3, ok:s=>!!dynInfKind(s), build:s=>{ const r=dynSpawn(s, dynInfKind(s), 'Replacement Corps'); if(!r) return null;
+      return {title:'Fresh replacements', text:`A newly-raised formation reaches the front at <b>${r.at}</b> — a full-strength division added to your order of battle.`}; } },
+  { id:'veterans', weight:2, ok:s=>!!dynRandFrontUnit(s), build:s=>{ const u=dynRandFrontUnit(s); if(!u) return null; gainXP(u,12);
+      return {title:'Baptism of fire', text:`After hard fighting, <b>${u.name}</b> has learned its trade — the division gains battle experience.`}; } },
+  { id:'air_resupply', weight:2, ok:s=>airOf(s).some(a=>a.str<AIR_MAXSTR), build:s=>{ const a=airOf(s).find(a=>a.str<AIR_MAXSTR); if(a) a.str=Math.min(AIR_MAXSTR,a.str+1);
+      return {title:'Replacement aircraft', text:`Fresh crews and airframes bring <b>${a?a.name:'an air group'}</b> back up to strength.`}; } },
+  { id:'enemy_reserve', weight:3, ok:s=>true, build:s=>{ const foe=enemyOf(s); const k=(buyableKinds(foe)[0])||null; const r=k?dynSpawn(foe,k,'Enemy Reserve'):null;
+      return {title:'Enemy reserves committed', text:`Intelligence reports a fresh enemy formation moving up${r?` around <b>${r.at}</b>`:''} — the defenders are being reinforced. Press on before they dig in.`}; } },
+  { id:'sabotage', weight:2, ok:s=>G.pp[s]>=3, build:s=>{ dynAddPP(s,-4);
+      return {title:'Rear-area sabotage', text:'Partisans blow a rail bridge and torch a fuel dump behind your lines. <b>−4 ⚙ production.</b>'}; } },
+  { id:'breakdown', weight:2, ok:s=>unitsOf(s).some(u=>KINDS[u.kind].sym==='arm'&&u.str>1), build:s=>{ const u=unitsOf(s).filter(x=>KINDS[x.kind].sym==='arm'&&x.str>1).sort(()=>Math.random()-0.5)[0]; if(u){u.str-=1;}
+      return {title:'Mechanical breakdowns', text:`Worn tracks and tired engines: <b>${u?u.name:'an armoured division'}</b> sheds a strength point to breakdowns on the march.`}; } },
+  { id:'requisition', weight:3, ok:s=>true, build:s=>({ title:'Requisition from the locals?',
+      text:'Your supply officers can strip the occupied villages bare to feed the offensive — or requisition fairly and keep the population quiet.',
+      options:[
+        { label:'Seize everything', effect:'+8 ⚙ now, but resentment costs a rear division a strength point', apply:()=>{ dynAddPP(s,8); const u=dynRandFrontUnit(s); if(u&&u.str>1)u.str-=1; } },
+        { label:'Requisition fairly', effect:'+2 ⚙, and goodwill seasons a division', apply:()=>{ dynAddPP(s,2); const u=dynRandFrontUnit(s); if(u)gainXP(u,8); } },
+      ] }) },
+  { id:'deserters', weight:2, ok:s=>unitsOf(enemyOf(s)).some(u=>u.str>1), build:s=>({ title:'Enemy deserters cross the line',
+      text:'A trickle of enemy soldiers is giving up. You can debrief them for intelligence, or turn their unit’s collapse into a local push.',
+      options:[
+        { label:'Debrief for intelligence', effect:'+4 ⚙ from what they reveal', apply:()=>{ dynAddPP(s,4); } },
+        { label:'Exploit the collapse', effect:'the deserting enemy division loses strength', apply:()=>{ const e=unitsOf(enemyOf(s)).filter(u=>u.str>1).sort(()=>Math.random()-0.5)[0]; if(e){e.str-=1; e.entrench=0;} } },
+      ] }) },
+  { id:'hq_demands', weight:3, once:false, ok:s=>!!dynNearestEnemyVP(s), build:s=>{ const c=dynNearestEnemyVP(s); if(!c) return null; const turns=Math.max(3,Math.min(6,hexDist(0,0,0,0)+4)); const title=`Take ${c.name}`; dynMission(s,'take',c.name,turns,10,title);
+      return {title:'High command demands a prize', text:`Headquarters wants <b>${c.name}</b> taken within <b>${turns} turns</b> to headline the communiqués. Do it and they release <b>+10 ⚙</b> of held-back production.`}; } },
+  { id:'hold_fast', weight:2, once:false, ok:s=>!!dynFriendlyFrontVP(s), build:s=>{ const c=dynFriendlyFrontVP(s); if(!c) return null; const turns=3; dynMission(s,'hold',c.name,turns,8,`Hold ${c.name}`);
+      return {title:'Hold at all costs', text:`<b>${c.name}</b> must not fall. Hold it for <b>${turns} turns</b> and command will reward the sector with <b>+8 ⚙</b>.`}; } },
+  { id:'clear_weather', weight:2, ok:s=>true, build:s=>{ dynAddPP(s,3);
+      return {title:'A break in the weather', text:'Clear skies let the trucks roll and the guns register. Staff work catches up — <b>+3 ⚙ production.</b>'}; } },
+];
+
+function eligibleDyn(side){
+  return DYN_EVENTS.filter(e => (!e.once || !G.dynSeen[e.id]) && e.ok(side));
+}
+function pickDyn(side){
+  const pool = eligibleDyn(side); if (!pool.length) return null;
+  let tot=0; for (const e of pool) tot += e.weight;
+  let r = Math.random()*tot;
+  for (const e of pool){ r -= e.weight; if (r<=0) return e; }
+  return pool[pool.length-1];
+}
+function showDynEvent(ev, data){
+  $('dyn-title').textContent = data.title;
+  $('dyn-text').innerHTML = data.text;
+  const box = $('dyn-options'); box.innerHTML = '';
+  const opts = data.options || [{ label:'Understood ✓' }];
+  opts.forEach(opt=>{
+    const b = document.createElement('button'); b.className = 'primary';
+    b.style.cssText = 'text-align:left;padding:10px 14px;';
+    b.innerHTML = `<b>${opt.label}</b>` + (opt.effect?`<div style="margin-top:4px;font-weight:700;color:#cfe8a8;font-size:12px;">→ ${opt.effect}</div>`:'');
+    b.onclick = ()=>{ if (opt.apply) opt.apply(); if (ev.once) G.dynSeen[ev.id]=1;
+      clearUndo(); sCity(); show('dyn-modal', false); refreshSupply(); updateAll(); saveGame(); };
+    box.appendChild(b);
+  });
+  show('dyn-modal', true);
+}
+/* rolled once at the human's turn-start; a cooldown keeps dispatches ~2–4 turns apart */
+function maybeDynEvent(){
+  if (!G || G.over || aiRunning) return false;
+  const human = G.mode==='hotseat' || G.phase===G.playerSide;
+  if (!human) return false;
+  const side = G.phase;
+  if (G.turn < 3 || G.turn > MAX_TURN-1) return false;   // not in the opening or the finale
+  if (G.turn < (G.dynNextTurn||0)) return false;
+  const ev = pickDyn(side); if (!ev) return false;
+  const data = ev.build(side); if (!data) return false;
+  G.dynNextTurn = G.turn + 2 + (Math.random()<0.5?0:1);  // next dispatch in 2–3 turns
+  showDynEvent(ev, data);
+  return true;
 }
 $('btn-gear-buy').onclick  = ()=>{ if (decideWinterGear(true)){  clearUndo(); sCity();  show('gear-modal', false); updateAll(); } };
 $('btn-gear-front').onclick = ()=>{ if (decideWinterGear(false)){ clearUndo(); sClick(); show('gear-modal', false); updateAll(); } };
@@ -10348,9 +10508,15 @@ function maybeTurnBanner(){
 
 /* ---------------- objectives modal ---------------- */
 $('btn-objectives').onclick = ()=>{
+  const mySide = G.mode==='hotseat' ? G.phase : G.playerSide;
+  const mine = (G.missions||[]).filter(m=>m.side===mySide);
+  const missLine = mine.length ? `<div style="margin-bottom:8px;padding:8px 10px;background:#20261699;border:1px solid var(--line);border-radius:8px;">`
+    + `<div style="color:var(--amber);font-size:11px;letter-spacing:1px;margin-bottom:4px;">🎯 STANDING ORDERS FROM HQ</div>`
+    + mine.map(m=>{ const left=m.deadline-G.turn; return `<div style="font-size:13px;">${m.kind==='take'?'⚔':'🛡'} <b>${m.title}</b> — <span style="color:${left<=1?'var(--redL)':'var(--dim)'}">${left>0?`${left} turn${left===1?'':'s'} left`:'due now'}</span> · reward <b style="color:var(--grn)">+${m.reward}⚙</b></div>`; }).join('')
+    + `</div>` : '';
   const list = G.cities.filter(c=>c.vp>0).sort((a,b)=>b.vp-a.vp).map(c=>
     `<div>${flag(c.owner)} <b>${c.name}</b> — ${'★'.repeat(c.vp)} ${c.owner==='G'?`<span style="color:#9fb0c4">${sideName('G')}-held</span>`:`<span style="color:#e09a90">${sideName('S')}-held</span>`}</div>`).join('');
-  $('obj-list').innerHTML = list;
+  $('obj-list').innerHTML = missLine + list;
   const vp = axisVP();
   const tierLine = VICTORY_TIERS.slice(0,-1).map(([min,t])=>`★ ${min}+ ${t.toLowerCase()}`).join(' · ');
   const lastTier = VICTORY_TIERS[VICTORY_TIERS.length-1][1].toLowerCase();
@@ -11498,17 +11664,21 @@ function runAIPhase(){
         const human = G.phase===G.playerSide;
         if (!human){ runAIPhase(); return; }
         runStandingOrders(G.phase);              // the player's battle plans execute first
+        checkMissions(G.phase);                  // resolve any timed side-objectives
         saveGame();
       }
     }
     updateAll();
+    if (!G.over && G.mode==='ai' && G.phase===G.playerSide)
+      setTimeout(()=>{ if (!anyModalOpen()) maybeDynEvent(); }, 460);
   }
   setTimeout(step, aiSpeed===2 ? 0 : 350);
 }
 
 $('btn-pass-go').onclick = ()=>{ show('pass-modal', false);
-  runStandingOrders(G.phase); saveGame(); updateAll();   // the incoming player's battle plans execute
-  if (!maybeShowDecision()) maybeShowGear(); };   // the new player faces any pending choice
+  runStandingOrders(G.phase); checkMissions(G.phase); saveGame(); updateAll();   // battle plans + timed objectives
+  if (!maybeShowDecision()) maybeShowGear();       // the new player faces any pending choice
+  if (!anyModalOpen()) maybeDynEvent(); };
 
 /* ---------------- end screen ---------------- */
 function showEnd(){
