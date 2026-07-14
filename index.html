@@ -390,6 +390,7 @@
       <span class="opt" data-d="easy">Easy</span>
       <span class="opt sel" data-d="normal">Normal</span>
       <span class="opt" data-d="hard">Hard</span>
+      <span class="opt" data-d="brutal" title="The enemy out-produces you and gives no quarter — sharp play, relentless pressure, no mercy for a weakened division.">Brutal 💀</span>
     </div>
     <div class="opt-row" id="rvar-row" style="justify-content:center;">
       <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
@@ -480,6 +481,7 @@
       <span class="opt" data-d="easy">Easy</span>
       <span class="opt sel" data-d="normal">Normal</span>
       <span class="opt" data-d="hard">Hard</span>
+      <span class="opt" data-d="brutal" title="The enemy out-produces you and gives no quarter — sharp play, relentless pressure, no mercy for a weakened division.">Brutal 💀</span>
     </div>
     <div class="opt-row" id="var-row">
       <span style="color:var(--dim);padding:6px 0;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
@@ -4439,7 +4441,7 @@ function diffPP(side){
   const aiSide = enemyOf(G.playerSide);
   if (G.difficulty==='easy')   return side===G.playerSide ? 1 : -1;
   if (G.difficulty==='hard')   return side===aiSide ? 2 : -1;
-  if (G.difficulty==='brutal') return side===aiSide ? 3 : -2;       // enemy out-produces you
+  if (G.difficulty==='brutal') return side===aiSide ? 4 : -2;       // enemy heavily out-produces you
   return 0;
 }
 function diffCombat(side){           // small attack-multiplier tweak for AI difficulty
@@ -4448,7 +4450,7 @@ function diffCombat(side){           // small attack-multiplier tweak for AI dif
   if (side!==aiSide) return 1;
   // the bulk of the difficulty now comes from how the AI PLAYS (aiSkill), so the
   // raw combat thumb-on-the-scale is light
-  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.1 : G.difficulty==='brutal' ? 1.2 : 1;
+  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.15 : G.difficulty==='brutal' ? 1.28 : 1;
 }
 /* AI SKILL — the heart of difficulty. 0 = sloppy (easy), 1 = solid (normal),
    2 = sharp (hard). A higher skill makes the AI judge odds better, hold an
@@ -4460,7 +4462,11 @@ function aiSkill(side){
 }
 /* sharper play presses good-but-not-perfect attacks; sloppier play waits for a
    sure thing (or over-commits to a bad one). */
-function skillMinR(side, base){ return base - (aiSkill(side)-1)*0.15; }
+function skillMinR(side, base){
+  // sharper play presses attacks harder; Brutal presses hardest of all
+  const brutal = G.difficulty==='brutal' && G.mode!=='hotseat' && side===enemyOf(G.playerSide);
+  return base - (aiSkill(side)-1)*0.18 - (brutal ? 0.10 : 0);
+}
 /* line coherence: near the front a unit wants friendly units beside it, so the
    line has no 1-hex hole for the enemy to pour through. Skill-scaled — a sharp
    AI keeps a solid line; a sloppy one leaves the gaps you exploit now. */
@@ -6107,9 +6113,11 @@ function bestAttack(u, minRatio){
           || (noRetreat && p.ratio >= minRatio-0.2);
     if (!ok) continue;
     const sk = aiSkill(u.side);
+    const brutal = G.difficulty==='brutal' && G.mode!=='hotseat' && u.side===enemyOf(G.playerSide);
     let util = p.defLoss*1.6 - p.atkLoss + (wouldDestroy ? 6+2*sk : 0) + (noRetreat?4:0)
              + (t.oos?2:0) + (cityAt(t.x,t.y)?1:0) + p.ratio
-             + (t.str<=4 ? sk*1.5 : 0);                 // focus fire: finish off the weakened
+             + (t.str<=4 ? sk*1.5 : 0)                  // focus fire: finish off the weakened
+             + (brutal && t.str<=5 ? 3 : 0);            // Brutal hunts the wounded relentlessly
     if (sk > 0){
       // don't trade into a hex where the human destroys my weakened unit next turn
       const tp = threatField(u.side).power.get(keyOf(u.x,u.y)) || 0;
