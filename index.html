@@ -7782,6 +7782,7 @@ function pocketsFor(side){
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
+let _hazeGrad = null, _hazeH = 0;
 /* smooth camera: pan glides ease toward a target, wheel zoom eases toward a
    target scale anchored under the cursor (the old camera teleported) */
 let camGlide = null;   // {x0,y0,x1,y1,t0,dur}
@@ -7845,6 +7846,84 @@ function drawPremiumOverlay(){                             // screen-space sun g
       ctx.globalAlpha = 1; ctx.globalCompositeOperation='source-over';
     }
   }
+}
+/* Emissive bloom — soft additive halos on the scene's light sources: the amber
+   lanterns of VP objectives, white-hot detonations, and the embers still glowing
+   at a fresh battle site. Radial gradients composited with 'lighter' give real
+   glow without a per-frame getImageData bright-pass. Drawn in WORLD space so each
+   halo stays pinned to its hex and scales with zoom. High only (cine); guarded so
+   the headless fake-DOM (no gradients) skips it cleanly. */
+function drawBloom(now, vL, vT, vR, vB){
+  if (!ctx.createRadialGradient) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const blob = (x, y, r, cr, cg, cb, a) => {
+    if (a <= 0.004 || x+r < vL || x-r > vR || y+r < vT || y-r > vB) return;   // faint / off-screen
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    if (!g || !g.addColorStop) return;
+    g.addColorStop(0,   `rgba(${cr},${cg},${cb},${a.toFixed(3)})`);
+    g.addColorStop(0.5, `rgba(${cr},${cg},${cb},${(a*0.4).toFixed(3)})`);
+    g.addColorStop(1,   `rgba(${cr},${cg},${cb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+  };
+  // VP objectives glow like lanterns — bigger and brighter for the great capitals,
+  // dimmed to a sullen flicker when the city has been battered into a ruin.
+  for (const c of G.cities){
+    if (!c.vp) continue;
+    const [cx,cy] = hexCenter(c.x, c.y);
+    const pulse = 0.82 + 0.18*Math.sin(now*0.0016 + c.x*0.7 + c.y*0.5);
+    const ruin = c.ruin ? 0.45 : 1;
+    blob(cx, cy, S*(1.5 + c.vp*0.55), 255, 205, 110, 0.16*pulse*ruin);
+  }
+  // live detonations flare white-hot, then bloom orange as the fireball collapses
+  for (const a of anims){
+    if (a.type !== 'boom') continue;
+    const pr = Math.min(1, ((now - a.t0)/(a.life || 1100))*1.7);
+    if (pr >= 1) continue;
+    const r = (a.big ? S*2.4 : S*1.5) * (0.5 + pr);
+    if (pr < 0.35) blob(a.x, a.y, r*0.7, 255, 246, 223, 0.55*(1 - pr/0.35));
+    blob(a.x, a.y, r, 255, 150, 70, 0.32*(1 - pr));
+  }
+  // fresh battle sites keep a dull ember glow while the smoke still rises
+  for (const s of scars){
+    const age = now - s.t0;
+    if (age > 3000) continue;
+    const [cx,cy] = hexCenter(s.x, s.y);
+    const fl = (1 - age/3000) * (0.75 + 0.25*Math.sin(now*0.01 + s.x));
+    blob(cx, cy, S*1.1, 230, 96, 40, 0.14*fl);
+  }
+  ctx.restore();
+}
+/* Sun-glint on open water — the same upper-left key light that grades the scene
+   scatters off the sea as drifting specular sparkles, biased toward the light so
+   the glitter reads as a reflection rather than random noise. World-space and
+   viewport-culled, and skipped when zoomed far out (the sparkles turn to noise and
+   the visible-water count balloons), so cost tracks screen area. High only (cine). */
+function drawWaterGlint(now, vL, vT, vR, vB){
+  if (cam.z < 0.5) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,248,214,1)';
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = terrainAt(x,y);
+    if (t!=='~' && t!=='o') continue;                       // sea only
+    const [cx,cy] = hexCenter(x,y);
+    if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
+    const seed = x*12.9898 + y*78.233;
+    for (let i=0;i<2;i++){                                   // two sparkles, each on its own slow cycle
+      const ph = seed + i*2.4;
+      const tw = Math.sin(now*0.004 + ph);
+      if (tw < 0.6) continue;                                // mostly dark; brief bright flashes
+      const a = (tw - 0.6)/0.4;
+      const gx = cx + Math.sin(ph)*S*0.42 - S*0.12;          // offset up-left, toward the sun
+      const gy = cy + Math.cos(ph*1.3)*S*0.34 - S*0.14;
+      ctx.globalAlpha = a*0.6;
+      ctx.beginPath(); ctx.arc(gx, gy, 0.8 + a*1.1, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 const $ = id => document.getElementById(id);
@@ -8947,6 +9026,7 @@ function draw(){
   }  // end live terrain/coastline draw (else of useCache)
 
   if (GFX.clouds) drawCloudShadows(now, vL, vT, vR, vB);   // high: drifting overcast
+  if (GFX.cine)   drawWaterGlint(now, vL, vT, vR, vB);     // high: sun sparkling on the sea
 
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
 
@@ -9019,10 +9099,11 @@ function draw(){
   }
   const su = sel && G.units.find(u=>u.id===sel);
   if (su && reach){
+    const rp = 0.5 + 0.5*Math.sin(now*0.005);              // reachable hexes breathe gently
     for (const k of reach.keys()){
       const [x,y] = k.split(',').map(Number);
       const [cx,cy] = hexCenter(x,y);
-      hexPath(cx,cy,S-3); ctx.fillStyle = '#e8b34b55'; ctx.fill();
+      hexPath(cx,cy,S-3); ctx.fillStyle = 'rgba(232,179,75,'+(0.20+0.14*rp).toFixed(3)+')'; ctx.fill();
       ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
     }
     if (!su.attacked) for (const t of enemiesInRange(su)){
@@ -9030,11 +9111,14 @@ function draw(){
       const [cx,cy] = hexCenter(t.x,t.y);
       hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#e2493b'; ctx.lineWidth = 3; ctx.stroke();
     }
-    // pulsing ring under the selected unit
+    // selected unit: a marching-ants ring that crawls and breathes under the counter
     const [scx,scy] = hexCenter(su.x,su.y);
-    hexPath(scx,scy, S-2 + Math.sin(now*0.006)*1.6);
-    ctx.globalAlpha = 0.55 + 0.3*Math.sin(now*0.006);
-    ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.save();
+    if (ctx.setLineDash){ ctx.setLineDash([6,5]); ctx.lineDashOffset = -(now*0.02)%11; }
+    hexPath(scx,scy, S-2 + Math.sin(now*0.006)*1.4);
+    ctx.globalAlpha = 0.6 + 0.28*Math.sin(now*0.006);
+    ctx.strokeStyle = '#ffe4a8'; ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.restore();                                          // clears the dash for later strokes
     ctx.globalAlpha = 1;
   }
   // combined-arms assault group
@@ -9152,6 +9236,22 @@ function draw(){
       const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
       const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
       cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
+      // dust kicked up behind a marching column — land moves only, high quality
+      if (GFX.cine && p<1){
+        const dt = terrainAt(u.x,u.y);
+        if (dt!=='~' && dt!=='o'){
+          const dxp = cx-moveAnim.fx, dyp = cy-moveAnim.fy;
+          ctx.save();
+          for (let i=0;i<5;i++){
+            const back = e - i*0.14; if (back<=0) continue;
+            const px = moveAnim.fx + dxp*back, py = moveAnim.fy + dyp*back;
+            ctx.globalAlpha = Math.max(0, (0.26 - i*0.05)*(1-e*0.3));
+            ctx.fillStyle = 'rgba(150,134,104,1)';
+            ctx.beginPath(); ctx.arc(px + (i%2?1.5:-1.5), py + 2 + i*0.6, 2.2 + (1-back)*3 + i*0.7, 0, Math.PI*2); ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
       if (p>=1) moveAnim = null;
     }
     // encirclement ring under the counter: red = an enemy you've trapped,
@@ -9415,6 +9515,8 @@ function draw(){
     ctx.globalAlpha = 1;
   }
 
+  if (GFX.cine) drawBloom(now, vL, vT, vR, vB);   // high: additive glow on lights/fire (world space)
+
   // vignette: focus the eye on the front
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if (!vignette || vgW!==innerWidth || vgH!==innerHeight){
@@ -9427,6 +9529,29 @@ function draw(){
     }
   }
   if (vignette){ ctx.fillStyle = vignette; ctx.fillRect(0,0,innerWidth,innerHeight); }
+  // atmospheric depth haze: as the camera pulls back, a cool wash settles over the
+  // far theatre so the front recedes and the great maps feel vast. Strengthens the
+  // more you zoom out and vanishes up close. High only (lighting).
+  if (GFX.lighting){
+    const haze = Math.max(0, Math.min(1, (0.72 - cam.z)/0.5));
+    if (haze > 0.01){
+      if (!_hazeGrad || _hazeH !== innerHeight){
+        const g3 = ctx.createLinearGradient && ctx.createLinearGradient(0,0,0,innerHeight);
+        if (g3 && g3.addColorStop){
+          g3.addColorStop(0,   'rgba(150,170,205,0.9)');
+          g3.addColorStop(0.55,'rgba(150,170,205,0.45)');
+          g3.addColorStop(1,   'rgba(150,170,205,0.28)');
+          _hazeGrad = g3; _hazeH = innerHeight;
+        }
+      }
+      if (_hazeGrad){
+        ctx.save();
+        ctx.globalAlpha = 0.20*haze; ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = _hazeGrad; ctx.fillRect(0,0,innerWidth,innerHeight);
+        ctx.restore();
+      }
+    }
+  }
   drawPremiumOverlay();                          // high: directional sun grade + film grain
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
 
@@ -9694,6 +9819,7 @@ function _sceneAnimating(){
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
+  if (sel && reach) return true;                                         // selection ants + reachable pulse
   if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
   if (threatView) return true;                                           // threat overlay pulse
   const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
