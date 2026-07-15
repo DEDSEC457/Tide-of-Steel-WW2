@@ -7696,7 +7696,11 @@ const GFX_PRESETS = {
   // grade, soft blurred counter shadows, a faint film grain — and `cine`:
   // hex relief shading, living water & rivers, ember front lines, upgraded
   // explosions, lightning and near-snow parallax.
-  high:   { dpr:2,   fpsMs:16, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
+  // fpsMs 6 uncaps the render loop to the display's native refresh: a clean 144fps
+  // on a 144Hz panel (frame interval ~6.9ms clears the 6ms gate every time), with a
+  // ~166fps ceiling so ultra-high-refresh screens don't run away. Motion is all
+  // time-based (performance.now), so the extra frames only smooth it — nothing speeds up.
+  high:   { dpr:2,   fpsMs:6,  decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
             lighting:true,  clouds:true,  grain:true,  softShadow:true, cine:true },
 };
 let GFX = Object.assign({ level:'medium' }, GFX_PRESETS.medium);
@@ -10778,7 +10782,7 @@ syncSoundUI();
 const GFX_DESC = {
   low:    'Flat terrain, no decorations or weather effects, 20fps. Best for older / work PCs.',
   medium: 'Trees, contours, weather effects, 30fps, standard pixel density. A good balance.',
-  high:   'Cinematic: relief-shaded terrain, living water & rivers, an ember front line, cloud shadows & sunlight, richer explosions, storm lightning, film grain — 60fps, retina. For a strong gaming PC.',
+  high:   'Cinematic: relief-shaded terrain, living water & rivers, an ember front line, cloud shadows & sunlight, richer explosions, storm lightning, film grain — up to 144fps, retina. For a strong gaming PC.',
 };
 function syncGfxUI(){
   for (const l of ['low','medium','high']) $('gfx-'+l).classList.toggle('sel', GFX.level===l);
