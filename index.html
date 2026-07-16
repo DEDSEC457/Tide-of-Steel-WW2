@@ -653,6 +653,7 @@
     <div id="pause-menu-btns" style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
       <button class="primary" id="btn-pause-resume">▶ Resume</button>
       <button id="btn-pause-save">💾 Quick Save</button>
+      <button id="btn-pause-settings">⚙ Settings &amp; Graphics</button>
       <button id="btn-pause-help">❔ How to Play</button>
       <button id="btn-pause-menu">🚪 Save &amp; Quit to Menu</button>
     </div>
@@ -728,9 +729,12 @@
         <button id="gfx-low">Low</button><button id="gfx-medium">Medium</button><button id="gfx-high">High</button>
       </div></div>
     <div id="gfx-desc" style="color:var(--dim);font-size:12px;margin-top:2px;"></div>
-    <div class="setrow" style="align-items:flex-start;margin-top:8px;"><span>⚙ Effects</span>
-      <div id="gfx-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:12px;flex:1;max-width:340px;"></div></div>
-    <div id="gfx-tog-note" style="color:var(--dim);font-size:11px;margin-top:4px;">Fine-tune individual effects — switch any off to claw back frames. Changing the quality preset resets these.</div>
+    <button id="gfx-adv-toggle" style="background:none;border:none;color:var(--amber);font-size:12px;padding:6px 0;cursor:pointer;">Advanced ▸</button>
+    <div id="gfx-adv" class="hidden">
+      <div class="setrow" style="align-items:flex-start;"><span>⚙ Effects</span>
+        <div id="gfx-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:12px;flex:1;max-width:340px;"></div></div>
+      <div id="gfx-tog-note" style="color:var(--dim);font-size:11px;margin-top:4px;">Fine-tune individual effects — switch any off to claw back frames. Changing the quality preset resets these.</div>
+    </div>
     <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
   </div>
 </div>
@@ -5769,6 +5773,7 @@ function endPhase(){
                      : 'DEEP SNOW. German attacks falter in -30° cold — frostbite claims more men than bullets. Siberian divisions are arriving.'}[wxNew];
       if (msg) logMsg('sys', (SCN.wxMsg ? '🌪 ' : '❄ ') + msg);
     }
+    if (typeof setAmbient==='function') setAmbient(wxNew);   // shift the weather ambience
     fireEvents();
     const cd = SCN.capitalDefense;
     if (cd && G.turn === cd.turn && G.cities.find(c=>c.name===cd.city)?.owner==='S')
@@ -8037,7 +8042,7 @@ const MUSIC = {
   ],
 };
 let musicGain = null, musicTimer = null, musicBar = 0;
-function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; }
+function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; if (typeof applyAmbientVol==='function') applyAmbientVol(); }
 function startMusic(){
   const a = ac(); if (!a || musicGain) return;
   musicGain = a.createGain(); applyMusicVol();
@@ -8108,6 +8113,7 @@ window.addEventListener('pointerdown', ()=>{
   const a = ac();
   if (a && a.state === 'suspended') a.resume();
   if (musicVol > 0) startMusic();
+  if (typeof G!=='undefined' && G) setAmbient(weatherFor(G.turn));   // match the bed to current weather
 }, {once:false});
 const sClick = ()=>tone(660,0.05,'square',0.04);
 const sMove  = ()=>tone(220,0.1,'triangle',0.05,-80);
@@ -8117,6 +8123,43 @@ const sCity  = ()=>{ tone(523,0.12,'square',0.05); setTimeout(()=>tone(659,0.12,
 const sLaunch= ()=>{ noise(0.55,0.05); tone(150,0.5,'sine',0.05,90); };          // landing craft under way — surf & a rising swell
 const sSurf  = ()=>{ noise(0.3,0.09); tone(200,0.22,'triangle',0.04,-60); };     // waves hitting the beach (unopposed landing)
 const sDrop  = ()=>{ noise(0.6,0.035); tone(260,0.55,'sawtooth',0.028,-70); };   // transport drone fading as the sticks jump
+
+/* ambient weather bed — a single looping noise source, shaped into a low wind
+   moan in the snow or a hissing rain in the mud, gusting on a slow LFO. Fades in
+   under the score, follows the music volume / mute, and falls silent in clear
+   weather. Guarded so the headless fake-DOM (no AudioContext) simply skips it. */
+let ambSrc=null, ambFilter=null, ambGain=null, ambLFO=null, ambLFOg=null, ambWx=null;
+function ambTarget(){ return (muted || musicVol<=0) ? 0 : musicVol; }
+function startAmbient(){
+  const a=ac(); if(!a || ambSrc) return;
+  const n=Math.floor(a.sampleRate*3), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  ambSrc=a.createBufferSource(); ambSrc.buffer=buf; ambSrc.loop=true;
+  ambFilter=a.createBiquadFilter(); ambFilter.type='lowpass'; ambFilter.frequency.value=500; ambFilter.Q.value=0.6;
+  ambGain=a.createGain(); ambGain.gain.value=0;
+  ambLFO=a.createOscillator(); ambLFO.frequency.value=0.12;             // slow gusts
+  ambLFOg=a.createGain(); ambLFOg.gain.value=180;
+  ambLFO.connect(ambLFOg); ambLFOg.connect(ambFilter.frequency);
+  ambSrc.connect(ambFilter); ambFilter.connect(ambGain); ambGain.connect(a.destination);
+  try{ ambSrc.start(); ambLFO.start(); }catch(e){}
+}
+function setAmbient(wx){
+  const a=ac(); if(!a) return;
+  startAmbient(); if(!ambGain) return;
+  ambWx=wx; const t=a.currentTime;
+  if(wx==='snow'){        // a low, gusting wind
+    ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(520,t,0.6);
+    ambLFOg.gain.value=240; ambLFO.frequency.value=0.10;
+    ambGain.gain.setTargetAtTime(ambTarget()*0.11, t, 1.2);
+  } else if(wx==='mud'){  // a steady hiss of rain
+    ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(1100,t,0.6);
+    ambLFOg.gain.value=90; ambLFO.frequency.value=0.22;
+    ambGain.gain.setTargetAtTime(ambTarget()*0.08, t, 1.2);
+  } else {                // clear skies — let it die away
+    ambGain.gain.setTargetAtTime(0, t, 1.6);
+  }
+}
+function applyAmbientVol(){ if(ambGain && ambWx!=null) setAmbient(ambWx); }
 
 /* ---------------- engine hooks ---------------- */
 onLog = function(){
@@ -9319,6 +9362,15 @@ function draw(){
       }
       if (p>=1) moveAnim = null;
     }
+    // recoil: the counter kicks back the instant it fires, then settles — a bit
+    // of physical weight behind every attack
+    const rc = recoilMap.get(u.id);
+    if (rc){
+      const re = (now - rc.t0)/220;
+      if (re >= 1) recoilMap.delete(u.id);
+      else { const amp = (re < 0.25 ? re/0.25 : 1-(re-0.25)/0.75) * S*0.16;
+        cx += rc.dx*amp; cy += rc.dy*amp; }
+    }
     // encirclement ring under the counter: red = an enemy you've trapped,
     // pulsing amber = one of yours cut off with no way out
     const trappedFoe = foePocket && u.side!==vs && foePocket.has(u.id) && isSpotted(u, vs);
@@ -9451,6 +9503,7 @@ function draw(){
   // prune flashes whose units are gone (destroyed mid-flash), or the render
   // scheduler would treat the scene as animating forever
   if (hitFlash.size) for (const [id,t0] of hitFlash) if (now - t0 > 400) hitFlash.delete(id);
+  if (recoilMap.size) for (const [id,r] of recoilMap) if (now - r.t0 > 260) recoilMap.delete(id);
 
   // floating texts & explosions
   anims = anims.filter(a => now - a.t0 < (a.life || 1100));
@@ -9885,6 +9938,17 @@ function boomAt(x,y,big){
 const hitFlash = new Map();            // unit id -> flash start time
 function flashUnit(u){ if (u) hitFlash.set(u.id, performance.now()); requestRender(); }
 
+/* recoil: a firing formation jerks back a few pixels away from its target and
+   settles — combat with weight. id -> {t0, dx, dy} (unit screen-space direction) */
+const recoilMap = new Map();
+function kickRecoil(att, def){
+  if (!GFX.particles || !att || !def) return;
+  const [ax,ay] = hexCenter(att.x,att.y), [bx,by] = hexCenter(def.x,def.y);
+  let dx = ax-bx, dy = ay-by; const L = Math.hypot(dx,dy) || 1;
+  recoilMap.set(att.id, { t0: performance.now(), dx: dx/L, dy: dy/L });
+  requestRender();
+}
+
 /* brief decaying camera shake — big explosions only, skipped on Low quality */
 let shakeT0 = 0, shakeMag = 0;
 function kickShake(mag){
@@ -9895,6 +9959,7 @@ function kickShake(mag){
 function attackArrow(att, def){
   const [x1,y1] = hexCenter(att.x,att.y), [x2,y2] = hexCenter(def.x,def.y);
   anims.push({type:'arrow', x1, y1, x2, y2, t0:performance.now()});
+  kickRecoil(att, def);
 }
 /* the game's best moment: a landing craft crosses the water from the launch hex
    to the beach, trailing a wake, and the shore erupts as it grounds. Used for
@@ -9947,7 +10012,7 @@ function _sceneAnimating(){
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   if (sel && reach) return true;                                         // selection ants + reachable pulse
-  if (camGlide || zoomGlide || hitFlash.size) return true;               // camera glides, damage flashes
+  if (camGlide || zoomGlide || hitFlash.size || recoilMap.size) return true;  // camera glides, damage flashes, recoil
   if (threatView) return true;                                           // threat overlay pulse
   const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
   if ((mp && mp.size) || (fp && fp.size)) return true;
@@ -10156,7 +10221,7 @@ window.addEventListener('keydown', e=>{
   if (openModal){
     if (e.key==='Escape'){
       if (openModal.id==='pause-modal') closePause();
-      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal') show(openModal.id, false);
+      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal' || openModal.id==='settings-modal') show(openModal.id, false);
     }
     return;
   }
@@ -10930,6 +10995,11 @@ function syncGfxUI(){
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
+$('gfx-adv-toggle').onclick = ()=>{
+  const adv = $('gfx-adv'), open = adv.classList.toggle('hidden');
+  $('gfx-adv-toggle').textContent = open ? 'Advanced ▸' : 'Advanced ▾';
+  sClick();
+};
 syncGfxUI();
 /* ============ THE WORLD AT WAR — native render / input / UI (browser only) ============ */
 const WW_S=14, WW_HX=Math.sqrt(3)*WW_S, WW_VY=1.5*WW_S, WW_PAD=20;
@@ -11875,6 +11945,7 @@ $('btn-pause-save').onclick = ()=>{
   const h = $('pause-hint');
   if (h) h.textContent = `✓ Saved — ${sideName(G.playerSide)}, turn ${G.turn}. Reload the menu's Continue to resume here.`;
 };
+$('btn-pause-settings').onclick = ()=>{ sClick(); closePause(); $('btn-sound').onclick(); };
 $('btn-pause-help').onclick = ()=>{ sClick(); closePause(); show('help-modal', true); };
 $('btn-pause-menu').onclick = ()=>{ sClick(); closePause(); $('btn-menu').onclick(); };
 $('pause-modal').addEventListener('click', e=>{ if (e.target === $('pause-modal')) closePause(); });
