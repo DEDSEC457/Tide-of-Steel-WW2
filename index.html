@@ -728,6 +728,9 @@
         <button id="gfx-low">Low</button><button id="gfx-medium">Medium</button><button id="gfx-high">High</button>
       </div></div>
     <div id="gfx-desc" style="color:var(--dim);font-size:12px;margin-top:2px;"></div>
+    <div class="setrow" style="align-items:flex-start;margin-top:8px;"><span>⚙ Effects</span>
+      <div id="gfx-toggles" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:12px;flex:1;max-width:340px;"></div></div>
+    <div id="gfx-tog-note" style="color:var(--dim);font-size:11px;margin-top:4px;">Fine-tune individual effects — switch any off to claw back frames. Changing the quality preset resets these.</div>
     <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
   </div>
 </div>
@@ -7689,9 +7692,11 @@ let cam = {x:0, y:0, z:1};
    dressing, weather particles, and the big-map cache resolution. */
 const GFX_PRESETS = {
   low:    { dpr:1,   fpsMs:50, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600,
-            lighting:false, clouds:false, grain:false, softShadow:false },
+            lighting:false, clouds:false, grain:false, softShadow:false,
+            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false },
   medium: { dpr:1.5, fpsMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096,
-            lighting:false, clouds:false, grain:false, softShadow:false },
+            lighting:false, clouds:false, grain:false, softShadow:false,
+            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false },
   // "high" adds a cinematic pass: drifting cloud shadows, a directional sun
   // grade, soft blurred counter shadows, a faint film grain — and `cine`:
   // hex relief shading, living water & rivers, ember front lines, upgraded
@@ -7701,18 +7706,53 @@ const GFX_PRESETS = {
   // ~166fps ceiling so ultra-high-refresh screens don't run away. Motion is all
   // time-based (performance.now), so the extra frames only smooth it — nothing speeds up.
   high:   { dpr:2,   fpsMs:6,  decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
-            lighting:true,  clouds:true,  grain:true,  softShadow:true, cine:true },
+            lighting:true,  clouds:true,  grain:true,  softShadow:true, cine:true,
+            bloom:true, glint:true, tracers:true, daynight:true, weatherSkin:true },
 };
 let GFX = Object.assign({ level:'medium' }, GFX_PRESETS.medium);
-function loadGfx(){ try{ const l = localStorage.getItem('hoi5-gfx'); if (l && GFX_PRESETS[l]) GFX = Object.assign({level:l}, GFX_PRESETS[l]); }catch(e){} }
+// Per-effect overrides layered on top of the chosen preset — players can keep 144fps
+// while switching individual effects off to dial in performance on a mid-range PC.
+// Only these keys are individually toggleable; everything else follows the preset.
+const GFX_TOGGLES = [
+  {k:'cine',        label:'Cinematic terrain'},
+  {k:'bloom',       label:'Emissive bloom'},
+  {k:'glint',       label:'Water sun-glint'},
+  {k:'lighting',    label:'Sunlight & haze'},
+  {k:'clouds',      label:'Cloud shadows'},
+  {k:'daynight',    label:'Seasonal light'},
+  {k:'weatherSkin', label:'Weather on counters'},
+  {k:'tracers',     label:'Combat tracers'},
+  {k:'softShadow',  label:'Soft shadows'},
+  {k:'grain',       label:'Film grain'},
+  {k:'particles',   label:'Weather particles'},
+];
+let _gfxOv = {};
+try{ _gfxOv = JSON.parse(localStorage.getItem('hoi5-gfx-ov')||'{}') || {}; }catch(e){ _gfxOv = {}; }
+function applyGfx(){                                          // preset baseline + any overrides
+  const base = GFX_PRESETS[GFX.level] || GFX_PRESETS.medium;
+  const lvl = GFX.level;
+  GFX = Object.assign({level:lvl}, base);
+  for (const t of GFX_TOGGLES) if (t.k in _gfxOv) GFX[t.k] = !!_gfxOv[t.k];
+}
+function loadGfx(){ try{ const l = localStorage.getItem('hoi5-gfx'); if (l && GFX_PRESETS[l]) GFX.level = l; }catch(e){} applyGfx(); }
 loadGfx();
+function _reGfx(){                                            // re-apply density + re-bake terrain
+  if (typeof resize === 'function') resize();
+  try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}
+  if (typeof requestRender === 'function') requestRender();
+}
 function setGfx(level){
   if (!GFX_PRESETS[level]) return;
-  GFX = Object.assign({level}, GFX_PRESETS[level]);
-  try{ localStorage.setItem('hoi5-gfx', level); }catch(e){}
-  if (typeof resize === 'function') resize();                 // re-apply pixel density
-  try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}   // re-bake terrain at new quality
-  if (typeof requestRender === 'function') requestRender();
+  GFX.level = level;
+  _gfxOv = {};                                               // a fresh preset is a clean baseline
+  try{ localStorage.setItem('hoi5-gfx', level); localStorage.removeItem('hoi5-gfx-ov'); }catch(e){}
+  applyGfx(); _reGfx();
+  if (typeof syncGfxUI === 'function') syncGfxUI();
+}
+function toggleGfx(k, on){
+  _gfxOv[k] = !!on;
+  try{ localStorage.setItem('hoi5-gfx-ov', JSON.stringify(_gfxOv)); }catch(e){}
+  applyGfx(); _reGfx();
 }
 
 let DPR = 1;
@@ -7787,6 +7827,7 @@ let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
 let _hazeGrad = null, _hazeH = 0;
+let _seasonGrad = null, _seasonKey = '';
 /* smooth camera: pan glides ease toward a target, wheel zoom eases toward a
    target scale anchored under the cursor (the old camera teleported) */
 let camGlide = null;   // {x0,y0,x1,y1,t0,dur}
@@ -7839,6 +7880,26 @@ function drawPremiumOverlay(){                             // screen-space sun g
       }
     }
     if (_sunGrad){ ctx.globalCompositeOperation='soft-light'; ctx.fillStyle=_sunGrad;
+      ctx.fillRect(0,0,innerWidth,innerHeight); ctx.globalCompositeOperation='source-over'; }
+  }
+  // seasonal grade — a colour wash keyed to the calendar month the scenario is in:
+  // golden high summer, sepia autumn, cold-blue winter, fresh spring. Driven by the
+  // same date maths as the HUD clock, applied as a gentle soft-light tint.
+  if (GFX.daynight && ctx.createLinearGradient && typeof G!=='undefined' && G && typeof START_DATE!=='undefined'){
+    const mon = new Date(START_DATE + (G.turn-1)*((SCN.turnDays||7))*864e5).getUTCMonth();
+    const key = mon + 'x' + innerWidth + 'x' + innerHeight;
+    if (_seasonKey !== key){
+      // [top, bottom] soft-light tints per month (Jan..Dec)
+      const S_WIN=['rgba(120,150,205,0.55)','rgba(95,125,180,0.32)'];    // cold blue
+      const S_SPR=['rgba(196,214,172,0.40)','rgba(214,216,182,0.22)'];   // fresh green
+      const S_SUM=['rgba(255,222,150,0.46)','rgba(255,208,150,0.24)'];   // golden
+      const S_AUT=['rgba(226,176,116,0.46)','rgba(208,158,110,0.26)'];   // sepia
+      const byMon=[S_WIN,S_WIN,S_SPR,S_SPR,S_SPR,S_SUM,S_SUM,S_SUM,S_AUT,S_AUT,S_AUT,S_WIN];
+      const [t0,t1]=byMon[mon]||S_SUM;
+      const g=ctx.createLinearGradient(0,0,0,innerHeight);
+      if (g&&g.addColorStop){ g.addColorStop(0,t0); g.addColorStop(1,t1); _seasonGrad=g; _seasonKey=key; }
+    }
+    if (_seasonGrad){ ctx.globalCompositeOperation='soft-light'; ctx.fillStyle=_seasonGrad;
       ctx.fillRect(0,0,innerWidth,innerHeight); ctx.globalCompositeOperation='source-over'; }
   }
   if (GFX.grain){
@@ -9030,7 +9091,7 @@ function draw(){
   }  // end live terrain/coastline draw (else of useCache)
 
   if (GFX.clouds) drawCloudShadows(now, vL, vT, vR, vB);   // high: drifting overcast
-  if (GFX.cine)   drawWaterGlint(now, vL, vT, vR, vB);     // high: sun sparkling on the sea
+  if (GFX.glint)  drawWaterGlint(now, vL, vT, vR, vB);     // high: sun sparkling on the sea
 
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
 
@@ -9273,7 +9334,7 @@ function draw(){
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
       ctx.restore();
     }
-    drawUnit(u, cx, cy);
+    drawUnit(u, cx, cy, wx);
     // a gold star marks a formation led by a general (top-left of the counter)
     if (generalOf(u)){
       ctx.fillStyle = '#ffd34d';
@@ -9450,10 +9511,39 @@ function draw(){
     if (a.type === 'arrow'){
       const pr = Math.min(1, p*2.4);
       const gx = a.x1 + (a.x2-a.x1)*pr, gy = a.y1 + (a.y2-a.y1)*pr;
-      ctx.globalAlpha = (1-p)*0.9;
+      const ang = Math.atan2(a.y2-a.y1, a.x2-a.x1);
+      if (GFX.tracers){
+        const dx=a.x2-a.x1, dy=a.y2-a.y1, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+        // muzzle flash at the firing hex — a bright bloom of spikes in the opening beat
+        if (p < 0.35){
+          const mf = 1 - p/0.35;
+          ctx.globalAlpha = mf*0.9; ctx.fillStyle = '#fff3c8';
+          ctx.beginPath(); ctx.arc(a.x1, a.y1, 3+mf*5, 0, Math.PI*2); ctx.fill();
+          ctx.strokeStyle = '#ffcf7a'; ctx.lineWidth = 1.4;
+          for (let i=0;i<4;i++){ const sa=ang+(i-1.5)*0.24;
+            ctx.beginPath(); ctx.moveTo(a.x1,a.y1); ctx.lineTo(a.x1+Math.cos(sa)*(6+mf*8), a.y1+Math.sin(sa)*(6+mf*8)); ctx.stroke(); }
+        }
+        // tracer rounds streaking across, each on its own lane and firing phase
+        ctx.lineWidth = 1.6;
+        for (let i=0;i<3;i++){
+          const ph = (p*2.0 + i*0.33) % 1;
+          const hx = a.x1 + dx*ph + nx*(i-1)*3, hy = a.y1 + dy*ph + ny*(i-1)*3;
+          ctx.globalAlpha = (1-p)*0.9;
+          ctx.strokeStyle = i%2 ? '#ffe08a' : '#ff9a4a';
+          ctx.beginPath(); ctx.moveTo(hx - Math.cos(ang)*7, hy - Math.sin(ang)*7); ctx.lineTo(hx, hy); ctx.stroke();
+        }
+        // sparks kicking off the target once rounds are landing
+        if (pr > 0.55){
+          ctx.globalAlpha = (1-p)*0.8; ctx.fillStyle = '#ffd27a';
+          for (let i=0;i<4;i++){ const sa=(a.x1+a.y1+i*90)*Math.PI/180, rr=3+i*1.6;
+            ctx.fillRect(a.x2+Math.cos(sa)*rr-0.8, a.y2+Math.sin(sa)*rr-0.8, 1.6, 1.6); }
+        }
+        ctx.globalAlpha = 1;
+      }
+      // the directional intent arrow (softened when tracers carry the drama)
+      ctx.globalAlpha = (1-p)*(GFX.tracers?0.5:0.9);
       ctx.strokeStyle = '#ffd98a'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(a.x1,a.y1); ctx.lineTo(gx,gy); ctx.stroke();
-      const ang = Math.atan2(a.y2-a.y1, a.x2-a.x1);
       ctx.fillStyle = '#ffd98a';
       ctx.beginPath();
       ctx.moveTo(gx,gy);
@@ -9519,7 +9609,7 @@ function draw(){
     ctx.globalAlpha = 1;
   }
 
-  if (GFX.cine) drawBloom(now, vL, vT, vR, vB);   // high: additive glow on lights/fire (world space)
+  if (GFX.bloom) drawBloom(now, vL, vT, vR, vB);   // high: additive glow on lights/fire (world space)
 
   // vignette: focus the eye on the front
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -9619,7 +9709,7 @@ function star(x,y,r){
   ctx.closePath(); ctx.fill();
 }
 
-function drawUnit(u, cx, cy){
+function drawUnit(u, cx, cy, wx){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
@@ -9636,6 +9726,15 @@ function drawUnit(u, cx, cy){
     roundRect(-w/2+2, -h/2+3, w, h, 5); ctx.fill();
     ctx.fillStyle = k.color || SIDES[u.side].color;
     roundRect(-w/2,-h/2,w,h,5); ctx.fill();
+  }
+  // glossy finish — a soft glass highlight across the top half of the counter
+  if (GFX.softShadow && ctx.createLinearGradient){
+    const gg = ctx.createLinearGradient(0,-h/2,0,h*0.12);
+    if (gg && gg.addColorStop){
+      gg.addColorStop(0,'rgba(255,255,255,0.22)'); gg.addColorStop(0.55,'rgba(255,255,255,0.05)'); gg.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.save(); roundRect(-w/2,-h/2,w,h,5); ctx.clip();
+      ctx.fillStyle = gg; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
+    }
   }
   ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
   ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
@@ -9738,6 +9837,30 @@ function drawUnit(u, cx, cy){
   if (u.oos){
     ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
     ctx.fillText('⚠', w/2-8, -h/2+10);
+  }
+  // weather skin — frost rime in the snow, mud splatter in the thaw. Land units
+  // only (a ship doesn't cake with mud); clipped to the counter so it reads as
+  // grime on the cardboard. A per-unit seed keeps each counter's pattern stable.
+  if (GFX.weatherSkin && (wx==='snow' || wx==='mud')){
+    const t = terrainAt(u.x,u.y);
+    if (t!=='~' && t!=='o'){
+      const seed = u.x*31 + u.y*47;
+      ctx.save(); roundRect(-w/2,-h/2,w,h,5); ctx.clip();
+      if (wx==='snow'){
+        if (ctx.createLinearGradient){
+          const fg = ctx.createLinearGradient(0,-h/2,0,0);
+          if (fg && fg.addColorStop){ fg.addColorStop(0,'rgba(236,246,255,0.5)'); fg.addColorStop(1,'rgba(236,246,255,0)');
+            ctx.fillStyle = fg; ctx.fillRect(-w/2,-h/2,w,h*0.5); }
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        for (let i=0;i<5;i++){ const sx=((seed*7+i*53)%100)/100*w-w/2, sy=((seed*13+i*29)%70)/100*h-h/2; ctx.fillRect(sx,sy,1.4,1.4); }
+      } else {                                                // mud flung up the lower half
+        ctx.fillStyle = 'rgba(38,28,15,0.55)';
+        for (let i=0;i<7;i++){ const sx=((seed*7+i*53)%100)/100*w-w/2, sy=(0.42+((seed*13+i*29)%56)/100)*h-h/2;
+          ctx.beginPath(); ctx.ellipse(sx,sy,1.3+(i%2)*0.8,0.9,0,0,Math.PI*2); ctx.fill(); }
+      }
+      ctx.restore();
+    }
   }
   ctx.restore();
 }
@@ -10784,9 +10907,26 @@ const GFX_DESC = {
   medium: 'Trees, contours, weather effects, 30fps, standard pixel density. A good balance.',
   high:   'Cinematic: relief-shaded terrain, living water & rivers, an ember front line, cloud shadows & sunlight, richer explosions, storm lightning, film grain — up to 144fps, retina. For a strong gaming PC.',
 };
+let _gfxTogBuilt = false;
+function buildGfxToggles(){
+  const box = $('gfx-toggles'); if (!box || _gfxTogBuilt) return;
+  box.innerHTML = '';
+  for (const t of GFX_TOGGLES){
+    const lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'gfxt-'+t.k;
+    cb.onchange = ()=>{ toggleGfx(t.k, cb.checked); syncGfxUI(); sClick(); };
+    const txt = document.createElement('span'); txt.textContent = t.label;
+    lab.appendChild(cb); lab.appendChild(txt);
+    box.appendChild(lab);
+  }
+  _gfxTogBuilt = true;
+}
 function syncGfxUI(){
   for (const l of ['low','medium','high']) $('gfx-'+l).classList.toggle('sel', GFX.level===l);
   $('gfx-desc').textContent = GFX_DESC[GFX.level] || '';
+  buildGfxToggles();
+  for (const t of GFX_TOGGLES){ const cb = $('gfxt-'+t.k); if (cb) cb.checked = !!GFX[t.k]; }
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
