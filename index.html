@@ -3382,6 +3382,7 @@ SCENARIOS.poland = (function buildPoland(){
   },
   deployNames: {g_inf:'Ersatz-Korps', g_mot:'Mot. Reserve', g_pz:'Panzer Reserve',
     s_inf:'Rezerwa Piechoty', s_cav:'Rezerwa Kawalerii', s_mil:'Bataliony ON'},
+  airRange: 12,                    // Luftwaffe air supremacy — the Stukas reach the whole front from day one
   cols: C, rows: R, map,
   cities: [
     // German border cities (staging areas)
@@ -5860,9 +5861,10 @@ function airWxMul(side){
   return 1;
 }
 function airfieldCovered(side, x, y){
-  if (G.cities.some(c => c.owner===side && hexDist(c.x,c.y,x,y) <= AIR_RANGE)) return true;
+  const R = SCN.airRange ?? AIR_RANGE;   // scenarios with total air supremacy (Poland) reach deeper
+  if (G.cities.some(c => c.owner===side && hexDist(c.x,c.y,x,y) <= R)) return true;
   // naval theaters: aircraft carriers are floating airfields
-  return unitsOf(side).some(u => KINDS[u.kind].carrier && hexDist(u.x,u.y,x,y) <= AIR_RANGE);
+  return unitsOf(side).some(u => KINDS[u.kind].carrier && hexDist(u.x,u.y,x,y) <= R);
 }
 function strikeTargets(side){
   return unitsOf(enemyOf(side)).filter(t => !KINDS[t.kind].lowProfile && airfieldCovered(side, t.x, t.y));
