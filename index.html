@@ -328,6 +328,18 @@
         <button class="primary mc-btn">PLAY NOW ▶</button>
       </div>
     </div>
+    <!-- Road to Victory — linked campaign -->
+    <div class="mode-card mc-hero" id="mc-road">
+      <div class="mc-inner">
+        <div class="mc-icon">🎖</div>
+        <div class="mc-text">
+          <span class="mc-badge fresh">✦ NEW</span>
+          <h2>ROAD TO VICTORY</h2>
+          <p class="mc-desc">Fight the whole war as the Axis, battle by battle — France 1940 to Stalingrad. Win to unlock the next front; your doctrines, veterans and war chest carry forward. One continuous campaign.</p>
+        </div>
+        <button class="primary mc-btn">MARCH ▶</button>
+      </div>
+    </div>
     <!-- Three secondary modes -->
     <div class="mode-row">
       <div class="mode-card" id="mc-realistic">
@@ -405,6 +417,31 @@
       <button id="btn-back-realistic">← Back</button>
       <button id="btn-continue-realistic" class="hidden">CONTINUE SAVED GAME</button>
       <button class="primary" id="btn-play-realistic">PLAY ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ROAD TO VICTORY (linked Axis campaign) ============ -->
+<div id="road-screen" class="modal-back hidden">
+  <div class="modal" style="max-width:940px;">
+    <h2>🎖 ROAD TO VICTORY</h2>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 10px;">THE AXIS WAR · 1940–1942 · WIN EACH FRONT TO OPEN THE NEXT</div>
+    <p id="rv-intro" style="color:var(--dim);font-size:13px;max-width:660px;margin:0 auto 6px;">Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.</p>
+    <div id="rv-setup">
+      <div class="opt-row" id="rv-diff-row" style="justify-content:center;margin-top:8px;">
+        <span style="color:var(--dim);padding:6px 0;font-size:13px;">Difficulty:</span>
+        <span class="opt" data-d="easy">Easy</span>
+        <span class="opt sel" data-d="normal">Normal</span>
+        <span class="opt" data-d="hard">Hard</span>
+        <span class="opt" data-d="brutal" title="No quarter — the enemy out-produces you and gives none.">Brutal 💀</span>
+      </div>
+    </div>
+    <div id="rv-stages" style="display:flex;gap:6px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin:14px 0;"></div>
+    <div id="rv-status" style="color:var(--dim);font-size:13px;min-height:18px;"></div>
+    <div class="mrow" style="justify-content:center;margin-top:14px;">
+      <button id="rv-back">← Back</button>
+      <button id="rv-reset" class="hidden">⟲ Restart Campaign</button>
+      <button class="primary" id="rv-begin">▶ Begin the War</button>
     </div>
   </div>
 </div>
@@ -694,6 +731,7 @@
       <button id="btn-end-replay" class="hidden">📽 Replay the Campaign</button>
       <button class="primary" id="btn-end-menu">Back to Menu</button>
     </div>
+    <div id="end-campaign" class="hidden" style="margin-top:8px;color:var(--dim);font-size:13px;"></div>
   </div>
 </div>
 
@@ -5501,6 +5539,52 @@ function aiBuyDoctrine(side){
   }
 }
 
+/* ======================= ROAD TO VICTORY — campaign core (engine level) =======================
+   A meta-layer over the existing scenarios: fight the Axis war front by front. Winning a stage
+   (a solid ★★★ victory) unlocks the next and carries your doctrines, a growing veteran cadre and
+   a war chest forward. Progress lives in its own localStorage slot, so the campaign survives
+   across sessions. The battles themselves are unchanged — AI-vs-AI balance is untouched; every
+   bonus here is the human's earned reward. (The screen/UI lives in the browser-only section.) */
+const RV_STAGES = [
+  { scn:'france',     name:'Fall Gelb',            sub:'France · May 1940',        goal:'Break the Western Front and knock France out of the war.' },
+  { scn:'barbarossa', name:'Operation Barbarossa', sub:'Soviet Union · June 1941', goal:'Invade Russia and drive for Moscow before the winter snows.' },
+  { scn:'winter41',   name:'The Winter Line',      sub:'Russia · December 1941',   goal:'Hold the front against the great Soviet counteroffensive.' },
+  { scn:'alamein',    name:'Desert Fox',           sub:'Egypt · October 1942',     goal:'Break the Eighth Army at Alamein and drive on the Nile.' },
+  { scn:'stalingrad', name:'Stalingrad',           sub:'Russia · November 1942',   goal:'Seize the city on the Volga — the high-water mark of the war.' },
+];
+const RV_KEY = 'hoi5-roadtovictory-v1';
+let RV = null;              // {diff, stage, cleared:[{stars,score}|null], doc:{}, score} · null = not begun
+let rvDiff = 'normal';
+function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(RV_KEY)) || null; }catch(e){ RV = null; } }
+function rvSaveState(){ try{ if (RV) localStorage.setItem(RV_KEY, JSON.stringify(RV)); else localStorage.removeItem(RV_KEY); }catch(e){} }
+function rvStars(vp){ const f = TOTAL_VP ? vp/TOTAL_VP : 0; return f>=0.85?5:f>=0.68?4:f>=0.5?3:f>=0.3?2:f>=0.14?1:0; }
+function rvWarChest(){ if (!RV) return 0; const s = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0); return Math.min(16, s*2); }
+function rvStart(diff){ RV = { diff:diff||rvDiff, stage:0, cleared:[], doc:{}, score:0 }; rvSaveState(); return RV; }
+function rvApplyVeterans(stageIdx){
+  const n = RV ? Math.min(6, RV.cleared.filter(Boolean).length*2) : 0;   // two blooded formations per front won
+  if (!n) return;
+  const cand = unitsOf('G').filter(u=>!KINDS[u.kind].hq && u.str>=4);
+  for (let i=0;i<Math.min(n,cand.length);i++) gainXP(cand[(i*4+1)%cand.length], 12 + stageIdx*4);
+}
+function rvOnStageEnd(){
+  if (!G.campaign || G.campaign.mode!=='rv') return;
+  if (!RV) rvLoadState();                    // resume after a mid-battle page reload
+  if (!RV) return;
+  const i = G.campaign.stage, vp = G.result ? G.result.vp : axisVP();
+  const stars = rvStars(vp), won = stars >= 3;
+  const score = Math.max(0, Math.round((TOTAL_VP?vp/TOTAL_VP:0)*1000));
+  G.campaign.result = { won, stars, score };
+  if (won && i === RV.stage){                                           // clear the front, unlock the next
+    RV.cleared[i] = { stars, score };
+    RV.score += score;
+    RV.doc = Object.assign({}, RV.doc, G.doc.G);
+    RV.stage = Math.min(RV_STAGES.length, i+1);
+    rvSaveState();
+  } else if (won && RV.cleared[i] && stars > RV.cleared[i].stars){      // replayed a past front, did better
+    RV.score += score - RV.cleared[i].score; RV.cleared[i] = { stars, score }; rvSaveState();
+  }
+}
+
 /* ============================ PRODUCTION ============================ */
 function canReinforce(u){
   if (u.str >= KINDS[u.kind].maxStr || u.oos || u.moved || u.attacked) return false;
@@ -8249,7 +8333,7 @@ onCityTaken = function(c){
   boomAt(c.x, c.y, true);
   floatText(c.x, c.y, '★ '+c.name+' taken', '#ffd34d');
 };
-onGameOver = function(){ recordResult(); setTimeout(showEnd, 600); };
+onGameOver = function(){ recordResult(); if (typeof rvOnStageEnd==='function') rvOnStageEnd(); setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
   // a strafing pass streaks across the target hex as the bombs land
   {
@@ -11954,7 +12038,7 @@ if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRende
 
 /* mode-select routing — each sub-menu shows its own Continue button only if that
    slot actually holds a saved campaign */
-function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); if(typeof wwClose==='function') wwClose(); }
+function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false); if(typeof wwClose==='function') wwClose(); }
 /* ---- THE WORLD AT WAR — native Europe grand-strategy (wwOpen defined above) ---- */
 $('mc-hex').onclick = wwOpen;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
@@ -12045,6 +12129,81 @@ $('btn-menu').onclick = ()=>{
   saveGame();                        // autosave into this game's own slot
   showModeSelect();                  // continue buttons are set when each sub-menu opens
 };
+
+/* ======================= ROAD TO VICTORY — screen, rendering & wiring =======================
+   The campaign core (state, progression, persistence) lives at engine level so the headless
+   tests can drive it; everything below is the browser-only presentation layer. */
+let rvResetPending = false;
+function rvOpen(){
+  show('mode-select', false); show('realistic-menu', false); show('menu', false); show('waw-menu', false);
+  rvLoadState(); if (RV && RV.diff) rvDiff = RV.diff;
+  show('road-screen', true); rvRender(); sClick();
+}
+function rvRender(){
+  const started = !!RV;
+  show('rv-setup', !started);
+  $('rv-begin').classList.toggle('hidden', started);
+  $('rv-reset').classList.toggle('hidden', !started);
+  if (!rvResetPending) $('rv-reset').textContent = '⟲ Restart Campaign';
+  let html = '';
+  for (let i=0;i<RV_STAGES.length;i++){
+    const st = RV_STAGES[i];
+    const state = !started ? (i===0?'open':'locked') : (i<RV.stage?'clear':(i===RV.stage?'open':'locked'));
+    const rec = started && RV.cleared[i];
+    const stars = rec ? '★'.repeat(rec.stars)+'<span style="opacity:.28">'+'★'.repeat(5-rec.stars)+'</span>' : '';
+    const border = state==='clear'?'var(--grn)':state==='open'?'var(--amber)':'var(--line)';
+    const bg = state==='open'?'#20261a':state==='clear'?'#18220f':'#141812';
+    const badge = state==='clear'?'<span style="color:var(--grn)">✓ CLEARED</span>'
+      : state==='open'?'<span style="color:var(--amber)">▶ AVAILABLE</span>'
+      : '<span style="color:var(--dim)">🔒 LOCKED</span>';
+    const clickable = started && i<=RV.stage;
+    html += `<div class="rv-box" data-i="${i}" style="width:160px;border:1.5px solid ${border};border-radius:10px;padding:10px 12px;background:${bg};text-align:left;${clickable?'cursor:pointer;':'opacity:.55;'}">
+      <div style="font-size:11px;letter-spacing:1px;margin-bottom:4px;">${badge}</div>
+      <div style="font-weight:700;font-size:14px;">${i+1}. ${st.name}</div>
+      <div style="color:var(--amber);font-size:11px;margin:2px 0 5px;">${st.sub}</div>
+      <div style="color:var(--dim);font-size:12px;line-height:1.35;min-height:52px;">${st.goal}</div>
+      <div style="font-size:13px;margin-top:5px;height:16px;color:#ffd34d;">${stars}</div>
+    </div>`;
+    if (i < RV_STAGES.length-1) html += `<div style="align-self:center;color:var(--dim);font-size:16px;">→</div>`;
+  }
+  $('rv-stages').innerHTML = html;
+  for (const b of $('rv-stages').querySelectorAll('.rv-box')){
+    const i = +b.dataset.i;
+    if (started && i<=RV.stage) b.onclick = ()=>rvPlayStage(i);
+  }
+  if (started){
+    const done = RV.cleared.filter(Boolean).length, totStars = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0);
+    const docs = Object.keys(RV.doc||{}).length;
+    if (RV.stage >= RV_STAGES.length)
+      $('rv-status').innerHTML = `<b style="color:var(--grn)">🏆 The war is won — all ${RV_STAGES.length} fronts cleared.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Replay any battle for a better result.`;
+    else
+      $('rv-status').innerHTML = `Fronts won <b>${done}/${RV_STAGES.length}</b> &nbsp;·&nbsp; <b>${totStars}★</b> earned &nbsp;·&nbsp; war chest <b>${rvWarChest()}⚙</b> &nbsp;·&nbsp; ${docs} doctrine${docs===1?'':'s'} carried &nbsp;·&nbsp; score <b>${RV.score.toLocaleString()}</b> &nbsp;·&nbsp; ${RV.diff}`;
+  } else {
+    $('rv-status').textContent = 'Pick a difficulty, then begin. The first battle is France, May 1940. A ★★★ victory or better clears a front.';
+  }
+}
+function rvBegin(){ rvStart(); rvRender(); sCity(); }
+function rvPlayStage(i){
+  if (!RV || i > RV.stage) return;
+  eventQueue.length = 0; show('event-modal', false);
+  newGame('G', RV.diff, 'ai', RV_STAGES[i].scn, null);
+  G.campaign = { mode:'rv', stage:i };
+  G.doc.G = Object.assign({}, RV.doc);                                   // doctrines carry forward
+  const chest = rvWarChest(); if (chest) G.pp.G = Math.min(40, G.pp.G + chest);
+  rvApplyVeterans(i);
+  refreshSupply();
+  show('road-screen', false);
+  startCampaign();
+}
+$('mc-road').onclick = rvOpen;
+$('rv-back').onclick = ()=>{ show('road-screen', false); showModeSelect(); };
+$('rv-begin').onclick = rvBegin;
+$('rv-reset').onclick = ()=>{
+  if (rvResetPending){ RV = null; rvSaveState(); rvResetPending = false; rvRender(); }
+  else { rvResetPending = true; $('rv-reset').textContent = '⚠ Erase all progress?'; setTimeout(()=>{ rvResetPending = false; if ($('road-screen') && !$('road-screen').classList.contains('hidden')) rvRender(); }, 3000); }
+};
+for (const el of document.querySelectorAll('#rv-diff-row .opt'))
+  el.onclick = ()=>{ rvDiff = el.dataset.d; document.querySelectorAll('#rv-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); };
 
 /* ---------------- pause menu (Esc) ---------------- */
 function openPause(){
@@ -12279,11 +12438,33 @@ function showEnd(){
     <div class="end-ladder">${ladder}</div>
     <div class="end-record">${recordLine(G.scenario)}</div>`;
   $('btn-end-replay').classList.toggle('hidden', !(G.replay && G.replay.length >= 2));
+  // Road to Victory framing: did this battle clear the front, and what comes next?
+  const camp = G.campaign && G.campaign.mode==='rv' ? G.campaign : null;
+  const cn = $('end-campaign');
+  if (camp && camp.result){
+    const i = camp.stage, next = RV_STAGES[i+1];
+    if (camp.result.won){
+      $('btn-end-menu').textContent = next ? 'To the next front ▶' : 'Return to the Road ▶';
+      cn.innerHTML = next
+        ? `<b style="color:var(--grn)">✓ ${RV_STAGES[i].name} cleared — ${camp.result.stars}★.</b> The road opens to <b>${next.name}</b> · ${next.sub}.`
+        : `<b style="color:var(--grn)">🏆 The final front is won — the campaign is complete.</b>`;
+    } else {
+      $('btn-end-menu').textContent = '◀ Back to the Road';
+      cn.innerHTML = `<b style="color:var(--redL)">The front held against you.</b> A <b>★★★ victory</b> is needed to advance — regroup and try ${RV_STAGES[i].name} again.`;
+    }
+    show('end-campaign', true);
+  } else {
+    $('btn-end-menu').textContent = 'Back to Menu';
+    show('end-campaign', false);
+  }
   show('end-modal', true);
   if (cls==='win') sCity(); else sBoom();
   clearSave();
 }
-$('btn-end-menu').onclick = ()=>{ show('end-modal',false); showModeSelect(); $('btn-continue').classList.add('hidden'); };
+$('btn-end-menu').onclick = ()=>{ show('end-modal',false);
+  if (G && G.campaign && G.campaign.mode==='rv'){ rvOpen(); }
+  else { showModeSelect(); $('btn-continue').classList.add('hidden'); }
+};
 
 /* ---------------- campaign replay viewer ---------------- */
 const RP = { cv:null, ctx:null, mode:'replay', frame:0, playing:false, raf:0, last:0, s:1, ox:0, oy:0, derived:null };
@@ -12565,6 +12746,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
+    rvStars, rvStart, rvOnStageEnd, rvCurrent: ()=>RV,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
