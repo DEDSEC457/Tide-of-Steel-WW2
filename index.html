@@ -321,7 +321,7 @@
       <div class="mc-inner">
         <div class="mc-icon">⚔</div>
         <div class="mc-text">
-          <span class="mc-badge ready">8 CAMPAIGNS</span>
+          <span class="mc-badge ready">9 CAMPAIGNS</span>
           <h2>ARCADE MODE</h2>
           <p class="mc-desc">Historical battles from Operation Barbarossa to the Battle of the Bulge — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
         </div>
@@ -493,6 +493,7 @@
     <div class="sub" id="menu-sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
     <div class="opt-row" id="scn-row">
       <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
+      <span class="opt" data-s="poland">🦅 Poland 1939</span>
       <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
@@ -3277,10 +3278,10 @@ SCENARIOS.france = (function buildFrance(){
   maxTurn: 12,
   startDate: Date.UTC(1940,4,10),
   weather(turn){ return turn>=11 ? 'mud' : 'clear'; },   // dry blitzkrieg summer; late rains only
-  pp(side, turn){ return side==='G' ? 9 : (turn<=2 ? 6 : 5); },
+  pp(side, turn){ return side==='G' ? 10 : (turn<=2 ? 6 : 5); },
   victoryTiers: [
     [22,'DECISIVE GERMAN VICTORY','France is overrun in six weeks and the BEF destroyed on the beaches. The myth of the Wehrmacht is born — and the war turns west.'],
-    [15,'GERMAN VICTORY','Paris falls and the armies of the north are trapped. France signs the armistice in the railway car at Compiègne, as history demanded.'],
+    [13,'GERMAN VICTORY','Paris falls and the armies of the north are trapped. France signs the armistice in the railway car at Compiègne, as history demanded.'],
     [8, 'A HARDER FALL','France is beaten but bleeds the Wehrmacht far more than history — the panzers are battered, the timetable wrecked, and much of the BEF gets away.'],
     [0, 'MIRACLE ON THE MEUSE','The sickle cut is blunted. The front holds on the Meuse, the war in the west settles into a siege — and everything that follows is different.'],
   ],
@@ -7086,7 +7087,11 @@ function aiFullPhase(side){
 const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', italy:'hoi5-save-italy-v1', normandy:'hoi5-save-normandy-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
 function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'italy' ? 'italy' : scnId === 'normandy' ? 'normandy' : 'arcade'; }
-function saveKeyFor(scnId){ return SAVE_KEYS[saveSlotFor(scnId)]; }
+function saveKeyFor(scnId){
+  // Road to Victory battles autosave into their own slot — never over a standalone campaign
+  if (typeof G!=='undefined' && G && G.campaign && G.campaign.mode==='rv') return 'hoi5-save-road-v1';
+  return SAVE_KEYS[saveSlotFor(scnId)];
+}
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
   const d = JSON.parse(json);
@@ -12228,7 +12233,11 @@ if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRende
 
 /* mode-select routing — each sub-menu shows its own Continue button only if that
    slot actually holds a saved campaign */
-function showModeSelect(){ show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false); if(typeof wwClose==='function') wwClose(); }
+function showModeSelect(){
+  eventQueue.length = 0; show('event-modal', false);   // a stale battle event must not float over the menu
+  show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false);
+  if(typeof wwClose==='function') wwClose();
+}
 /* ---- THE WORLD AT WAR — native Europe grand-strategy (wwOpen defined above) ---- */
 $('mc-hex').onclick = wwOpen;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
@@ -12907,6 +12916,11 @@ $('btn-continue').onclick = ()=>{
 };
 function startCampaign(loaded){
   undoSnap = null;
+  // wipe the previous game's transient stage effects — unit ids restart at 1, so a
+  // stale hit-flash/recoil would land on the wrong counter, and old booms/smoke
+  // would draw onto the new map
+  anims = []; scars = []; moveAnim = null; hitFlash.clear(); recoilMap.clear(); shakeMag = 0;
+  _clouds = null;                              // reseed the overcast for this map's dimensions
   bannerTurn = 0; aiReport = null;             // a fresh campaign gets a fresh turn banner
   $('game-title').textContent = '⚙ ' + SCN.short;
   show('menu', false);
