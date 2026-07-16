@@ -280,6 +280,7 @@
   <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠ Threat</button>
   <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
   <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
+  <button id="btn-doctrine" title="Adopt war doctrines — permanent bonuses bought with production (D)">🎖 Doctrine</button>
   <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋 Units</button>
   <button id="btn-help2" title="How to play">Help</button>
   <button id="btn-sound" title="Sound & graphics settings">🔊</button>
@@ -669,6 +670,17 @@
     <div id="obj-list" style="font-size:14px;line-height:1.9;"></div>
     <p id="obj-summary" style="margin-top:10px;"></p>
     <div class="mrow"><button class="primary" id="btn-obj-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ WAR DOCTRINES ============ -->
+<div id="doc-modal" class="modal-back hidden">
+  <div class="modal" style="max-width:640px;">
+    <h2>🎖 WAR DOCTRINES</h2>
+    <p style="color:var(--dim);font-size:13px;margin-bottom:4px;">Spend production points on permanent doctrines — the same points that field divisions, so every doctrine is a division delayed. Choose the way your army fights.</p>
+    <p id="doc-pp" style="margin-bottom:10px;"></p>
+    <div id="doc-tree"></div>
+    <div class="mrow"><button class="primary" id="btn-doc-close">Close</button></div>
   </div>
 </div>
 
@@ -4370,6 +4382,7 @@ function newGame(playerSide, difficulty, mode, scenario, variants){
     units: START_UNITS.map(([k,n,x,y,s]) => makeUnit(k,n,x,y,s)),
     air: AIR_INIT.map(([sd,n,s,hm]) => makeAir(sd,n,s,hm)),
     pp: {G:0, S:0},
+    doc: {G:{}, S:{}},                         // adopted war doctrines per side (key -> true)
     winterGear: null,                          // null = not yet asked · 'pending' · true/false
     railDepth: {G: RAIL_START, S: RAIL_START},  // railhead reach from each home edge (realistic mode)
     decisions: {},                             // decision id -> chosen option index (or 'pending')
@@ -4628,7 +4641,7 @@ function computeSupply(side){
   }
   const cityKeys = new Set(myCities.map(c=>keyOf(c.x,c.y)));
   const dist = new Map();             // hex -> hexes since last depot
-  const range = SCN.supplyRange ?? SUPPLY_RANGE;
+  const range = (SCN.supplyRange ?? SUPPLY_RANGE) + docSupplyBonus(side);   // Motorised Supply extends reach
   // Dijkstra over a binary heap (stepping costs 1; arriving at a friendly depot
   // city costs 0 and re-sources the network). The heap keeps this near-linear —
   // vital because the AI computes supply hundreds of times a turn, and on the
@@ -4912,6 +4925,7 @@ function moveCost(u, x, y){
 function reachable(u){
   const wx = weatherFor(G.turn);
   let mp = KINDS[u.kind].mp + (generalOf(u)?.mp || 0);
+  if (hasDoc(u.side,'deepops') && docMech(u)) mp += 1;     // Deep Operations: mechanised exploitation
   // felt boots keep the infantry marching; frozen engines stop the panzers regardless
   if (wx==='snow' && u.side==='G' && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
     mp = Math.max(1, mp-1);
@@ -4989,6 +5003,8 @@ function combatMods(att, def){
   const ag = generalOf(att), dg = generalOf(def);
   if (ag && ag.atk) af('⭐ '+ag.name, ag.atk);
   if (dg && dg.def) df('⭐ '+dg.name, dg.def);
+  if (hasDoc(att.side,'combined')) af('⚙ Combined Arms', 1.10);
+  if (hasDoc(def.side,'depth') && def.entrench>0) df('⚙ Defense in Depth', 1.12);
   if (zhukovDefends(def)) df('⭐ '+ (SCN.capitalDefense.city) +' defense', SCN.capitalDefense.def);
   const al = unitLevel(att), dl = unitLevel(def);
   if (al > 0) af('✚ '+RANK_NAME[al], 1+0.05*al);
@@ -5431,6 +5447,60 @@ function paradropAssault(u, tx, ty){
   return ev;
 }
 
+/* ============================ WAR DOCTRINES ============================
+   A strategic meta-layer: each side spends production points (the same pool that
+   buys divisions) on permanent doctrine unlocks, trading immediate force for a
+   lasting edge. Three branches of two tiers; the tier-2 needs its tier-1. Effects
+   are read live from G.doc[side] at every combat / movement / supply / income
+   calculation, so they stay in the save with zero migration beyond the empty map.
+   The AI invests too (see aiBuyDoctrine), keeping AI-vs-AI balance symmetric. */
+const DOCTRINES = [
+  { key:'combined',   branch:'⚔ Offensive',  tier:1, cost:12, name:'Combined Arms',
+    desc:'+10% attack in every assault.' },
+  { key:'deepops',    branch:'⚔ Offensive',  tier:2, req:'combined',  cost:18, name:'Deep Operations',
+    desc:'Armour, motorised & cavalry gain +1 movement — deeper exploitation.' },
+  { key:'fortify',    branch:'🛡 Defensive',  tier:1, cost:12, name:'Field Fortification',
+    desc:'Holding units dig in one level deeper (+1 max entrenchment).' },
+  { key:'depth',      branch:'🛡 Defensive',  tier:2, req:'fortify',   cost:18, name:'Defense in Depth',
+    desc:'+12% defence for dug-in formations.' },
+  { key:'motorpool',  branch:'🚚 Logistics',  tier:1, cost:12, name:'Motorised Supply',
+    desc:'Supply reaches +1 hex further from every depot.' },
+  { key:'wareconomy', branch:'🚚 Logistics',  tier:2, req:'motorpool', cost:18, name:'War Economy',
+    desc:'+2 production points every turn.' },
+];
+function docDef(key){ return DOCTRINES.find(d => d.key===key); }
+function hasDoc(side, key){ return !!(G && G.doc && G.doc[side] && G.doc[side][key]); }
+function docMech(u){ const s = KINDS[u.kind].sym; return s==='arm' || s==='mot' || s==='cav'; }
+function docSupplyBonus(side){ return hasDoc(side,'motorpool') ? 1 : 0; }
+function docIncome(side){ return hasDoc(side,'wareconomy') ? 2 : 0; }
+function canBuyDoc(side, key){
+  const d = docDef(key); if (!d || hasDoc(side,key)) return false;
+  if (d.req && !hasDoc(side, d.req)) return false;
+  return G.pp[side] >= d.cost;
+}
+function buyDoctrine(side, key){
+  if (!canBuyDoc(side, key)) return false;
+  if (!G.doc) G.doc = {G:{}, S:{}};
+  if (!G.doc[side]) G.doc[side] = {};
+  G.doc[side][key] = true;
+  G.pp[side] -= docDef(key).cost;
+  return true;
+}
+/* the AI invests surplus production into doctrine — but only when it's flush
+   enough that it wouldn't otherwise be fielding divisions, so it never starves
+   the front. Attackers lean offensive, defenders defensive; both value supply. */
+function aiAggressive(side){ return side==='G' ? SCN.gerAI!=='defend' : SCN.sovAI==='attack'; }
+function aiBuyDoctrine(side){
+  const order = aiAggressive(side)
+    ? ['combined','deepops','motorpool','wareconomy','fortify','depth']
+    : ['fortify','depth','motorpool','wareconomy','combined','deepops'];
+  for (const key of order){
+    const d = docDef(key);
+    if (hasDoc(side,key) || (d.req && !hasDoc(side,d.req))) continue;
+    if (G.pp[side] >= d.cost + 16){ buyDoctrine(side, key); return; }   // keep a division's worth in hand
+  }
+}
+
 /* ============================ PRODUCTION ============================ */
 function canReinforce(u){
   if (u.str >= KINDS[u.kind].maxStr || u.oos || u.moved || u.attacked) return false;
@@ -5675,7 +5745,7 @@ function startPhase(side){
     }
     u.fuel = Math.min(FUEL_MAX, fuelOf(u) + gain);
   }
-  G.pp[side] += ppFor(side, G.turn) + diffPP(side);
+  G.pp[side] += ppFor(side, G.turn) + diffPP(side) + docIncome(side);   // War Economy adds output
   if (G.pp[side] > 40) G.pp[side] = 40;
   // the winter question: asked in mid-August, and not open forever
   const wq = SCN.winterQuestion;
@@ -5740,7 +5810,7 @@ function endPhase(){
   }
   for (const u of unitsOf(side)){
     if (!u.moved && !u.attacked && !u.oos){
-      const cap = effTerrain(u.x,u.y).dig;
+      const cap = effTerrain(u.x,u.y).dig + (hasDoc(u.side,'fortify') ? 1 : 0);   // Field Fortification digs deeper
       if (u.entrench < cap) u.entrench++;
     }
   }
@@ -5932,7 +6002,8 @@ function clearAICache(){ dfCache = {}; threatCache = {}; }
 function enemyReach(f){
   // cheap terrain-only movement flood for a foe unit; conservative — it ignores
   // my units as blockers, since I may move them out of the way before its turn
-  const mp = KINDS[f.kind].mp + (generalOf(f)?.mp || 0);
+  let mp = KINDS[f.kind].mp + (generalOf(f)?.mp || 0);
+  if (hasDoc(f.side,'deepops') && docMech(f)) mp += 1;
   const out = new Set([keyOf(f.x,f.y)]);
   const best = new Map([[keyOf(f.x,f.y),0]]);
   const heap = makeHeap(); heap.push(0,f.x,f.y);
@@ -6071,6 +6142,7 @@ function aiSpend(side){
   if (side==='G' && G.winterGear === 'pending')
     decideWinterGear(G.pp.G >= SCN.winterQuestion.cost + 4 && axisVP() >= 5);
   aiAir(side);
+  aiBuyDoctrine(side);                        // invest surplus production into doctrine
   // 1. reinforce hurt units (cheap, in the rear first)
   const mine = unitsOf(side).slice().sort((a,b)=>
     (KINDS[b.kind].cost - KINDS[a.kind].cost) || (a.str - b.str));
@@ -6754,6 +6826,7 @@ function deserialize(json){
   if (!G.beachheads) G.beachheads = [];                             // pre-amphibious saves
   if (!G.airdrops) G.airdrops = [];                                 // pre-airborne saves
   if (!G.missions) G.missions = [];                                 // pre-dispatch saves
+  if (!G.doc) G.doc = {G:{}, S:{}};                                 // pre-doctrine saves
   if (G.dynNextTurn == null) G.dynNextTurn = G.turn + 2;
   if (!G.dynSeen) G.dynSeen = {};
   if (!G.dynFlags) G.dynFlags = {};
@@ -10226,7 +10299,7 @@ window.addEventListener('keydown', e=>{
   if (openModal){
     if (e.key==='Escape'){
       if (openModal.id==='pause-modal') closePause();
-      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal' || openModal.id==='settings-modal') show(openModal.id, false);
+      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal' || openModal.id==='settings-modal' || openModal.id==='doc-modal') show(openModal.id, false);
     }
     return;
   }
@@ -10252,6 +10325,7 @@ window.addEventListener('keydown', e=>{
   if (k==='u' || k==='U'){ if (!$('btn-undo').classList.contains('hidden')) $('btn-undo').onclick(); }
   if (k==='s' || k==='S') $('btn-supply').onclick();
   if (k==='t' || k==='T') $('btn-threat').onclick();
+  if (k==='d' || k==='D') $('btn-doctrine').onclick();
   if (k==='m' || k==='M'){
     showMinimap = !showMinimap;
     try { localStorage.setItem('barb-minimap', showMinimap ? '1' : '0'); } catch(err){}
@@ -10934,6 +11008,34 @@ $('btn-objectives').onclick = ()=>{
   show('obj-modal', true);
 };
 $('btn-obj-close').onclick = ()=>show('obj-modal', false);
+
+/* ---------------- war doctrines ---------------- */
+function renderDoctrines(){
+  const side = G.mode==='hotseat' ? G.phase : G.playerSide;
+  $('doc-pp').innerHTML = `Your production: <b style="color:var(--amber)">${G.pp[side]}⚙</b> &nbsp;·&nbsp; <span style="color:var(--dim)">+${ppFor(side,G.turn)+diffPP(side)+docIncome(side)}⚙/turn</span>`;
+  const branches = [...new Set(DOCTRINES.map(d=>d.branch))];
+  let html = '';
+  for (const br of branches){
+    html += `<div style="margin:12px 0 5px;color:var(--amber);font-size:12px;letter-spacing:1px;">${br}</div><div style="display:flex;gap:8px;">`;
+    for (const d of DOCTRINES.filter(x=>x.branch===br)){
+      const owned = hasDoc(side,d.key), reqOk = !d.req || hasDoc(side,d.req), afford = G.pp[side] >= d.cost;
+      let foot;
+      if (owned) foot = `<span style="color:var(--grn);font-size:12px;">✓ Adopted</span>`;
+      else if (!reqOk) foot = `<span style="color:var(--dim);font-size:12px;">🔒 needs ${docDef(d.req).name}</span>`;
+      else foot = `<button class="doc-buy" data-key="${d.key}" ${afford?'':'disabled'} style="font-size:12px;padding:5px 10px;${afford?'':'opacity:0.5;cursor:not-allowed;'}">Adopt · ${d.cost}⚙</button>`;
+      html += `<div style="flex:1;border:1px solid ${owned?'var(--grn)':'var(--line)'};border-radius:8px;padding:8px 10px;background:${owned?'#1a2412':'#181d12'};">
+        <div style="font-weight:600;font-size:13px;">${d.name}</div>
+        <div style="color:var(--dim);font-size:12px;margin:3px 0 7px;line-height:1.35;">${d.desc}</div>${foot}</div>`;
+    }
+    html += `</div>`;
+  }
+  $('doc-tree').innerHTML = html;
+  for (const b of $('doc-tree').querySelectorAll('.doc-buy'))
+    b.onclick = ()=>{ if (buyDoctrine(side, b.dataset.key)){ sCity(); renderDoctrines(); updateAll(); } else sClick(); };
+}
+function openDoctrine(){ if (!G || G.over) return; renderDoctrines(); show('doc-modal', true); }
+$('btn-doctrine').onclick = openDoctrine;
+$('btn-doc-close').onclick = ()=>{ show('doc-modal', false); sClick(); };
 
 /* ---------------- help ---------------- */
 $('btn-help').onclick = ()=>show('help-modal',true);
@@ -12462,6 +12564,7 @@ if (typeof module !== 'undefined' && module.exports){
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
+    DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
