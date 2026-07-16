@@ -8129,7 +8129,7 @@ const sDrop  = ()=>{ noise(0.6,0.035); tone(260,0.55,'sawtooth',0.028,-70); };  
    under the score, follows the music volume / mute, and falls silent in clear
    weather. Guarded so the headless fake-DOM (no AudioContext) simply skips it. */
 let ambSrc=null, ambFilter=null, ambGain=null, ambLFO=null, ambLFOg=null, ambWx=null;
-function ambTarget(){ return (muted || musicVol<=0) ? 0 : musicVol; }
+function ambTarget(){ return (muted || musicVol<=0) ? 0 : Math.max(0.35, musicVol); }  // audible floor when unmuted
 function startAmbient(){
   const a=ac(); if(!a || ambSrc) return;
   const n=Math.floor(a.sampleRate*3), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
@@ -8148,13 +8148,13 @@ function setAmbient(wx){
   startAmbient(); if(!ambGain) return;
   ambWx=wx; const t=a.currentTime;
   if(wx==='snow'){        // a low, gusting wind
-    ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(520,t,0.6);
-    ambLFOg.gain.value=240; ambLFO.frequency.value=0.10;
-    ambGain.gain.setTargetAtTime(ambTarget()*0.11, t, 1.2);
+    ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(700,t,0.6);
+    ambLFOg.gain.value=320; ambLFO.frequency.value=0.10;
+    ambGain.gain.setTargetAtTime(ambTarget()*0.34, t, 1.0);
   } else if(wx==='mud'){  // a steady hiss of rain
-    ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(1100,t,0.6);
-    ambLFOg.gain.value=90; ambLFO.frequency.value=0.22;
-    ambGain.gain.setTargetAtTime(ambTarget()*0.08, t, 1.2);
+    ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(950,t,0.6);
+    ambLFOg.gain.value=140; ambLFO.frequency.value=0.22;
+    ambGain.gain.setTargetAtTime(ambTarget()*0.26, t, 1.0);
   } else {                // clear skies — let it die away
     ambGain.gain.setTargetAtTime(0, t, 1.6);
   }
@@ -8964,6 +8964,7 @@ function draw(){
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
   if (!G) return;
   const wx = weatherFor(G.turn);
+  if (wx !== ambWx && typeof setAmbient==='function') setAmbient(wx);   // keep the weather bed in sync every frame it changes
   const now = performance.now();
   // camera shake: a short decaying rattle after a kill
   if (shakeMag > 0){
