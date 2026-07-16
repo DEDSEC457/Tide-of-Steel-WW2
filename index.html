@@ -713,16 +713,19 @@
 <div id="settings-modal" class="modal-back hidden">
   <div class="modal" style="max-width:440px;">
     <h2>SETTINGS</h2>
-    <div class="setrow"><span>🎵 Music volume</span>
+    <div class="setrow"><span>🎵 Music</span>
       <input type="range" id="vol-music" min="0" max="100" step="1">
       <span class="vlabel" id="vol-music-val">40%</span></div>
-    <div class="setrow"><span>💥 Effects volume</span>
+    <div class="setrow"><span>💥 Sound effects</span>
       <input type="range" id="vol-sfx" min="0" max="100" step="1">
       <span class="vlabel" id="vol-sfx-val">80%</span></div>
+    <div class="setrow"><span>🌬 Ambience (weather)</span>
+      <input type="range" id="vol-amb" min="0" max="100" step="1">
+      <span class="vlabel" id="vol-amb-val">70%</span></div>
     <div class="setrow"><span>🔇 Mute everything</span>
       <button id="btn-mute">Sound: ON</button></div>
-    <div style="color:var(--dim);font-size:12px;margin-top:6px;">The soundtrack is an original score
-      played live by the game's own synthesizer — somber strings for a long war.</div>
+    <div style="color:var(--dim);font-size:12px;margin-top:6px;">The score is an original synth soundtrack;
+      <b>Sound effects</b> are combat &amp; UI; <b>Ambience</b> is the wind &amp; rain of foul weather.</div>
     <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
     <div class="setrow"><span>🖥 Graphics quality</span>
       <div class="gfx-seg">
@@ -8001,10 +8004,11 @@ const show = (id,on) => $(id).classList.toggle('hidden', !on);
 
 /* ---------------- sound (tiny WebAudio synth) ---------------- */
 let AC = null;
-let sfxVol = 0.8, musicVol = 0.4;
+let sfxVol = 0.8, musicVol = 0.4, ambVol = 0.7;
 try {
   const sv = parseFloat(localStorage.getItem('barb-sfxvol'));  if (!isNaN(sv)) sfxVol = sv;
   const mv = parseFloat(localStorage.getItem('barb-musvol'));  if (!isNaN(mv)) musicVol = mv;
+  const av = parseFloat(localStorage.getItem('barb-ambvol'));  if (!isNaN(av)) ambVol = av;
 } catch(e){}
 function ac(){ if (!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
 function tone(f, dur, type='square', vol=0.06, slide=0){
@@ -8042,7 +8046,7 @@ const MUSIC = {
   ],
 };
 let musicGain = null, musicTimer = null, musicBar = 0;
-function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; if (typeof applyAmbientVol==='function') applyAmbientVol(); }
+function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; }
 function startMusic(){
   const a = ac(); if (!a || musicGain) return;
   musicGain = a.createGain(); applyMusicVol();
@@ -8129,7 +8133,7 @@ const sDrop  = ()=>{ noise(0.6,0.035); tone(260,0.55,'sawtooth',0.028,-70); };  
    under the score, follows the music volume / mute, and falls silent in clear
    weather. Guarded so the headless fake-DOM (no AudioContext) simply skips it. */
 let ambSrc=null, ambFilter=null, ambGain=null, ambLFO=null, ambLFOg=null, ambWx=null;
-function ambTarget(){ return (muted || musicVol<=0) ? 0 : Math.max(0.35, musicVol); }  // audible floor when unmuted
+function ambTarget(){ return (muted || ambVol<=0) ? 0 : ambVol; }   // its own Ambience slider
 function startAmbient(){
   const a=ac(); if(!a || ambSrc) return;
   const n=Math.floor(a.sampleRate*3), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
@@ -8150,11 +8154,11 @@ function setAmbient(wx){
   if(wx==='snow'){        // a low, gusting wind
     ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(700,t,0.6);
     ambLFOg.gain.value=320; ambLFO.frequency.value=0.10;
-    ambGain.gain.setTargetAtTime(ambTarget()*0.34, t, 1.0);
+    ambGain.gain.setTargetAtTime(ambTarget()*0.20, t, 1.0);
   } else if(wx==='mud'){  // a steady hiss of rain
     ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(950,t,0.6);
     ambLFOg.gain.value=140; ambLFO.frequency.value=0.22;
-    ambGain.gain.setTargetAtTime(ambTarget()*0.26, t, 1.0);
+    ambGain.gain.setTargetAtTime(ambTarget()*0.15, t, 1.0);
   } else {                // clear skies — let it die away
     ambGain.gain.setTargetAtTime(0, t, 1.6);
   }
@@ -10943,16 +10947,18 @@ function syncSoundUI(){
   $('btn-mute').textContent = muted ? 'Sound: MUTED' : 'Sound: ON';
   $('vol-music-val').textContent = Math.round(musicVol*100)+'%';
   $('vol-sfx-val').textContent = Math.round(sfxVol*100)+'%';
+  $('vol-amb-val').textContent = Math.round(ambVol*100)+'%';
 }
 $('btn-sound').onclick = ()=>{ $('vol-music').value = Math.round(musicVol*100);
-  $('vol-sfx').value = Math.round(sfxVol*100); syncSoundUI(); syncGfxUI(); show('settings-modal', true); };
+  $('vol-sfx').value = Math.round(sfxVol*100); $('vol-amb').value = Math.round(ambVol*100);
+  syncSoundUI(); syncGfxUI(); show('settings-modal', true); };
 $('btn-settings-menu').onclick = $('btn-sound').onclick;
 $('btn-settings-main').onclick = $('btn-sound').onclick;
 $('btn-settings-close').onclick = ()=>{ show('settings-modal', false); sClick(); };
 $('btn-mute').onclick = ()=>{
   muted = !muted;
   try{ localStorage.setItem('barb-muted', muted?'1':'0'); }catch(e){}
-  applyMusicVol(); syncSoundUI();
+  applyMusicVol(); applyAmbientVol(); syncSoundUI();
 };
 $('vol-music').oninput = ()=>{
   musicVol = $('vol-music').value/100;
@@ -10964,6 +10970,11 @@ $('vol-sfx').oninput = ()=>{
   sfxVol = $('vol-sfx').value/100;
   try{ localStorage.setItem('barb-sfxvol', sfxVol); }catch(e){}
   syncSoundUI(); tone(440,0.08,'square',0.06);
+};
+$('vol-amb').oninput = ()=>{
+  ambVol = $('vol-amb').value/100;
+  try{ localStorage.setItem('barb-ambvol', ambVol); }catch(e){}
+  applyAmbientVol(); syncSoundUI();
 };
 syncSoundUI();
 
