@@ -425,7 +425,7 @@
 <div id="road-screen" class="modal-back hidden">
   <div class="modal" style="max-width:940px;">
     <h2>🎖 ROAD TO VICTORY</h2>
-    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 10px;">THE AXIS WAR · 1940–1942 · WIN EACH FRONT TO OPEN THE NEXT</div>
+    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 10px;">THE AXIS WAR · 1939–1942 · WIN EACH FRONT TO OPEN THE NEXT</div>
     <p id="rv-intro" style="color:var(--dim);font-size:13px;max-width:660px;margin:0 auto 6px;">Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.</p>
     <div id="rv-setup">
       <div class="opt-row" id="rv-diff-row" style="justify-content:center;margin-top:8px;">
@@ -3315,6 +3315,183 @@ SCENARIOS.france = (function buildFrance(){
 })();
 
 
+/* ============================ SCENARIOS.poland ============================
+   FALL WEISS — the invasion of Poland, 1 September 1939. Germany (G, moves first,
+   carries the offensive) strikes from Pomerania and Silesia in the west and from
+   East Prussia in the north, converging on Warsaw. Poland (S) is brave but deployed
+   forward along the whole border, out-produced and about to be stabbed in the back
+   from the east. Arcade-style — the campaign opener that teaches the blitz. Reached
+   through Road to Victory (also the first front of the Axis war). */
+SCENARIOS.poland = (function buildPoland(){
+  const C = 42, R = 26;
+  const box = (x,y,a,b,c,d)=> x>=a && x<=c && y>=b && y<=d;
+  const map = [];
+  for (let y=0;y<R;y++){
+    let row = '';
+    for (let x=0;x<C;x++){
+      let t = '.';
+      // the Baltic — a small sea along the northern coast (Danzig sits just below it)
+      if (y===0 && x>=12 && x<=28) t='~';
+      else if (y===1 && x>=15 && x<=25) t='~';
+      if (t==='.'){
+        // the Vistula — Kraków (SW) → Warsaw → the Baltic at Danzig (N)
+        const south = (y>=11 && y<=21) && Math.abs(x - (15 + (21-y)*0.9)) < 0.55;   // Kraków→Warsaw
+        const north = (y>=2  && y<=11) && Math.abs(x - (24 - (11-y)*0.67)) < 0.55;  // Warsaw→Danzig
+        if (south || north) t='r';
+        else if (y>=8 && y<=15 && Math.abs(x-34) < 0.5) t='r';                      // the Bug, in the east
+        // the Carpathians along the southern (Slovak) border
+        else if (y>=24) t='h';
+        else if (y===23 && x<=22) t='h';
+        // Silesian uplands in the south-west
+        else if (box(x,y,6,17,12,22) && (x*y)%4===0) t='h';
+        // forests: Tuchola in the Corridor, Kampinos by Warsaw, the eastern woods
+        else if (box(x,y,9,3,15,6)   && (x+y)%3===0) t='f';
+        else if (box(x,y,20,8,27,11) && (x*3+y)%4===0) t='f';
+        else if (box(x,y,29,16,38,21)&& (x+y*2)%4===0) t='f';
+        // the Pripet marshes in the far south-east
+        else if (box(x,y,35,17,41,22) && (x+y)%2===0) t='s';
+      }
+      row += t;
+    }
+    map.push(row);
+  }
+  return {
+  id: 'poland',
+  title: 'THE INVASION OF POLAND', short: 'POLAND 1939',
+  sub: 'FALL WEISS · SEPTEMBER 1939 · THE FIRST BLITZKRIEG',
+  sides: {
+    G: {name:'German', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+    S: {name:'Polish', flag:'🟥', color:'#8a3a3a', tint:'rgba(170,70,70,0.24)'},
+  },
+  menu: {
+    ger: {h:'⬛ Germany (Wehrmacht)', p:'Fall Weiss. Drive the pincers in from Pomerania, Silesia and East Prussia, break the border armies before they can fall back behind the Vistula, and take Warsaw before the world reacts.'},
+    sov: {h:'🟥 Poland (Wojsko Polskie)', p:'You are deployed too far forward and out-gunned. Trade the frontier for time, pull the armies back behind the Vistula and the San, hold Warsaw — and pray the Allies in the west attack before the Soviets strike your rear.'},
+  },
+  kinds: {
+    g_inf:  {side:'G', label:'Infanterie-Korps', atk:5, def:5, mp:2, maxStr:10, cost:10, sym:'inf'},
+    g_mot:  {side:'G', label:'Motorisiert',      atk:6, def:5, mp:3, maxStr:9,  cost:14, sym:'mot', fast:true, color:'#46504a'},
+    g_pz:   {side:'G', label:'Panzer-Division',  atk:8, def:5, mp:4, maxStr:10, cost:18, sym:'arm'},
+    s_inf:  {side:'S', label:'Piechota',         atk:4, def:5, mp:2, maxStr:9,  cost:9,  sym:'inf', color:'#7a5038'},
+    s_cav:  {side:'S', label:'Kawaleria',        atk:4, def:5, mp:3, maxStr:7,  cost:8,  sym:'cav', color:'#8a6a44'},
+    s_mil:  {side:'S', label:'Obrona Narodowa',  atk:2, def:4, mp:2, maxStr:6,  cost:4,  sym:'inf', color:'#5a4a3a'},
+    g_hq:   {side:'G', label:'Heeresgruppe HQ',  atk:1, def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+    s_hq:   {side:'S', label:'Naczelne Dowództwo',atk:1,def:4, mp:3, maxStr:6,  cost:0,  sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6a3030'},
+  },
+  deployNames: {g_inf:'Ersatz-Korps', g_mot:'Mot. Reserve', g_pz:'Panzer Reserve',
+    s_inf:'Rezerwa Piechoty', s_cav:'Rezerwa Kawalerii', s_mil:'Bataliony ON'},
+  cols: C, rows: R, map,
+  cities: [
+    // German border cities (staging areas)
+    {x:3,  y:8,  name:'Frankfurt-Oder', vp:0, owner:'G'},
+    {x:3,  y:15, name:'Breslau',        vp:0, owner:'G'},
+    {x:38, y:2,  name:'Königsberg',     vp:0, owner:'G'},
+    {x:33, y:4,  name:'Allenstein',     vp:0, owner:'G'},
+    // Poland
+    {x:24, y:11, name:'Warszawa',       vp:5, owner:'S'},
+    {x:15, y:21, name:'Kraków',         vp:2, owner:'S'},
+    {x:36, y:20, name:'Lwów',           vp:2, owner:'S'},
+    {x:19, y:14, name:'Łódź',           vp:1, owner:'S'},
+    {x:11, y:9,  name:'Poznań',         vp:1, owner:'S'},
+    {x:18, y:3,  name:'Gdańsk',         vp:1, owner:'S'},
+    {x:10, y:20, name:'Katowice',       vp:1, owner:'S'},
+    {x:29, y:15, name:'Lublin',         vp:1, owner:'S'},
+    {x:33, y:12, name:'Brześć',         vp:1, owner:'S'},
+    {x:14, y:6,  name:'Bydgoszcz',      vp:1, owner:'S'},
+  ],
+  gerSpawns: [[0,10],[0,14],[0,17],[1,20],[39,3],[35,5]],
+  sovSpawns: [[41,12],[38,15],[35,18],[30,10],[41,8]],
+  supplySeeds: {G: [[38,3],[34,4]]},          // East Prussia feeds the northern pincer
+  startUnits: [
+    // ---- Germany (G) ----
+    // Army Group North — Pomerania (through the Corridor) and East Prussia
+    ['g_inf','4. Armee',        8,  4],
+    ['g_pz', 'XIX. Guderian',   6,  5],
+    ['g_inf','3. Armee',        36, 4],
+    ['g_hq', 'HG Nord',         39, 3],
+    // Army Group South — Silesia (the Schwerpunkt) and the Slovak border
+    ['g_inf','8. Armee',        3,  12],
+    ['g_inf','10. Armee',       3,  15],
+    ['g_pz', 'XVI. Hoepner',    2,  16],
+    ['g_inf','14. Armee',       4,  20],
+    ['g_pz', 'XXII. Kleist',    5,  21],
+    ['g_hq', 'HG Süd',          1,  16],
+    // ---- Poland (S) — deployed forward along the frontier ----
+    ['s_inf','Armia Pomorze',   12, 5, 7],
+    ['s_inf','Armia Poznań',    12, 10, 8],
+    ['s_inf','Armia Łódź',      18, 14, 8],
+    ['s_inf','Armia Kraków',    13, 20, 8],
+    ['s_cav','Wołyńska Bgda',   16, 17, 7],
+    ['s_inf','Armia Modlin',    26, 8, 7],
+    ['s_inf','Armia Karpaty',   31, 21, 6],
+    ['s_inf','Armia Prusy',     20, 12, 7],
+    ['s_mil','Obrona Warszawy', 24, 11, 6],
+    ['s_cav','Nowogródzka Bgda',31, 13, 6],
+    ['s_hq', 'Sztab Generalny', 27, 12],
+  ],
+  generals: [
+    {side:'G', unit:'XIX. Guderian', name:'Guderian', atk:1.15,
+     bio:'His panzer corps knifes down from East Prussia — the tank tactics he wrote the book on, tried in earnest for the first time.'},
+    {side:'G', unit:'10. Armee', name:'von Reichenau', atk:1.12,
+     bio:'The Schwerpunkt out of Silesia, driving hard and straight for Warsaw on the shortest road.'},
+    {side:'G', unit:'XVI. Hoepner', name:'Hoepner', atk:1.10,
+     bio:'Leads the massed armour of Army Group South through the Polish plains toward the capital.'},
+    {side:'S', unit:'Armia Poznań', name:'Kutrzeba', atk:1.14,
+     bio:'Turns and strikes at the German flank on the Bzura — the one Polish blow that made the Wehrmacht flinch.'},
+    {side:'S', unit:'Armia Łódź', name:'Rómmel', def:1.06,
+     bio:'Juliusz Rómmel holds the central approaches, buying the hours that let Warsaw dig in.'},
+  ],
+  sovSchedule: [
+    [2, 's_inf','Armia Lublin'], [3, 's_mil','Ochotnicy Warszawy'], [4, 's_cav','Kresowa Bgda'],
+  ],
+  events: [
+    {turn:1, date:'1 September 1939',  title:'FALL WEISS',
+     text:'Without a declaration of war, 1.5 million German troops cross the frontier at dawn behind a wall of Stukas. The Luftwaffe catches the Polish air force on the ground; the panzers pour through the border screen. In London and Paris, the ultimatums are being drafted.'},
+    {turn:2, date:'9 September 1939',  title:'THE BZURA', pp:{S:2},
+     text:'Kutrzeba wheels the Poznań Army about and smashes into the exposed German flank on the Bzura — the largest battle of the campaign, and the one moment the Wehrmacht is made to flinch before its weight tells.'},
+    {turn:3, date:'14 September 1939', title:'WARSAW ENCIRCLED',
+     text:'The pincers close around the capital. Guderian\'s corps from East Prussia and Reichenau\'s from the south link hands east of the city. Warsaw radio plays Chopin between air-raid warnings; the garrison digs in among the rubble.'},
+    {turn:4, date:'17 September 1939', title:'THE KNIFE IN THE BACK', pp:{G:2},
+     text:'Molotov\'s armies cross the eastern border under a secret protocol signed in Moscow. Poland is now fighting on two fronts against two empires. The government crosses into Romania; the soldiers fight on where they stand.'},
+  ],
+  maxTurn: 8,
+  startDate: Date.UTC(1939,8,1),
+  weather(turn){ return turn>=7 ? 'mud' : 'clear'; },     // dry blitz weather; the autumn rains come late
+  pp(side, turn){ return side==='G' ? 9 : (turn<=2 ? 5 : 4); },
+  victoryTiers: [
+    [13,'DECISIVE GERMAN VICTORY','Poland is overrun in weeks — the border armies are trapped west of the Vistula and Warsaw falls. The Blitzkrieg is born, and the world takes note.'],
+    [9, 'GERMAN VICTORY','Warsaw falls and Poland is partitioned, as history demanded — though the Poles cost you more time and steel than the newsreels admit.'],
+    [4, 'A BLOODY SEPTEMBER','Poland is beaten but fights on far longer than history — the panzers are battered, the timetable wrecked, and the west has time to arm.'],
+    [0, 'MIRACLE ON THE VISTULA','The invasion stalls on the Vistula. Warsaw holds, the border armies escape east, and the war begins very differently.'],
+  ],
+  sudden: {
+    axisCities: ['Warszawa','Kraków'], minAxisUnits: 4,
+    axisTitle: 'DECISIVE GERMAN VICTORY',
+    axisText:  'Warsaw and Kraków are taken and the Polish army is shattered west of the Vistula. Poland ceases to exist within the month.',
+    sovTitle:  'MIRACLE ON THE VISTULA',
+    sovText:   'The pincers are broken in the field. The panzers meant to demonstrate a new way of war lie wrecked on the Polish plains.',
+  },
+  airInit: [
+    ['G','Luftflotte 1', 8],
+    ['G','Luftflotte 4', 7],
+    ['S','Lotnictwo',    3],
+  ],
+  sovAirSchedule: [ [3,'PZL Reserves', 2] ],
+  setup(st){
+    for (const u of st.units){
+      if (u.side==='S' && st.cities.some(c=>c.x===u.x && c.y===u.y && c.vp>0)) u.entrench = 2;   // the cities dig in
+    }
+    const pom = st.units.find(u=>u.name==='Armia Pomorze'); if (pom) pom.entrench = 0;            // the exposed Corridor
+  },
+  opening(playerSide){ return [
+    '1 September 1939 — at 04:45 the guns of the Schleswig-Holstein open fire on the Westerplatte. The Second World War has begun.',
+    playerSide==='G'
+      ? 'Close the pincers on the border armies, cross the Vistula, and take Warsaw before the west can stir.'
+      : 'Fall back behind the Vistula, save the army for the fight, and hold the capital as long as the world will watch.',
+  ]; },
+  };
+})();
+
+
 /* ============================ SCENARIOS.italy ============================
    THE ITALIAN CAMPAIGN — Operation Husky and the long road up the peninsula,
    July 1943 → 1945. The Allies (G — they move first, they carry the offensive
@@ -5546,6 +5723,7 @@ function aiBuyDoctrine(side){
    across sessions. The battles themselves are unchanged — AI-vs-AI balance is untouched; every
    bonus here is the human's earned reward. (The screen/UI lives in the browser-only section.) */
 const RV_STAGES = [
+  { scn:'poland',     name:'Fall Weiss',           sub:'Poland · September 1939',  goal:'Close the pincers on Warsaw and knock Poland out in weeks — the first Blitzkrieg.' },
   { scn:'france',     name:'Fall Gelb',            sub:'France · May 1940',        goal:'Break the Western Front and knock France out of the war.' },
   { scn:'barbarossa', name:'Operation Barbarossa', sub:'Soviet Union · June 1941', goal:'Invade Russia and drive for Moscow before the winter snows.' },
   { scn:'winter41',   name:'The Winter Line',      sub:'Russia · December 1941',   goal:'Hold the front against the great Soviet counteroffensive.' },
@@ -12184,7 +12362,7 @@ function rvRender(){
     else
       $('rv-status').innerHTML = `Fronts won <b>${done}/${RV_STAGES.length}</b> &nbsp;·&nbsp; <b>${totStars}★</b> earned &nbsp;·&nbsp; war chest <b>${rvWarChest()}⚙</b> &nbsp;·&nbsp; ${docs} doctrine${docs===1?'':'s'} carried &nbsp;·&nbsp; score <b>${RV.score.toLocaleString()}</b> &nbsp;·&nbsp; ${RV.diff}`;
   } else {
-    $('rv-status').textContent = 'Pick a difficulty, then begin. The first battle is France, May 1940. A ★★★ victory or better clears a front.';
+    $('rv-status').textContent = 'Pick a difficulty, then begin. The first battle is Poland, September 1939. A ★★★ victory or better clears a front.';
   }
 }
 function rvBegin(){ rvStart(); rvRender(); sCity(); }
