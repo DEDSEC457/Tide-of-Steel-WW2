@@ -3274,9 +3274,9 @@ SCENARIOS.france = (function buildFrance(){
     {turn:6, date:'14 June 1940', title:'PARIS',
      text:'German troops march down the Champs-Élysées. The government has fled to Bordeaux; Reynaud falls, Pétain rises, and a little-known general broadcasts defiance from London.'},
   ],
-  maxTurn: 7,
+  maxTurn: 12,
   startDate: Date.UTC(1940,4,10),
-  weather(turn){ return turn>=7 ? 'mud' : 'clear'; },
+  weather(turn){ return turn>=11 ? 'mud' : 'clear'; },   // dry blitzkrieg summer; late rains only
   pp(side, turn){ return side==='G' ? 9 : (turn<=2 ? 6 : 5); },
   victoryTiers: [
     [22,'DECISIVE GERMAN VICTORY','France is overrun in six weeks and the BEF destroyed on the beaches. The myth of the Wehrmacht is born — and the war turns west.'],
@@ -12151,17 +12151,22 @@ function rvRender(){
     const state = !started ? (i===0?'open':'locked') : (i<RV.stage?'clear':(i===RV.stage?'open':'locked'));
     const rec = started && RV.cleared[i];
     const stars = rec ? '★'.repeat(rec.stars)+'<span style="opacity:.28">'+'★'.repeat(5-rec.stars)+'</span>' : '';
-    const border = state==='clear'?'var(--grn)':state==='open'?'var(--amber)':'var(--line)';
-    const bg = state==='open'?'#20261a':state==='clear'?'#18220f':'#141812';
+    const open = state==='open';
+    const border = state==='clear'?'var(--grn)':open?'#ffd98a':'var(--line)';
+    const bg = open?'#37401f':state==='clear'?'#18220f':'#12160f';
+    const bw = open?2.5:1.5;
+    const glow = open ? 'box-shadow:0 0 22px rgba(232,179,75,0.45), inset 0 0 0 1px rgba(255,217,138,0.25);' : '';
     const badge = state==='clear'?'<span style="color:var(--grn)">✓ CLEARED</span>'
-      : state==='open'?'<span style="color:var(--amber)">▶ AVAILABLE</span>'
+      : open?'<span style="color:#ffe4a8;font-weight:700;">▶ AVAILABLE</span>'
       : '<span style="color:var(--dim)">🔒 LOCKED</span>';
     const clickable = started && i<=RV.stage;
-    html += `<div class="rv-box" data-i="${i}" style="width:160px;border:1.5px solid ${border};border-radius:10px;padding:10px 12px;background:${bg};text-align:left;${clickable?'cursor:pointer;':'opacity:.55;'}">
+    const titleCol = open?'#fff3d6':'inherit';
+    const goalCol = open?'#cdbb90':'var(--dim)';
+    html += `<div class="rv-box" data-i="${i}" style="width:160px;border:${bw}px solid ${border};border-radius:10px;padding:10px 12px;background:${bg};text-align:left;${glow}${clickable?'cursor:pointer;':'opacity:.45;'}">
       <div style="font-size:11px;letter-spacing:1px;margin-bottom:4px;">${badge}</div>
-      <div style="font-weight:700;font-size:14px;">${i+1}. ${st.name}</div>
+      <div style="font-weight:700;font-size:14px;color:${titleCol};">${i+1}. ${st.name}</div>
       <div style="color:var(--amber);font-size:11px;margin:2px 0 5px;">${st.sub}</div>
-      <div style="color:var(--dim);font-size:12px;line-height:1.35;min-height:52px;">${st.goal}</div>
+      <div style="color:${goalCol};font-size:12px;line-height:1.35;min-height:52px;">${st.goal}</div>
       <div style="font-size:13px;margin-top:5px;height:16px;color:#ffd34d;">${stars}</div>
     </div>`;
     if (i < RV_STAGES.length-1) html += `<div style="align-self:center;color:var(--dim);font-size:16px;">→</div>`;
