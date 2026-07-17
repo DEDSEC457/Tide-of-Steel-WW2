@@ -4806,18 +4806,23 @@ const WX_FX = {
 function inMap(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
 function terrainAt(x,y){ return MAP_ROWS[y][x]; }
 function passable(x,y){ if (!inMap(x,y)) return false; const t = terrainAt(x,y); return t !== '~' && t !== 'q'; }
+// the six neighbour offsets are constant per row parity — hoisted so neighbors()
+// doesn't rebuild them (seven array allocations) on every call. It's one of the
+// hottest functions in the AI's supply/ZOC/reach floods.
+const NB_ODD  = [[1,0],[-1,0],[0,-1],[1,-1],[0,1],[1,1]];
+const NB_EVEN = [[1,0],[-1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
 function neighbors(x,y){
-  const odd = y & 1;
-  const d = odd ? [[1,0],[-1,0],[0,-1],[1,-1],[0,1],[1,1]]
-                : [[1,0],[-1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+  const d = (y & 1) ? NB_ODD : NB_EVEN;
   const out = [];
   for (const [dx,dy] of d){ const nx=x+dx, ny=y+dy; if (inMap(nx,ny)) out.push([nx,ny]); }
   return out;
 }
 function cubeOf(x,y){ const q = x - ((y - (y&1)) >> 1); return [q, y, -q - y]; }
+// allocation-free hex distance (cubeOf allocated two arrays per call, and this
+// runs in every AI distance sort) — inline the cube coords
 function hexDist(x1,y1,x2,y2){
-  const a=cubeOf(x1,y1), b=cubeOf(x2,y2);
-  return Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]), Math.abs(a[2]-b[2]));
+  const q1 = x1 - ((y1 - (y1&1)) >> 1), q2 = x2 - ((y2 - (y2&1)) >> 1);
+  return Math.max(Math.abs(q1-q2), Math.abs(y1-y2), Math.abs((-q1-y1) - (-q2-y2)));
 }
 const keyOf = (x,y) => x + ',' + y;
 
