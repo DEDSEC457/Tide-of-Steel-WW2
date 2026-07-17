@@ -9674,6 +9674,30 @@ function draw(){
     }
   }
 
+  // close-air-support umbrella: when your own group is flying support, mark the
+  // enemy stacks under your air cover — those are the assaults it will harden
+  {
+    const vs = viewerSide();
+    if (G.air.some(a => a.side===vs && a.mission==='support' && a.str>0)){
+      const pulse = 0.6 + 0.4*Math.sin(now*0.005);
+      for (const u of unitsOf(enemyOf(vs))){
+        if (!isSpotted(u, vs) || !airfieldCovered(vs, u.x, u.y)) continue;
+        const [cx,cy] = hexCenter(u.x,u.y);
+        if (cx<vL||cx>vR||cy<vT||cy>vB) continue;
+        hexPath(cx,cy,S-2);
+        ctx.fillStyle = `rgba(240,176,72,${(0.10+0.06*pulse).toFixed(3)})`; ctx.fill();
+        ctx.strokeStyle = `rgba(240,176,72,${(0.30+0.20*pulse).toFixed(3)})`; ctx.lineWidth = 1.1; ctx.stroke();
+        if (GFX.lighting){                                   // High: a plane drifts across the target
+          const t = (now*0.00035 + (u.x*7+u.y*3)) % 1;
+          ctx.save(); ctx.globalAlpha = 0.5*pulse;
+          ctx.fillStyle = '#ffe0a0'; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center';
+          ctx.fillText('✈', cx - S*0.7 + t*S*1.4, cy - S*0.55);
+          ctx.restore();
+        }
+      }
+    }
+  }
+
   // cities
   for (const c of G.cities){
     const [cx,cy] = hexCenter(c.x,c.y);
@@ -10571,6 +10595,7 @@ function _sceneAnimating(){
   if (sel && reach) return true;                                         // selection ants + reachable pulse
   if (camGlide || zoomGlide || panVel || hitFlash.size || recoilMap.size) return true;  // camera glides, flick momentum, damage flashes, recoil
   if (threatView) return true;                                           // threat overlay pulse
+  if (G.air && G.air.some(a => a.side===viewerSide() && a.mission==='support' && a.str>0)) return true;  // CAS umbrella pulse
   const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
   if ((mp && mp.size) || (fp && fp.size)) return true;
   return false;
