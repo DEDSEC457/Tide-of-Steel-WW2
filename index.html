@@ -9338,13 +9338,14 @@ function buildClock(){
 }
 
 /* ---------------- drawing ---------------- */
+// the six hex-corner unit vectors are constant — bake them once instead of
+// running twelve trig calls on every hexPath (thousands of times a frame)
+const HEX_COS = [], HEX_SIN = [];
+for (let i=0;i<6;i++){ const a = Math.PI/180*(60*i-30); HEX_COS.push(Math.cos(a)); HEX_SIN.push(Math.sin(a)); }
 function hexPath(cx,cy,s){
   ctx.beginPath();
-  for (let i=0;i<6;i++){
-    const a = Math.PI/180*(60*i-30);
-    const px = cx + s*Math.cos(a), py = cy + s*Math.sin(a);
-    i ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
-  }
+  ctx.moveTo(cx + s*HEX_COS[0], cy + s*HEX_SIN[0]);
+  for (let i=1;i<6;i++) ctx.lineTo(cx + s*HEX_COS[i], cy + s*HEX_SIN[i]);
   ctx.closePath();
 }
 
@@ -9359,7 +9360,8 @@ let _terrCacheCv=null, _tintCacheCv=null, _cacheKey='', _cacheF=1;   // _tintDir
 function _bigMap(){ return COLS*ROWS > 6000; }
 function hexPathC(c,cx,cy,s){
   c.beginPath();
-  for (let i=0;i<6;i++){ const a=Math.PI/180*(60*i-30), px=cx+s*Math.cos(a), py=cy+s*Math.sin(a); i?c.lineTo(px,py):c.moveTo(px,py); }
+  c.moveTo(cx + s*HEX_COS[0], cy + s*HEX_SIN[0]);
+  for (let i=1;i<6;i++) c.lineTo(cx + s*HEX_COS[i], cy + s*HEX_SIN[i]);
   c.closePath();
 }
 function _cacheCtx(prev){
@@ -10199,10 +10201,14 @@ function draw(){
   const readyPulse = 0.5 + 0.5*Math.sin(now*0.005);
   const vs = viewerSide();
   const myPocket = pocketsFor(vs), foePocket = pocketsFor(enemyOf(vs));
+  const uMargin = S*2.2;                              // counter + ring + smoulder overhang
   for (const u of G.units){
     // fog of war: unseen enemy formations simply aren't on your map
     if (fowSight && u.side!==viewerSide() && !fowSight.has(keyOf(u.x,u.y))) continue;
     let [cx,cy] = hexCenter(u.x,u.y);
+    // viewport cull: don't draw counters off the visible map (big-map win)
+    if (!(moveAnim && moveAnim.unit.id===u.id) &&
+        (cx < vL-uMargin || cx > vR+uMargin || cy < vT-uMargin || cy > vB+uMargin)) continue;
     if (moveAnim && moveAnim.unit.id===u.id){
       const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
       const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
@@ -10670,6 +10676,7 @@ function star(x,y,r){
   ctx.closePath(); ctx.fill();
 }
 
+let _glossGrad = null, _glossH = -1;                 // gloss-gradient cache (see drawUnit)
 function drawUnit(u, cx, cy, wx){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
@@ -10688,13 +10695,21 @@ function drawUnit(u, cx, cy, wx){
     ctx.fillStyle = k.color || SIDES[u.side].color;
     roundRect(-w/2,-h/2,w,h,5); ctx.fill();
   }
-  // glossy finish — a soft glass highlight across the top half of the counter
+  // glossy finish — a soft glass highlight across the top half of the counter.
+  // The gradient is identical for every counter (local space), so bake it once
+  // per zoom level instead of allocating one per unit per frame.
   if (GFX.softShadow && ctx.createLinearGradient){
-    const gg = ctx.createLinearGradient(0,-h/2,0,h*0.12);
-    if (gg && gg.addColorStop){
-      gg.addColorStop(0,'rgba(255,255,255,0.22)'); gg.addColorStop(0.55,'rgba(255,255,255,0.05)'); gg.addColorStop(1,'rgba(255,255,255,0)');
+    if (_glossH !== h){
+      const gg = ctx.createLinearGradient(0,-h/2,0,h*0.12);
+      if (gg && gg.addColorStop){
+        gg.addColorStop(0,'rgba(255,255,255,0.22)'); gg.addColorStop(0.55,'rgba(255,255,255,0.05)'); gg.addColorStop(1,'rgba(255,255,255,0)');
+        _glossGrad = gg;
+      } else _glossGrad = null;
+      _glossH = h;
+    }
+    if (_glossGrad){
       ctx.save(); roundRect(-w/2,-h/2,w,h,5); ctx.clip();
-      ctx.fillStyle = gg; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
+      ctx.fillStyle = _glossGrad; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
     }
   }
   ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
