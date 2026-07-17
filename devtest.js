@@ -60,6 +60,14 @@ check('no two start units share a hex', E.START_UNITS.every(([k,n,x,y]) => {
 }), [...E.START_UNITS.map(u=>u[2]+','+u[3])].join(' '));
 check('weather schedule', E.weatherFor(1)==='clear' && E.weatherFor(16)==='mud'
   && E.weatherFor(20)==='freeze' && E.weatherFor(22)==='snow');
+// seasonal snow accumulation (visual): bare in summer, deepens once it snows, never out of [0,1]
+{
+  check('no snow before winter', E.snowDepth(1)===0 && E.snowDepth(10)===0);
+  const early = E.snowDepth(22), later = E.snowDepth(25);   // turn 22 is the first snow week
+  check('snow builds up over successive snow weeks', early>0 && later>early && later<=1);
+  let bad=false; for (let t=1;t<=30;t++){ const d=E.snowDepth(t); if (d<0||d>1) bad=true; }
+  check('snow depth stays within [0,1]', !bad);
+}
 
 /* every scenario in the registry must be internally consistent */
 say('— scenario registry —');
