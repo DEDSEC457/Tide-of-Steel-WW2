@@ -8589,6 +8589,12 @@ const sCity  = ()=>{ tone(523,0.12,'square',0.05); setTimeout(()=>tone(659,0.12,
 const sLaunch= ()=>{ noise(0.55,0.05); tone(150,0.5,'sine',0.05,90); };          // landing craft under way — surf & a rising swell
 const sSurf  = ()=>{ noise(0.3,0.09); tone(200,0.22,'triangle',0.04,-60); };     // waves hitting the beach (unopposed landing)
 const sDrop  = ()=>{ noise(0.6,0.035); tone(260,0.55,'sawtooth',0.028,-70); };   // transport drone fading as the sticks jump
+// a division wiped off the board: a low, final bell-toll (sine partials, long
+// decay) — distinct from the noisy sBoom of an ordinary hit, so a KILL is
+// legible by ear in a busy turn
+const sKill  = ()=>{ tone(196,0.5,'sine',0.09,-30); tone(98,0.75,'sine',0.06,-18); setTimeout(()=>tone(147,0.55,'sine',0.05,-16),70); };
+// flak / interception on an air strike: a stuttering ack-ack burst
+const sFlak  = ()=>{ for (let i=0;i<4;i++) setTimeout(()=>{ noise(0.06,0.08); tone(300+i*40,0.05,'square',0.03); }, i*55); };
 
 /* ambient weather bed — a single looping noise source, shaped into a low wind
    moan in the snow or a hissing rain in the mud, gusting on a slow LFO. Fades in
@@ -10673,7 +10679,7 @@ canvas.addEventListener('click', e=>{
     airTarget = null;
     if (au && t && t.side!==G.phase && isSpotted(t, G.phase)){
       const res = airStrike(au, t);
-      if (res){ clearUndo(); res.killed ? sBoom() : sShot(); }
+      if (res){ clearUndo(); res.killed ? sBoom() : sShot(); if (res.flak || res.intercepted) sFlak(); if (res.killed) sKill(); }
     }
     $('hint').innerHTML = defaultHint();
     updateAll(); return;
@@ -10926,7 +10932,7 @@ function playerAttack(att,def){
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
   if (ev.atkLoss>0){ floatText(att.x,att.y,'-'+ev.atkLoss,'#ffd98a'); flashUnit(att); }
   if (ev.defLoss>0 && !ev.destroyed) flashUnit(def);
-  if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
+  if (ev.destroyed){ sBoom(); sKill(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
   deselect(); updateAll();
 }
 function playerGroupAttack(attackers, def){
@@ -10939,7 +10945,7 @@ function playerGroupAttack(attackers, def){
   if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
   if (ev.defLoss>0 && !ev.destroyed) flashUnit(def);
   if (ev.atkLoss>0) flashUnit(lead);
-  if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
+  if (ev.destroyed){ sBoom(); sKill(); floatText(ev.defFrom[0],ev.defFrom[1],'✕ DESTROYED','#ff5340'); }
   selSet = [];
   if (ev.choose && ev.choose.length){
     advanceChoice = {x:ev.defFrom[0], y:ev.defFrom[1], ids:ev.choose};
@@ -12836,7 +12842,7 @@ function runAIPhase(){
       if (ev.defLoss>0) floatText(ev.defFrom[0],ev.defFrom[1],'-'+ev.defLoss,'#ff8d80');
       if (ev.defLoss>0 && !ev.destroyed) flashUnit(res.def);
       if (ev.atkLoss>0) flashUnit(res.att);
-      if (ev.destroyed){ sBoom(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
+      if (ev.destroyed){ sBoom(); sKill(); floatText(ev.defFrom[0],ev.defFrom[1],'✕','#ff5340'); }
       updateAll();
       setTimeout(step, aDelay*mult);
     } else {
