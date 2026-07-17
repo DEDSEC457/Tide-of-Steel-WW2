@@ -11378,8 +11378,17 @@ function updateTop(){
   $('date-chip').innerHTML = `<b>Turn ${G.turn}/${MAX_TURN}</b> · ${dateStr(G.turn)}`;
   const wx = weatherFor(G.turn);
   const chip = $('wx-chip');
-  chip.innerHTML = `Weather: <b>${wxLabelOf(wx)}</b>`;
+  // forecast: the next few turns are pre-determined (the AI plans on them too) —
+  // surface them so the player can time an offensive before the roads turn to mud
+  const wxIcon = {clear:'☀', mud:'🌧', freeze:'❄', snow:'❄'};
+  let fc = '', fcTip = '';
+  for (let t=G.turn+1; t<=Math.min(MAX_TURN, G.turn+4); t++){
+    const w = weatherFor(t); fc += wxIcon[w] || '·';
+    fcTip += `\nTurn ${t}: ${wxLabelOf(w)}`;
+  }
+  chip.innerHTML = `Weather: <b>${wxLabelOf(wx)}</b>${fc?` <span style="opacity:.65;font-size:11px;letter-spacing:1px;">→ ${fc}</span>`:''}`;
   chip.className = 't-chip ' + wx;
+  chip.title = `${wxFxOf(wx)[1] || wxLabelOf(wx)}${fcTip ? '\n\nForecast:'+fcTip : ''}\n\n(click for the campaign clock)`;
   $('vp-chip').innerHTML = `${sideName('G')} objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
   $('pp-chip').innerHTML = `${sideName(side)} production: <b>${G.pp[side]}</b> ⚙`;
