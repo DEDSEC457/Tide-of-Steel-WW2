@@ -8591,6 +8591,12 @@ onCityTaken = function(c){
   if (c.vp>0) sCity();
   boomAt(c.x, c.y, true);
   floatText(c.x, c.y, '★ '+c.name+' taken', '#ffd34d');
+  // High: a flag-planting flourish — rings in the new owner's colour flare out
+  if (GFX.cine){
+    const [cx,cy] = hexCenter(c.x,c.y);
+    anims.push({type:'capture', x:cx, y:cy, side:c.owner, vp:c.vp||0, t0:performance.now(), life:1500});
+  }
+  mmPing(c.x, c.y);
 };
 onGameOver = function(){ recordResult(); if (typeof rvOnStageEnd==='function') rvOnStageEnd(); setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
@@ -10099,6 +10105,33 @@ function draw(){
       ctx.lineTo(px - a.dir*2, py);
       ctx.lineTo(px - a.dir*4, py + 4);                    // wing
       ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'capture'){
+      const pr = Math.min(1, (now - a.t0)/a.life);
+      const col = (SIDES[a.side] && SIDES[a.side].color) || '#ffd34d';
+      // two rings racing outward in the captor's colour
+      for (let i=0;i<2;i++){
+        const rp = Math.min(1, pr*1.4 - i*0.28); if (rp<=0) continue;
+        ctx.globalAlpha = (1-rp)*0.8;
+        ctx.strokeStyle = col; ctx.lineWidth = 3*(1-rp)+0.6;
+        ctx.beginPath(); ctx.arc(a.x, a.y, 6 + rp*(a.vp>0?40:26), 0, Math.PI*2); ctx.stroke();
+      }
+      // a small flag rising and flipping to the new colours
+      const rise = -(1-Math.pow(1-pr,2))*S*0.9;
+      ctx.globalAlpha = Math.min(1, (1-pr)*2.4);
+      ctx.strokeStyle = '#e9e5d2'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y+rise+8); ctx.lineTo(a.x, a.y+rise-9); ctx.stroke();   // pole
+      const flap = Math.sin(now*0.02)*1.4;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y+rise-9); ctx.lineTo(a.x+11, a.y+rise-6+flap); ctx.lineTo(a.x, a.y+rise-3); ctx.closePath(); ctx.fill();
+      if (a.vp>0 && GFX.bloom){                          // an objective flares gold
+        ctx.globalAlpha = (1-pr)*0.5;
+        ctx.fillStyle = 'rgba(255,211,77,1)'; ctx.globalCompositeOperation='lighter';
+        ctx.beginPath(); ctx.arc(a.x, a.y, 14*(1-pr)+4, 0, Math.PI*2); ctx.fill();
+        ctx.globalCompositeOperation='source-over';
+      }
       ctx.globalAlpha = 1;
       continue;
     }
@@ -13136,6 +13169,10 @@ window.__dbgSelect = (name) => {                       // select a unit by name 
   sel = u.id; try{ reach = reachable(u); }catch(e){}
   const [cx,cy] = hexCenter(u.x,u.y); cam.x = cx - innerWidth/2/cam.z; cam.y = cy - innerHeight/2/cam.z;
   updateAll(); requestRender(); return true;
+};
+window.__dbgCenter = (hx,hy,z) => {                    // centre the camera on a hex (QA)
+  if (z) cam.z = z; const [cx,cy] = hexCenter(hx,hy);
+  cam.x = cx - innerWidth/2/cam.z; cam.y = cy - innerHeight/2/cam.z; requestRender();
 };
 
 })();
