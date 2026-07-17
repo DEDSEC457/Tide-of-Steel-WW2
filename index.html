@@ -335,7 +335,7 @@
         <div class="mc-text">
           <span class="mc-badge fresh">✦ NEW</span>
           <h2>ROAD TO VICTORY</h2>
-          <p class="mc-desc">Fight the whole war as the Axis, battle by battle — Poland 1939 to the Ardennes 1944, eight fronts. Win to unlock the next; your doctrines, veterans and war chest carry forward. One continuous campaign.</p>
+          <p class="mc-desc">Two linked campaigns: the Axis war, Poland 1939 to the Ardennes — or the Great Patriotic War as the Soviets, Barbarossa to Kursk. Win to unlock the next; your doctrines, veterans and war chest carry forward. One continuous campaign.</p>
         </div>
         <button class="primary mc-btn">MARCH ▶</button>
       </div>
@@ -424,8 +424,9 @@
 <!-- ============ ROAD TO VICTORY (linked Axis campaign) ============ -->
 <div id="road-screen" class="modal-back hidden">
   <div class="modal" style="max-width:1150px;">
-    <h2>🎖 ROAD TO VICTORY</h2>
-    <div class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 10px;">THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT</div>
+    <h2 id="rv-title">🎖 ROAD TO VICTORY</h2>
+    <div id="rv-sub" class="sub" style="letter-spacing:3px;color:var(--dim);font-size:12px;margin:4px 0 10px;">THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT</div>
+    <div id="rv-camps" style="display:flex;gap:10px;justify-content:center;margin:0 0 10px;"></div>
     <p id="rv-intro" style="color:var(--dim);font-size:13px;max-width:660px;margin:0 auto 6px;">Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.</p>
     <div id="rv-setup">
       <div class="opt-row" id="rv-diff-row" style="justify-content:center;margin-top:8px;">
@@ -5747,33 +5748,57 @@ const RV_STAGES = [
   { scn:'kursk',      name:'Zitadelle',            sub:'Russia · July 1943',       goal:'Break the Kursk salient — the last great offensive in the East.' },
   { scn:'bulge',      name:'Watch on the Rhine',   sub:'Ardennes · December 1944', goal:'One final gamble through the snow — split the Allies and reach the Meuse.' },
 ];
-const RV_KEY = 'hoi5-roadtovictory-v1';
-let RV = null;              // {diff, stage, cleared:[{stars,score}|null], doc:{}, score} · null = not begun
+/* The Soviet arc — the same framework fought from the other side of the front.
+   The player is side 'S' throughout; a "victory" is holding the Axis score DOWN. */
+const GPW_STAGES = [
+  { scn:'barbarossa', name:'Hold the Line',      sub:'Russia · June 1941',     goal:'Survive Barbarossa — trade land for time and keep Moscow standing.' },
+  { scn:'winter41',   name:'The Sledgehammer',   sub:'Moscow · December 1941', goal:'The Siberians arrive. Throw the frozen Wehrmacht back from the capital.' },
+  { scn:'stalingrad', name:'Not One Step Back',  sub:'Volga · June 1942',      goal:'Hold the city on the Volga, then close the ring — Order 227.' },
+  { scn:'kursk',      name:'The Fire Brigade',   sub:'Kursk · July 1943',      goal:'Blunt Zitadelle on the deep defensive belts, then counterattack.' },
+];
+const RV_CAMPS = {
+  rv:  { title:'ROAD TO VICTORY',        sub:'THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT',
+         side:'G', flag:'⬛', key:'hoi5-roadtovictory-v1', stages:RV_STAGES },
+  gpw: { title:'THE GREAT PATRIOTIC WAR', sub:'THE SOVIET WAR · 1941–1943 · WIN EACH FRONT TO OPEN THE NEXT',
+         side:'S', flag:'🟥', key:'hoi5-gpw-v1',          stages:GPW_STAGES },
+};
+let rvCampId = 'rv';        // active campaign on the road screen
+let RV = null;              // active campaign's progress: {diff, stage, cleared:[{stars,score}|null], doc:{}, score}
 let rvDiff = 'normal';
-function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(RV_KEY)) || null; }catch(e){ RV = null; } }
-function rvSaveState(){ try{ if (RV) localStorage.setItem(RV_KEY, JSON.stringify(RV)); else localStorage.removeItem(RV_KEY); }catch(e){} }
-function rvStars(vp){ const f = TOTAL_VP ? vp/TOTAL_VP : 0; return f>=0.85?5:f>=0.68?4:f>=0.5?3:f>=0.3?2:f>=0.14?1:0; }
+function rvCamp(){ return RV_CAMPS[rvCampId] || RV_CAMPS.rv; }
+function rvStagesOf(campId){ return (RV_CAMPS[campId] || RV_CAMPS.rv).stages; }
+function rvSetCamp(id){ if (RV_CAMPS[id]){ rvCampId = id; rvLoadState(); } }
+function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(rvCamp().key)) || null; }catch(e){ RV = null; } }
+function rvSaveState(){ try{ if (RV) localStorage.setItem(rvCamp().key, JSON.stringify(RV)); else localStorage.removeItem(rvCamp().key); }catch(e){} }
+/* stars measure the PLAYER's objective performance: the attacker wants the Axis
+   score high, the Soviet defender wants it low */
+function rvStars(vp){
+  const f = TOTAL_VP ? (rvCamp().side==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
+  return f>=0.85?5:f>=0.68?4:f>=0.5?3:f>=0.3?2:f>=0.14?1:0;
+}
 function rvWarChest(){ if (!RV) return 0; const s = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0); return Math.min(16, s*2); }
 function rvStart(diff){ RV = { diff:diff||rvDiff, stage:0, cleared:[], doc:{}, score:0 }; rvSaveState(); return RV; }
 function rvApplyVeterans(stageIdx){
   const n = RV ? Math.min(6, RV.cleared.filter(Boolean).length*2) : 0;   // two blooded formations per front won
   if (!n) return;
-  const cand = unitsOf('G').filter(u=>!KINDS[u.kind].hq && u.str>=4);
+  const cand = unitsOf(rvCamp().side).filter(u=>!KINDS[u.kind].hq && u.str>=4);
   for (let i=0;i<Math.min(n,cand.length);i++) gainXP(cand[(i*4+1)%cand.length], 12 + stageIdx*4);
 }
 function rvOnStageEnd(){
   if (!G.campaign || G.campaign.mode!=='rv') return;
-  if (!RV) rvLoadState();                    // resume after a mid-battle page reload
+  rvSetCamp(G.campaign.camp || 'rv');        // bind to the battle's campaign (also loads its state)
   if (!RV) return;
+  const side = rvCamp().side;
   const i = G.campaign.stage, vp = G.result ? G.result.vp : axisVP();
   const stars = rvStars(vp), won = stars >= 3;
-  const score = Math.max(0, Math.round((TOTAL_VP?vp/TOTAL_VP:0)*1000));
+  const frac = TOTAL_VP ? (side==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
+  const score = Math.max(0, Math.round(frac*1000));
   G.campaign.result = { won, stars, score };
   if (won && i === RV.stage){                                           // clear the front, unlock the next
     RV.cleared[i] = { stars, score };
     RV.score += score;
-    RV.doc = Object.assign({}, RV.doc, G.doc.G);
-    RV.stage = Math.min(RV_STAGES.length, i+1);
+    RV.doc = Object.assign({}, RV.doc, G.doc[side]);
+    RV.stage = Math.min(rvCamp().stages.length, i+1);
     rvSaveState();
   } else if (won && RV.cleared[i] && stars > RV.cleared[i].stars){      // replayed a past front, did better
     RV.score += score - RV.cleared[i].score; RV.cleared[i] = { stars, score }; rvSaveState();
@@ -12385,8 +12410,15 @@ $('btn-menu').onclick = ()=>{
 let rvResetPending = false;
 function rvOpen(){
   show('mode-select', false); show('realistic-menu', false); show('menu', false); show('waw-menu', false);
-  rvLoadState(); if (RV && RV.diff) rvDiff = RV.diff;
+  try{ rvSetCamp(localStorage.getItem('hoi5-road-camp') || 'rv'); }catch(e){ rvSetCamp('rv'); }
+  if (RV && RV.diff) rvDiff = RV.diff;
   show('road-screen', true); rvRender(); sClick();
+}
+function rvPickCamp(id){
+  rvSetCamp(id);
+  try{ localStorage.setItem('hoi5-road-camp', id); }catch(e){}
+  if (RV && RV.diff) rvDiff = RV.diff;
+  rvRender(); sClick();
 }
 /* peek the road-battle autosave: an unfinished battle the player can resume */
 function rvBattleSave(){
@@ -12396,11 +12428,23 @@ function rvBattleSave(){
     const d = JSON.parse(j);
     if (!d.G || !d.G.campaign || d.G.campaign.mode!=='rv' || d.G.over) return null;
     const i = d.G.campaign.stage;
-    if (i==null || i<0 || i>=RV_STAGES.length || i>RV.stage) return null;   // stale/foreign save
+    if ((d.G.campaign.camp || 'rv') !== rvCampId) return null;               // belongs to the other arc
+    if (i==null || i<0 || i>=rvCamp().stages.length || i>RV.stage) return null;   // stale/foreign save
     return { stage:i, turn:d.G.turn };
   } catch(e){ return null; }
 }
 function rvRender(){
+  const camp = rvCamp(), STAGES = camp.stages;
+  $('rv-title').textContent = '🎖 ' + camp.title;
+  $('rv-sub').textContent = camp.sub;
+  // campaign selector: one card per arc, with its progress at a glance
+  $('rv-camps').innerHTML = Object.entries(RV_CAMPS).map(([id,c])=>{
+    let prog = '';
+    try{ const s = JSON.parse(localStorage.getItem(c.key)); if (s) prog = ` · ${s.cleared.filter(Boolean).length}/${c.stages.length} fronts`; }catch(e){}
+    const sel = id===rvCampId;
+    return `<div class="rv-camp" data-c="${id}" style="cursor:pointer;padding:7px 16px;border-radius:8px;border:1.5px solid ${sel?'var(--amber)':'var(--line)'};background:${sel?'#2a3119':'#181d12'};font-size:13px;${sel?'color:var(--amber);font-weight:700;':'color:var(--dim);'}">${c.flag} ${c.title}${prog}</div>`;
+  }).join('');
+  for (const el of $('rv-camps').querySelectorAll('.rv-camp')) el.onclick = ()=>rvPickCamp(el.dataset.c);
   const started = !!RV;
   show('rv-setup', !started);
   $('rv-begin').classList.toggle('hidden', started);
@@ -12408,10 +12452,10 @@ function rvRender(){
   if (!rvResetPending) $('rv-reset').textContent = '⟲ Restart Campaign';
   const bs = rvBattleSave();
   $('rv-continue').classList.toggle('hidden', !bs);
-  if (bs) $('rv-continue').textContent = `⚔ Continue battle — ${RV_STAGES[bs.stage].name} · turn ${bs.turn}`;
+  if (bs) $('rv-continue').textContent = `⚔ Continue battle — ${STAGES[bs.stage].name} · turn ${bs.turn}`;
   let html = '';
-  for (let i=0;i<RV_STAGES.length;i++){
-    const st = RV_STAGES[i];
+  for (let i=0;i<STAGES.length;i++){
+    const st = STAGES[i];
     const state = !started ? (i===0?'open':'locked') : (i<RV.stage?'clear':(i===RV.stage?'open':'locked'));
     const rec = started && RV.cleared[i];
     const stars = rec ? '★'.repeat(rec.stars)+'<span style="opacity:.28">'+'★'.repeat(5-rec.stars)+'</span>' : '';
@@ -12433,7 +12477,7 @@ function rvRender(){
       <div style="color:${goalCol};font-size:11.5px;line-height:1.35;min-height:62px;">${st.goal}</div>
       <div style="font-size:13px;margin-top:4px;height:16px;color:#ffd34d;">${stars}</div>
     </div>`;
-    if (i < RV_STAGES.length-1) html += `<div style="align-self:center;color:var(--dim);font-size:16px;">→</div>`;
+    if (i < STAGES.length-1) html += `<div style="align-self:center;color:var(--dim);font-size:16px;">→</div>`;
   }
   $('rv-stages').innerHTML = html;
   for (const b of $('rv-stages').querySelectorAll('.rv-box')){
@@ -12443,12 +12487,12 @@ function rvRender(){
   if (started){
     const done = RV.cleared.filter(Boolean).length, totStars = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0);
     const docs = Object.keys(RV.doc||{}).length;
-    if (RV.stage >= RV_STAGES.length)
-      $('rv-status').innerHTML = `<b style="color:var(--grn)">🏆 The war is won — all ${RV_STAGES.length} fronts cleared.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Replay any battle for a better result.`;
+    if (RV.stage >= STAGES.length)
+      $('rv-status').innerHTML = `<b style="color:var(--grn)">🏆 The war is won — all ${STAGES.length} fronts cleared.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Replay any battle for a better result.`;
     else
-      $('rv-status').innerHTML = `Fronts won <b>${done}/${RV_STAGES.length}</b> &nbsp;·&nbsp; <b>${totStars}★</b> earned &nbsp;·&nbsp; war chest <b>${rvWarChest()}⚙</b> &nbsp;·&nbsp; ${docs} doctrine${docs===1?'':'s'} carried &nbsp;·&nbsp; score <b>${RV.score.toLocaleString()}</b> &nbsp;·&nbsp; ${RV.diff}`;
+      $('rv-status').innerHTML = `Fronts won <b>${done}/${STAGES.length}</b> &nbsp;·&nbsp; <b>${totStars}★</b> earned &nbsp;·&nbsp; war chest <b>${rvWarChest()}⚙</b> &nbsp;·&nbsp; ${docs} doctrine${docs===1?'':'s'} carried &nbsp;·&nbsp; score <b>${RV.score.toLocaleString()}</b> &nbsp;·&nbsp; ${RV.diff}`;
   } else {
-    $('rv-status').textContent = 'Pick a difficulty, then begin. The first battle is Poland, September 1939. A ★★★ victory or better clears a front.';
+    $('rv-status').textContent = `Pick a difficulty, then begin. The first battle is ${STAGES[0].name} — ${STAGES[0].sub}. A ★★★ victory or better clears a front.`;
   }
 }
 function rvBegin(){ rvStart(); rvRender(); sCity(); }
@@ -12459,17 +12503,18 @@ function rvPlayStage(i){
   const bs = rvBattleSave();
   if (bs && performance.now() > rvAbandonPending){
     rvAbandonPending = performance.now() + 4000;
-    $('rv-status').innerHTML = `<b style="color:var(--redL)">⚠ You have an unfinished battle — ${RV_STAGES[bs.stage].name}, turn ${bs.turn}.</b> Starting a new one abandons it. Click the front again to proceed, or ⚔ Continue battle below.`;
+    $('rv-status').innerHTML = `<b style="color:var(--redL)">⚠ You have an unfinished battle — ${rvCamp().stages[bs.stage].name}, turn ${bs.turn}.</b> Starting a new one abandons it. Click the front again to proceed, or ⚔ Continue battle below.`;
     setTimeout(()=>{ if (performance.now() >= rvAbandonPending && !$('road-screen').classList.contains('hidden')) rvRender(); }, 4100);
     return;
   }
   rvAbandonPending = 0;
   try{ localStorage.removeItem(SAVE_KEYS.road); }catch(e){}   // the old battle is abandoned
   eventQueue.length = 0; show('event-modal', false);
-  newGame('G', RV.diff, 'ai', RV_STAGES[i].scn, null);
-  G.campaign = { mode:'rv', stage:i };
-  G.doc.G = Object.assign({}, RV.doc);                                   // doctrines carry forward
-  const chest = rvWarChest(); if (chest) G.pp.G = Math.min(40, G.pp.G + chest);
+  const camp = rvCamp();
+  newGame(camp.side, RV.diff, 'ai', camp.stages[i].scn, null);
+  G.campaign = { mode:'rv', camp:rvCampId, stage:i };
+  G.doc[camp.side] = Object.assign({}, RV.doc);                          // doctrines carry forward
+  const chest = rvWarChest(); if (chest) G.pp[camp.side] = Math.min(40, G.pp[camp.side] + chest);
   rvApplyVeterans(i);
   refreshSupply();
   show('road-screen', false);
@@ -12727,15 +12772,16 @@ function showEnd(){
   const camp = G.campaign && G.campaign.mode==='rv' ? G.campaign : null;
   const cn = $('end-campaign');
   if (camp && camp.result){
-    const i = camp.stage, next = RV_STAGES[i+1];
+    const cs = rvStagesOf(camp.camp || 'rv');
+    const i = camp.stage, next = cs[i+1];
     if (camp.result.won){
       $('btn-end-menu').textContent = next ? 'To the next front ▶' : 'Return to the Road ▶';
       cn.innerHTML = next
-        ? `<b style="color:var(--grn)">✓ ${RV_STAGES[i].name} cleared — ${camp.result.stars}★.</b> The road opens to <b>${next.name}</b> · ${next.sub}.`
+        ? `<b style="color:var(--grn)">✓ ${cs[i].name} cleared — ${camp.result.stars}★.</b> The road opens to <b>${next.name}</b> · ${next.sub}.`
         : `<b style="color:var(--grn)">🏆 The final front is won — the campaign is complete.</b>`;
     } else {
       $('btn-end-menu').textContent = '◀ Back to the Road';
-      cn.innerHTML = `<b style="color:var(--redL)">The front held against you.</b> A <b>★★★ victory</b> is needed to advance — regroup and try ${RV_STAGES[i].name} again.`;
+      cn.innerHTML = `<b style="color:var(--redL)">The front held against you.</b> A <b>★★★ victory</b> is needed to advance — regroup and try ${cs[i].name} again.`;
     }
     show('end-campaign', true);
   } else {
@@ -13039,7 +13085,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
-    rvStars, rvStart, rvOnStageEnd, rvCurrent: ()=>RV,
+    rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvCurrent: ()=>RV,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
