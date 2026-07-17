@@ -5434,6 +5434,7 @@ function resolveCombat(att, def, supports){
   }
   if (events.destroyed){
     killUnit(def);
+    att.kills = (att.kills||0) + 1;                       // battle honours: the lead formation takes the credit
     logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${tag} destroys ${def.name}${defNoEscape(events)?' — pocket closed!':'!'}`);
   } else {
     logMsg(att.side==='G'?'l-g':'l-s', `${flag(att.side)} ${tag} hits ${def.name}: ${defLoss} losses inflicted, ${atkLoss} taken.`);
@@ -5577,6 +5578,7 @@ function amphibiousAssault(u, tx, ty){
       logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} is annihilated in the surf at ${beachName(tx,ty)} — the landing fails.`);
     } else if (def.str <= 0){
       killUnit(def); land();
+      u.kills = (u.kills||0) + 1;
       logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} destroys ${def.name} and storms ashore at ${beachName(tx,ty)}!`);
     } else if (r >= RETREAT_RATIO && defLoss >= 2){
       const rh = retreatHex(def, {x:tx,y:ty,side:u.side});
@@ -10965,6 +10967,7 @@ function updateUnitCard(){
     ${k.carrier ? `<div class="statrow"><span>Air operations</span><span>✈ floating airfield</span></div>` : ''}
     <div class="statrow"><span>Dug in</span><span>${'▮'.repeat(u.entrench)||'—'}</span></div>
     ${!k.hq ? `<div class="statrow"><span>Experience</span><span>${unitLevel(u)>0?'✚'.repeat(unitLevel(u))+' ':''}${RANK_NAME[unitLevel(u)]}${unitLevel(u)<3?` <span style="color:var(--dim)">(${u.xp||0}/${XP_LEVELS[unitLevel(u)]} xp)</span>`:''}</span></div>` : ''}
+    ${(u.kills||0) > 0 ? `<div class="statrow"><span>Confirmed kills</span><span class="good">☠ ${u.kills} formation${u.kills===1?'':'s'}</span></div>` : ''}
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
     <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':'In supply'}</span></div>
@@ -12763,6 +12766,11 @@ function showEnd(){
     <div class="statrow"><span>Your losses</span><span class="bad">${yourLost} str</span></div>
     <div class="statrow"><span>Exchange ratio</span><span class="${exch>=1?'good':'bad'}">${fx(exch)} : 1</span></div>
     ${deco ? `<div class="statrow"><span>🎖 Most decorated</span><span>${flag(deco.u.side)} ${deco.u.name} <span style="color:var(--dim)">· ${RANK_NAME[deco.lv]}</span></span></div>` : ''}
+    ${(()=>{ // battle honours: the divisions that did the killing
+      const aces = unitsOf(meSide).filter(u=>(u.kills||0)>0).sort((a,b)=>b.kills-a.kills).slice(0,3);
+      return aces.length ? `<div class="end-ladder-h">BATTLE HONOURS — most enemy formations destroyed</div>` +
+        aces.map(u=>`<div class="statrow"><span>${flag(u.side)} ${u.name}</span><span class="good">☠ ${u.kills}</span></div>`).join('') : '';
+    })()}
     <div class="statrow"><span>Campaign length</span><span>${Math.min(G.turn,MAX_TURN)} ${turnsWord}</span></div>
     <div class="end-ladder-h">CAMPAIGN LADDER — where you finished</div>
     <div class="end-ladder">${ladder}</div>
