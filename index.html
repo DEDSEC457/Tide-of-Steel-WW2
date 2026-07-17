@@ -8197,7 +8197,7 @@ let _seasonGrad = null, _seasonKey = '';
    target scale anchored under the cursor (the old camera teleported) */
 let camGlide = null;   // {x0,y0,x1,y1,t0,dur}
 let zoomGlide = null;  // {target, sx,sy, wx,wy} — keep world point (wx,wy) under screen point (sx,sy)
-function killGlides(){ camGlide = null; zoomGlide = null; }
+function killGlides(){ camGlide = null; zoomGlide = null; if (typeof panVel!=='undefined') panVel = null; }
 let _sunGrad = null, _sunW = 0, _clouds = null, _grainTile = null, _grainTried = false;
 
 /* High-quality cinematic pass — all guarded so the headless fake-DOM (whose
@@ -8330,14 +8330,24 @@ function drawBloom(now, vL, vT, vR, vB){
    the glitter reads as a reflection rather than random noise. World-space and
    viewport-culled, and skipped when zoomed far out (the sparkles turn to noise and
    the visible-water count balloons), so cost tracks screen area. High only (cine). */
+let _seaCells = null, _seaKey = '';
 function drawWaterGlint(now, vL, vT, vR, vB){
   if (cam.z < 0.5) return;
+  // the sea never moves — list its hexes once per scenario instead of scanning
+  // the whole grid every frame (matters at 144fps on the 120×72 map)
+  const sk = (SCN.id||'?') + '|' + COLS + 'x' + ROWS;
+  if (_seaKey !== sk){
+    _seaCells = [];
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      const t = terrainAt(x,y);
+      if (t==='~' || t==='o') _seaCells.push([x,y]);
+    }
+    _seaKey = sk;
+  }
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.fillStyle = 'rgba(255,248,214,1)';
-  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-    const t = terrainAt(x,y);
-    if (t!=='~' && t!=='o') continue;                       // sea only
+  for (const [x,y] of _seaCells){
     const [cx,cy] = hexCenter(x,y);
     if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
     const seed = x*12.9898 + y*78.233;
@@ -9320,6 +9330,15 @@ function draw(){
     cam.y = camGlide.y0 + (camGlide.y1-camGlide.y0)*e;
     if (p >= 1) camGlide = null;
   }
+  // flick momentum: after a fast drag release the map keeps sliding, braking
+  // exponentially — frame-rate independent so 30fps and 144fps feel identical
+  if (panVel && !dragging){
+    const dt = Math.min(50, tnow - panVel.t); panVel.t = tnow;
+    cam.x -= panVel.vx*dt/cam.z; cam.y -= panVel.vy*dt/cam.z;
+    const f = Math.pow(0.994, dt);
+    panVel.vx *= f; panVel.vy *= f;
+    if (Math.hypot(panVel.vx, panVel.vy) < 0.02) panVel = null;
+  }
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = '#0a0c08'; ctx.fillRect(0,0,innerWidth,innerHeight);
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
@@ -9749,6 +9768,24 @@ function draw(){
       ctx.restore();
     }
     drawUnit(u, cx, cy, wx);
+    // a battered formation smoulders — thin smoke wisps and the odd ember rise
+    // from a counter at 3 strength or less, so hurt divisions read at a glance
+    if (GFX.cine && u.str <= 3 && cam.z >= 0.5){
+      const us = (u.id*37)%100;
+      for (let i=0;i<2;i++){
+        const rise = ((now*0.012) + us*3 + i*17) % 26;
+        const sa = Math.max(0, 0.22*(1 - rise/26));
+        if (sa <= 0.01) continue;
+        ctx.fillStyle = `rgba(70,64,58,${sa.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(cx + S*0.34 + Math.sin((now*0.001)+i+us)*2.5*(rise/26), cy - S*0.30 - rise, 1.6 + rise*0.11, 0, Math.PI*2);
+        ctx.fill();
+      }
+      if (((now*0.004 + us)|0) % 7 === 0){                 // a brief ember glint
+        ctx.fillStyle = 'rgba(255,140,60,0.55)';
+        ctx.fillRect(cx + S*0.30, cy - S*0.26, 1.4, 1.4);
+      }
+    }
     // a gold star marks a formation led by a general (top-left of the counter)
     if (generalOf(u)){
       ctx.fillStyle = '#ffd34d';
@@ -10374,7 +10411,7 @@ function _sceneAnimating(){
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
   if (sel && reach) return true;                                         // selection ants + reachable pulse
-  if (camGlide || zoomGlide || hitFlash.size || recoilMap.size) return true;  // camera glides, damage flashes, recoil
+  if (camGlide || zoomGlide || panVel || hitFlash.size || recoilMap.size) return true;  // camera glides, flick momentum, damage flashes, recoil
   if (threatView) return true;                                           // threat overlay pulse
   const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
   if ((mp && mp.size) || (fp && fp.size)) return true;
@@ -10394,13 +10431,21 @@ function _sceneAnimating(){
 
 /* ---------------- input ---------------- */
 let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
-canvas.addEventListener('mousedown', e=>{ killGlides(); dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
-window.addEventListener('mouseup', ()=>{ dragging=false; canvas.classList.remove('dragging'); requestRender(); });
+let panVel=null, _dragVx=0, _dragVy=0, _dragT=0;    // release momentum: the map glides to a stop
+canvas.addEventListener('mousedown', e=>{ killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
+window.addEventListener('mouseup', ()=>{
+  if (dragging && dragMoved && Math.hypot(_dragVx,_dragVy) > 0.15 && performance.now()-_dragT < 90)
+    panVel = { vx:_dragVx, vy:_dragVy, t:performance.now() };   // flick: carry the pan through
+  dragging=false; canvas.classList.remove('dragging'); requestRender();
+});
 window.addEventListener('mousemove', e=>{
   if (dragging){
     const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
     if (Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
     cam.x -= dx/cam.z; cam.y -= dy/cam.z; lastMx=e.clientX; lastMy=e.clientY;
+    const now = performance.now(), dt = Math.max(1, now - _dragT); _dragT = now;
+    _dragVx = 0.7*(dx/dt) + 0.3*_dragVx;            // smoothed screen-px/ms velocity
+    _dragVy = 0.7*(dy/dt) + 0.3*_dragVy;
   }
   const [wx,wy] = toWorld(e.clientX, e.clientY);
   hover = hexFromPixel(wx,wy);
@@ -12973,6 +13018,9 @@ function startCampaign(loaded){
 }
 migrateSaves();                                        // fold any old single-slot save into its slot
 $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
+
+// tiny read-only debug hook for automated QA (camera state lives inside this closure)
+window.__dbgCam = () => ({ x: cam.x, y: cam.y, z: cam.z, inertia: !!panVel });
 
 })();
 
