@@ -740,6 +740,48 @@ say('— events & winter gear —');
   check('unanswered offer expires', G3.winterGear === false, String(G3.winterGear));
 }
 
+/* the Winter War: SCN.winterSide flips the deep-freeze onto the Red Army */
+say('— winter war —');
+{
+  const Gw = E.newGame('G','normal','hotseat','winterwar');
+  Gw.turn = 5;                                        // deep-snow midwinter
+  const fin = E.unitsOf('G').find(u=>u.name==='4th Division');
+  const sov = E.unitsOf('S').find(u=>u.name==='24th Rifle');
+  // Soviet attacks carry the snow penalty; Finnish attacks don't
+  const sf = E.previewCombat(sov, fin).factors;
+  check('deep snow punishes the SOVIET attacker', sf.some(f=>f.who==='atk' && /snow/i.test(f.label) && f.mul<1),
+    JSON.stringify(sf.map(f=>f.label)));
+  const ff = E.previewCombat(fin, sov).factors;
+  check('Finnish attackers shrug off the snow', !ff.some(f=>f.who==='atk' && /snow/i.test(f.label)),
+    JSON.stringify(ff.map(f=>f.label)));
+  // the defender penalty falls on Soviet defenders, not Finnish ones
+  check('snow saps the SOVIET defense', ff.some(f=>f.who==='def' && /snow/i.test(f.label) && f.mul<1));
+  check('Finnish defense is unbothered', !sf.some(f=>f.who==='def' && /snow/i.test(f.label)));
+  // ski troops are winter-hardened attackers
+  const ski = E.unitsOf('G').find(u=>u.kind==='f_ski');
+  const kf = E.previewCombat(ski, sov).factors;
+  check('ski groups attack winter-hardened', kf.some(f=>/Winter-hardened/.test(f.label) && f.mul>1));
+  // movement: the snow slows the invader, not the defender
+  const rSov = E.reachable(sov).size;
+  const rFin = E.reachable(fin).size;
+  Gw.turn = 13;                                       // February hard frost — snow gone
+  const rSovThaw = E.reachable(sov).size;
+  check('deep snow slows the Soviet columns', rSovThaw > rSov, rSov+' snow vs '+rSovThaw+' frost');
+  // Soviet air freezes while the Finnish handful flies
+  Gw.turn = 5;
+  check('snow grounds the Red air arm, not the Finnish one',
+    E.airWxMul('S') < 0.5 && E.airWxMul('G') >= 0.9, E.airWxMul('S')+','+E.airWxMul('G'));
+  // Barbarossa is untouched: the freeze still falls on the Germans there
+  E.newGame('G','normal','hotseat','barbarossa');
+  E.getState().turn = 23;
+  const gu = E.unitsOf('G').find(u=>u.name==='9. Armee') || E.unitsOf('G')[0];
+  const su = E.unitsOf('S')[0];
+  const bf = E.previewCombat(gu, su).factors;
+  check('Barbarossa snow still punishes the German attacker',
+    bf.some(f=>f.who==='atk' && /snow/i.test(f.label) && f.mul<1));
+  E.newGame('G','normal','hotseat','barbarossa');
+}
+
 /* ---------------- campaign variants (replayability mutators) ---------------- */
 say('— campaign variants —');
 {

@@ -496,6 +496,7 @@
     <div class="opt-row" id="scn-row">
       <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
       <span class="opt" data-s="poland">🦅 Poland 1939</span>
+      <span class="opt" data-s="winterwar">⛷ Winter War 1939</span>
       <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
@@ -3518,6 +3519,279 @@ SCENARIOS.poland = (function buildPoland(){
 })();
 
 
+/* ============================ SCENARIOS.winterwar ============================
+   THE WINTER WAR — Finland, 30 November 1939 → 13 March 1940. Side G = Finland
+   (west, defending, moves first, the victory tiers count the cities it HOLDS);
+   side S = the Soviet Union attacking out of the east. The engine's deep-snow
+   penalties are flipped onto the Red Army with SCN.winterSide:'S' — here the
+   defenders are the winter masters, and Soviet mass freezes on the roads while
+   winter-hardened ski troops (kind flag `winter`) run rings around it. */
+SCENARIOS.winterwar = {
+  id: 'winterwar',
+  title: 'THE WINTER WAR', short: 'FINLAND 1939',
+  sub: 'FINLAND · NOVEMBER 1939 — MARCH 1940 · TURN-BASED STRATEGY',
+  sides: {
+    G: {name:'Finland', flag:'⬜', color:'#5b7891', tint:'rgba(150,175,200,0.22)'},
+    S: {name:'Soviet',  flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
+  },
+  winterSide: 'S',                 // the deep freeze falls on the invader here
+  gerAI: 'defend',                 // Finland (side G) holds the Line and the forests
+  sovAI: 'attack',                 // the Red Army (side S) presses the offensive
+  supplyRange: 9,                  // short 1939 distances — depots reach a little further
+  // the isolated northern fronts are fed by their own local depots (rail from
+  // the interior), each gated by holding the town — take it and the supply dies
+  supplySeeds: {G: [[3,1],[16,6],[20,7],[19,2]]},
+  menu: {
+    ger: {h:'⬜ Finland', p:'Nine divisions against an empire. Hold the Mannerheim Line with your left hand while your ski battalions carve the invasion columns into frozen mottis with your right — and make every week cost Moscow more than it can bear.'},
+    sov: {h:'🟥 Soviet Union', p:'The Leningrad Military District expects a parade. It gets Finland in winter. Smash the Line at Summa, breach the isthmus, and take Helsinki — however many rifle divisions the forest swallows first.'},
+  },
+  kinds: {
+    f_inf:  {side:'G', label:'Finnish Division',   atk:5, def:5, mp:3, maxStr:9,  cost:11, sym:'inf'},
+    f_ski:  {side:'G', label:'Ski Group',          atk:7, def:6, mp:5, maxStr:8,  cost:14, sym:'inf', winter:true, color:'#c8d2da'},
+    s_inf:  {side:'S', label:'Rifle Division',     atk:6, def:4, mp:3, maxStr:10, cost:7,  sym:'inf'},
+    s_tank: {side:'S', label:'Tank Brigade',       atk:7, def:4, mp:4, maxStr:9,  cost:14, sym:'arm'},
+    s_art:  {side:'S', label:'Artillery Corps',    atk:10, def:4, mp:3, maxStr:8, cost:13, sym:'art', color:'#7a2d3c'},
+    f_hq:   {side:'G', label:'GHQ',      atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#3c4a56'},
+    s_hq:   {side:'S', label:'Army HQ',  atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#57303c'},
+  },
+  deployNames: {f_inf:'Reserve Division', f_ski:'Sissi Detachment', s_inf:'Rifle Reinforcement', s_tank:'Tank Reserve'},
+  wxLabel: { snow:'Deep Snow — −30°', freeze:'Hard Frost' },
+  wxFx: {
+    snow:  ['Deep snow — −30°','SOVIET attacks ×0.6 and defense ×0.8, −1 Soviet movement, Red aviation grounded. Winter-hardened ski troops attack ×1.2.'],
+    freeze:['Hard frost','The lakes and swamps freeze solid — movement is normal again, attacks ×0.9. The Red Army\'s window.'],
+  },
+  wxMsg: {
+    snow:  'DEEP SNOW. The temperature falls through −30°. The invasion columns freeze on the forest roads — and white-clad ski troops own the space between them.',
+    freeze:'HARD FROST. The snow crusts over and the lakes bear tanks — the Red Army can finally move. So can everyone else.',
+  },
+  cols: 30, rows: 20,
+  /* Finland west, the USSR east. Lake Ladoga in the middle; the Karelian
+     Isthmus runs beneath it (the Mannerheim Line at Summa/Taipale), the motti
+     country of Ladoga Karelia and Suomussalmi stretches north through forest
+     and swamp. The Gulfs pin the south and west edges. */
+  map: [
+  /*        0    5    10   15   20   25     */
+  /* 0*/ "~~fffffffssfffffffsffffff.....",
+  /* 1*/ "~~ffffffffssffffffffffff......",
+  /* 2*/ "~.ffffffffssfffffffffffff.....",
+  /* 3*/ "..fffffffffsssffffffffff......",
+  /* 4*/ "..ffffffffffssffffffffff......",
+  /* 5*/ "..fffffffffffffffffffffff.....",
+  /* 6*/ "...ffffffffffffffhfffffff.....",
+  /* 7*/ "...fffffffffffffhhffffffff....",
+  /* 8*/ "....ffffffffffff~~~~ffffff....",
+  /* 9*/ "....ffffffffff~~~~~~~fffff....",
+  /*10*/ ".....fffffffff~~~~~~~~ffff....",
+  /*11*/ ".....fffffffff~~~~~~~~ffff....",
+  /*12*/ "......ffffffff~~~~~~~fffff....",
+  /*13*/ "......fffffffff~~~~~fffff.....",
+  /*14*/ ".......ffffffhhfffffffff......",
+  /*15*/ "........fffffhhffffffff.......",
+  /*16*/ "........ffffffffffffffff......",
+  /*17*/ "~~~~~~~~..ffffffffffff........",
+  /*18*/ "~~~~~~~~~~~~..................",
+  /*19*/ "~~~~~~~~~~~~~~~~..............",
+  ],
+  /* vp>0 are FINNISH-held objectives — the tiers count what Finland keeps. */
+  cities: [
+    {x:8, y:17, name:'Helsinki',    vp:4, owner:'G'},
+    {x:11,y:15, name:'Viipuri',     vp:3, owner:'G'},
+    {x:14,y:15, name:'Summa',       vp:2, owner:'G'},
+    {x:3, y:1,  name:'Oulu',        vp:2, owner:'G'},
+    {x:20,y:7,  name:'Kollaa',      vp:1, owner:'G'},
+    {x:16,y:6,  name:'Sortavala',   vp:1, owner:'G'},
+    {x:19,y:2,  name:'Suomussalmi', vp:1, owner:'G'},
+    {x:21,y:13, name:'Taipale',     vp:1, owner:'G'},
+    {x:5, y:12, name:'Tampere',     vp:0, owner:'G'},
+    {x:26,y:18, name:'Leningrad',   vp:0, owner:'S'},
+    {x:27,y:5,  name:'Petrozavodsk',vp:0, owner:'S'},
+  ],
+  sovSpawns: [[26,18],[27,15],[26,5],[27,3],[28,10]],
+  gerSpawns: [[8,16],[6,13],[4,5],[3,10],[9,17]],
+  /* Nine Finnish divisions dug in since October vs the Leningrad Military
+     District's first echelon — with far more behind it. */
+  startUnits: [
+    // — Finland: the Line on the isthmus (a thin crust, no real depth behind it) —
+    ['f_inf','5th Division',  16,15, 9], ['f_inf','8th Division',  18,14, 8],
+    ['f_inf','11th Division', 20,14, 8], ['f_inf','4th Division',  13,15, 8],
+    // — Ladoga Karelia & the north: held only by light ski forces fighting a
+    //   war of movement — the mottis, not a line. Thin, and the Soviet 8th and
+    //   9th Armies can wear it down —
+    ['f_inf','13th Division', 17,7, 8],
+    ['f_ski','Group Talvela', 18,5, 7], ['f_ski','9th Division',  18,2, 7],
+    ['f_ski','Sissi P-1',     16,3, 6],
+    ['f_hq','Mannerheim GHQ', 10,16, 6],
+    // — Soviet 7th Army: the great weight of the isthmus assault —
+    ['s_inf','24th Rifle',  19,15, 10], ['s_inf','43rd Rifle', 21,15, 10],
+    ['s_inf','49th Rifle',  20,16, 10], ['s_inf','90th Rifle', 22,16, 10],
+    ['s_inf','123rd Rifle', 22,15, 10], ['s_inf','138th Rifle', 23,14, 10],
+    ['s_inf','70th Rifle',  21,17, 10], ['s_inf','142nd Rifle', 23,17, 10],
+    ['s_tank','20th Tank Bde', 21,16, 9], ['s_tank','35th Tank Bde', 23,16, 9],
+    ['s_art','34th Artillery Corps', 24,17, 8],
+    // — 8th Army north of Ladoga —
+    ['s_inf','56th Rifle',  22,6, 9], ['s_inf','139th Rifle', 21,5, 9],
+    ['s_inf','168th Rifle', 23,7, 9],
+    // — 9th Army in the far north —
+    ['s_inf','163rd Rifle', 22,2, 9], ['s_inf','44th Rifle',  24,3, 9],
+    ['s_hq','7th Army HQ', 24,16, 6], ['s_hq','8th Army HQ', 25,6, 6],
+  ],
+  /* the Soviet tide keeps coming; Finland scrapes together reserves and, at
+     the end, the first foreign volunteers */
+  sovSchedule: [
+    [2,'s_inf','54th Rifle'], [3,'s_inf','75th Rifle'],
+    [4,'s_inf','62nd Rifle'],  [4,'s_tank','39th Tank Bde'],
+    [5,'s_inf','150th Rifle'], [5,'f_inf','21st Division'],
+    [6,'s_inf','7th Rifle'],   [7,'s_inf','100th Rifle'],
+    // February: Timoshenko's guns arrive — the Line-crackers. Finland, by
+    // contrast, has no reserves left to raise but the lone volunteer battalion.
+    [8,'s_art','35th Artillery Corps'], [8,'s_inf','23rd Rifle'],
+    [9,'s_art','136th Artillery Div'],  [9,'s_tank','13th Tank Bde'],
+    [10,'s_inf','84th Rifle'], [10,'s_art','402nd Howitzer Rgt'],
+    [11,'s_inf','51st Rifle'], [11,'f_ski','Swedish Volunteers'],
+    [12,'s_tank','20th Heavy Tank'], [12,'s_art','280th Artillery Corps'],
+    [13,'s_art','316th Artillery Corps'], [13,'s_inf','86th Rifle'],
+  ],
+  generals: [
+    // — Finland —
+    {side:'G', unit:'9th Division',  name:'Siilasvuo', trait:'encircler', atk:1.12,
+     bio:'The butcher of Suomussalmi. Chops a road-bound column into frozen pockets — mottis — and eats them one by one.'},
+    {side:'G', unit:'Group Talvela', name:'Talvela', atk:1.12,
+     bio:'Won the war\'s first victory at Tolvajärvi. Attacks in −25° darkness, on skis, from three directions at once.'},
+    {side:'G', unit:'5th Division',  name:'Öhquist', def:1.12,
+     bio:'Commands II Corps on the Line. Summa is his anvil — the most shelled square kilometre on Earth.'},
+    {side:'G', unit:'13th Division', name:'Hägglund', trait:'bulwark', def:1.10,
+     bio:'Asked whether Kollaa will hold, his front answers for him: "Kollaa kestää" — Kollaa holds.'},
+    // — Soviet Union —
+    {side:'S', unit:'123rd Rifle',  name:'Meretskov', atk:1.10,
+     bio:'Commands the 7th Army against the Line. He will learn siegecraft here the hard way — and use it on Summa.'},
+    {side:'S', unit:'20th Tank Bde', name:'Borzilov', atk:1.08,
+     bio:'His T-28s reach the wire at Summa in December. Most of them are still there, burned out, in February.'},
+    {side:'S', unit:'44th Rifle',   name:'Vinogradov', atk:1.05,
+     bio:'Marches the 44th up the Raate road to relieve Suomussalmi. He will be shot for what happens next.'},
+    {side:'S', unit:'100th Rifle',  name:'Timoshenko', atk:1.12,
+     bio:'Takes over in January with artillery, patience and no illusions. His method: grind the Line to gravel.'},
+  ],
+  decisions: [
+    {
+      id:'motti', turn:5, side:'G',
+      date:'early January 1940', title:'THE MOTTI DOCTRINE',
+      text:'North of Ladoga the invasion columns are strung out along forest roads, engines idling day and night so they don\'t freeze. Headquarters can reinforce the raiders and try to <b>carve the columns into pockets</b> — or husband its tiny reserve for the Line, where the real decision must come.',
+      options:[
+        {label:'Chop the roads — every column a motti',
+         effect:'All ski groups +2 strength (the raiders are reinforced)',
+         blurb:'Give the ski battalions the reserves. The columns will be cut, ringed and starved — the forest does the rest.',
+         log:'⬜ The sissi battalions melt into the treeline. Tonight the roads north of Ladoga belong to Finland.',
+         apply(G){
+           for (const u of unitsOf('G')) if (KINDS[u.kind].winter)
+             u.str = Math.min(KINDS[u.kind].maxStr, u.str+2);
+         }},
+        {label:'Husband the reserves for the Line',
+         effect:'+6⚙ production saved for the isthmus battle',
+         blurb:'The mottis can starve on their own time. Every shell and every man goes to the Summa sector — the war will be decided there.',
+         log:'⬜ Mannerheim hoards his reserve. The Line must not break.',
+         apply(G){ G.pp.G = Math.min(40, G.pp.G+6); }},
+      ],
+      ai(G){ return 0; },   // history chops the roads
+    },
+    {
+      id:'shturm', turn:9, side:'S',
+      date:'1 February 1940', title:'TIMOSHENKO\'S METHOD',
+      text:'The December assaults died on the wire. Timoshenko proposes something slower and far worse: a <b>set-piece grind</b> — artillery wheel to wheel, one kilometre of Line pulverised at a time. Voroshilov\'s faction still wants attacks everywhere, to give the Finns no rest.',
+      options:[
+        {label:'The set-piece grind — crush Summa',
+         effect:'+2 strength to your 4 armies nearest Summa, +2⚙',
+         blurb:'Mass everything against one sector of the Line and erase it. Slow, methodical, unstoppable.',
+         log:'🟥 A thousand guns register on Summa. The grind begins.',
+         apply(G){
+           const tgt = G.cities.find(c=>c.name==='Summa') || G.cities.find(c=>c.vp>0);
+           if (!tgt) return;
+           unitsOf('S').slice().sort((a,b)=>hexDist(a.x,a.y,tgt.x,tgt.y)-hexDist(b.x,b.y,tgt.x,tgt.y))
+             .slice(0,4).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+           G.pp.S = Math.min(40, G.pp.S+2);
+         }},
+        {label:'Attack everywhere — give them no rest',
+         effect:'+1 strength to EVERY Soviet division',
+         blurb:'The Finns have no reserves at all. Stretch them until something, somewhere, tears.',
+         log:'🟥 The whole front attacks. Somewhere the nine divisions must run out.',
+         apply(G){
+           for (const u of unitsOf('S'))
+             u.str = Math.min(KINDS[u.kind].maxStr, u.str+1);
+         }},
+      ],
+      ai(G){ return 0; },   // history grinds
+    },
+  ],
+  events: [
+    {turn:1,  date:'30 November 1939', title:'THE WINTER WAR BEGINS', pp:{S:2},
+     text:'Without declaration, Soviet bombers appear over Helsinki and twenty-one divisions cross the border. Moscow expects the campaign to take twelve days; a puppet "Finnish Democratic Republic" is already waiting in a briefcase at Terijoki.'},
+    {turn:2,  date:'mid-December 1939', title:'TOLVAJÄRVI', pp:{G:2},
+     text:'At Tolvajärvi, Talvela\'s men attack across the frozen lake in darkness and rout a Soviet division — the first Finnish victory of the war, and proof the giant can be cut.'},
+    {turn:4,  date:'27 December 1939', title:'SUOMUSSALMI', pp:{G:2},
+     text:'The 163rd Division is surrounded in the snow at Suomussalmi and destroyed. The ski battalions turn without pausing to meet the column marching to its rescue.'},
+    {turn:6,  date:'8 January 1940', title:'THE RAATE ROAD',
+     text:'The 44th Division dies along thirty kilometres of forest road — carved into mottis, starved, and annihilated. Finland captures more artillery in a week than its whole army owned in November. The world\'s newspapers discover the word "sisu".'},
+    {turn:8,  date:'late January 1940', title:'THE WORLD WATCHES', pp:{G:2},
+     text:'Foreign volunteers, Brewster fighters and (mostly) sympathy arrive. France and Britain debate an expedition that will never come. Sweden sends what it dares. Finland fights on with what it has.'},
+    {turn:10, date:'early February 1940', title:'THE RED ARMY RE-EQUIPS', pp:{S:3},
+     text:'Timoshenko\'s army is a different animal: white camouflage, ski battalions of its own, armoured sledges, and artillery ammunition without limit. The lessons of December have been paid for and learned.',
+     apply(G){
+       G.winterGear = true;                              // the invader finally gets winter equipment
+       for (const u of unitsOf('S'))                     // and the re-trained assault echelon steps up
+         u.str = Math.min(KINDS[u.kind].maxStr, u.str+1);
+     }},
+    {turn:12, date:'11 February 1940', title:'BREAKTHROUGH AT SUMMA', pp:{S:2},
+     text:'After a ten-day bombardment the Line cracks at Summa. Mannerheim commits his last reserves and begins falling back toward Viipuri. There are no more divisions behind them.'},
+    {turn:14, date:'early March 1940', title:'PEACE FEELERS IN STOCKHOLM',
+     text:'Both sides are bleeding: Finland out of men, the USSR out of patience and prestige. In Stockholm, terms are quietly discussed. Every hex held when the guns stop is a card at that table.'},
+  ],
+  maxTurn: 18,                              // 30 Nov 1939 → the March peace
+  startDate: Date.UTC(1939,10,30),
+  /* early freeze, then the deep-snow midwinter (the motti season), then the
+     February hard frost — the crust that finally lets the Red Army grind the
+     Line down. The Soviet breakthrough window opens with the frost. */
+  weather(turn){ return turn<=2 ? 'freeze' : turn<=9 ? 'snow' : 'freeze'; },
+  pp(side, turn){
+    if (side==='G') return 3;                          // Finland scrapes together just enough to patch the Line
+    return turn<=9 ? 7 : 12;                           // Timoshenko's buildup is bottomless
+  },
+  /* Finland starts holding all 15 objective points — the tiers score the
+     military position when the March peace is signed. History: the army stood
+     unbroken (~12 points still held), and Karelia was ceded at the table, not
+     stormed. Below that line is a Soviet breakthrough only a human can force. */
+  victoryTiers: [
+    [13,'KOLLAA STILL HOLDS','The Line never breaks and barely a village is lost. The Red Army has failed at a war it announced would take twelve days — and the whole world knows it.'],
+    [11,'THE MIRACLE OF THE WINTER WAR','The Line holds and only the border mottis are given up. Finland signs from strength — an empire fought to a standstill by nine divisions.'],
+    [8,'THE MOSCOW PEACE — HISTORY REPEATS','Summa is stormed and Viipuri lost; the whole Karelian Isthmus is ceded at the Moscow table. But the army is not destroyed and the nation stays free. "We paid our debts to the West in full — in blood."'],
+    [4,'THE ISTHMUS SHATTERED','The Line collapses and the army is broken back on Helsinki. The terms dictated in Moscow are far crueller than history\'s.'],
+    [0,'FINLAND FALLS','The white columns reach Helsinki. The Finnish Democratic Republic is proclaimed from Terijoki — there is no more Finland to make peace for.'],
+  ],
+  sudden: {
+    minAxisUnits: 4,
+    sovTitle:  'FINLAND FALLS',
+    sovText:   'The Finnish army is destroyed in the snow — nine divisions can die only once. The Republic capitulates.',
+  },
+  airInit: [
+    ['G','LeR 2', 4],                       // a handful of Fokkers and Blenheims
+    ['S','7th Army VVS', 8],
+    ['S','Baltic Fleet Air', 6],
+  ],
+  sovAirSchedule: [ [8,'1st Air Army Group', 6] ],
+  setup(st){
+    // the Mannerheim Line: the isthmus divisions have dug since October, but
+    // the concrete is thinner than legend (capped at 2); the forest fronts
+    // fight a war of movement and start with only shallow scrapes
+    for (const u of st.units) if (u.side==='G')
+      u.entrench = (u.y>=13) ? Math.min(2, effTerrain(u.x,u.y).dig) : Math.min(1, effTerrain(u.x,u.y).dig);
+  },
+  opening(playerSide){ return [
+    '30 November 1939 — Soviet bombs fall on Helsinki and twenty-one divisions cross the frontier. Moscow gives the campaign twelve days.',
+    playerSide==='G'
+      ? '⬜ Hold the Line at Summa and Taipale. In the forests, let the ski battalions cut the roads and starve the columns — every week you stand, the peace terms soften.'
+      : '🟥 December\'s parade is dead in the snow. Mass your rifle divisions, survive the motti country, and when the frost hardens in February — break the Line and take Viipuri.',
+  ]; },
+};
+
+
 /* ============================ SCENARIOS.italy ============================
    THE ITALIAN CAMPAIGN — Operation Husky and the long road up the peninsula,
    July 1943 → 1945. The Allies (G — they move first, they carry the offensive
@@ -4472,6 +4746,7 @@ function fireEvents(){
   const evs = EVENTS.filter(e => e.turn === G.turn);
   for (const e of evs){
     if (e.pp) for (const s of ['G','S']) if (e.pp[s]) G.pp[s] = Math.min(40, G.pp[s] + e.pp[s]);
+    if (e.apply) e.apply(G);                     // scripted consequences (never serialized)
     logMsg('sys', `📰 ${e.date} — ${e.title}`);
   }
   if (evs.length && typeof onEvents === 'function') onEvents(evs);
@@ -5185,7 +5460,7 @@ function reachable(u){
   if (hasDoc(u.side,'deepops') && docMech(u)) mp += 1;     // Deep Operations: mechanised exploitation
   if (genTraitId(u)==='panzer' && docMech(u) && wx==='clear') mp += 1;   // Panzer Leader: blitz only rolls on dry ground
   // felt boots keep the infantry marching; frozen engines stop the panzers regardless
-  if (wx==='snow' && u.side==='G' && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
+  if (wx==='snow' && u.side===(SCN.winterSide||'G') && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
     mp = Math.max(1, mp-1);
   if (underHQ(u)) mp += 1;                      // forward HQ keeps the formation moving
   if (usesFuel(u)) mp = Math.min(mp, Math.max(1, fuelOf(u))); // low on fuel = short hops; dry = a 1-hex crawl back to supply
@@ -5294,9 +5569,12 @@ function combatMods(att, def){
   if (wx==='mud'){ af('Rasputitsa mud', KINDS[att.kind].sym==='arm' ? 0.5 : 0.6); }
   if (wx==='freeze'){ af('Hard frost', 0.9); }
   if (wx==='snow'){
-    // winter gear saves the defense, not the offensive — no December blitz
-    if (att.side==='G') af(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.65 : 0.6);
-    if (def.side==='G') df(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.9 : 0.8);
+    // winter gear saves the defense, not the offensive — no December blitz.
+    // SCN.winterSide names the army that suffers the deep freeze (default the
+    // Germans; the Winter War flips it onto the Red Army).
+    const ws = SCN.winterSide || 'G';
+    if (att.side===ws) af(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.65 : 0.6);
+    if (def.side===ws) df(hasWinterGear()?'Deep snow (geared)':'Deep snow', hasWinterGear() ? 0.9 : 0.8);
     if (KINDS[att.kind].winter) af('Winter-hardened', 1.2);
   }
   const dc = diffCombat(att.side);
@@ -5935,7 +6213,7 @@ function airWxMul(side){
   const wx = weatherFor(G.turn);
   if (wx==='mud') return 0.7;
   if (wx==='freeze') return 0.85;
-  if (wx==='snow') return side==='G' ? 0.45 : 0.9;   // the Luftwaffe freezes solid
+  if (wx==='snow') return side===(SCN.winterSide||'G') ? 0.45 : 0.9;   // the winter-struck side's air arm freezes solid
   return 1;
 }
 function airfieldCovered(side, x, y){
@@ -10453,6 +10731,8 @@ function drawUnit(u, cx, cy, wx){
   } else if (k.sym==='cav'){                              // cavalry: single diagonal slash
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/2); ctx.stroke();
+  } else if (k.sym==='art'){                              // artillery: the filled ball
+    ctx.beginPath(); ctx.arc(bx, 0, bw*0.17, 0, Math.PI*2); ctx.fill();
   } else if (k.sym==='cv'){
     ctx.fillRect(bx-bw*0.42, -2.6, bw*0.84, 2.6);         // flight deck
     ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 3);              // hull
@@ -13320,7 +13600,7 @@ if (typeof module !== 'undefined' && module.exports){
     threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
-    airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, strikeTargets, airfieldCovered, previewStrike,
+    airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,
     buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
     GENERALS, generalOf, zhukovDefends, GEN_TRAITS, genTraitId,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,
