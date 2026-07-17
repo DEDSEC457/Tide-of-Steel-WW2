@@ -9323,10 +9323,23 @@ function drawMinimap(now, wx){
     mc.strokeStyle = '#0009'; mc.lineWidth = 0.5;
     mc.strokeRect(cx*sc - 1.5, cy*sc - 1.5, 3, 3);
   }
+  // battle pings: expanding red rings where combat just happened, so an attack
+  // off-screen still catches the eye down on the strategic map
+  if (mmPings.length){
+    mmPings = mmPings.filter(p => now - p.t0 < 1400);
+    for (const p of mmPings){
+      const pr = (now - p.t0)/1400;
+      mc.strokeStyle = `rgba(255,80,60,${(0.9*(1-pr)).toFixed(3)})`;
+      mc.lineWidth = 1.4;
+      mc.beginPath(); mc.arc(p.x*sc, p.y*sc, 2 + pr*9, 0, Math.PI*2); mc.stroke();
+    }
+  }
   // viewport box
   mc.strokeStyle = '#ffd98a'; mc.lineWidth = 1;
   mc.strokeRect(cam.x*sc, cam.y*sc, innerWidth/cam.z*sc, innerHeight/cam.z*sc);
 }
+let mmPings = [];
+function mmPing(x,y){ const [cx,cy]=hexCenter(x,y); mmPings.push({x:cx,y:cy,t0:performance.now()}); requestRender(); }
 let mmDragging = false;
 function mmFly(e){
   killGlides();
@@ -10372,6 +10385,7 @@ function floatText(x,y,text,color){
 function boomAt(x,y,big){
   const [cx,cy] = hexCenter(x,y);
   anims.push({type:'boom', x:cx, y:cy, big:!!big, seed:(x*31+y*47)%360, t0:performance.now()});
+  mmPing(x,y);                                   // echo the battle on the strategic minimap
   addScar(x,y);                                  // leave scorched ground & smoke behind
   if (big) kickShake(5);                         // a kill rattles the camera a touch
 }
@@ -10452,7 +10466,7 @@ function _sceneAnimating(){
   const wx = weatherFor(G.turn);
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
-  if (anims.length || moveAnim || shakeMag > 0) return true;             // booms, floats, slides, shake
+  if (anims.length || moveAnim || shakeMag > 0 || mmPings.length) return true;  // booms, floats, slides, shake, minimap pings
   if (sel && reach) return true;                                         // selection ants + reachable pulse
   if (camGlide || zoomGlide || panVel || hitFlash.size || recoilMap.size) return true;  // camera glides, flick momentum, damage flashes, recoil
   if (threatView) return true;                                           // threat overlay pulse
