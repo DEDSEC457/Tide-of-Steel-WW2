@@ -9622,6 +9622,22 @@ function draw(){
       hexPath(cx,cy,S-3); ctx.fillStyle = 'rgba(232,179,75,'+(0.20+0.14*rp).toFixed(3)+')'; ctx.fill();
       ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
     }
+    // route preview: hovering a reachable hex shows the exact march the division
+    // will make on a click — crawling dashes with a pip at every hex of the way
+    if (hover && reach.has(keyOf(hover[0],hover[1])) && !unitAt(hover[0],hover[1])){
+      const path = tracePath(su, reach, hover[0], hover[1]);
+      if (path && path.length > 1){
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,228,168,0.85)'; ctx.lineWidth = 2.6;
+        if (ctx.setLineDash){ ctx.setLineDash([7,6]); ctx.lineDashOffset = -(now*0.03)%13; }
+        ctx.beginPath();
+        for (let i=0;i<path.length;i++){ const [hx,hy]=hexCenter(path[i][0],path[i][1]); i?ctx.lineTo(hx,hy):ctx.moveTo(hx,hy); }
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,228,168,0.9)';
+        for (let i=1;i<path.length;i++){ const [hx,hy]=hexCenter(path[i][0],path[i][1]); ctx.beginPath(); ctx.arc(hx,hy,2.2,0,Math.PI*2); ctx.fill(); }
+      }
+    }
     if (!su.attacked) for (const t of enemiesInRange(su)){
       if (!isSpotted(t, G.phase)) continue;
       const [cx,cy] = hexCenter(t.x,t.y);
