@@ -4830,7 +4830,19 @@ const keyOf = (x,y) => x + ',' + y;
 let G = null;          // the whole game state (serializable)
 let nextId = 1;
 
-function cityAt(x,y){ return G.cities.find(c => c.x===x && c.y===y); }
+// cities never move and the set is fixed for a game, so index them by hex once
+// (rebuilt only when G.cities is swapped — new game or load). cityAt runs
+// per-hex inside effTerrain → combatMods/reachable/terrain-draw, so the O(n)
+// find was real work on every one of those.
+let _cityIdx = null, _cityIdxRef = null;
+function cityAt(x,y){
+  if (_cityIdxRef !== G.cities){
+    _cityIdx = new Map();
+    for (const c of G.cities) _cityIdx.set(c.x*4096 + c.y, c);
+    _cityIdxRef = G.cities;
+  }
+  return _cityIdx.get(x*4096 + y);
+}
 function unitAt(x,y){ return G.units.find(u => u.x===x && u.y===y); }
 function unitsOf(side){ return G.units.filter(u => u.side===side); }
 function enemyOf(side){ return side==='G' ? 'S' : 'G'; }
