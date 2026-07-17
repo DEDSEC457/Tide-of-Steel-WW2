@@ -1009,22 +1009,22 @@ SCENARIOS.barbarossa = {
      unit — generals go down with their commands, so guard them well. */
   generals: [
   // — German —
-  {side:'G', unit:'2. Panzergruppe', name:'Guderian',     atk:1.15,
+  {side:'G', unit:'2. Panzergruppe', name:'Guderian', trait:'panzer',     atk:1.15,
    bio:'"Schneller Heinz", father of the blitzkrieg — leads from a radio truck at the point of the spearhead.'},
-  {side:'G', unit:'3. Panzergruppe', name:'Hoth',         atk:1.10,
+  {side:'G', unit:'3. Panzergruppe', name:'Hoth', trait:'panzer',         atk:1.10,
    bio:'"Papa" Hoth — steady, relentless, driving up the Moscow highway.'},
   {side:'G', unit:'4. Panzergruppe', name:'Hoepner',      atk:1.10,
    bio:'The old cavalryman, commanding the armored thrust on Leningrad.'},
-  {side:'G', unit:'1. Panzergruppe', name:'von Kleist',   atk:1.10,
+  {side:'G', unit:'1. Panzergruppe', name:'von Kleist', trait:'panzer',   atk:1.10,
    bio:'Aristocrat at the head of the southern panzer wedge, aimed at Kiev and the Donets.'},
-  {side:'G', unit:'11. Armee',       name:'von Manstein', atk:1.15,
+  {side:'G', unit:'11. Armee',       name:'von Manstein', trait:'encircler', atk:1.15,
    bio:'The Wehrmacht’s sharpest operational mind, handed the southern flank in September.'},
   {side:'G', unit:'4. Armee',        name:'von Kluge',    def:1.10,
    bio:'"Clever Hans" — methodical and careful, very hard to catch off balance.'},
   // — Soviet —
-  {side:'S', unit:'16th Army',       name:'Rokossovsky',  def:1.15,
+  {side:'S', unit:'16th Army',       name:'Rokossovsky', trait:'encircler',  def:1.15,
    bio:'Master of the flexible defense. His army stands across the road to Moscow.'},
-  {side:'S', unit:'19th Army',       name:'Konev',        def:1.10,
+  {side:'S', unit:'19th Army',       name:'Konev', trait:'logi',        def:1.10,
    bio:'A hard, unsentimental driver of men — a front commander in the making.'},
   {side:'S', unit:'13th Army',       name:'Yeryomenko',   atk:1.10,
    bio:'Promised Stalin he would smash "the scoundrel Guderian". He keeps trying.'},
@@ -1256,16 +1256,16 @@ SCENARIOS.winter41 = {
   ],
   generals: [
     // — German: the defensive specialists take over —
-    {side:'G', unit:'9. Armee',        name:'Model',       def:1.15,
+    {side:'G', unit:'9. Armee',        name:'Model', trait:'bulwark',       def:1.15,
      bio:'The Führer\'s fireman. Arrives in January to hold the Rzhev salient — and holds it.'},
     {side:'G', unit:'4. Armee',        name:'Heinrici',    def:1.15,
      bio:'The master of the defense: gives up ground an hour before the barrage lands on it.'},
     {side:'G', unit:'3. Panzerarmee',  name:'Reinhardt',   atk:1.10,
      bio:'Panzer leader who reached the Moscow canal — now fighting to keep his army alive.'},
-    {side:'G', unit:'2. Panzerarmee',  name:'Guderian',    atk:1.10,
+    {side:'G', unit:'2. Panzerarmee',  name:'Guderian', trait:'panzer',    atk:1.10,
      bio:'Still arguing with Hitler about retreats. He will be sacked by Christmas — make him count first.'},
     // — Soviet —
-    {side:'S', unit:'16th Army',       name:'Rokossovsky', atk:1.10,
+    {side:'S', unit:'16th Army',       name:'Rokossovsky', trait:'encircler', atk:1.10,
      bio:'Held the Volokolamsk highway in the dark days. Now he advances down it.'},
     {side:'S', unit:'5th Army',        name:'Govorov',     def:1.10,
      bio:'The artillerist. His gun lines broke the panzers at Mozhaisk.'},
@@ -1494,14 +1494,14 @@ SCENARIOS.stalingrad = {
     // — Axis —
     {side:'G', unit:'6. Armee',        name:'Paulus',       def:1.10,
      bio:'The methodical staff officer marching on Stalingrad — brilliant on paper, cautious in a crisis.'},
-    {side:'G', unit:'4. Panzerarmee',  name:'Hoth',         atk:1.10,
+    {side:'G', unit:'4. Panzerarmee',  name:'Hoth', trait:'panzer',         atk:1.10,
      bio:'"Papa" Hoth again — his panzers swing between the Don and the Volga all summer.'},
-    {side:'G', unit:'1. Panzerarmee',  name:'von Kleist',   atk:1.10,
+    {side:'G', unit:'1. Panzerarmee',  name:'von Kleist', trait:'panzer',   atk:1.10,
      bio:'Driving for the Caucasus oil — the prize the whole war economy is aimed at.'},
-    {side:'G', unit:'11. Armee',       name:'von Manstein', atk:1.15,
+    {side:'G', unit:'11. Armee',       name:'von Manstein', trait:'encircler', atk:1.15,
      bio:'Conqueror of Sevastopol — and the man who will be sent to break any encirclement.'},
     // — Soviet —
-    {side:'S', unit:'62nd Army',       name:'Chuikov',      def:1.15,
+    {side:'S', unit:'62nd Army',       name:'Chuikov', trait:'bulwark',      def:1.15,
      bio:'"There is no land for us beyond the Volga." Master of the hugging defense in the rubble.'},
     {side:'S', unit:'64th Army',       name:'Shumilov',     def:1.10,
      bio:'Holds the southern shoulder of the city, rock-steady, for five months.'},
@@ -1741,9 +1741,9 @@ SCENARIOS.kursk = {
   ],
   generals: [
     // — Axis —
-    {side:'G', unit:'XLVII. Panzerkorps', name:'Model',   def:1.12,
+    {side:'G', unit:'XLVII. Panzerkorps', name:'Model', trait:'bulwark',   def:1.12,
      bio:'The Führer\'s fireman drives the northern pincer — a defensive genius about to learn what six fortified belts mean.'},
-    {side:'G', unit:'XLVIII. Panzerkorps', name:'Hoth',   atk:1.12,
+    {side:'G', unit:'XLVIII. Panzerkorps', name:'Hoth', trait:'panzer',   atk:1.12,
      bio:'Commands the strongest armoured formation Germany ever assembled — aimed straight up the Oboyan road.'},
     {side:'G', unit:'II. SS-Panzerkorps', name:'Hausser', atk:1.15,
      bio:'Leibstandarte, Das Reich and Totenkopf under one hard-bitten SS veteran — the spear-point of Zitadelle.'},
@@ -1756,7 +1756,7 @@ SCENARIOS.kursk = {
      bio:'First to take the SS blow on the Oboyan road — his anti-tank fronts trade lives for panzer tracks.'},
     {side:'S', unit:'1st Tank Army',      name:'Katukov', def:1.10,
      bio:'Refuses the order to counterattack head-on — digs his tanks in hull-down and lets the panzers come to him.'},
-    {side:'S', unit:'5th Guards Tank Army', name:'Rotmistrov', atk:1.12,
+    {side:'S', unit:'5th Guards Tank Army', name:'Rotmistrov', trait:'panzer', atk:1.12,
      bio:'Leads 800 tanks headlong into the SS at Prokhorovka — the greatest armoured melee in history.'},
   ],
   decisions: [
@@ -1987,7 +1987,7 @@ SCENARIOS.alamein = {
   ],
   generals: [
     // — Axis —
-    {side:'G', unit:'15. Panzer', name:'Rommel', atk:1.20,
+    {side:'G', unit:'15. Panzer', name:'Rommel', trait:'panzer', atk:1.20,
      bio:'The Desert Fox — audacious, exhausted, and two hundred miles from the Nile with tanks running on fumes.'},
     {side:'G', unit:'21. Panzer', name:'von Thoma', atk:1.10,
      bio:'Commands the Afrikakorps at the sharp end — a hard tanker who knows the fuel gauges better than the Führer does.'},
@@ -1996,7 +1996,7 @@ SCENARIOS.alamein = {
     {side:'G', unit:'Ariete', name:'De Stefanis', atk:1.08,
      bio:'The Ariete is the best armour Italy fielded — and it dies covering the German retreat more than once.'},
     // — British —
-    {side:'S', unit:'10th Armoured', name:'Montgomery', def:1.15,
+    {side:'S', unit:'10th Armoured', name:'Montgomery', trait:'bulwark', def:1.15,
      bio:'New to the desert and utterly sure of himself: "no withdrawal and no surrender." He fights the battle Rommel wants to avoid — a set-piece.'},
     {side:'S', unit:'2nd New Zealand', name:'Freyberg', def:1.12,
      bio:'"Tiny" Freyberg — a giant of a man whose New Zealanders are the hardest infantry in the Eighth Army.'},
@@ -2253,7 +2253,7 @@ SCENARIOS.dday = {
     // — Allied —
     {side:'G', unit:'VII Corps (Utah)', name:'Collins',   atk:1.15,
      bio:'"Lightning Joe" — takes Cherbourg in three weeks, then leads the breakout.'},
-    {side:'G', unit:'XXX Corps (Gold)', name:'Montgomery', def:1.10,
+    {side:'G', unit:'XXX Corps (Gold)', name:'Montgomery', trait:'bulwark', def:1.10,
      bio:'Master of the set-piece battle, commanding all Allied ground forces — methodical, and the panzers\' magnet at Caen.'},
     {side:'G', unit:'82nd Airborne',    name:'Ridgway',   def:1.10,
      bio:'Jumped into the dark over the Merderet with his division.'},
@@ -2988,21 +2988,21 @@ SCENARIOS.realistic = {
     [28,'s_tank','3rd Tank Corps'],     [30,'s_guard','4th Siberian Gds'],
   ],
   generals: [
-  {side:'G', unit:'2nd Panzer Group', name:'Guderian', atk:1.15,
+  {side:'G', unit:'2nd Panzer Group', name:'Guderian', trait:'panzer', atk:1.15,
    bio:'"Schneller Heinz" — the prophet of the panzer arm leads its strongest group toward Smolensk and beyond.'},
-  {side:'G', unit:'3rd Panzer Group', name:'Hoth',     atk:1.10,
+  {side:'G', unit:'3rd Panzer Group', name:'Hoth', trait:'panzer',     atk:1.10,
    bio:'Guderian\'s quieter partner — together their pincers close the great pockets of 1941.'},
-  {side:'G', unit:'1st Panzer Group', name:'von Kleist', atk:1.10,
+  {side:'G', unit:'1st Panzer Group', name:'von Kleist', trait:'panzer', atk:1.10,
    bio:'Leads the armored fist of Army Group South across the Ukraine toward the Dnieper bend.'},
   {side:'G', unit:'4th Panzer Group', name:'Hoepner',  atk:1.08,
    bio:'Drives through the Baltic states toward Leningrad — and will be cashiered in the winter for retreating.'},
-  {side:'G', unit:'11th Army',        name:'von Manstein', atk:1.12,
+  {side:'G', unit:'11th Army',        name:'von Manstein', trait:'encircler', atk:1.12,
    bio:'The finest operational mind of the war takes 11th Army south — toward the Crimea and Sevastopol.'},
   {side:'S', unit:'5th Army',         name:'Potapov',  def:1.10,
    bio:'His counterattacks out of the Pripyat marshes haunt the German flank for months.'},
-  {side:'S', unit:'16th Army',        name:'Rokossovsky', def:1.12,
+  {side:'S', unit:'16th Army',        name:'Rokossovsky', trait:'encircler', def:1.12,
    bio:'Released from prison camp to command — ends the war a Marshal taking the surrender of Berlin.'},
-  {side:'S', unit:'19th Army',        name:'Konev',    def:1.08,
+  {side:'S', unit:'19th Army',        name:'Konev', trait:'logi',    def:1.08,
    bio:'Hard-driving and unsentimental; Zhukov\'s great rival commands the reserve front before Moscow.'},
   {side:'S', unit:'4th Mech Corps',   name:'Vlasov',   atk:1.10,
    bio:'One of the heroes of the border battles — history has a darker road waiting for him.'},
@@ -3248,11 +3248,11 @@ SCENARIOS.france = (function buildFrance(){
     ['s_hq',  'GQG',           16, 15],
   ],
   generals: [
-    {side:'G', unit:'Pz.Gr. Guderian', name:'Guderian', atk:1.18,
+    {side:'G', unit:'Pz.Gr. Guderian', name:'Guderian', trait:'panzer', atk:1.18,
      bio:'The panzer prophet leads the Sedan breakthrough — and races west for the Channel against his own high command\'s nerves.'},
-    {side:'G', unit:'7. Panzer', name:'Rommel', atk:1.15,
+    {side:'G', unit:'7. Panzer', name:'Rommel', trait:'panzer', atk:1.15,
      bio:'The "Ghost Division" — Rommel drives so fast and so far that his own headquarters loses track of where he is.'},
-    {side:'G', unit:'Pz.Gr. Kleist', name:'von Kleist', atk:1.10,
+    {side:'G', unit:'Pz.Gr. Kleist', name:'von Kleist', trait:'panzer', atk:1.10,
      bio:'Commands the massed armor of Army Group A through the Ardennes — the largest concentration of tanks yet seen.'},
     {side:'S', unit:'4e DCR', name:'de Gaulle', atk:1.18,
      bio:'His lone armored counterattack at Montcornet bloodies the German flank — a glimpse of a war France could have fought.'},
@@ -3441,7 +3441,7 @@ SCENARIOS.poland = (function buildPoland(){
     ['s_hq', 'Sztab Generalny', 27, 12],
   ],
   generals: [
-    {side:'G', unit:'XIX. Guderian', name:'Guderian', atk:1.15,
+    {side:'G', unit:'XIX. Guderian', name:'Guderian', trait:'panzer', atk:1.15,
      bio:'His panzer corps knifes down from East Prussia — the tank tactics he wrote the book on, tried in earnest for the first time.'},
     {side:'G', unit:'10. Armee', name:'von Reichenau', atk:1.12,
      bio:'The Schwerpunkt out of Silesia, driving hard and straight for Warsaw on the shortest road.'},
@@ -3682,7 +3682,7 @@ SCENARIOS.italy = (function buildItaly(){
   generals: [
     {side:'G', unit:'US II Corps', name:'Patton', atk:1.15,
      bio:'"Old Blood and Guts" drives the US 7th Army in a headlong dash across Sicily to Messina — as much a race against Montgomery as against the Germans.'},
-    {side:'G', unit:'British XXX Corps', name:'Montgomery', atk:1.10,
+    {side:'G', unit:'British XXX Corps', name:'Montgomery', trait:'bulwark', atk:1.10,
      bio:'The victor of Alamein lands the 8th Army on Sicily\'s south-east and grinds up the east coast toward Messina and, beyond it, the Italian mainland.'},
     {side:'G', unit:'British 7th Armoured', name:'Alexander', atk:1.08,
      bio:'Army-group commander for the whole campaign — the patient orchestrator of Husky, Salerno and the long grind to the Gothic Line.'},
@@ -4033,13 +4033,13 @@ SCENARIOS.normandy = (function buildNormandy(){
     ['s_hq', 'Heeresgruppe B',     27, 20],
   ],
   generals: [
-    {side:'G', unit:'21st Army Group', name:'Montgomery', def:1.08,
+    {side:'G', unit:'21st Army Group', name:'Montgomery', trait:'bulwark', def:1.08,
      bio:'Ground-force commander for Overlord — draws the German armour onto the British at Caen so the Americans can break out in the west.'},
     {side:'G', unit:'US V Corps', name:'Bradley', atk:1.12,
      bio:'Commands the US First Army from bloody Omaha through the bocage to the Cobra breakout — the quiet architect of the American war in Normandy.'},
     {side:'G', unit:'Guards Armoured', name:'Patton', atk:1.18,
      bio:'His Third Army is the whip of the breakout: once Avranches opens, he pours armour into Brittany and races east for the Seine before the Germans can form a line.'},
-    {side:'S', unit:'Panzer Lehr', name:'Rommel', def:1.12,
+    {side:'S', unit:'Panzer Lehr', name:'Rommel', trait:'panzer', def:1.12,
      bio:'"The invasion must be defeated on the beaches — the first 24 hours will be decisive." The Desert Fox knows the Allied air power leaves him no war of movement.'},
     {side:'S', unit:'12. SS Hitlerjugend', name:'Meyer', def:1.10,
      bio:'His teenage fanatics fight Caen to rubble and hold it for six weeks against everything Montgomery throws at them.'},
@@ -5157,6 +5157,7 @@ function reachable(u){
   const wx = weatherFor(G.turn);
   let mp = KINDS[u.kind].mp + (generalOf(u)?.mp || 0);
   if (hasDoc(u.side,'deepops') && docMech(u)) mp += 1;     // Deep Operations: mechanised exploitation
+  if (genTraitId(u)==='panzer' && docMech(u) && wx==='clear') mp += 1;   // Panzer Leader: blitz only rolls on dry ground
   // felt boots keep the infantry marching; frozen engines stop the panzers regardless
   if (wx==='snow' && u.side==='G' && !(hasWinterGear() && KINDS[u.kind].sym==='inf'))
     mp = Math.max(1, mp-1);
@@ -5232,8 +5233,13 @@ function combatMods(att, def){
   df(effTerrain(def.x,def.y).name, tDef);
   if (def.entrench > 0) df('Dug in '+'▮'.repeat(def.entrench), 1 + ENTRENCH_DEF*def.entrench);
   const ag = generalOf(att), dg = generalOf(def);
-  if (ag && ag.atk) af('⭐ '+ag.name, ag.atk);
+  // a Panzer Leader's edge is speed (see reachable): his mobility trait replaces
+  // the flat attack bonus rather than stacking, keeping total command power in check
+  if (ag && ag.atk && ag.trait!=='panzer') af('⭐ '+ag.name, ag.atk);
   if (dg && dg.def) df('⭐ '+dg.name, dg.def);
+  if (ag && ag.trait==='bulwark' && ag.def) {} // (bulwark is a defensive trait; no attack effect)
+  if (dg && dg.trait==='bulwark') df('🛡 '+dg.name+' — Master of Defence', 1.15);
+  if (att.oos && ag && ag.trait==='logi') af('🚚 '+ag.name+' — Iron Logistician', SCN.harshOOS ? (1/0.35) : (1/OOS_ATK));  // cancels the cut-off penalty
   if (hasDoc(att.side,'combined')) af('⚙ Combined Arms', 1.10);
   if (hasDoc(def.side,'depth') && def.entrench>0) df('⚙ Defense in Depth', 1.12);
   if (zhukovDefends(def)) df('⭐ '+ (SCN.capitalDefense.city) +' defense', SCN.capitalDefense.def);
@@ -5251,7 +5257,10 @@ function combatMods(att, def){
     const t = unitAt(nx,ny);
     if (t && t.side===att.side && t.id!==att.id) ring++;
   }
-  if (ring > 0) af((Math.min(ring,3)+1)+'-sided attack', 1 + CONCENTRIC*Math.min(ring,3));
+  if (ring > 0){
+    const cf = (ag && ag.trait==='encircler') ? CONCENTRIC*1.45 : CONCENTRIC;   // The Cauldron: encirclement master
+    af((Math.min(ring,3)+1)+'-sided attack'+(ag&&ag.trait==='encircler'?' 🌀':''), 1 + cf*Math.min(ring,3));
+  }
   // weather
   if (wx==='mud'){ af('Rasputitsa mud', KINDS[att.kind].sym==='arm' ? 0.5 : 0.6); }
   if (wx==='freeze'){ af('Hard frost', 0.9); }
@@ -5733,6 +5742,19 @@ function aiBuyDoctrine(side){
     if (G.pp[side] >= d.cost + 16){ buyDoctrine(side, key); return; }   // keep a division's worth in hand
   }
 }
+
+/* ======================= GENERAL TRAITS =======================
+   A named ability on top of a general's raw command bonus, tied to the ONE
+   formation they lead — so choosing who commands the spearhead vs the anvil
+   is a real decision. Effects are small (a single formation at a time) and
+   symmetric across both sides' generals, so the AI-vs-AI balance holds. */
+const GEN_TRAITS = {
+  panzer:    { icon:'⚙', name:'Panzer Leader',    desc:'Leads from the point of the spearhead — this formation gains +1 movement when mechanised.' },
+  bulwark:   { icon:'🛡', name:'Master of Defence', desc:'An immovable anvil — +15% defence for the formation he commands.' },
+  encircler: { icon:'🌀', name:'The Cauldron',      desc:'Master of the encirclement — draws far more killing power from a concentric attack.' },
+  logi:      { icon:'🚚', name:'Iron Logistician',  desc:'Keeps the guns firing even when the roads are cut — no out-of-supply attack penalty.' },
+};
+function genTraitId(u){ const g = generalOf(u); return (g && g.trait && GEN_TRAITS[g.trait]) ? g.trait : null; }
 
 /* ======================= ROAD TO VICTORY — campaign core (engine level) =======================
    A meta-layer over the existing scenarios: fight the Axis war front by front. Winning a stage
@@ -10919,8 +10941,11 @@ function renderRoster(){
   for (const u of list){
     const st = rosterStatus(u), k = KINDS[u.kind], frac = u.str/k.maxStr;
     const scls = frac>0.55?'good':frac>0.3?'':'bad';
+    const g = generalOf(u), tr = g && g.trait && GEN_TRAITS[g.trait] ? GEN_TRAITS[g.trait] : null;
+    const genTag = g ? ` <small style="color:var(--amber)">· ⭐ ${g.name}${tr?` <span title="${tr.name}: ${tr.desc}">${tr.icon}</span>`:''}</small>` : '';
+    const kills = (u.kills||0) > 0 ? ` <small style="color:#e0a06a" title="${u.kills} enemy formations destroyed">☠${u.kills}</small>` : '';
     const row = document.createElement('div'); row.className = 'ros';
-    row.innerHTML = `<span class="ros-nm"><b>${u.name}</b> <small>· ${k.label}${u.entrench?' · '+'▮'.repeat(u.entrench):''}</small></span>`
+    row.innerHTML = `<span class="ros-nm"><b>${u.name}</b> <small>· ${k.label}${u.entrench?' · '+'▮'.repeat(u.entrench):''}</small>${genTag}${kills}</span>`
       + `<span class="ros-tag ${st.cls}">${st.tag}</span>`
       + `<span class="ros-str ${scls}">${u.str}/${k.maxStr}</span>`;
     row.onclick = ()=>{ show('roster-modal', false); selectUnit(u); sClick(); centerOn(u.x,u.y); };
@@ -10988,6 +11013,7 @@ function updateUnitCard(){
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
     ${g ? `<div style="color:var(--amber);margin-bottom:2px;">⭐ Gen. ${g.name} · ${genBonusText(g)}</div>
+           ${g.trait && GEN_TRAITS[g.trait] ? `<div style="color:#ffe4a8;font-size:12px;margin-bottom:2px;" title="${GEN_TRAITS[g.trait].desc}">${GEN_TRAITS[g.trait].icon} <b>${GEN_TRAITS[g.trait].name}</b> — ${GEN_TRAITS[g.trait].desc}</div>` : ''}
            <div style="color:var(--dim);font-size:12px;font-style:italic;margin-bottom:4px;">${g.bio}</div>` : ''}
     <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
     <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
@@ -13103,8 +13129,14 @@ function startCampaign(loaded){
 migrateSaves();                                        // fold any old single-slot save into its slot
 $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
 
-// tiny read-only debug hook for automated QA (camera state lives inside this closure)
+// tiny debug hooks for automated QA (game internals live inside this closure)
 window.__dbgCam = () => ({ x: cam.x, y: cam.y, z: cam.z, inertia: !!panVel });
+window.__dbgSelect = (name) => {                       // select a unit by name and centre on it
+  const u = G && G.units.find(u=>u.name===name); if (!u) return false;
+  sel = u.id; try{ reach = reachable(u); }catch(e){}
+  const [cx,cy] = hexCenter(u.x,u.y); cam.x = cx - innerWidth/2/cam.z; cam.y = cy - innerHeight/2/cam.z;
+  updateAll(); requestRender(); return true;
+};
 
 })();
 
@@ -13118,7 +13150,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
     airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
     buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
-    GENERALS, generalOf, zhukovDefends,
+    GENERALS, generalOf, zhukovDefends, GEN_TRAITS, genTraitId,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,

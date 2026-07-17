@@ -286,16 +286,23 @@ say('— generals —');
     new Set(E.GENERALS.map(g=>g.side+'|'+g.unit)).size === E.GENERALS.length);
   const gud = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');
   check('Guderian leads 2. Panzergruppe', !!E.generalOf(gud) && E.generalOf(gud).name==='Guderian');
-  // attack bonus shows up in the forecast (and therefore in the AI's eyes)
+  check('Guderian carries the Panzer Leader trait', E.genTraitId(gud)==='panzer');
+  // a plain flat-attack general (Hoepner, no trait) still boosts the forecast — and the AI's eyes
+  const hoe = E.unitsOf('G').find(u=>u.name==='4. Panzergruppe');
   const tgt = E.unitsOf('S').find(u=>u.name==='3rd Army');
-  const withGen = E.previewCombat(gud, tgt).ratio;
-  gud.name = 'Nobody';
-  const without = E.previewCombat(gud, tgt).ratio;
-  check('Guderian boosts attack odds ×1.15', Math.abs(withGen/without - 1.15) < 1e-9,
+  const withGen = E.previewCombat(hoe, tgt).ratio;
+  const mnm = hoe.name; hoe.name = 'Nobody';
+  const without = E.previewCombat(hoe, tgt).ratio;
+  hoe.name = mnm;
+  check('a flat-attack general boosts attack odds ×1.10', Math.abs(withGen/without - 1.10) < 1e-9,
     (withGen/without).toFixed(3));
-  // the engine supports +movement generals (none shipped — it unbalanced the AI sims)
-  gud.name = '2. Panzergruppe';
-  check('no general grants movement', E.GENERALS.every(g=>!g.mp),
+  // a Panzer Leader leads with speed, not extra punch: no flat attack bonus on a lone assault
+  const gWith = E.previewCombat(gud, tgt).ratio;
+  const gnm = gud.name; gud.name = 'Nobody'; const gWithout = E.previewCombat(gud, tgt).ratio; gud.name = gnm;
+  check('Panzer Leader adds no flat attack bonus (edge is mobility)', Math.abs(gWith/gWithout - 1) < 1e-9,
+    (gWith/gWithout).toFixed(3));
+  // the engine supports +movement generals via the field (none shipped — traits handle mobility)
+  check('no general grants raw +movement via the mp field', E.GENERALS.every(g=>!g.mp),
     E.GENERALS.filter(g=>g.mp).map(g=>g.name).join(','));
   const reachPlain = E.reachable(gud).size;
   E.generalOf(gud).mp = 1;
@@ -558,12 +565,12 @@ say('— AI skill & threat awareness —');
 say('— combat readability —');
 {
   E.newGame('G','normal','hotseat');
-  const pz = E.unitsOf('G').find(u=>u.name==='2. Panzergruppe');   // Guderian, +15% atk
+  const mn = E.unitsOf('G').find(u=>u.name==='11. Armee');         // von Manstein, +15% atk
   const def = E.unitsOf('S').find(u=>u.name==='3rd Army');
-  const p = E.previewCombat(pz, def);
+  const p = E.previewCombat(mn, def);
   check('forecast returns a factors breakdown', Array.isArray(p.factors));
-  check('Guderian shows up as an attack factor',
-    p.factors.some(f=>f.who==='atk' && /Guderian/.test(f.label) && Math.abs(f.mul-1.15)<1e-9),
+  check('a flat-attack general shows up as an attack factor',
+    p.factors.some(f=>f.who==='atk' && /Manstein/.test(f.label) && Math.abs(f.mul-1.15)<1e-9),
     JSON.stringify(p.factors.map(f=>f.label)));
   // a defender in a forest shows a terrain factor on the defending side
   const forestDef = E.unitsOf('S').find(u=>E.terrainAt(u.x,u.y)==='f');
@@ -574,10 +581,10 @@ say('— combat readability —');
     check('terrain appears as a defensive factor', fp.factors.some(f=>f.who==='def' && f.mul>1));
   } else check('terrain appears as a defensive factor', true);
   // an out-of-supply attacker is flagged
-  pz.oos = true;
+  mn.oos = true;
   check('cut-off attacker shows a penalty factor',
-    E.previewCombat(pz,def).factors.some(f=>f.who==='atk' && f.mul<1 && /cut off/i.test(f.label)));
-  pz.oos = false;
+    E.previewCombat(mn,def).factors.some(f=>f.who==='atk' && f.mul<1 && /cut off/i.test(f.label)));
+  mn.oos = false;
 }
 
 /* strategic decisions */
@@ -779,10 +786,15 @@ say('— fog of war —');
     if (p && (!path || p.length>path.length)){ path=p; dest=[x,y]; }
   }
   check('fow: a long route exists to test against', !!path && path.length>=4);
-  // plant an ambusher beside a late step of the route, out of everyone's sight
-  const step = path[path.length-2];
-  const amb = E.neighbors(step[0],step[1]).map(([x,y])=>({x,y}))
-    .find(h=>E.passable(h.x,h.y) && !E.unitAt(h.x,h.y) && !E.sightFor('G').has(h.x+','+h.y));
+  // plant an ambusher beside a late step of the route, out of everyone's sight.
+  // Scan steps from the destination backward so the placement is robust to the
+  // exact route length (which shifts with movement/traits).
+  let amb = null;
+  for (let si=path.length-2; si>=1 && !amb; si--){
+    const step = path[si];
+    amb = E.neighbors(step[0],step[1]).map(([x,y])=>({x,y}))
+      .find(h=>E.passable(h.x,h.y) && !E.unitAt(h.x,h.y) && !E.sightFor('G').has(h.x+','+h.y)) || null;
+  }
   if (amb){
     hidFoe.x = amb.x; hidFoe.y = amb.y; Gf.mv++;
     const r1 = E.reachable(pz);
