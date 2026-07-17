@@ -157,10 +157,10 @@ say('— amphibious warfare —');
   const beaches = E.navalReach(corps);
   check('naval reach finds beaches across the sea', beaches.size > 0);
   check('a Sicilian beach is within reach of the invasion fleet',
-    [...beaches.keys()].some(k=>{const [x,y]=k.split(',').map(Number); return y>=31 && y<=37 && x>=16 && x<=27;}));
+    [...beaches.keys()].some(k=>{const [x,y]=E.unkey(k); return y>=31 && y<=37 && x>=16 && x<=27;}));
   // no production → no landing craft
   G.pp.G = 0;
-  const openBeach = [...beaches.keys()].map(k=>k.split(',').map(Number)).find(([x,y])=>!E.unitAt(x,y));
+  const openBeach = [...beaches.keys()].map(k=>E.unkey(k)).find(([x,y])=>!E.unitAt(x,y));
   check('a landing needs production (blocked at 0 PP)',
     E.amphibiousAssault(corps, openBeach[0], openBeach[1]) === null);
   // fund it and storm an empty beach
@@ -171,7 +171,7 @@ say('— amphibious warfare —');
   check('the landing plants a beachhead',
     (G.beachheads||[]).some(b=>b.x===openBeach[0] && b.y===openBeach[1] && b.side==='G'));
   check('the beachhead projects its own supply',
-    E.computeSupply('G').has(openBeach[0]+','+openBeach[1]));
+    E.computeSupply('G').has(E.keyOf(openBeach[0],openBeach[1])));
   check('a landed division has spent its turn', corps.moved && corps.attacked);
   E.newGame('G','normal','hotseat','barbarossa');
 }
@@ -220,7 +220,7 @@ say('— rules sanity —');
     }
   }
   const net = E.computeSupply('S');
-  check('fully surrounded unit is cut off', !net.has(victim.x+','+victim.y));
+  check('fully surrounded unit is cut off', !net.has(E.keyOf(victim.x,victim.y)));
 }
 
 /* encirclement bites: savage combat debuffs and fast attrition */
@@ -820,9 +820,9 @@ say('— fog of war —');
   const Gf = E.getState();
   check('fow: variant state initialised', !!(Gf.variants.fow && Gf.seen && Array.isArray(Gf.recon)));
   const sight = E.sightFor('G');
-  check('fow: sight covers every friendly position', E.unitsOf('G').every(u=>sight.has(u.x+','+u.y)));
-  const seenFoe = E.unitsOf('S').find(t=>sight.has(t.x+','+t.y));
-  const hidFoe  = E.unitsOf('S').filter(t=>!sight.has(t.x+','+t.y)).pop();  // deepest reserve
+  check('fow: sight covers every friendly position', E.unitsOf('G').every(u=>sight.has(E.keyOf(u.x,u.y))));
+  const seenFoe = E.unitsOf('S').find(t=>sight.has(E.keyOf(t.x,t.y)));
+  const hidFoe  = E.unitsOf('S').filter(t=>!sight.has(E.keyOf(t.x,t.y))).pop();  // deepest reserve
   check('fow: frontier enemies spotted, deep reserves hidden',
     !!seenFoe && !!hidFoe && E.isSpotted(seenFoe,'G') && !E.isSpotted(hidFoe,'G'));
   check('fow: your own units are always visible to you', E.unitsOf('G').every(u=>E.isSpotted(u,'G')));
@@ -850,7 +850,7 @@ say('— fog of war —');
   const r0 = E.reachable(pz);
   let dest=null, path=null;
   for (const k of r0.keys()){                                // longest traced route
-    const [x,y] = k.split(',').map(Number);
+    const [x,y] = E.unkey(k);
     const p = E.tracePath(pz, r0, x, y);
     if (p && (!path || p.length>path.length)){ path=p; dest=[x,y]; }
   }
@@ -862,13 +862,13 @@ say('— fog of war —');
   for (let si=path.length-2; si>=1 && !amb; si--){
     const step = path[si];
     amb = E.neighbors(step[0],step[1]).map(([x,y])=>({x,y}))
-      .find(h=>E.passable(h.x,h.y) && !E.unitAt(h.x,h.y) && !E.sightFor('G').has(h.x+','+h.y)) || null;
+      .find(h=>E.passable(h.x,h.y) && !E.unitAt(h.x,h.y) && !E.sightFor('G').has(E.keyOf(h.x,h.y))) || null;
   }
   if (amb){
     hidFoe.x = amb.x; hidFoe.y = amb.y; Gf.mv++;
     const r1 = E.reachable(pz);
     check('fow: the unseen ambusher leaves no hole in the reach preview',
-      r1.has(amb.x+','+amb.y) || r1.size >= r0.size - 2);
+      r1.has(E.keyOf(amb.x,amb.y)) || r1.size >= r0.size - 2);
     const plan = E.fowMovePlan(pz, dest[0], dest[1], r1);
     check('fow: the march halts on surprise contact',
       plan.contact && plan.contact.id===hidFoe.id && !(plan.x===dest[0] && plan.y===dest[1]));
@@ -883,13 +883,13 @@ say('— fog of war —');
   const au = G4.air.find(a=>a.side==='G');
   let hit=null;
   outer2: for (let y=0;y<E.ROWS;y++) for (let x=0;x<E.COLS;x++){
-    if (!E.passable(x,y) || E.sightFor('G').has(x+','+y)) continue;
+    if (!E.passable(x,y) || E.sightFor('G').has(E.keyOf(x,y))) continue;
     if (E.airRecon(au, x, y)){ hit=[x,y]; break outer2; }
   }
-  check('fow: photo-recon reveals the target patch', !!hit && E.sightFor('G').has(hit[0]+','+hit[1]));
+  check('fow: photo-recon reveals the target patch', !!hit && E.sightFor('G').has(E.keyOf(hit[0],hit[1])));
   check('fow: recon spends the air group', au.mission==='done');
   E.startPhase('G');
-  check('fow: the photos are stale by your next turn', !E.sightFor('G').has(hit[0]+','+hit[1]));
+  check('fow: the photos are stale by your next turn', !E.sightFor('G').has(E.keyOf(hit[0],hit[1])));
 
   // fog survives a save/load and a few AI turns without breaking invariants
   E.newGame('S','normal','ai','barbarossa',{fow:true});   // human plays S → the AI owns G

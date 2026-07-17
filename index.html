@@ -4824,7 +4824,13 @@ function hexDist(x1,y1,x2,y2){
   const q1 = x1 - ((y1 - (y1&1)) >> 1), q2 = x2 - ((y2 - (y2&1)) >> 1);
   return Math.max(Math.abs(q1-q2), Math.abs(y1-y2), Math.abs((-q1-y1) - (-q2-y2)));
 }
-const keyOf = (x,y) => x + ',' + y;
+// Numeric hex keys: the supply/ZOC/reach floods live in Sets and Maps hit
+// thousands of times per AI turn. String keys ("x,y") meant a string alloc per
+// key plus string hashing/compare on every has/add — the single biggest cost in
+// the profiler on the big map. A packed integer removes all of it. y < 4096 on
+// every map, so x*4096+y is collision-free and reversible with unkey().
+const keyOf = (x,y) => x*4096 + y;
+const unkey = k => [(k/4096)|0, k%4096];
 
 /* ============================ GAME STATE ============================ */
 let G = null;          // the whole game state (serializable)
@@ -5069,7 +5075,7 @@ function aiEscape(u){
   const net = computeSupply(u.side);
   let best=null, bestS=-1e9;
   for (const k of reach.keys()){
-    const [x,y] = k.split(',').map(Number);
+    const [x,y] = unkey(k);
     let s = (net.has(k)?10:0) + (rearDir(u.side)>0 ? x : COLS-x)*0.3;  // toward home edge & supply
     let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side!==u.side) e++; }
     s -= e*3;
@@ -5451,7 +5457,7 @@ function tracePath(u, r, x, y){
   const home = keyOf(u.x,u.y), path = [];
   let k = keyOf(x,y), guard = 0;
   while (k && k !== home && guard++ < 99){
-    path.push(k.split(',').map(Number));
+    path.push(unkey(k));
     k = r.parent.get(k);
   }
   if (k !== home) return null;
@@ -5510,7 +5516,7 @@ function reachable(u){
   }
   best.delete(keyOf(u.x,u.y));
   for (const [k] of [...best]) {                       // can't end on any (visible) unit
-    const [x,y] = k.split(',').map(Number);
+    const [x,y] = unkey(k);
     const o = unitAt(x,y);
     if (o && !(fh && o.side!==u.side && !sight.has(k))) best.delete(k);
   }
@@ -5849,7 +5855,7 @@ function navalReach(u){
     }
   }
   for (const [wk,d] of seaDist){
-    const [wx,wy] = wk.split(',').map(Number);
+    const [wx,wy] = unkey(wk);
     for (const [nx,ny] of neighbors(wx,wy)){
       if (!passable(nx,ny)) continue;               // must be land to wade ashore
       const occ = unitAt(nx,ny);
@@ -6636,7 +6642,7 @@ function orderObjective(u){
 function stepToward(u, obj){                           // the reachable hex that gets closest to the objective
   const r = reachable(u);
   let best=[u.x,u.y], bd = hexDist(u.x,u.y,obj[0],obj[1]);
-  for (const k of r.keys()){ const [x,y]=k.split(',').map(Number);
+  for (const k of r.keys()){ const [x,y]=unkey(k);
     const d = hexDist(x,y,obj[0],obj[1]); if (d<bd){ bd=d; best=[x,y]; } }
   return best;
 }
@@ -6708,7 +6714,7 @@ function threatField(side){
     const atk = KINDS[f.kind].atk * (f.str/10) * (generalOf(f)?.atk || 1);
     const hit = new Set();
     for (const k of enemyReach(f)){                       // a foe here threatens its neighbours
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       for (const [nx,ny] of neighbors(x,y)) if (passable(nx,ny)) hit.add(keyOf(nx,ny));
     }
     for (const k of hit){ power.set(k,(power.get(k)||0)+atk); count.set(k,(count.get(k)||0)+1); }
@@ -7178,7 +7184,7 @@ function aiAmphibPlan(side){
     if (!reach.size) continue;
     const isHQ = KINDS[u.kind].hq;
     for (const [k,cost] of reach){
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       // ship a unit onto a beach that lands it meaningfully closer to an objective
       // (staging units with no land route are "stranded" and skip this test)
       if (!stranded && !isHQ && !(nearestEnemyObjDist(side,x,y) + 3 <= dNow)) continue;
@@ -7226,7 +7232,7 @@ function aiParaPlan(side){
     if (!dz.size) continue;
     const dNow = nearestEnemyObjDist(side, u.x, u.y);
     for (const [k,hot] of dz){
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       let obj = 1e9, objVp = 0;                         // nearest enemy objective to the DZ
       for (const c of G.cities) if (c.vp>0 && c.owner!==side){ const d=hexDist(x,y,c.x,c.y); if (d<obj){ obj=d; objVp=c.vp; } }
       if (obj > 4) continue;                            // only drop to grab or threaten an objective
@@ -7273,7 +7279,7 @@ function aiPlanGerman(){
     const myNet = computeSupply('G');
     const reach = reachable(u);
     let best=[u.x,u.y], bestS = gerScoreHex(u,u.x,u.y,df,isArm,myNet) + (u.entrench>0?1:0) - 0.5;
-    const cand = [...reach.keys()].map(k=>k.split(',').map(Number));
+    const cand = [...reach.keys()].map(k=>unkey(k));
     for (const [x,y] of cand){
       let s = gerScoreHex(u,x,y,df,isArm,myNet);
       if (s > bestS-6 && isArm){
@@ -7295,7 +7301,7 @@ function aiPlanHQ(u){
   const reach = reachable(u);
   let best = [u.x,u.y], bestS = -1e9;
   for (const k of reach.keys()){
-    const [x,y] = k.split(',').map(Number);
+    const [x,y] = unkey(k);
     let ed = 99; for (const t of unitsOf(enemyOf(u.side))) ed = Math.min(ed, hexDist(x,y,t.x,t.y));
     let fr = 0; for (const f of unitsOf(u.side)) if (f.id!==u.id && hexDist(x,y,f.x,f.y)<=3) fr++;
     const s = ed*2 + fr*1.5 + rearDir(u.side)*x*0.3;           // toward safety & friends & home edge
@@ -7384,7 +7390,7 @@ function aiPlanSoviet(){
       const net = computeSupply('S');
       let best=null, bestS=-1e9;
       for (const k of reach.keys()){
-        const [x,y] = k.split(',').map(Number);
+        const [x,y] = unkey(k);
         let s = (net.has(k)?10:0) + rearDir(u.side)*x*0.6;       // fall back toward own supply
         let e=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t&&t.side==='G') e++; }
         s -= e*3;
@@ -7408,7 +7414,7 @@ function aiPlanSoviet(){
     const reach2 = reachable(u);
     let best=[u.x,u.y], bestS = sovScoreHex(u,u.x,u.y,df,myNet) + (u.entrench>0?2:0) + (sovOffensive?0:-0.5);
     for (const k of reach2.keys()){
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       let s = sovScoreHex(u,x,y,df,myNet);
       // offensive: closing with a weak enemy is extra valuable (mirrors German exploitation)
       if (sovOffensive) for (const [nx,ny] of neighbors(x,y)){
@@ -9289,7 +9295,7 @@ function computeThreat(){
     const rng = attackRange(f);
     const hit = new Set();
     for (const k of enemyReach(f)){                       // wherever it can move…
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       if (rng <= 1){ for (const [nx,ny] of neighbors(x,y)) if (passable(nx,ny)) hit.add(keyOf(nx,ny)); }
       else { for (let yy=Math.max(0,y-rng); yy<=Math.min(ROWS-1,y+rng); yy++)
                for (let xx=Math.max(0,x-rng); xx<=Math.min(COLS-1,x+rng); xx++)
@@ -9514,7 +9520,7 @@ function drawRailhead(){
   const rn = railNetwork('G');
   // 1. supplied-corridor wash, fading with distance from the edge
   for (const k of rn.railed){
-    const [x,y] = k.split(',').map(Number);
+    const [x,y] = unkey(k);
     if (terrainAt(x,y)==='~') continue;
     const [cx,cy] = hexCenter(x,y);
     const a = Math.max(0.04, 0.15 - (rn.dist.get(k)||0)*0.006);
@@ -9530,7 +9536,7 @@ function drawRailhead(){
   ctx.lineCap = 'round';
   for (const s of segs){                                  // the rail bed
     const [k1,k2] = s.split('>');
-    const [x1,y1] = k1.split(',').map(Number), [x2,y2] = k2.split(',').map(Number);
+    const [x1,y1] = unkey(k1), [x2,y2] = unkey(k2);
     const [ax,ay] = hexCenter(x1,y1), [bx,by] = hexCenter(x2,y2);
     ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
     ctx.strokeStyle = '#1a140c'; ctx.lineWidth = 3.4; ctx.stroke();
@@ -9538,7 +9544,7 @@ function drawRailhead(){
   }
   for (const s of segs){                                  // the sleepers (ties)
     const [k1,k2] = s.split('>');
-    const [x1,y1] = k1.split(',').map(Number), [x2,y2] = k2.split(',').map(Number);
+    const [x1,y1] = unkey(k1), [x2,y2] = unkey(k2);
     const [ax,ay] = hexCenter(x1,y1), [bx,by] = hexCenter(x2,y2);
     let dx=bx-ax, dy=by-ay; const len=Math.hypot(dx,dy)||1, nx=-dy/len, ny=dx/len;
     const n = Math.max(2, Math.round(len/8));
@@ -10012,7 +10018,7 @@ function draw(){
   if (threatView){
     const pulse = 0.85 + 0.15*Math.sin(now*0.004);
     for (const [k,c] of threatView){
-      const [tx,ty] = k.split(',').map(Number);
+      const [tx,ty] = unkey(k);
       const [cx,cy] = hexCenter(tx,ty);
       if (cx<vL||cx>vR||cy<vT||cy>vB) continue;
       hexPath(cx,cy,S-2);
@@ -10075,7 +10081,7 @@ function draw(){
   if (su && reach){
     const rp = 0.5 + 0.5*Math.sin(now*0.005);              // reachable hexes breathe gently
     for (const k of reach.keys()){
-      const [x,y] = k.split(',').map(Number);
+      const [x,y] = unkey(k);
       const [cx,cy] = hexCenter(x,y);
       hexPath(cx,cy,S-3); ctx.fillStyle = 'rgba(232,179,75,'+(0.20+0.14*rp).toFixed(3)+')'; ctx.fill();
       ctx.strokeStyle = '#ffd98acc'; ctx.lineWidth = 1.5; ctx.stroke();
@@ -10143,7 +10149,7 @@ function draw(){
     const su2 = G.units.find(t=>t.id===amphibTarget.id);
     const pulse = 0.5 + 0.5*Math.sin(now*0.006);
     for (const k of amphibTarget.beaches.keys()){
-      const [bx,by] = k.split(',').map(Number);
+      const [bx,by] = unkey(k);
       const [cx,cy] = hexCenter(bx,by);
       const defended = !!unitAt(bx,by);
       hexPath(cx,cy,S-3);
@@ -10160,13 +10166,13 @@ function draw(){
   if (paraTarget){
     const dz = paraTarget.dz;
     for (const [k,hot] of dz){                              // gentle wash over the reachable ground
-      const [bx,by] = k.split(',').map(Number), [cx,cy] = hexCenter(bx,by);
+      const [bx,by] = unkey(k), [cx,cy] = hexCenter(bx,by);
       hexPath(cx,cy,S-3);
       ctx.fillStyle = hot ? 'rgba(232,179,75,0.10)' : 'rgba(120,200,140,0.09)'; ctx.fill();
     }
     ctx.strokeStyle = 'rgba(143,208,160,0.6)'; ctx.lineWidth = 1.8;
     for (const k of dz.keys()){                             // and a firm outline round the drop range
-      const [bx,by] = k.split(',').map(Number);
+      const [bx,by] = unkey(k);
       const nbs = neighbors(bx,by);
       if (nbs.length===6 && nbs.every(([nx,ny])=>dz.has(keyOf(nx,ny)))) continue;
       const [cx,cy] = hexCenter(bx,by); hexPath(cx,cy,S-3); ctx.stroke();
@@ -11354,7 +11360,7 @@ function supplyGapInfo(u){
   if (net.has(keyOf(u.x,u.y))) return null;                 // actually in supply
   let gap = 1e9, toward = null;
   for (const key of net){
-    const [x,y] = key.split(',').map(Number);
+    const [x,y] = unkey(key);
     const d = hexDist(u.x,u.y,x,y);
     if (d < gap){ gap = d; toward = [x,y]; }
   }
@@ -13631,7 +13637,7 @@ if (typeof module !== 'undefined' && module.exports){
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork,
     threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
-    unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
+    unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,
     buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
     GENERALS, generalOf, zhukovDefends, GEN_TRAITS, genTraitId,
