@@ -5271,6 +5271,9 @@ function combatMods(att, def){
     const cf = (ag && ag.trait==='encircler') ? CONCENTRIC*1.45 : CONCENTRIC;   // The Cauldron: encirclement master
     af((Math.min(ring,3)+1)+'-sided attack'+(ag&&ag.trait==='encircler'?' 🌀':''), 1 + cf*Math.min(ring,3));
   }
+  // close air support loitering over the target lends its weight to the assault
+  const cas = casBonus(att.side, def.x, def.y);
+  if (cas > 1) af('✈ Close air support', cas);
   // weather
   if (wx==='mud'){ af('Rasputitsa mud', KINDS[att.kind].sym==='arm' ? 0.5 : 0.6); }
   if (wx==='freeze'){ af('Hard frost', 0.9); }
@@ -5944,6 +5947,30 @@ function setPatrol(au){
   logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} flies fighter patrols.`);
   return true;
 }
+/* CLOSE AIR SUPPORT: instead of a single bomb-run, a group can loiter over the
+   front all turn, lending its punch to friendly GROUND ATTACKS anywhere its
+   airfields/carriers reach. The price is real — a supporting group can't strike
+   or intercept, and it doesn't repair. Enemy fighters on patrol contest the
+   skies and blunt the support; bad weather grounds it just like a strike. */
+function casCover(side, x, y){
+  if (!airfieldCovered(side, x, y)) return 0;
+  let str = 0;
+  for (const a of airOf(side)) if (a.mission==='support' && a.str>0) str += a.str;
+  return str;
+}
+function casBonus(side, x, y){
+  const str = casCover(side, x, y);
+  if (str <= 0) return 1;
+  const contested = airOf(enemyOf(side)).some(p => p.mission==='patrol' && p.str>0);
+  const raw = Math.min(0.28, 0.032*str) * airWxMul(side) * (contested ? 0.5 : 1);
+  return 1 + raw;
+}
+function setSupport(au){
+  if (au.mission!=='ready') return false;
+  au.mission = 'support';
+  logMsg(au.side==='G'?'l-g':'l-s', `${flag(au.side)} ✈ ${au.name} flies close air support over the front.`);
+  return true;
+}
 function airStrike(au, t){
   if (au.mission!=='ready' || !t || t.side===au.side) return null;
   if (!airfieldCovered(au.side, t.x, t.y)) return null;
@@ -6459,6 +6486,15 @@ function aiAir(side){
         !airOf(side).some(p=>p.mission==='patrol')){ setPatrol(au); continue; }
     if (airWxMul(side) < 0.5) continue;               // grounded by winter: rest & repair
     if (au.str <= 3) continue;                        // too mauled to fly: repair
+    // close air support: when a real assault is brewing — several of our divisions
+    // lined up against dug-in or strong defenders under our air umbrella — loiter
+    // over the front instead of a one-off strike. Keep at most one group on support.
+    if (au.str >= 5 && airWxMul(side) >= 0.7 && !airOf(side).some(p=>p.mission==='support')){
+      const assault = unitsOf(side).filter(u => !KINDS[u.kind].hq &&
+        airfieldCovered(side,u.x,u.y) &&
+        adjacentEnemies(u).some(e => e.entrench>0 || e.str>=6)).length;
+      if (assault >= 3){ setSupport(au); continue; }
+    }
     let best=null, bestS=1;                           // only fly if it's worth it
     for (const t of strikeTargets(side)){
       let s = t.str*0.3 + t.entrench*1.2 + (t.oos?2:0);
@@ -11178,6 +11214,7 @@ function updateAirCard(){
     const row = document.createElement('div');
     const status = au.mission==='ready' ? '<span class="good">ready</span>'
                  : au.mission==='patrol' ? '<span style="color:var(--cyan)">on patrol</span>'
+                 : au.mission==='support' ? '<span style="color:var(--amber)">flying support ✈</span>'
                  : '<span style="color:var(--dim)">flown</span>';
     row.innerHTML = `<div class="statrow"><span>✈ ${au.name}</span><span>str ${au.str} · ${status}</span></div>`;
     if (isHuman && au.mission==='ready'){
@@ -11192,7 +11229,11 @@ function updateAirCard(){
       const bp = document.createElement('button');
       bp.textContent = '🛡 Patrol'; bp.style.cssText = 'padding:2px 10px;font-size:12px;';
       bp.onclick = ()=>{ clearUndo(); sClick(); setPatrol(au); airTarget=null; reconTarget=null; updateAll(); };
-      act.appendChild(bs); act.appendChild(bp);
+      const bsup = document.createElement('button');
+      bsup.textContent = '✈ Support'; bsup.style.cssText = 'padding:2px 10px;font-size:12px;';
+      bsup.title = 'Close air support: loiter over the front all turn — every ground attack in air range hits harder. Costs this group its strike and its rest.';
+      bsup.onclick = ()=>{ clearUndo(); sClick(); setSupport(au); airTarget=null; reconTarget=null; updateAll(); };
+      act.appendChild(bs); act.appendChild(bp); act.appendChild(bsup);
       if (fowActive()){
         const bc = document.createElement('button');
         bc.textContent = '🔭 Recon'; bc.style.cssText = 'padding:2px 10px;font-size:12px;';
@@ -13204,7 +13245,7 @@ if (typeof module !== 'undefined' && module.exports){
     threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt,
-    airOf, airStrike, setPatrol, strikeTargets, airfieldCovered, previewStrike,
+    airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, strikeTargets, airfieldCovered, previewStrike,
     buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
     GENERALS, generalOf, zhukovDefends, GEN_TRAITS, genTraitId,
     EVENTS, fireEvents, decideWinterGear, hasWinterGear, terrOwner, absorbPockets, claimTerritory,

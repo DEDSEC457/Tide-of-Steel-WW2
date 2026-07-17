@@ -266,6 +266,25 @@ say('— air power —');
   const moscow = E.unitsOf('S').find(u=>u.name==='24th Army');
   const lfAny = E.airOf('G').find(a=>a.mission==='ready');
   check('out-of-range strike refused', !lfAny || E.airStrike(lfAny, moscow)===null);
+  // close air support: loitering group boosts a covered ground attack, and only
+  // for the side flying support — out-of-range and other-side hexes see nothing
+  {
+    E.newGame('G','normal','hotseat');
+    const border2 = E.unitsOf('S').find(u=>u.name==='11th Army');   // within German air range
+    const far = E.unitsOf('S').find(u=>u.name==='24th Army');       // Moscow, out of range turn 1
+    const base = E.casBonus('G', border2.x, border2.y);
+    const g = E.airOf('G').find(a=>a.mission==='ready'); g.str = 8;
+    check('no support flying → no CAS bonus', base===1, base);
+    check('setSupport takes a ready group off strike duty',
+      E.setSupport(g)===true && g.mission==='support');
+    const cov = E.casBonus('G', border2.x, border2.y);
+    check('support lifts covered attacks', cov>1 && cov<=1.30, cov);
+    check('CAS respects air range', E.casBonus('G', far.x, far.y)===1);
+    check('CAS is one-sided (helps only its owner)', E.casBonus('S', border2.x, border2.y)===1);
+    // enemy fighters on patrol blunt the support
+    const s2 = E.airOf('S')[0]; s2.str = 8; E.setPatrol(s2);
+    check('enemy patrol contests the support', E.casBonus('G', border2.x, border2.y) < cov);
+  }
   // old saves (no air) migrate cleanly
   const snap = JSON.parse(E.serialize());
   delete snap.G.air;
