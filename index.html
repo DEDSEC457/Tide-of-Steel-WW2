@@ -502,6 +502,7 @@
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
       <span class="opt" data-s="guadalcanal">🌴 Guadalcanal 1942</span>
+      <span class="opt" data-s="okinawa">🌊 Okinawa 1945</span>
       <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
       <span class="opt" data-s="alamein">🐪 El Alamein 1942</span>
       <span class="opt" data-s="dday">🟦 D-Day 1944</span>
@@ -3068,6 +3069,253 @@ SCENARIOS.guadalcanal = {
     playerSide==='G'
       ? '🟦 Take the airfield and hold it against everything that comes down the Slot. Your build-up wins the long game — if the perimeter holds through the autumn.'
       : '🟥 Retake the airfield before the American build-up drowns you. The Express delivers a regiment a week — mass them, pick your night, and break the perimeter.',
+  ]; },
+};
+
+/* ---------- Scenario: OKINAWA — April–June 1945 ----------
+   The last great battle: Tenth Army against the 32nd Army's cave fortress on
+   the Shuri Line, while the kikusui waves burn the fleet offshore. The
+   landing itself was unopposed — the battle is the grind south through three
+   fortified belts, against the finest defensive plan Japan ever executed. */
+SCENARIOS.okinawa = {
+  id: 'okinawa',
+  title: 'OKINAWA — TYPHOON OF STEEL', short: 'OKINAWA',
+  sub: 'THE RYUKYUS · APRIL — JUNE 1945 · TURN-BASED STRATEGY',
+  harshOOS: true,
+  sides: {
+    G: {name:'United States', flag:'🟦', color:'#3a5c40', tint:'rgba(80,130,90,0.24)'},
+    S: {name:'Japan',         flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
+  },
+  menu: {
+    ger: {h:'🟦 United States', p:'The landing is a walk ashore — then the island turns to stone. Grind through the Kakazu, Shuri and Kunishi lines cave by cave, while the kamikazes burn your fleet offshore. Finish it before the fleet bleeds white.'},
+    sov: {h:'🟥 Imperial Japan', p:'You cannot win — you can make it cost. A year of digging has turned the south into a fortress. Hold every ridge, spend every shell, and make Okinawa an argument against ever invading the Home Islands.'},
+  },
+  kinds: {
+    g_mar:  {side:'G', label:'Marine Division',    atk:7, def:6, mp:3, maxStr:10, cost:14, sym:'inf'},
+    g_army: {side:'G', label:'Infantry Division',  atk:6, def:6, mp:3, maxStr:10, cost:11, sym:'inf'},
+    g_cv:   {side:'G', label:'Fast Carrier Force', atk:7, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true, noBuy:true},
+    g_ca:   {side:'G', label:'Radar Picket Group', atk:4, def:5, mp:5, maxStr:8,  cost:16, sym:'ca', fast:true, noCapture:true, sea:true},
+    g_bb:   {side:'G', label:'Bombardment Force',  atk:7, def:7, mp:4, maxStr:10, cost:26, sym:'bb', range:2, noCapture:true, sea:true},
+    g_art:  {side:'G', label:'Corps Artillery',   atk:10, def:4, mp:2, maxStr:8, cost:13, sym:'art', color:'#2d4a3a'},
+    s_inf:  {side:'S', label:'Infantry Division',  atk:5, def:6, mp:2, maxStr:9,  cost:9,  sym:'inf'},
+    s_art:  {side:'S', label:'Artillery Command',  atk:9, def:5, mp:2, maxStr:8,  cost:13, sym:'art', color:'#7a2d3c', noBuy:true},
+    s_mil:  {side:'S', label:'Boeitai Militia',    atk:3, def:5, mp:2, maxStr:7,  cost:5,  sym:'inf', color:'#5a5244'},
+    g_hq:   {side:'G', label:'Tenth Army HQ', atk:1, def:4, mp:3, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3c34'},
+    s_hq:   {side:'S', label:'32nd Army HQ',  atk:1, def:5, mp:2, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#57303c'},
+  },
+  deployNames: {g_mar:'Marine Reinforcement', g_army:'Army Reinforcement', g_ca:'Picket Reinforcement', g_bb:'Fire-Support Group', s_inf:'Cave Garrison', s_mil:'Home Guard Draft'},
+  wxLabel: { mud:'The May Rains' },
+  wxFx: { mud:['The May rains','The plum rains: +1 movement cost, attacks ×0.5–0.6, air grounded, the whole front a sea of mud.'] },
+  wxMsg: { mud:'THE MAY RAINS break over Okinawa — the roads dissolve, tanks drown to their turrets, and the war shrinks to mud, caves and hand grenades.' },
+  cols: 30, rows: 20,
+  /* Okinawa runs north-south: the thin Motobu neck, the Hagushi beaches and
+     airfields mid-island, and the fortress south — three ridge belts (Kakazu,
+     Shuri, Kunishi) between the beachhead and Mabuni. */
+  map: [
+  /* 0*/ "oooooooooooooooooooooooooooooo",
+  /* 1*/ "oooooooooooooooooooooooooooooo",
+  /* 2*/ "ooooooooooooooffoooooooooooooo",
+  /* 3*/ "ooooooooooooofffhooooooooooooo",
+  /* 4*/ "ooooooooooooofff.ooooooooooooo",
+  /* 5*/ "oooooooooooooo.f.ooooooooooooo",
+  /* 6*/ "oooooooooooooo..oooooooooooooo",
+  /* 7*/ "ooooooooooooo....ooooooooooooo",
+  /* 8*/ "ooooooooooooo.....oooooooooooo",
+  /* 9*/ "oooooooooooo......oooooooooooo",
+  /*10*/ "oooooooooooo.......ooooooooooo",
+  /*11*/ "ooooooooooo..f.....ooooooooooo",
+  /*12*/ "ooooooooooo...f....ooooooooooo",
+  /*13*/ "oooooooooo..hh.h....oooooooooo",
+  /*14*/ "oooooooooo.hhhh.h...oooooooooo",
+  /*15*/ "oooooooooo..hh.hh...oooooooooo",
+  /*16*/ "ooooooooooo..hh.h..ooooooooooo",
+  /*17*/ "ooooooooooo...h....ooooooooooo",
+  /*18*/ "oooooooooooo....oooooooooooooo",
+  /*19*/ "oooooooooooooooooooooooooooooo",
+  ],
+  /* vp>0 are US objectives — the ridge belts and the capital of the cave war */
+  cities: [
+    {x:15,y:3,  name:'Motobu',        vp:1, owner:'S'},
+    {x:13,y:7,  name:'Hagushi',       vp:0, owner:'G'},
+    {x:14,y:8,  name:'Kadena',        vp:2, owner:'G'},
+    {x:13,y:9,  name:'Yontan',        vp:1, owner:'G'},
+    {x:13,y:14, name:'Shuri',         vp:4, owner:'S'},
+    {x:11,y:15, name:'Naha',          vp:3, owner:'S'},
+    {x:16,y:15, name:'Yonabaru',      vp:1, owner:'S'},
+    {x:14,y:17, name:'Mabuni',        vp:2, owner:'S'},
+  ],
+  gerSpawns: [[14,7],[15,8],[14,9],[8,10],[7,6]],
+  sovSpawns: [[14,16],[15,16],[12,16]],
+  /* Japan's supply is the cave stores under Shuri and Mabuni — lose them and
+     the 32nd Army fights on what it carries. The US feeds over the beaches. */
+  edgeSupply: {G:true, S:false},
+  supplySeeds: {S: [[13,14],[14,17]]},
+  startUnits: [
+    // — Tenth Army ashore on L-Day: the walk before the wall —
+    ['g_mar','1st Marine Division',  13,7, 10], ['g_mar','6th Marine Division', 14,7, 10],
+    ['g_army','7th Infantry Division', 14,8, 10], ['g_army','96th Infantry Division', 15,8, 10],
+    ['g_hq','Tenth Army HQ', 13,9, 6],
+    ['g_art','XXIV Corps Artillery', 15,9, 8],
+    ['g_art','III Amphib Corps Arty', 12,10, 8],
+    ['g_army','77th Infantry Division', 14,10, 10],
+    // — the fleet that must stand and take it —
+    ['g_cv','TF-58 Fast Carriers', 6,7, 8],
+    ['g_bb','TF-54 Bombardment',   9,10, 10],
+    ['g_ca','Radar Picket Line',   8,4, 8],
+    // — the 32nd Army in its fortress —
+    ['s_inf','62nd Division',    12,13, 9],
+    ['s_inf','24th Division',    13,14, 9],
+    ['s_inf','44th Ind. Brigade',16,15, 8],
+    ['s_mil','Boeitai Militia',  11,15, 7],
+    ['s_art','5th Artillery Command', 14,15, 8],
+        ['s_inf','Udo Force',        15,3, 6],
+    ['s_hq','32nd Army HQ',      14,16, 6],
+  ],
+  sovSchedule: [
+    [3,'g_mar','2nd Marine Division'],
+    [2,'s_mil','Home Guard Draft'],
+        [6,'s_mil','Student Corps'],
+    [3,'g_army','27th Infantry Division'],
+  ],
+  generals: [
+    {side:'G', unit:'Tenth Army HQ', name:'Buckner', atk:1.08,
+     bio:'Methodical, artillery-heavy, and unwilling to gamble on a second landing. He will not live to see the island taken.'},
+    {side:'G', unit:'1st Marine Division', name:'del Valle', atk:1.10,
+     bio:'Brings the Old Breed from Peleliu — no division on earth knows cave war better, or hates it more.'},
+    {side:'G', unit:'6th Marine Division', name:'Shepherd', atk:1.10,
+     bio:'Clears Motobu in April, then bleeds for Sugar Loaf Hill in May — four days, four hundred yards.'},
+    {side:'G', unit:'TF-58 Fast Carriers', name:'Mitscher', def:1.10,
+     bio:'His task force has fought from Midway to Tokyo Bay — now it must anchor in one spot and take the kamikazes\' best.'},
+    {side:'S', unit:'32nd Army HQ', name:'Ushijima', def:1.10,
+     bio:'Serene and immovable. His orders: no banzai, no surrender — dig, wait, and bleed them for every metre.'},
+    {side:'S', unit:'62nd Division', name:'Cho', atk:1.12,
+     bio:'The firebrand who demands the offensive. On 4 May he will get his way — and waste the army\'s reserves in an afternoon.'},
+    {side:'S', unit:'24th Division', name:'Yahara', trait:'bulwark', def:1.12,
+     bio:'The coldest defensive mind in the Imperial Army. His plan: yield nothing, counterattack never, and make time itself the weapon.'},
+    {side:'S', unit:'5th Artillery Command', name:'Wada', atk:1.10,
+     bio:'The heaviest artillery concentration Japan ever fielded — registered on every yard of the approaches.'},
+  ],
+  capitalDefense: {turn:1, range:1, def:1.25, city:'Shuri',
+    announce:'⭐ The 32nd Army waits under Shuri — a year of digging, sixty miles of tunnels, wired for the storm.'},
+  amphibious: { sides:['G'], range:9, cost:2, beachLife:4 },   // the second-landing option Buckner never used
+  decisions: [
+    {
+      id:'secondfront', turn:3, side:'G',
+      date:'mid-April 1945', title:'THE SECOND LANDING',
+      text:'The Marines want to land the 2nd Division at Minatoga, behind the Shuri Line — crack the fortress from both sides. Buckner\'s staff call it "another Anzio": a second front to supply over open beaches, in kamikaze water. The frontal grind is slow but sure. The flank is fast — or a disaster.',
+      options:[
+        {label:'Land behind the line at Minatoga',
+         effect:'Your three divisions nearest Yonabaru +2 strength and +2⚙ — the fortress is gripped from both sides',
+         blurb:'Grip the Shuri line from front and rear. If the beaches hold, the fortress starves months early.',
+         log:'🟦 Landing craft turn south — a second front opens behind the Shuri Line.',
+         apply(G){
+           const tgt = G.cities.find(c=>c.name==='Yonabaru');
+           unitsOf('G').filter(u=>KINDS[u.kind].sym==='inf')
+             .sort((a,b)=>hexDist(a.x,a.y,tgt.x,tgt.y)-hexDist(b.x,b.y,tgt.x,tgt.y))
+             .slice(0,3).forEach(u=>{ u.str=Math.min(KINDS[u.kind].maxStr,u.str+2); });
+           G.pp.G = Math.min(40, G.pp.G+2);
+         }},
+        {label:'The methodical grind — corps abreast',
+         effect:'+6⚙ production for the set-piece assault',
+         blurb:'One front, massed artillery, no gambles. It is slow. It is sure. It is what Buckner chose.',
+         log:'🟦 "We\'ll take them cave by cave." The corps grind south behind a wall of naval gunfire.',
+         apply(G){ G.pp.G = Math.min(40, G.pp.G+6); }},
+      ],
+      ai(G){ return 1; },   // Buckner ground it out
+    },
+    {
+      id:'maycounter', turn:5, side:'S',
+      date:'4 May 1945', title:'CHO\'S COUNTEROFFENSIVE',
+      text:'General Cho has had enough of Yahara\'s patient bleeding: he demands a full counteroffensive — every gun firing openly, the 24th Division attacking over ground the Americans own. Yahara calls it suicide dressed as strategy. Ushijima must choose between his firebrand and his iceberg.',
+      options:[
+        {label:'Attack — Cho\'s way',
+         effect:'Every Japanese division +1 strength for the blow — but your artillery reveals itself (US production +3⚙)',
+         blurb:'One great blow to throw them back to the beaches. The guns fire from the open. Whatever survives the day will never be hidden again.',
+         log:'🟥 At dawn the whole line erupts — the 32nd Army attacks for the first and last time.',
+         apply(G){
+           unitsOf('S').forEach(u=>{ if(!KINDS[u.kind].hq) u.str=Math.min(KINDS[u.kind].maxStr,u.str+1); });
+           G.pp.G = Math.min(40, G.pp.G+3);
+         }},
+        {label:'Stay in the caves — Yahara\'s way',
+         effect:'+4⚙ and every dug-in division digs +1 deeper',
+         blurb:'The fortress does not attack. It waits, and it charges rent in blood.',
+         log:'🟥 Yahara prevails: not one gun reveals itself. The caves wait.',
+         apply(G){
+           G.pp.S = Math.min(40, G.pp.S+4);
+           unitsOf('S').forEach(u=>{ u.entrench = Math.min(effTerrain(u.x,u.y).dig, u.entrench+1); });
+         }},
+      ],
+      ai(G){ return 0; },   // history attacked, and wasted the reserve
+    },
+  ],
+  events: [
+    {turn:1, date:'1 April 1945', title:'LOVE DAY',
+     text:'Easter Sunday. The largest amphibious force of the Pacific war puts 60,000 men ashore against — nothing. The beaches are undefended, Kadena falls by noon, and every veteran ashore knows exactly what silence like this costs later.'},
+    {turn:2, date:'6–7 April 1945', title:'KIKUSUI NO. 1 — AND YAMATO', pp:{S:1},
+     text:'Three hundred and fifty kamikazes fall on the fleet in one day — and Yamato herself sails south on a one-way tank of fuel. She dies under 380 aircraft without sighting the island. The fleet learns what "floating chrysanthemum" means.',
+     apply(G){ unitsOf('G').filter(u=>KINDS[u.kind].sea).forEach(s=>{ s.str=Math.max(1,s.str-1); }); }},
+    {turn:4, date:'April 1945', title:'THE WALL AT KAKAZU',
+     text:'The 96th Division walks into the first belt: reverse-slope caves, registered mortars, artillery that answers every move. Two hundred yards gained, a battalion bled. The map calls it a ridge; the infantry call it the meat grinder.'},
+    {turn:5, date:'12 May 1945', title:'KIKUSUI — THE PICKETS BURN', pp:{G:1},
+     text:'The radar picket destroyers have become the most dangerous posting in the Navy — some stations have been hit so often the crews paint arrows pointing to the carriers: "THAT WAY, BOYS." The fleet holds station anyway.',
+     apply(G){ unitsOf('G').filter(u=>KINDS[u.kind].sea).forEach(s=>{ s.str=Math.max(1,s.str-1); }); }},
+    {turn:6, date:'mid-May 1945', title:'SUGAR LOAF AND CHOCOLATE DROP',
+     text:'The hills have candy names and casualty lists like Verdun: Sugar Loaf changes hands eleven times. The 6th Marine Division loses three thousand men on one hill you could walk around in ten minutes.'},
+    {turn:9, date:'29 May 1945', title:'THE WITHDRAWAL FROM SHURI', pp:{G:2},
+     text:'With Naha and Yonabaru under pressure and the flanks peeling, Ushijima slips the whole 32nd Army out of Shuri by night, south to the Kiyan line — in the rain, under the guns, brilliantly. The Marines take the castle and find the caves empty. The fortress must be taken twice.',
+     apply(G){
+       // the historical mechanism: the fortress is abandoned under pressure, not stormed.
+       // Ushijima pre-planned the move — it happens unless the Americans are being thrown back
+       if (axisVP() < 5) return;
+       const shuri=G.cities.find(c=>c.name==='Shuri');
+       const def=unitAt(shuri.x,shuri.y);
+       if (def && def.side==='S'){
+         for (const [x,y] of [[14,16],[13,16],[15,16],[14,17],[12,16]]){
+           if (passable(x,y) && !unitAt(x,y) && terrainAt(x,y)!=='o'){ def.x=x; def.y=y; def.entrench=1; break; }
+         }
+       }
+     }},
+    {turn:10, date:'18 June 1945', title:'BUCKNER IS KILLED',
+     text:'A Japanese shell finds the Tenth Army\'s commanding general at a forward observation post — the most senior American officer killed by enemy fire in the war. Three days later the island is declared secure. Nobody uses the word "over".'},
+    {turn:12, date:'22 June 1945', title:'THE LAST HEADQUARTERS',
+     text:'On the cliff at Mabuni, Ushijima and Cho kneel facing the sea. Yahara is ordered to live: "Tell them how we fought." A hundred and ten thousand Japanese and twelve thousand Americans are dead — and in Washington, planners double their casualty estimate for invading Japan.'},
+  ],
+  maxTurn: 13,                              // 1 April → 21 June 1945, weekly
+  startDate: Date.UTC(1945,3,1),
+  weather(turn){ return (turn>=6 && turn<=7) ? 'mud' : 'clear'; },   // the May rains
+  pp(side, turn){
+    if (side==='G') return 8;                          // the fleet train is bottomless
+    return turn<=4 ? 3 : 2;                      // no replacements ever come — the caves spend what they stored                            // the caves spend what they stored
+  },
+  victoryTiers: [
+    [13,'THE ISLAND FALLS EARLY','The Shuri line cracks weeks ahead of schedule and the 32nd Army dies in the open — the cheapest great victory of the Pacific.'],
+    [10,'HISTORY REPEATS — TYPHOON OF STEEL','Twelve weeks, three fortified lines, the bloodiest battle of the Pacific — and the island is taken. The fleet held. The invasion of Japan just became unthinkable.'],
+    [6,'THE SHURI LINE HOLDS','June ends with Shuri still Japanese. The timetable for ending the war slips by a season, and the fleet keeps burning offshore.'],
+    [3,'STALLED AT KAKAZU','Ten weeks ashore and the first ridge line still stands. Washington quietly shelves the invasion plans.'],
+    [0,'THROWN BACK','The beachhead itself is lost — the impossible has happened, and the Pacific war has no plan B.'],
+  ],
+  sudden: {
+    axisCities: ['Shuri','Naha','Mabuni'], minAxisUnits: 3,
+    axisTitle: 'THE ISLAND FALLS EARLY',
+    axisText:  'With Shuri, Naha and the last line at Mabuni all taken, the 32nd Army ceases to exist as a force. Okinawa is secured months ahead of the timetable.',
+    sovTitle:  'TENTH ARMY BLEEDS OUT',
+    sovText:   'The assault divisions are wrecked on the ridge lines and the fleet can no longer hold station. The greatest amphibious operation of the Pacific ends in withdrawal.',
+  },
+  airInit: [
+    ['G','TF-58 Air Groups', 9, 'TF-58 Fast Carriers'],
+    ['G','Kadena Air Wing', 5],
+    ['S','8th Air Division', 5],
+  ],
+  sovAirSchedule: [],
+  setup(st){
+    // a year of digging: the 32nd Army starts at full entrenchment everywhere
+    for (const u of st.units) if (u.side==='S') u.entrench = effTerrain(u.x,u.y).dig;
+  },
+  opening(playerSide){ return [
+    '1 April 1945 — Love Day. Sixty thousand men walk ashore against no resistance at all, and the silence is the worst omen of the Pacific war.',
+    playerSide==='G'
+      ? '🟦 The island must fall before the fleet bleeds out under the kamikazes. Grind south — Kakazu, Shuri, Kunishi — and finish it.'
+      : '🟥 Make it cost. Every week the Shuri line holds, the kamikazes feast offshore — and the invasion of Japan looks more impossible in Washington.',
   ]; },
 };
 
