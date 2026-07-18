@@ -8574,6 +8574,7 @@ function hexFromPixel(wx,wy){
 /* ---------------- ui state ---------------- */
 let sel = null;            // selected unit id
 let reach = null;          // Map of reachable keys for sel
+let selT = 0;              // when the current selection was made (for the select-pop ring)
 let selSet = [];           // ids in a combined-arms assault group
 let advanceChoice = null;  // {x,y,ids} — pick who advances after a combined kill
 let hover = null;          // [x,y] under mouse
@@ -10108,10 +10109,14 @@ function draw(){
         for (let i=1;i<path.length;i++){ const [hx,hy]=hexCenter(path[i][0],path[i][1]); ctx.beginPath(); ctx.arc(hx,hy,2.2,0,Math.PI*2); ctx.fill(); }
       }
     }
+    // attackable enemies pulse red so your targets read at a glance
     if (!su.attacked) for (const t of enemiesInRange(su)){
       if (!isSpotted(t, G.phase)) continue;
       const [cx,cy] = hexCenter(t.x,t.y);
-      hexPath(cx,cy,S-2.5); ctx.strokeStyle = '#e2493b'; ctx.lineWidth = 3; ctx.stroke();
+      const tp = 0.5 + 0.5*Math.sin(now*0.008 + t.x*0.9);
+      hexPath(cx,cy,S-2.5);
+      ctx.strokeStyle = `rgba(226,73,59,${(0.62+0.38*tp).toFixed(3)})`;
+      ctx.lineWidth = 2.4 + tp*1.3; ctx.stroke();
     }
     // selected unit: a marching-ants ring that crawls and breathes under the counter
     const [scx,scy] = hexCenter(su.x,su.y);
@@ -10121,6 +10126,14 @@ function draw(){
     ctx.globalAlpha = 0.6 + 0.28*Math.sin(now*0.006);
     ctx.strokeStyle = '#ffe4a8'; ctx.lineWidth = 2.4; ctx.stroke();
     ctx.restore();                                          // clears the dash for later strokes
+    // a quick ring snaps outward the moment a unit is selected — a crisp confirmation
+    const selAge = now - selT;
+    if (selAge >= 0 && selAge < 260){
+      const sp = selAge/260;
+      ctx.globalAlpha = (1-sp)*0.85;
+      ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.6*(1-sp)+0.5;
+      hexPath(scx, scy, (S-2) + sp*S*0.75); ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   }
   // combined-arms assault group
@@ -11177,6 +11190,7 @@ function toggleGroup(u){
   }
   if (selSet.includes(u.id)) selSet = selSet.filter(id=>id!==u.id);
   else selSet.push(u.id);
+  if (sel !== u.id) selT = performance.now();
   sel = u.id; reach = (!u.moved) ? reachable(u) : new Map();
   sClick(); updateUnitCard();
   $('hint').innerHTML = selSet.length >= 2
@@ -11247,6 +11261,7 @@ window.addEventListener('keydown', e=>{
 });
 
 function selectUnit(u){
+  if (sel !== u.id) selT = performance.now();      // fresh selection → play the pop ring
   sel = u.id;
   reach = (!u.moved) ? reachable(u) : new Map();
   updateUnitCard();
