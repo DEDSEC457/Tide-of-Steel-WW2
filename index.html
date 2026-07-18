@@ -501,6 +501,7 @@
       <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
+      <span class="opt" data-s="guadalcanal">🌴 Guadalcanal 1942</span>
       <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
       <span class="opt" data-s="alamein">🐪 El Alamein 1942</span>
       <span class="opt" data-s="dday">🟦 D-Day 1944</span>
@@ -2666,15 +2667,15 @@ SCENARIOS.midway = {
      them), battleships shoot 2 hexes, submarines can't be bombed, and only
      the troop convoy or a garrison can actually take an island */
   kinds: {
-    g_pz:   {side:'G', label:'Carrier Division',   atk:8, def:4, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true},
-    g_inf:  {side:'G', label:'Battleship Division',atk:6, def:7, mp:4, maxStr:10, cost:24, sym:'bb', range:2, noCapture:true},
-    g_ca:   {side:'G', label:'Cruiser Division',   atk:4, def:5, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true},
-    g_ally: {side:'G', label:'Invasion Convoy',    atk:2, def:3, mp:3, maxStr:8,  cost:20, sym:'tr', color:'#6b5a36'},
-    s_tank: {side:'S', label:'Carrier Task Force', atk:7, def:4, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true},
-    s_inf:  {side:'S', label:'Cruiser Task Force', atk:4, def:5, mp:5, maxStr:8,  cost:20, sym:'ca', fast:true, noCapture:true},
-    s_sub:  {side:'S', label:'Submarine Patrol',   atk:5, def:2, mp:3, maxStr:4,  cost:15, sym:'ss', lowProfile:true, noCapture:true, noBuy:true},
-    s_guard:{side:'S', label:'Fast Battleships',   atk:6, def:7, mp:4, maxStr:10, cost:30, sym:'bb', range:2, noCapture:true},
-    s_mil:  {side:'S', label:'Island Garrison',    atk:2, def:5, mp:1, maxStr:8,  cost:10, sym:'inf', color:'#4a5a44'},
+    g_pz:   {side:'G', label:'Carrier Division',   atk:8, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true},
+    g_inf:  {side:'G', label:'Battleship Division',atk:6, def:7, mp:4, maxStr:10, cost:24, sym:'bb', range:2, noCapture:true, sea:true},
+    g_ca:   {side:'G', label:'Cruiser Division',   atk:4, def:5, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true, sea:true},
+    g_ally: {side:'G', label:'Invasion Convoy',    atk:2, def:2, mp:3, maxStr:8,  cost:20, sym:'tr', color:'#6b5a36', sea:true, landing:true},
+    s_tank: {side:'S', label:'Carrier Task Force', atk:7, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true},
+    s_inf:  {side:'S', label:'Cruiser Task Force', atk:4, def:5, mp:5, maxStr:8,  cost:20, sym:'ca', fast:true, noCapture:true, sea:true},
+    s_sub:  {side:'S', label:'Submarine Patrol',   atk:5, def:2, mp:3, maxStr:4,  cost:15, sym:'ss', lowProfile:true, noCapture:true, noBuy:true, sea:true},
+    s_guard:{side:'S', label:'Fast Battleships',   atk:6, def:7, mp:4, maxStr:10, cost:30, sym:'bb', range:2, noCapture:true, sea:true},
+    s_mil:  {side:'S', label:'Island Garrison',    atk:2, def:7, mp:1, maxStr:11, cost:10, sym:'inf', color:'#4a5a44'},
   },
   menu: {
     ger: {h:'🟥 Imperial Japan', p:'Four fleet carriers, the finest naval aviators alive, and one objective: take Midway and finish what Pearl Harbor started — before the American carriers interfere.'},
@@ -2722,8 +2723,8 @@ SCENARIOS.midway = {
     ['s_tank','TF-16 (Enterprise·Hornet)',    25,5,  8],
     ['s_tank','TF-17 (Yorktown)',             26,7,  7],
     ['s_inf','TF-8 Cruisers',                 24,8,  7],
-    ['s_sub','Submarine Picket Line',         16,11, 4],
-    ['s_mil','Midway Garrison',               20,9,  7],
+    ['s_sub','Submarine Picket Line',         16,11, 6],
+    ['s_mil','Midway Garrison',               20,9,  9],
   ],
   sovSchedule: [],
   generals: [
@@ -2739,8 +2740,8 @@ SCENARIOS.midway = {
      bio:'Veteran of Coral Sea, flying his flag from a carrier patched back together in 72 hours.'},
   ],
   /* Midway itself: the unsinkable carrier — garrison, guns and land-based air */
-  capitalDefense: {turn:1, range:1, def:1.2, city:'Midway',
-    announce:'⭐ Midway\'s garrison stands to — the island is an unsinkable carrier.'},
+  capitalDefense: {turn:1, range:1, def:1.35, city:'Midway',
+    announce:'⭐ Midway\'s garrison stands to — coastal guns, coral revetments, and no room for a landing to fail politely.'},
   decisions: [
     {
       id:'nagumo', turn:1, side:'G',
@@ -2765,7 +2766,7 @@ SCENARIOS.midway = {
            unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str = Math.min(KINDS[c.kind].maxStr, c.str+1); });
          }},
       ],
-      ai(G){ return 1; },   // the smart, historical-counterfactual choice: keep the decks clear
+      ai(G){ return 0; },   // the AI repeats Nagumo's mistake — history's median flows from history's decision. Dodging it is the human Japan player's what-if.
     },
   ],
   events: [
@@ -2806,13 +2807,267 @@ SCENARIOS.midway = {
   sovAirSchedule: [],
   setup(st){
     const g = st.units.find(t=>t.name==='Midway Garrison');
-    if (g) g.entrench = 2;                  // dug into the coral for months
+    if (g) g.entrench = 3;                  // dug into the coral for months — an invasion here likely dies in the surf
   },
   opening(playerSide){ return [
     '4 June 1942, 04:30 — the Kidō Butai turns into the wind and launches 108 aircraft at Midway.',
     playerSide==='S'
       ? 'HYPO has broken their code: you know they are coming. Spring the ambush — and strike first.'
       : 'Somewhere out there, the American carriers may be waiting. Find them before they find you.',
+  ]; },
+};
+
+/* ---------- Scenario: GUADALCANAL — the Solomons, August 1942 – February 1943 ----------
+   The first Allied offensive of the Pacific war, and the engine's first true
+   mixed land/sea theater: Marines dig in around Henderson Field while the
+   fleets fight for Ironbottom Sound and the Tokyo Express runs reinforcements
+   down the Slot by night. Side G = the United States (attacker, supplies from
+   the EAST via Espiritu Santo — SCN.reversed), side S = Japan (Rabaul, west).
+   Ships carry sea:true and fight only on open ocean; the infantry war for the
+   island runs on the same hexes under the same rules as every other front. */
+SCENARIOS.guadalcanal = {
+  id: 'guadalcanal',
+  title: 'GUADALCANAL — OPERATION WATCHTOWER', short: 'GUADALCANAL',
+  sub: 'THE SOLOMONS · AUGUST 1942 — FEBRUARY 1943 · TURN-BASED STRATEGY',
+  reversed: true,                  // the US supplies from the EAST edge; Japan from the west (Rabaul)
+  harshOOS: true,                  // Starvation Island: cut-off troops waste away fast
+  sides: {
+    G: {name:'United States', flag:'🟦', color:'#3a5c40', tint:'rgba(80,130,90,0.24)'},
+    S: {name:'Japan',         flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
+  },
+  menu: {
+    ger: {h:'🟦 United States', p:'The Marines are ashore and the airfield is almost finished. Hold Henderson Field against everything Japan sends down the Slot — and turn the island into the graveyard of their army.'},
+    sov: {h:'🟥 Imperial Japan', p:'The Americans have seized your airfield. Run the Tokyo Express by night, rule Ironbottom Sound after dark, and throw them back into the sea before their build-up becomes unstoppable.'},
+  },
+  kinds: {
+    g_mar:  {side:'G', label:'Marine Regiment',    atk:7, def:6, mp:3, maxStr:9,  cost:14, sym:'inf'},
+    g_army: {side:'G', label:'Army Division',      atk:5, def:6, mp:3, maxStr:10, cost:11, sym:'inf'},
+    g_cv:   {side:'G', label:'Carrier Task Force', atk:7, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true},
+    g_ca:   {side:'G', label:'Cruiser Task Force', atk:5, def:5, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true, sea:true},
+    g_bb:   {side:'G', label:'Battleship Group',   atk:6, def:7, mp:4, maxStr:10, cost:26, sym:'bb', range:2, noCapture:true, sea:true},
+    s_inf:  {side:'S', label:'Infantry Detachment',atk:6, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+    s_cv:   {side:'S', label:'Carrier Force',      atk:7, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true, noBuy:true},
+    s_ca:   {side:'S', label:'Night Cruiser Force',atk:6, def:4, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true, sea:true},
+    s_bb:   {side:'S', label:'Bombardment Group',  atk:6, def:6, mp:4, maxStr:9,  cost:26, sym:'bb', range:2, noCapture:true, sea:true, noBuy:true},
+    g_hq:   {side:'G', label:'Division HQ', atk:1, def:4, mp:3, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3c34'},
+    s_hq:   {side:'S', label:'Army HQ',     atk:1, def:4, mp:3, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#57303c'},
+  },
+  deployNames: {g_mar:'Marine Reinforcement', g_army:'Army Reinforcement', g_ca:'Cruiser Reinforcement', g_bb:'Battleship Group', g_cv:'Carrier Task Force', s_inf:'Express Landing Force', s_ca:'Night Escort Force'},
+  wxLabel: { mud:'Tropical Storm' },
+  wxFx: { mud:['Tropical storm','Monsoon squalls: +1 movement cost, attacks ×0.5–0.6, all air grounded, supply lines choked.'] },
+  wxMsg: { mud:'A TROPICAL STORM closes over the Solomons — the Slot vanishes into rain squalls, aircraft are lashed to their fields, and both armies\' supply lines drown in the mud.' },
+  cols: 30, rows: 20,
+  /* The Slot runs in from the NW; Ironbottom Sound between Guadalcanal and
+     Florida/Tulagi; Savo Island guards the western entrance. Guadalcanal runs
+     along the south — beaches on the north coast, jungle and ridges inland. */
+  map: [
+  /* 0*/ "oooooooooooooooooooooooooooooo",
+  /* 1*/ "oooooooooooooooooooooooooooooo",
+  /* 2*/ "oooooooooooooooooooooooooooooo",
+  /* 3*/ "oooooooooooooooooooooooooooooo",
+  /* 4*/ "oooooooooooooooooooooooooooooo",
+  /* 5*/ "ooooooooooooooooffoooooooooooo",
+  /* 6*/ "oooooooooooooooo.f.ooooooooooo",
+  /* 7*/ "oooooooooooooooooooooooooooooo",
+  /* 8*/ "ooooooooooo.oooooooooooooooooo",
+  /* 9*/ "oooooooooooooooooooooooooooooo",
+  /*10*/ "oooooooooooooooooooooooooooooo",
+  /*11*/ "oooooooooooooooooooooooooooooo",
+  /*12*/ "oooo......ff.......ff......ooo",
+  /*13*/ "oooof.ff.ff......f..ff...ffooo",
+  /*14*/ "ooooffhh.ffff.hh.ff.fhh.fffooo",
+  /*15*/ "oooofffff.fffff.fffff.ffff.ooo",
+  /*16*/ "oooooffffffff.ffffff.fffffoooo",
+  /*17*/ "ooooooo..ffff...fffff..ooooooo",
+  /*18*/ "oooooooooooooooooooooooooooooo",
+  /*19*/ "oooooooooooooooooooooooooooooo",
+  ],
+  /* vp>0 are US objectives; the tiers count what the US HOLDS at the end.
+     The Marines start with Tulagi and the Lunga beachhead; Henderson Field —
+     the whole point of the campaign — must be stormed on day one. */
+  cities: [
+    {x:14,y:13, name:'Henderson Field', vp:5, owner:'S'},
+    {x:13,y:12, name:'Lunga Point',     vp:1, owner:'G'},
+    {x:16,y:6,  name:'Tulagi',          vp:1, owner:'G'},
+    {x:11,y:13, name:'Matanikau',       vp:1, owner:'S'},
+    {x:18,y:13, name:'Tenaru',          vp:1, owner:'S'},
+    {x:5, y:12, name:'Cape Esperance',  vp:1, owner:'S'},
+    {x:8, y:12, name:'Tassafaronga',    vp:1, owner:'S'},
+    {x:23,y:13, name:'Taivu Point',     vp:1, owner:'S'},
+    {x:11,y:8,  name:'Savo',            vp:0, owner:'S'},
+    {x:22,y:12, name:'Koli Point',      vp:0, owner:'G'},
+  ],
+  /* US reinforcements land in the east (Espiritu Santo convoy route); the
+     Tokyo Express delivers Japan's in the west, by night, at Tassafaronga */
+  gerSpawns: [[24,12],[25,13],[23,12],[27,8],[27,11]],
+  sovSpawns: [[6,12],[4,13],[7,12],[2,5],[2,9]],
+  startUnits: [
+    // — the 1st Marine Division, ashore since dawn on 7 August —
+    ['g_mar','1st Marines',    13,13, 9], ['g_mar','5th Marines',   15,12, 9],
+    ['g_mar','Edson\'s Raiders',16,6, 7],
+    ['g_hq','1st MarDiv HQ',   14,12, 6],
+    // — the invasion fleet offshore —
+    ['g_cv','TF-61 (Saratoga·Enterprise)', 26,9, 8],
+    ['g_ca','TF-44 Screen',    24,8, 7],
+    // — Japan: the airfield garrison and the first counter-landings —
+    ['s_inf','11th Construction', 14,13, 4],
+    ['s_inf','Esperance Base Force', 4,13, 6],
+    ['s_inf','Sendai Advance Party', 6,13, 6],
+    ['s_hq','17th Army HQ (fwd)', 5,13, 5],
+    // — Mikawa's cruisers command the night sound —
+    ['s_ca','Mikawa Cruiser Force', 6,4, 8],
+    ['s_ca','Destroyer Squadron 2', 3,7, 7],
+    ['s_bb','Hiei Bombardment Group', 3,2, 8],
+  ],
+  /* the Tokyo Express: week after week, Japan feeds its army in piecemeal —
+     while the American build-up comes slower, but comes to stay */
+  sovSchedule: [
+    [2,'s_inf','Ichiki Detachment'],
+    [3,'s_inf','Kawaguchi Brigade'],
+    [4,'s_ca','Express Escort Force'],
+    [5,'s_inf','Sendai 29th Regiment'],
+    [6,'s_inf','Sendai 16th Regiment'],
+    [4,'g_mar','7th Marines'],
+    [8,'s_inf','38th Div Advance'],
+    [8,'g_army','164th Infantry'],
+    [9,'g_bb','TF-64 (Washington)'],
+    [10,'s_inf','38th Division'],
+    [11,'g_army','Americal Division'],
+    [12,'s_ca','Tanaka\'s Rat Run'],
+    [14,'g_army','25th Infantry Div'],
+    [16,'g_mar','2nd Marines'],
+  ],
+  generals: [
+    // — United States —
+    {side:'G', unit:'1st MarDiv HQ', name:'Vandegrift', def:1.12,
+     bio:'Commands the perimeter with a planter\'s patience: hold the airfield, feed the line, never spend a Marine cheaply.'},
+    {side:'G', unit:'Edson\'s Raiders', name:'Edson', trait:'bulwark', def:1.12,
+     bio:'"Red Mike." His Raiders will hold the ridge above the airfield against everything Kawaguchi has, two nights running.'},
+    {side:'G', unit:'7th Marines', name:'Puller', atk:1.12,
+     bio:'"Chesty." Arrives with the 7th Marines spoiling for the fight he\'s been demanding since August.'},
+    {side:'G', unit:'TF-64 (Washington)', name:'Lee', atk:1.12,
+     bio:'The best radar-gunnery mind in the Navy. On the night of 14 November his sixteen-inch salvos settle the campaign.'},
+    // — Japan —
+    {side:'S', unit:'17th Army HQ (fwd)', name:'Hyakutake', atk:1.08,
+     bio:'Feeds his army into the jungle one regiment at a time — always one regiment short of enough.'},
+    {side:'S', unit:'Kawaguchi Brigade', name:'Kawaguchi', atk:1.10,
+     bio:'Leads his brigade through trackless jungle to storm the ridge above the airfield — and into the guns of the Raiders.'},
+    {side:'S', unit:'Mikawa Cruiser Force', name:'Mikawa', atk:1.15,
+     bio:'The victor of Savo Island — the most one-sided night action of the war. After dark, the Sound is his.'},
+    {side:'S', unit:'Tanaka\'s Rat Run', name:'Tanaka', trait:'logi', atk:1.08,
+     bio:'"Tenacious Tanaka," master of the Express. Keeps an army alive on destroyer runs the Americans cannot stop.'},
+  ],
+  amphibious: { sides:['G'], range:8, cost:2, beachLife:4 },   // the US can re-land around the coast
+  decisions: [
+    {
+      id:'carriers', turn:2, side:'G',
+      date:'9 August 1942', title:'FLETCHER\'S WITHDRAWAL',
+      text:'Savo Island has cost four cruisers in a single night, and Fletcher wants his carriers out of range of Rabaul\'s bombers. Pull the flattops back to safety — abandoning the transports half-unloaded — or keep them in close support and risk the only carriers left in the Pacific?',
+      options:[
+        {label:'Withdraw the carriers to safety',
+         effect:'Your carrier task force +1 strength (husbanded), but every Marine ashore loses 1 supply-line strength this week',
+         blurb:'The carriers live to fight at Santa Cruz — but the Marines watch their transports sail away with half their supplies still aboard.',
+         log:'🟦 The carriers withdraw. On the beach, the Marines call it the Navy\'s bug-out.',
+         apply(G){
+           unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str=Math.min(KINDS[c.kind].maxStr,c.str+1); });
+           unitsOf('G').filter(u=>KINDS[u.kind].sym==='inf').forEach(m=>{ m.str=Math.max(1,m.str-1); });
+         }},
+        {label:'Keep the carriers in close support',
+         effect:'Marines keep their strength and +2⚙ production now — but your carriers −1 strength (exposed to Rabaul\'s bombers)',
+         blurb:'The transports finish unloading under a friendly combat air patrol. The carriers pay for it under land-based air attack.',
+         log:'🟦 The flattops stay. Rabaul\'s bombers find them by noon.',
+         apply(G){
+           unitsOf('G').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str=Math.max(1,c.str-1); });
+           G.pp.G = Math.min(40, G.pp.G+2);
+         }},
+      ],
+      ai(G){ return 0; },   // Fletcher withdrew
+    },
+    {
+      id:'piecemeal', turn:5, side:'S',
+      date:'September 1942', title:'PIECEMEAL OR MASSED',
+      text:'Tokyo still believes there is only a regiment of Americans on the island. Kawaguchi wants to attack NOW with what he has; 17th Army staff urge waiting for the Sendai Division to mass first. Every week of waiting, the American perimeter grows stronger.',
+      options:[
+        {label:'Attack now — storm the ridge',
+         effect:'All Japanese infantry +1 strength and +2⚙ — strike before the perimeter hardens',
+         blurb:'Attack while the Americans are still weakest. It worked at every river in China.',
+         log:'🟥 Kawaguchi\'s brigade disappears into the jungle, marching on the ridge above the airfield.',
+         apply(G){
+           unitsOf('S').filter(u=>KINDS[u.kind].sym==='inf').forEach(u=>{ u.str=Math.min(KINDS[u.kind].maxStr,u.str+1); });
+           G.pp.S = Math.min(40, G.pp.S+2);
+         }},
+        {label:'Wait and mass the Sendai Division',
+         effect:'+6⚙ production banked for the October offensive',
+         blurb:'Concentrate first, attack once, attack hard — and give the Americans three more weeks to dig.',
+         log:'🟥 The Express doubles its runs. The great offensive is set for October.',
+         apply(G){ G.pp.S = Math.min(40, G.pp.S+6); }},
+      ],
+      ai(G){ return 0; },   // history attacked piecemeal
+    },
+  ],
+  events: [
+    {turn:1,  date:'9 August 1942', title:'DISASTER AT SAVO ISLAND', pp:{S:2},
+     text:'Mikawa\'s cruisers come down the Slot after midnight and annihilate the Allied screen off Savo — four heavy cruisers sunk in forty minutes without a single Japanese loss. Ironbottom Sound earns its name in one night. After dark, the sea belongs to Japan.'},
+    {turn:2,  date:'21 August 1942', title:'THE TENARU',
+     text:'Colonel Ichiki, sure that one bayonet charge will finish the Americans, throws his detachment straight across the Tenaru sandbar into the Marine line. By morning his force is destroyed and Ichiki is dead. Tokyo begins, slowly, to understand.'},
+    {turn:5,  date:'13 September 1942', title:'BLOODY RIDGE', pp:{G:2},
+     text:'For two nights Kawaguchi\'s brigade storms the ridge a thousand yards from Henderson Field. Edson\'s Raiders bend, bleed — and hold. It is as close as Japan will ever come to taking the airfield.'},
+    {turn:7,  date:'26 October 1942', title:'SANTA CRUZ',
+     text:'The carriers meet off the Santa Cruz Islands: Hornet is lost, Enterprise mauled — but Japan\'s air groups are gutted, and unlike the Americans, they cannot be replaced. Both fleets limp away; only one will be back.'},
+    {turn:9,  date:'13–15 November 1942', title:'THE NAVAL BATTLE OF GUADALCANAL', pp:{G:2},
+     text:'Three nights of point-blank battleship war. Callaghan and Scott die stopping Abe\'s bombardment force; Lee\'s Washington sinks Kirishima by radar. The transports of the 38th Division burn on the beaches. The Express will never run in strength again.'},
+    {turn:12, date:'30 November 1942', title:'TASSAFARONGA',
+     text:'Tanaka\'s eight destroyers, ambushed by a cruiser force twice their weight, torpedo four American cruisers and escape untouched — the finest small-ship action of the war, fought to deliver drums of rice. Skill cannot feed an army.'},
+    {turn:14, date:'December 1942', title:'STARVATION ISLAND', pp:{G:1},
+     text:'The Japanese army on Guadalcanal is starving — the men call it Gatō, Starvation Island. Rice ration: none. The Americans, on new roads behind a growing perimeter, are pouring in fresh divisions.',
+     apply(G){ unitsOf('S').filter(u=>KINDS[u.kind].sym==='inf' && u.oos).forEach(u=>{ u.str=Math.max(1,u.str-1); }); }},
+    {turn:17, date:'31 December 1942', title:'THE DECISION TO WITHDRAW',
+     text:'In the Imperial Palace, the Army and Navy jointly recommend what neither will say aloud: Guadalcanal cannot be held. Operation KE — the evacuation — is approved. The war has turned.'},
+    {turn:20, date:'1–7 February 1943', title:'OPERATION KE',
+     text:'In three flawless night runs the Express lifts 10,600 skeletal survivors off Cape Esperance. The Americans, expecting one last offensive, wake to an empty island.'},
+  ],
+  maxTurn: 22,                              // 7 Aug 1942 → early Feb 1943, weekly
+  startDate: Date.UTC(1942,7,7),
+  /* South Pacific weather: hot and clear, broken by monsoon storms that ground
+     the air groups and choke both armies' supply runs */
+  weather(turn){ return (turn===6 || turn===7 || turn===13 || turn===18) ? 'mud' : 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=6 ? 5 : 8;            // the US build-up becomes a flood
+    return turn<=9 ? 7 : 4;                            // the Express withers after November
+  },
+  victoryTiers: [
+    [12,'HISTORY REPEATS — THE ISLAND IS WON','Henderson holds, the Sound is closed, and the starving 17th Army slips away down the Slot. The first great counteroffensive of the Pacific has succeeded — the war has turned.'],
+    [9,'THE EXPRESS STILL RUNS','The airfield is safe but the western bases still feed the Tokyo Express — the island is won in all but name, and the Slot will bleed for months yet.'],
+    [6,'A CONTESTED ISLAND','The campaign gutters out with both flags still on the island — the airfield holds, but nothing is decided. The Solomons will bleed for another year.'],
+    [3,'HENDERSON FALLS','The perimeter cracks and the airfield is lost. The South Pacific lifeline to Australia lies open.'],
+    [0,'THROWN INTO THE SEA','The Marines are evacuated from their own invasion — the worst American defeat of the war.'],
+  ],
+  sudden: {
+    axisCities: ['Henderson Field','Tassafaronga','Cape Esperance'], minAxisUnits: 2,
+    axisTitle: 'THE ISLAND IS SWEPT',
+    axisText:  'With the Express terminals in American hands there is no way to feed or save the 17th Army. It dies on the island, and the Solomons ladder stands open to Rabaul.',
+    sovTitle:  'THROWN INTO THE SEA',
+    sovText:   'The perimeter collapses and the beachhead with it. The Marines are taken off by the same Navy that landed them — the worst American defeat of the war.',
+  },
+  airInit: [
+    ['G','Saratoga Air Group', 6],
+    ['S','11th Air Fleet (Rabaul)', 8],
+  ],
+  sovAirSchedule: [
+    [2,'Cactus Air Force', 6, 'G'],          // Henderson operational: the island becomes a carrier
+    [6,'R-Area Air Force', 4, 'S'],
+    [10,'Enterprise Air Group', 5, 'G'],
+  ],
+  setup(st){
+    // the Marines came ashore digging; the airfield garrison is labour troops
+    for (const u of st.units) if (u.side==='G' && KINDS[u.kind].sym==='inf') u.entrench = 1;
+    const c = st.units.find(t=>t.name==='11th Construction'); if (c) c.entrench = 0;
+  },
+  opening(playerSide){ return [
+    '7 August 1942 — eleven thousand Marines are ashore on Guadalcanal, and the almost-finished Japanese airfield is the prize of the Pacific.',
+    playerSide==='G'
+      ? '🟦 Take the airfield and hold it against everything that comes down the Slot. Your build-up wins the long game — if the perimeter holds through the autumn.'
+      : '🟥 Retake the airfield before the American build-up drowns you. The Express delivers a regiment a week — mass them, pick your night, and break the perimeter.',
   ]; },
 };
 
@@ -4806,6 +5061,17 @@ const WX_FX = {
 function inMap(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
 function terrainAt(x,y){ return MAP_ROWS[y][x]; }
 function passable(x,y){ if (!inMap(x,y)) return false; const t = terrainAt(x,y); return t !== '~' && t !== 'q'; }
+/* NAVAL DOMAIN — a universal rule for mixed land/sea theaters (the Pacific).
+   Kinds flagged sea:true are ships: they exist only on open ocean ('o').
+   Everything else is a land formation and cannot enter open ocean. Coastal
+   water '~' stays impassable to both, as ever. landing:true marks an invasion
+   convoy: it sails as a ship but may also come ASHORE (beaching itself to land
+   the troops it carries) — the one sanctioned crossing of the line. */
+function domainOk(kind, x, y){
+  const k = KINDS[kind];
+  if (k.sea) return k.landing ? true : terrainAt(x,y) === 'o';
+  return terrainAt(x,y) !== 'o';
+}
 // the six neighbour offsets are constant per row parity — hoisted so neighbors()
 // doesn't rebuild them (seven array allocations) on every call. It's one of the
 // hottest functions in the AI's supply/ZOC/reach floods.
@@ -5526,7 +5792,7 @@ function reachable(u){
     if (c > (best.get(keyOf(x,y)) ?? 1e9)) continue;
     if (foeZOC.has(keyOf(x,y)) && !(x===u.x&&y===u.y)) continue;  // ZOC: stop here
     for (const [nx,ny] of neighbors(x,y)){
-      if (!passable(nx,ny)) continue;
+      if (!passable(nx,ny) || !domainOk(u.kind,nx,ny)) continue;   // ships stay at sea, infantry stays ashore
       const k = keyOf(nx,ny);
       if (occ[k] === enemyOf(u.side)) continue;
       const nc = c + moveCost(u,nx,ny);
@@ -5702,7 +5968,7 @@ function retreatHex(def, att){
   const foeZOC = computeZOC(att.side);
   let best=null, bestScore=-1e9;
   for (const [nx,ny] of neighbors(def.x,def.y)){
-    if (!passable(nx,ny) || unitAt(nx,ny)) continue;
+    if (!passable(nx,ny) || !domainOk(def.kind,nx,ny) || unitAt(nx,ny)) continue;   // ships retreat to sea, infantry to land
     let s = hexDist(nx,ny,att.x,att.y)*3;
     s += rearDir(def.side) * nx;                      // bias toward own rear
     if (foeZOC.has(keyOf(nx,ny))) s -= 8;
@@ -5802,6 +6068,7 @@ function resolveCombat(att, def, supports){
   if ((events.destroyed || events.retreated) && lead && adjacentKill && !unitAt(...events.defFrom)){
     const [fx,fy] = events.defFrom;
     const eligible = group.filter(u => u.str>0 && hexDist(u.x,u.y,fx,fy)===1 &&
+      (domainOk(u.kind,fx,fy) || KINDS[u.kind].landing) &&   // ships don't advance ashore — except invasion convoys, which beach to land the troops
       !(KINDS[u.kind].noCapture && cityAt(fx,fy) && cityAt(fx,fy).owner!==u.side));
     if (combined && eligible.length){
       events.choose = eligible.map(u => u.id);                  // the player picks who advances
@@ -6229,6 +6496,7 @@ function buyableKinds(side){
 function doDeploy(side, kind, x, y){
   const k = KINDS[kind];
   if (!k || k.side!==side || G.pp[side] < k.cost) return false;
+  if (!domainOk(kind, x, y)) return false;   // ships deploy to sea spawns, land formations to land ones
   if (!deploySpots(side).some(([sx,sy]) => sx===x && sy===y)) return false;
   G.pp[side] -= k.cost;
   const names = SCN.deployNames || {g_inf:'Ersatz Armee', g_pz:'Panzer Reserve', s_inf:'Reserve Army',
@@ -6275,7 +6543,8 @@ function enemyPatrol(side){
 function previewStrike(au, t){
   const eff = (au.str/10)*airWxMul(au.side);
   const p = enemyPatrol(au.side);
-  return {dmg: Math.min(2, Math.max(0, Math.round(eff*(p?0.7:1.45)))), intercepted: !!p};
+  const deck = t && KINDS[t.kind].carrier;          // carrier decks take double (see airStrike)
+  return {dmg: Math.min(deck?5:2, Math.max(0, Math.round(eff*(p?0.7:1.45)*(deck?2:1)))), intercepted: !!p};
 }
 function killAir(au){ G.air = G.air.filter(a => a.id !== au.id); }
 function setPatrol(au){
@@ -6332,7 +6601,11 @@ function airStrike(au, t){
     au.str -= 1; res.flak = true;
     if (au.str <= 0){ killAir(au); res.lostGroup = true; }
   }
-  res.dmg = Math.min(2, t.str, Math.max(0, Math.round(eff*(1.1 + Math.random()*0.7))));
+  // carrier decks are tinderboxes — fuel lines, torpedoes and parked aircraft.
+  // A strike that gets through hits for double, capped high: the Fateful Five
+  // Minutes, as a rule. Carrier war is first-strike war.
+  const deckHit = KINDS[t.kind].carrier;
+  res.dmg = Math.min(deckHit ? 5 : 2, t.str, Math.max(0, Math.round(eff*(1.1 + Math.random()*0.7)*(deckHit ? 2 : 1))));
   t.str -= res.dmg;
   // field entrenchments are blasted open — but bombed cities just become rubble fortresses
   const bc = cityAt(t.x,t.y);
@@ -13754,7 +14027,7 @@ if (typeof module !== 'undefined' && module.exports){
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
     threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
-    unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey,
+    unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,
     buildAir, reinforceAir, canBuildAir, canReinfAir, aiAirBuild,
     GENERALS, generalOf, zhukovDefends, GEN_TRAITS, genTraitId,

@@ -223,6 +223,33 @@ say('— rules sanity —');
   check('fully surrounded unit is cut off', !net.has(E.keyOf(victim.x,victim.y)));
 }
 
+/* naval domain: ships stay at sea, infantry stays ashore, convoys may land */
+say('— naval domain —');
+{
+  E.newGame('G','normal','hotseat','midway');
+  const G = E.getState();
+  const cv = G.units.find(u=>u.kind==='g_pz');           // a carrier division
+  const conv = G.units.find(u=>u.kind==='g_ally');       // the invasion convoy
+  const gar = G.units.find(u=>u.kind==='s_mil');         // the Midway garrison (land)
+  // Midway atoll land hexes: (18,8) and (20,9)
+  check('warships cannot enter land', !E.domainOk('g_pz', 18, 8) && E.domainOk('g_pz', 5, 5));
+  check('the invasion convoy may come ashore', E.domainOk('g_ally', 18, 8) && E.domainOk('g_ally', 5, 5));
+  check('land formations cannot walk onto open ocean', !E.domainOk('s_mil', 5, 5) && E.domainOk('s_mil', 20, 9));
+  // reachable respects the domain: a carrier's reach never includes a land hex
+  const r = E.reachable(cv);
+  let seaOnly = true;
+  for (const k of r.keys()){ const [x,y]=E.unkey(k); if (E.terrainAt(x,y)!=='o') seaOnly=false; }
+  check('a carrier task force plots courses only at sea', seaOnly && r.size>0, r.size+' hexes');
+  // the garrison, if it could move, may not step into the ocean
+  const rg = E.reachable(gar);
+  let landOnly = true;
+  for (const k of rg.keys()){ const [x,y]=E.unkey(k); if (E.terrainAt(x,y)==='o') landOnly=false; }
+  check('the garrison cannot wade into the Pacific', landOnly, rg.size+' hexes');
+  // land scenarios are untouched: no kind carries the sea flag
+  E.newGame('G','normal','hotseat','barbarossa');
+  check('land theaters have no sea kinds', Object.values(E.KINDS).every(k=>!k.sea));
+}
+
 /* logistics realism: bad weather contracts supply REACH (SCN.weatherLogistics) */
 say('— weather logistics —');
 {
