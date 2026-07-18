@@ -9774,12 +9774,18 @@ mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation();
 window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
 
+let _animPrev = 0;
 function draw(){
-  // step the camera animations before the frame is transformed
+  // step the camera animations before the frame is transformed. dt-correct the
+  // exponential glides so they feel identical at 30, 60 or 144fps instead of
+  // converging faster the higher the frame rate (the old per-frame *0.28).
   const tnow = performance.now();
+  const dtf = _animPrev ? Math.min(64, tnow - _animPrev) : 16.7;   // ms since last frame (clamped)
+  _animPrev = tnow;
+  const smooth = rate => 1 - Math.pow(1 - rate, dtf/16.7);         // 60fps-referenced smoothing
   if (zoomGlide){
     const dz = zoomGlide.target - cam.z;
-    cam.z = Math.abs(dz) < 0.0015 ? zoomGlide.target : cam.z + dz*0.28;
+    cam.z = Math.abs(dz) < 0.0015 ? zoomGlide.target : cam.z + dz*smooth(0.28);
     cam.x = zoomGlide.wx - zoomGlide.sx/cam.z;
     cam.y = zoomGlide.wy - zoomGlide.sy/cam.z;
     if (cam.z === zoomGlide.target) zoomGlide = null;
@@ -10974,7 +10980,10 @@ function _sceneAnimating(){
   const anim = _sceneAnimating();
   const elapsed = ts - _lastFrameTs;
   if (!_needRender && !anim && elapsed < 120) return;                   // idle: ~8fps self-heal
-  if (elapsed < GFX.fpsMs) return;                                      // frame-rate cap by quality
+  // the fps cap throttles continuous animation, but an input-driven redraw
+  // (_needRender) should paint on the very next frame — never wait out the cap,
+  // or clicks and hovers feel laggy on the medium/low presets
+  if (elapsed < GFX.fpsMs && !_needRender) return;                      // frame-rate cap by quality
   _lastFrameTs = ts; _needRender = false;
   try{ if (G) draw(); }
   catch(e){ if (!window.__drawErr){ window.__drawErr = 1; console.error('draw error:', e); } }
@@ -10998,10 +11007,15 @@ window.addEventListener('mousemove', e=>{
     _dragVx = 0.7*(dx/dt) + 0.3*_dragVx;            // smoothed screen-px/ms velocity
     _dragVy = 0.7*(dy/dt) + 0.3*_dragVy;
   }
+  // only refresh the hover cards (and the combat preview's Monte-Carlo forecast)
+  // when the cursor actually crosses into a new hex — not on every pixel of a
+  // 120Hz mousemove stream. Cuts most of the per-move work, so hover stays snappy.
   const [wx,wy] = toWorld(e.clientX, e.clientY);
-  hover = hexFromPixel(wx,wy);
-  updateTerrainCard(); updatePreview();
-  requestRender();
+  const nh = hexFromPixel(wx,wy);
+  const moved = (!hover !== !nh) || (hover && nh && (hover[0]!==nh[0] || hover[1]!==nh[1]));
+  hover = nh;
+  if (moved){ updateTerrainCard(); updatePreview(); }
+  if (moved || dragging) requestRender();
 });
 canvas.addEventListener('wheel', e=>{
   e.preventDefault();
