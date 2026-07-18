@@ -8970,13 +8970,16 @@ onCityTaken = function(c){
 };
 onGameOver = function(){ recordResult(); if (typeof rvOnStageEnd==='function') rvOnStageEnd(); setTimeout(showEnd, 600); };
 onAirStrike = function(au, t, res){
-  // a strafing pass streaks across the target hex as the bombs land
+  // a strafing pass streaks across the target hex, then the bombs land: a
+  // bigger, longer-lived explosion with a rising smoke column — used ONLY for
+  // air strikes on troops, to sell the bomb run (ground combat keeps its boom)
   {
     const [tcx,tcy] = hexCenter(t.x,t.y);
     const dir = au.side==='G' ? 1 : -1;                  // each side flies in from its own rear
-    anims.push({type:'plane', x0:tcx - dir*S*3.2, x1:tcx + dir*S*3.2, y:tcy - S*0.55, dir, t0:performance.now()});
+    const t0 = performance.now();
+    anims.push({type:'plane', x0:tcx - dir*S*3.2, x1:tcx + dir*S*3.2, y:tcy - S*0.55, dir, t0});
+    anims.push({type:'bombs', x:tcx, y:tcy, big:res.killed, t0:t0+170, life: GFX.cine?2400:1600});
   }
-  boomAt(t.x, t.y, res.killed);
   if (!res.killed && res.dmg > 0) flashUnit(t);
   floatText(t.x, t.y, '✈ −'+res.dmg, '#9fd8ff');
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
@@ -10613,6 +10616,52 @@ function draw(){
           const rr = r*(1.1 + (i%3)*0.3);
           ctx.fillRect(a.x+Math.cos(ang)*rr-0.8, a.y+Math.sin(ang)*rr*0.85-0.8, 1.6, 1.6);
         }
+      }
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'bombs'){
+      // an air strike on troops: a stick of bombs walks across the hex in
+      // staggered detonations, then a smoke column rises and lingers. Bigger and
+      // far longer-lived than a ground-combat boom — this reads as a bomb run.
+      const t = now - a.t0;
+      if (t < 0){ continue; }                              // brief delay while the plane runs in
+      const life = a.life || 2200, pr = Math.min(1, t/life);
+      const bursts = a.big ? 4 : 3;
+      for (let i=0;i<bursts;i++){
+        const bt = t - i*150;                              // detonations land in sequence
+        if (bt < 0) break;
+        const bp = bt/560; if (bp > 1) continue;           // each blooms over ~560ms
+        const bx = a.x + (i-(bursts-1)/2)*S*0.44, by = a.y + ((i%2)?1:-1)*S*0.12;
+        const r = (a.big?18:13)*bp + 3;
+        if (GFX.cine && bp < 0.3){                         // white-hot core
+          ctx.globalAlpha = (1-bp/0.3)*0.85; ctx.fillStyle = '#fff6df';
+          ctx.beginPath(); ctx.arc(bx,by,(a.big?11:8)*(0.3+bp*2.2),0,Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha = (1-bp)*0.9; ctx.fillStyle = '#ff7a2e';   // fireball
+        ctx.beginPath(); ctx.arc(bx,by,r*0.7,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha = (1-bp)*0.7; ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 2.5*(1-bp)+0.4;
+        ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2); ctx.stroke();
+      }
+      // the smoke column: puffs that rise, expand and drift, fading over the full life
+      const smokeN = a.big ? 6 : 4;
+      for (let i=0;i<smokeN;i++){
+        const seed = (i*97)%13;
+        const rise = pr*S*1.35;
+        const sx = a.x + ((seed%5)-2)*S*0.26 + Math.sin(now*0.001+i*1.7)*3;
+        const sy = a.y - rise - i*2.4;
+        const sr = (a.big?7:5) + pr*(a.big?15:11) + i;
+        const fadeIn = pr < 0.08 ? pr/0.08 : 1;
+        ctx.globalAlpha = Math.max(0, 0.46*(1-pr*0.85)*fadeIn);
+        ctx.fillStyle = (i%3) ? '#5c564d' : '#443f38';
+        ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI*2); ctx.fill();
+      }
+      // a low fire glow at the crater, dying out
+      if (GFX.bloom && pr < 0.65){
+        ctx.globalAlpha = (1-pr/0.65)*0.5; ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(255,138,48,1)';
+        ctx.beginPath(); ctx.arc(a.x, a.y, (a.big?13:9)*(1-pr*0.5), 0, Math.PI*2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
       }
       ctx.globalAlpha = 1;
       continue;
