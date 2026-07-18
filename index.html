@@ -502,6 +502,7 @@
       <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
       <span class="opt" data-s="midway">⚓ Midway 1942</span>
       <span class="opt" data-s="guadalcanal">🌴 Guadalcanal 1942</span>
+      <span class="opt" data-s="leyte">⚔ Leyte Gulf 1944</span>
       <span class="opt" data-s="okinawa">🌊 Okinawa 1945</span>
       <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
       <span class="opt" data-s="alamein">🐪 El Alamein 1942</span>
@@ -598,10 +599,15 @@
           doctrines</b> — the same points that field divisions, so each is a division delayed. Choose
           an offensive, defensive or logistics path to shape how your army fights. Your divisions also
           keep a <b>☠ confirmed-kill</b> tally; the after-action report crowns your top killers.</li>
-      <li><b>🎖 Road to Victory.</b> A linked campaign on the menu: fight the whole war front by
-          front — as the <b>⬛ Axis</b> (Poland → the Ardennes) or the <b>🟥 Soviets</b> (Barbarossa →
-          Kursk). Win a front to unlock the next; your doctrines, veterans and a war chest carry
-          forward. Quit and resume any battle where you left it.</li>
+      <li><b>🎖 Linked campaigns.</b> Fight the whole war front by front — as the <b>⬛ Axis</b>
+          (Poland → the Ardennes), the <b>🟥 Soviets</b> (Barbarossa → Kursk), or the <b>🟦 United
+          States</b> across the Pacific (Midway → Guadalcanal → Leyte Gulf → Okinawa). Win a front to
+          unlock the next; your doctrines, veterans and a war chest carry forward. Quit and resume
+          any battle where you left it.</li>
+      <li><b>⚓ The Pacific.</b> Ships fight only at sea, infantry only ashore — invasion convoys
+          are the bridge between them. <b>Carrier decks are tinderboxes</b>: air strikes hit them for
+          double, so in a carrier duel the fleet that strikes first usually wins. Guard your flattops
+          with fighter patrols, and kill theirs on the deck.</li>
       <li><b>✚ Experience.</b> Units harden as they fight — <b>Veteran</b>, <b>Hardened</b>, <b>Elite</b>
           (gold chevrons on the counter) for +5/+10/+15% to attack and defense. Veterancy survives
           reinforcement, so keep your best formations alive.</li>
@@ -3316,6 +3322,223 @@ SCENARIOS.okinawa = {
     playerSide==='G'
       ? '🟦 The island must fall before the fleet bleeds out under the kamikazes. Grind south — Kakazu, Shuri, Kunishi — and finish it.'
       : '🟥 Make it cost. Every week the Shuri line holds, the kamikazes feast offshore — and the invasion of Japan looks more impossible in Washington.',
+  ]; },
+};
+
+/* ---------- Scenario: LEYTE GULF — 23–30 October 1944 ----------
+   The largest naval battle ever fought. Side G = Japan executing Shō-Gō:
+   Kurita's Center Force through San Bernardino, the Southern Force into
+   Surigao Strait, Ozawa's empty carriers dangled as bait to pull Halsey
+   north — all to reach the invasion shipping in Leyte Gulf. Side S = the
+   US 3rd and 7th Fleets, and the two corps already ashore. One-day turns. */
+SCENARIOS.leyte = {
+  id: 'leyte',
+  title: 'LEYTE GULF — THE LAST SORTIE', short: 'LEYTE GULF',
+  sub: 'THE PHILIPPINES · 23 — 30 OCTOBER 1944 · ONE TURN = ONE DAY',
+  sides: {
+    G: {name:'Japan',         flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
+    S: {name:'United States', flag:'🟦', color:'#3a5c40', tint:'rgba(80,130,90,0.24)'},
+  },
+  menu: {
+    ger: {h:'🟥 Imperial Japan', p:'The fleet exists for this morning. Three forces converge on the American beachhead — the Center Force through San Bernardino, the old battleships through Surigao, and Ozawa\'s empty carriers as the sacrifice that pulls Halsey away. Reach the transports.'},
+    sov: {h:'🟦 United States', p:'The landings are ashore and MacArthur has returned — now the whole Combined Fleet is coming to drown the beachhead. Guard the straits, don\'t take the bait, and finish the Japanese navy forever.'},
+  },
+  kinds: {
+    g_bb:  {side:'G', label:'Battleship Division', atk:7, def:8, mp:4, maxStr:10, cost:30, sym:'bb', range:2, noCapture:true, sea:true},
+    g_ca:  {side:'G', label:'Cruiser Squadron',    atk:6, def:4, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true, sea:true},
+    g_cv:  {side:'G', label:'Decoy Carrier Force', atk:4, def:3, mp:5, maxStr:6,  cost:26, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true, noBuy:true},
+    g_tr:  {side:'G', label:'Reinforcement Convoy',atk:1, def:2, mp:3, maxStr:7,  cost:16, sym:'tr', color:'#6b5a36', sea:true, landing:true},
+    g_inf: {side:'G', label:'Infantry Division',   atk:5, def:5, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    s_cv:  {side:'S', label:'Fast Carrier Group',  atk:8, def:3, mp:5, maxStr:8,  cost:30, sym:'cv', carrier:true, fast:true, noCapture:true, sea:true},
+    s_cve: {side:'S', label:'Escort Carrier Unit', atk:4, def:3, mp:4, maxStr:6,  cost:18, sym:'cv', carrier:true, noCapture:true, sea:true, noBuy:true},
+    s_bb:  {side:'S', label:'Battle Line',         atk:7, def:8, mp:4, maxStr:10, cost:30, sym:'bb', range:2, noCapture:true, sea:true},
+    s_ca:  {side:'S', label:'Cruiser Screen',      atk:5, def:5, mp:5, maxStr:8,  cost:18, sym:'ca', fast:true, noCapture:true, sea:true},
+    s_inf: {side:'S', label:'Army Corps',          atk:6, def:6, mp:3, maxStr:10, cost:11, sym:'inf'},
+  },
+  deployNames: {g_ca:'Cruiser Reinforcement', g_tr:'TA Convoy', g_inf:'Ormoc Landing Force', s_ca:'Screen Reinforcement', s_inf:'Army Reinforcement'},
+  cols: 30, rows: 20,
+  /* The archipelago: Luzon and the Bicol tail NW, Samar center-east, Leyte
+     below it, Mindanao south. San Bernardino Strait is the gap above Samar;
+     Surigao Strait the passage south of Leyte. Japan enters from the western
+     seas; the American fleets stand in the Philippine Sea to the east. */
+  map: [
+  /* 0*/ "fffffffooooooooooooooooooooooo",
+  /* 1*/ "fffffff.oooooooooooooooooooooo",
+  /* 2*/ "offffff.oooooooooooooooooooooo",
+  /* 3*/ "oo.fffffff.ooooooooooooooooooo",
+  /* 4*/ "ooooo..ffff.oooooooooooooooooo",
+  /* 5*/ "oooooooooooooff.oooooooooooooo",
+  /* 6*/ "ooooooooooooofffff.ooooooooooo",
+  /* 7*/ "oooooooooooooffffff.oooooooooo",
+  /* 8*/ "oooooooooooooofffff.oooooooooo",
+  /* 9*/ "ooooooooooooo.ffff.ooooooooooo",
+  /*10*/ "oooooooooooo.fff.f.ooooooooooo",
+  /*11*/ "ooooooooooooffff..oooooooooooo",
+  /*12*/ "oooooooooooofffff.oooooooooooo",
+  /*13*/ "oooooooooooo.ffff.oooooooooooo",
+  /*14*/ "ooooooooooooo.ff.ooooooooooooo",
+  /*15*/ "oooooooooooooooooooooooooooooo",
+  /*16*/ "oooooooooooooooooooooooooooooo",
+  /*17*/ "ooooooooof.fffffff.ooooooooooo",
+  /*18*/ "oooooooooffffffffff.oooooooooo",
+  /*19*/ "ooooooooofffffffffoooooooooooo",
+  ],
+  /* vp>0 are JAPAN's objectives: the beachhead itself. Japan holds Ormoc. */
+  cities: [
+    {x:2, y:1,  name:'Manila',   vp:0, owner:'G'},
+    {x:8, y:3,  name:'Legaspi',  vp:0, owner:'G'},
+    {x:13,y:11, name:'Tacloban', vp:4, owner:'S'},
+    {x:14,y:13, name:'Dulag',    vp:1, owner:'S'},
+    {x:12,y:12, name:'Ormoc',    vp:1, owner:'G'},
+    {x:11,y:17, name:'Surigao',  vp:0, owner:'G'},
+  ],
+  gerSpawns: [[4,8],[3,12],[6,10]],
+  sovSpawns: [[24,10],[25,13],[23,7]],
+  supplyRange: 40,                          // fleet trains — nobody starves in a week
+  startUnits: [
+    // — Shō-Gō: three forces converge —
+    ['g_bb','Center Force (Yamato·Musashi)', 3,6, 10],
+    ['g_ca','CruDiv 5 (Myōkō)',              5,7, 8],
+    ['g_bb','Southern Force (Yamashiro)',    4,13, 8],
+    ['g_ca','Shima Second Striking Force',   3,15, 7],
+    ['g_cv','Ozawa Decoy Force',             20,1, 5],
+    ['g_tr','Ormoc Reinforcement Convoy',    6,10, 7],
+    ['g_inf','35th Army',                    12,12, 8],
+    // — the Americans: two fleets and two corps ashore —
+    ['s_cv','TF-38 (Halsey)',        24,4, 9],
+    ['s_cv','TF-38 Second Group',    25,7, 8],
+    ['s_cve','Taffy 3 (Sprague)',    20,10, 6],
+    ['s_bb','7th Fleet Battle Line', 19,14, 9],
+    ['s_ca','Cruiser Screen',        21,12, 7],
+    ['s_inf','X Corps',              13,11, 9],
+    ['s_inf','XXIV Corps',           14,13, 9],
+  ],
+  sovSchedule: [
+    [2,'g_inf','1st Division (Ormoc)'],
+    [3,'s_inf','77th Division'],
+    [4,'g_tr','TA Convoy No. 2'],
+  ],
+  generals: [
+    {side:'G', unit:'Center Force (Yamato·Musashi)', name:'Kurita', def:1.10,
+     bio:'Carries the heaviest guns afloat and the weight of knowing the plan spends his fleet like ammunition. At the decisive moment, he will turn away.'},
+    {side:'G', unit:'Southern Force (Yamashiro)', name:'Nishimura', atk:1.10,
+     bio:'Leads the old battleships into Surigao Strait on schedule, in the dark, knowing precisely what waits at the far end.'},
+    {side:'G', unit:'Ozawa Decoy Force', name:'Ozawa', def:1.12,
+     bio:'The finest carrier admiral Japan has left, commanding empty flight decks whose only mission is to die conspicuously.'},
+    {side:'G', unit:'35th Army', name:'Suzuki', def:1.10,
+     bio:'Fights the land battle for Leyte with whatever the TA convoys can land at Ormoc under the bombs.'},
+    {side:'S', unit:'TF-38 (Halsey)', name:'Halsey', atk:1.15,
+     bio:'The most aggressive admiral in the Navy, shown exactly the bait he most wants to see.'},
+    {side:'S', unit:'7th Fleet Battle Line', name:'Oldendorf', atk:1.12,
+     bio:'Five of his six old battleships rose from the mud of Pearl Harbor. Tonight in Surigao Strait he crosses the T of their attackers.'},
+    {side:'S', unit:'Taffy 3 (Sprague)', name:'Sprague', trait:'bulwark', def:1.12,
+     bio:'Six escort carriers, no armor, no big guns. When Yamato\'s shell splashes walk through his formation, he will attack.'},
+  ],
+  capitalDefense: {turn:1, range:1, def:1.2, city:'Tacloban',
+    announce:'⭐ The beachhead is the battle — the gulf shipping and the two corps ashore are what everything else exists to reach.'},
+  decisions: [
+    {
+      id:'halsey', turn:2, side:'S',
+      date:'24 October · evening', title:'HALSEY\'S CHOICE',
+      text:'Ozawa\'s carriers have been sighted to the north — the target every carrier admiral dreams of. But if TF-38 goes north, San Bernardino Strait stands open behind it, and only the escort carriers screen the beachhead. The greatest decision-point of the naval war: is the northern force the enemy fleet, or the bait?',
+      options:[
+        {label:'Go north — kill the carriers',
+         effect:'Ozawa\'s force −3 strength (annihilated from the air) and +2⚙ — but the strait is left open at your back',
+         blurb:'It is the bait, and it works: the decoys die gloriously — while Kurita comes through the unguarded strait at dawn.',
+         log:'🟦 "The enemy carrier force is my target." TF-38 turns north at flank speed.',
+         apply(G){
+           const oz = G.units.find(u=>u.name==='Ozawa Decoy Force');
+           if (oz) oz.str = Math.max(1, oz.str-3);
+           G.pp.S = Math.min(40, G.pp.S+2);
+         }},
+        {label:'Guard San Bernardino Strait',
+         effect:'Every 7th Fleet ship +1 strength (the fleet stands concentrated at the straits)',
+         blurb:'Refuse the bait. The decoys live, the strait is shut, and the Center Force sails into a wall.',
+         log:'🟦 Halsey holds his station. The strait stays watched.',
+         apply(G){
+           unitsOf('S').filter(u=>KINDS[u.kind].sea).forEach(s=>{ s.str=Math.min(KINDS[s.kind].maxStr,s.str+1); });
+         }},
+      ],
+      ai(G){ return 0; },   // history took the bait
+    },
+    {
+      id:'kurita', turn:4, side:'G',
+      date:'25 October · 09:11', title:'KURITA TURNS AWAY',
+      text:'The Center Force is through the strait and the escort carriers are under its guns — the transports barely an hour south. But three days of air attack have shredded the formation, Musashi is gone, and the reports say fleet carriers ahead. Press the attack into the gulf — or save what remains of the fleet?',
+      options:[
+        {label:'Press on into the gulf',
+         effect:'Every surface ship +1 strength for the final charge — there is no fleet to save it for',
+         blurb:'The mission is the transports. Whatever this costs, there is no other morning after this one.',
+         log:'🟥 "Charge! All ships attack!" The Center Force runs south for the gulf.',
+         apply(G){
+           unitsOf('G').filter(u=>KINDS[u.kind].sea && !KINDS[u.kind].carrier).forEach(s=>{ s.str=Math.min(KINDS[s.kind].maxStr,s.str+1); });
+         }},
+        {label:'Break off — save the fleet',
+         effect:'+4⚙ production husbanded — and history\'s question is asked forever',
+         blurb:'The fleet retires through the strait it fought so hard to pass. Whatever it was saved for, it will never fight again.',
+         log:'🟥 The Center Force turns north. On the American bridges, no one can quite believe it.',
+         apply(G){ G.pp.G = Math.min(40, G.pp.G+4); }},
+      ],
+      ai(G){ return 1; },   // history turned away — dodging Kurita's doubt is the human Japan player's what-if
+    },
+  ],
+  events: [
+    {turn:1, date:'23 October 1944', title:'PALAWAN PASSAGE', pp:{S:1},
+     text:'Two American submarines find the Center Force in the pre-dawn dark of Palawan Passage. Kurita\'s flagship Atago goes down in nineteen minutes — the admiral swims for his life and the battle has not even begun.',
+     apply(G){ const c=unitsOf('G').filter(u=>u.kind==='g_ca').sort((a,b)=>b.str-a.str)[0]; if (c) c.str=Math.max(1,c.str-2); }},
+    {turn:2, date:'24 October 1944', title:'THE SIBUYAN SEA', pp:{S:1},
+     text:'Two hundred and fifty carrier aircraft fall on the Center Force in the Sibuyan Sea. Musashi — eighteen-inch guns, seventy thousand tons, unsinkable — takes nineteen torpedoes and thirty bombs, and sinks at dusk.',
+     apply(G){ const b=unitsOf('G').filter(u=>u.kind==='g_bb').sort((a,b)=>b.str-a.str)[0]; if (b) b.str=Math.max(1,b.str-2); }},
+    {turn:3, date:'25 October · 03:00', title:'SURIGAO STRAIT', pp:{S:1},
+     text:'The last battleship line ever to fight crosses the T in the dark: six battleships and eight cruisers firing by radar down a strait walled with torpedo wakes. Of Nishimura\'s force, one destroyer survives. It is the end of an age of naval war.'},
+    {turn:4, date:'25 October · 07:00', title:'THE MIRACLE OFF SAMAR',
+     text:'Taffy 3\'s escort carriers — thirteen thousand tons of thin steel — find Yamato\'s shell splashes walking through their formation. Their destroyers turn and CHARGE. Johnston, Hoel and Samuel B. Roberts die so completely out of proportion to their size that the Japanese believe they are cruisers.'},
+    {turn:5, date:'25 October · afternoon', title:'THE DIVINE WIND', pp:{G:1},
+     text:'Off Leyte, a Zero dives deliberately into the escort carrier St. Lo and sinks her — the first planned kamikaze strike of the war. Something has changed that will not change back.',
+     apply(G){ unitsOf('S').filter(u=>KINDS[u.kind].carrier).forEach(c=>{ c.str=Math.max(1,c.str-1); }); }},
+    {turn:6, date:'27 October 1944', title:'THE TA CONVOYS',
+     text:'Beaten at sea, Japan keeps fighting for Leyte itself: reinforcement convoys run the Camotes Sea to Ormoc by night, under the bombs, in a bloody echo of Guadalcanal — this time with the roles reversed.'},
+    {turn:8, date:'30 October 1944', title:'THE FLEET THAT WAS',
+     text:'Four carriers, three battleships, ten cruisers and eleven destroyers are gone — the Imperial Navy has ceased to exist as a fighting force. Whatever happens ashore, the sea now belongs entirely to the United States.'},
+  ],
+  maxTurn: 8, turnDays: 1,
+  startDate: Date.UTC(1944,9,23),
+  weather(turn){ return 'clear'; },
+  pp(side, turn){
+    if (side==='G') return turn<=4 ? 6 : 4;
+    return 8;
+  },
+  /* Japan's score: what it takes and holds of the beachhead (it starts with Ormoc) */
+  victoryTiers: [
+    [5,'SHŌ-GŌ TRIUMPHANT — THE TRANSPORTS BURN','The Combined Fleet reaches the gulf and the invasion shipping dies at anchor. The return to the Philippines ends in the worst American naval disaster of the war.'],
+    [3,'THE GULF RUNS RED','The beachhead is mauled and the landing timetable wrecked — bought with the last of a navy.'],
+    [1,'HISTORY REPEATS — THE LAST SORTIE DIES','The pincers are annihilated in the straits and the beachhead never hears the guns. The Imperial Navy spent itself for nothing, and the sea belongs to America forever.'],
+    [0,'NOT ONE SHIP RETURNS','Annihilation beyond even history — the Combined Fleet, the convoys and the Leyte garrison are all erased in a single week.'],
+  ],
+  sudden: {
+    axisCities: ['Tacloban'], minAxisUnits: 3,
+    axisTitle: 'SHŌ-GŌ TRIUMPHANT — THE TRANSPORTS BURN',
+    axisText:  'Japanese battleships stand off the beachhead firing into the transports. The impossible plan has worked.',
+    sovTitle:  'NOT ONE SHIP RETURNS',
+    sovText:   'The Combined Fleet has been hunted to destruction in its own waters. The Imperial Navy is extinct.',
+  },
+  airInit: [
+    ['G','Luzon Land-Based Air', 6],
+    ['G','Ozawa Air Group', 3, 'Ozawa Decoy Force'],
+    ['S','TF-38 Air Group', 9, 'TF-38 (Halsey)'],
+    ['S','Second Group Air', 7, 'TF-38 Second Group'],
+    ['S','Taffy CAP', 5, 'Taffy 3 (Sprague)'],
+  ],
+  sovAirSchedule: [],
+  setup(st){
+    const x = st.units.find(t=>t.name==='X Corps'); if (x) x.entrench = 1;
+    const xx = st.units.find(t=>t.name==='XXIV Corps'); if (xx) xx.entrench = 1;
+  },
+  opening(playerSide){ return [
+    '23 October 1944 — the whole surviving strength of the Imperial Navy is at sea, converging on the beachhead at Leyte from three directions.',
+    playerSide==='G'
+      ? '🟥 The fleet exists for this morning. Get a force — any force — through the straits to the transports, whatever it costs.'
+      : '🟦 Guard both straits, don\'t take the bait, and finish the Japanese navy. The beachhead must never hear the guns.',
   ]; },
 };
 
@@ -6456,10 +6679,23 @@ function amphibiousAssault(u, tx, ty){
       logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} destroys ${def.name} and storms ashore at ${beachName(tx,ty)}!`);
     } else if (r >= RETREAT_RATIO && defLoss >= 2){
       const rh = retreatHex(def, {x:tx,y:ty,side:u.side});
-      if (rh){ const c=cityAt(def.x,def.y); def.x=rh[0]; def.y=rh[1]; def.entrench=0;
-        const c2=cityAt(rh[0],rh[1]); if (c2 && c2.owner!==def.side) c2.owner=def.side; }
-      land();
-      logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} throws ${def.name} off the beach and lands at ${beachName(tx,ty)}!`);
+      if (rh){
+        def.x=rh[0]; def.y=rh[1]; def.entrench=0;
+        const c2=cityAt(rh[0],rh[1]); if (c2 && c2.owner!==def.side) c2.owner=def.side;
+        land();
+        logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} throws ${def.name} off the beach and lands at ${beachName(tx,ty)}!`);
+      } else {
+        // nowhere to retreat: the defender is mauled where it stands — and the
+        // hex is never yielded, so the assault washes back into the surf
+        def.str -= 2; G.stats[def.side].lost += 2; G.stats[u.side].killed += 2;
+        if (def.str <= 0){
+          killUnit(def); u.kills = (u.kills||0) + 1; land();
+          logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} wipes out ${def.name} at the waterline and storms ashore at ${beachName(tx,ty)}!`);
+        } else {
+          ev.repelled = true;
+          logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${def.name} has nowhere to go and holds the waterline — ${u.name}'s landing is thrown back.`);
+        }
+      }
     } else {
       ev.repelled = true;                            // bounced — survivors cling to the boats
       logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name}'s assault on ${beachName(tx,ty)} is thrown back — ${ev.atkLoss} lost in the water.`);
@@ -6645,12 +6881,33 @@ const GPW_STAGES = [
   { scn:'stalingrad', name:'Not One Step Back',  sub:'Volga · June 1942',      goal:'Hold the city on the Volga, then close the ring — Order 227.' },
   { scn:'kursk',      name:'The Fire Brigade',   sub:'Kursk · July 1943',      goal:'Blunt Zitadelle on the deep defensive belts, then counterattack.' },
 ];
+/* The Pacific arc — the American war from the ambush at Midway to the gates of
+   Japan. Stages may override the campaign side: the engine's G/S letters swap
+   roles between naval defenses (US = S at Midway and Leyte) and the island
+   assaults (US = G) — the PLAYER is the United States throughout. */
+const PAC_STAGES = [
+  { scn:'midway',      side:'S', name:'The Ambush',       sub:'Midway · June 1942',         goal:'Spring the codebreakers\' trap — hold the atoll and sink the Kidō Butai.' },
+  { scn:'guadalcanal', side:'G', name:'Watchtower',       sub:'The Solomons · August 1942', goal:'Land the Marines, hold Henderson Field, and turn the Tokyo Express back.' },
+  { scn:'leyte',       side:'S', name:'The Return',       sub:'Leyte Gulf · October 1944',  goal:'Guard the beachhead, refuse the bait, and destroy the Combined Fleet forever.' },
+  { scn:'okinawa',     side:'G', name:'Typhoon of Steel', sub:'Okinawa · April 1945',       goal:'Break the Shuri line at the gates of Japan — and end it.' },
+];
 const RV_CAMPS = {
   rv:  { title:'ROAD TO VICTORY',        sub:'THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT',
+         blurb:'Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.',
          side:'G', flag:'⬛', key:'hoi5-roadtovictory-v1', stages:RV_STAGES },
   gpw: { title:'THE GREAT PATRIOTIC WAR', sub:'THE SOVIET WAR · 1941–1943 · WIN EACH FRONT TO OPEN THE NEXT',
+         blurb:'Fight the war as the Soviet Union, front by front. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.',
          side:'S', flag:'🟥', key:'hoi5-gpw-v1',          stages:GPW_STAGES },
+  pac: { title:'THE PACIFIC WAR',         sub:'FROM MIDWAY TO OKINAWA · 1942–1945 · WIN EACH FRONT TO OPEN THE NEXT',
+         blurb:'Fight the American war across the Pacific — carrier ambush, island perimeter, the great fleet action, and the last assault. Doctrines, veterans and the war chest carry from front to front.',
+         side:'G', flag:'🟦', key:'hoi5-pacific-v1',      stages:PAC_STAGES },
 };
+/* a stage may override its campaign's engine side (the Pacific swaps G/S
+   between battles); everything that scores or rewards the player reads this */
+function rvStageSide(campId, i){
+  const c = RV_CAMPS[campId] || RV_CAMPS.rv;
+  return (c.stages[i] && c.stages[i].side) || c.side;
+}
 let rvCampId = 'rv';        // active campaign on the road screen
 let RV = null;              // active campaign's progress: {diff, stage, cleared:[{stars,score}|null], doc:{}, score}
 let rvDiff = 'normal';
@@ -6661,8 +6918,9 @@ function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(rvCamp().key))
 function rvSaveState(){ try{ if (RV) localStorage.setItem(rvCamp().key, JSON.stringify(RV)); else localStorage.removeItem(rvCamp().key); }catch(e){} }
 /* stars measure the PLAYER's objective performance: the attacker wants the Axis
    score high, the Soviet defender wants it low */
-function rvStars(vp){
-  const f = TOTAL_VP ? (rvCamp().side==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
+function rvStars(vp, side){
+  const s = side || rvCamp().side;
+  const f = TOTAL_VP ? (s==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
   return f>=0.85?5:f>=0.68?4:f>=0.5?3:f>=0.3?2:f>=0.14?1:0;
 }
 function rvWarChest(){ if (!RV) return 0; const s = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0); return Math.min(16, s*2); }
@@ -6670,16 +6928,16 @@ function rvStart(diff){ RV = { diff:diff||rvDiff, stage:0, cleared:[], doc:{}, s
 function rvApplyVeterans(stageIdx){
   const n = RV ? Math.min(6, RV.cleared.filter(Boolean).length*2) : 0;   // two blooded formations per front won
   if (!n) return;
-  const cand = unitsOf(rvCamp().side).filter(u=>!KINDS[u.kind].hq && u.str>=4);
+  const cand = unitsOf(rvStageSide(rvCampId, stageIdx)).filter(u=>!KINDS[u.kind].hq && u.str>=4);
   for (let i=0;i<Math.min(n,cand.length);i++) gainXP(cand[(i*4+1)%cand.length], 12 + stageIdx*4);
 }
 function rvOnStageEnd(){
   if (!G.campaign || G.campaign.mode!=='rv') return;
   rvSetCamp(G.campaign.camp || 'rv');        // bind to the battle's campaign (also loads its state)
   if (!RV) return;
-  const side = rvCamp().side;
   const i = G.campaign.stage, vp = G.result ? G.result.vp : axisVP();
-  const stars = rvStars(vp), won = stars >= 3;
+  const side = rvStageSide(rvCampId, i);     // the player's engine side THIS stage (the Pacific swaps)
+  const stars = rvStars(vp, side), won = stars >= 3;
   const frac = TOTAL_VP ? (side==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
   const score = Math.max(0, Math.round(frac*1000));
   G.campaign.result = { won, stars, score };
@@ -13620,6 +13878,7 @@ function rvRender(){
   const camp = rvCamp(), STAGES = camp.stages;
   $('rv-title').textContent = '🎖 ' + camp.title;
   $('rv-sub').textContent = camp.sub;
+  if (camp.blurb) $('rv-intro').innerHTML = camp.blurb;   // each arc introduces itself
   // campaign selector: one card per arc, with its progress at a glance
   $('rv-camps').innerHTML = Object.entries(RV_CAMPS).map(([id,c])=>{
     let prog = '';
@@ -13694,10 +13953,11 @@ function rvPlayStage(i){
   try{ localStorage.removeItem(SAVE_KEYS.road); }catch(e){}   // the old battle is abandoned
   eventQueue.length = 0; show('event-modal', false);
   const camp = rvCamp();
-  newGame(camp.side, RV.diff, 'ai', camp.stages[i].scn, null);
+  const side = rvStageSide(rvCampId, i);     // the Pacific swaps the player's engine side per battle
+  newGame(side, RV.diff, 'ai', camp.stages[i].scn, null);
   G.campaign = { mode:'rv', camp:rvCampId, stage:i };
-  G.doc[camp.side] = Object.assign({}, RV.doc);                          // doctrines carry forward
-  const chest = rvWarChest(); if (chest) G.pp[camp.side] = Math.min(40, G.pp[camp.side] + chest);
+  G.doc[side] = Object.assign({}, RV.doc);                          // doctrines carry forward
+  const chest = rvWarChest(); if (chest) G.pp[side] = Math.min(40, G.pp[side] + chest);
   rvApplyVeterans(i);
   refreshSupply();
   show('road-screen', false);
@@ -14283,7 +14543,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
-    rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvCurrent: ()=>RV,
+    rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvStageSide, RV_CAMPS, rvCurrent: ()=>RV,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,

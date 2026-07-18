@@ -250,6 +250,47 @@ say('— naval domain —');
   check('land theaters have no sea kinds', Object.values(E.KINDS).every(k=>!k.sea));
 }
 
+/* THE PACIFIC WAR campaign: per-stage side override + arc integrity */
+say('— pacific campaign —');
+{
+  const pac = E.RV_CAMPS.pac;
+  check('the Pacific arc exists with four fronts', !!pac && pac.stages.length===4);
+  check('every Pacific stage is a real scenario', pac.stages.every(s=>!!E.SCENARIOS[s.scn]));
+  check('the player is the US on both engine sides',
+    E.rvStageSide('pac',0)==='S' && E.rvStageSide('pac',1)==='G' &&
+    E.rvStageSide('pac',2)==='S' && E.rvStageSide('pac',3)==='G');
+  check('campaigns without overrides keep their side', E.rvStageSide('rv',3)==='G' && E.rvStageSide('gpw',1)==='S');
+  // stars respect the stage side: at Midway (US=S) LOW axis VP is the win
+  E.newGame('S','normal','ai','midway');
+  check('stage stars flip with the stage side', E.rvStars(0,'S')===5 && E.rvStars(0,'G')===0);
+}
+
+/* amphibious no-retreat fix: a cornered defender is never stacked under the attacker */
+say('— amphibious waterline —');
+{
+  for (let trial=0; trial<12; trial++){
+    E.newGame('G','normal','hotseat','guadalcanal');
+    const G = E.getState();
+    // a Japanese defender on the coastal city at Tassafaronga (9,12), cornered:
+    // every land neighbour is occupied, and the sea is no retreat for infantry
+    const def = E.unitsOf('S').find(u=>u.name==='Esperance Base Force');
+    def.x = 9; def.y = 12; def.str = 5;
+    const nbs = E.neighbors(9,12).filter(([x,y])=>E.passable(x,y) && E.terrainAt(x,y)!=='o');
+    const blockers = E.unitsOf('S').filter(u=>u.id!==def.id).slice(0, nbs.length);
+    nbs.forEach(([x,y],i)=>{ if (blockers[i]){ blockers[i].x=x; blockers[i].y=y; } });
+    const mar = E.unitsOf('G').find(u=>u.name==='1st Marines');
+    G.pp.G = 40; mar.moved = false; mar.attacked = false; mar.str = 9;
+    const ev = E.amphibiousAssault(mar, 9, 12);
+    // whatever happened — landed, repelled, destroyed — no hex holds two units
+    const seen = new Set(); let stacked = false;
+    for (const u of G.units){ const k=u.x+'|'+u.y; if (seen.has(k)) stacked = true; seen.add(k); }
+    check(`cornered-defender assault never stacks (trial ${trial+1})`, !stacked,
+      ev ? JSON.stringify({landed:ev.landed,repelled:ev.repelled}) : 'null');
+    if (stacked) break;
+  }
+  E.newGame('G','normal','hotseat','barbarossa');
+}
+
 /* logistics realism: bad weather contracts supply REACH (SCN.weatherLogistics) */
 say('— weather logistics —');
 {
