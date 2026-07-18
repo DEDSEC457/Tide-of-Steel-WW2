@@ -1055,7 +1055,6 @@ SCENARIOS.barbarossa = {
      one man in five. Divert supply trains to winter equipment — or gamble,
      as the OKH did, that the war ends before the snow falls? */
   winterQuestion: {turn:9, cost:10},
-  weatherLogistics: true,           // the Rasputitsa strangles supply, not just movement
   /* Strategic crossroads. apply(G) runs in engine scope (unitsOf, hexDist,
      KINDS, axisVP, G.pp all available); only the chosen index is serialized. */
   decisions: [
@@ -2833,7 +2832,6 @@ SCENARIOS.realistic = {
   },
   fuel: true,                                   // mechanized formations burn & refuel fuel
   harshOOS: true,                               // pockets fight at a fraction and starve fast
-  weatherLogistics: true,                       // the Rasputitsa strangles supply reach, not just movement
   railhead: {G: true},                          // German forward depots lag behind the railhead
   supplyRange: 12,                              // hexes are ~half-scale here, so supply reaches further
                                                 //   (keeps the depot chain intact on the 60-wide map;
@@ -5184,16 +5182,18 @@ function railNetwork(side){
   return { railed: new Set(dist.keys()), parent, dist };
 }
 
-/* LOGISTICS REALISM (SCN.weatherLogistics): bad weather throttles supply
-   THROUGHPUT, not just movement. The whole network's reach contracts, so an
+/* LOGISTICS REALISM — a universal rule (every scenario & campaign, so the
+   supply model behaves the same everywhere). Bad weather throttles supply
+   THROUGHPUT, not just movement: the whole network's reach contracts, so an
    army that outran its railhead in the summer culminates the moment the mud
    arrives — the Rasputitsa is the supply-killer; a hard freeze restores the
    roads. Applied symmetrically, but it bites the overextended ATTACKER (its
    spearheads sit at the very edge of range, deep in enemy country) far harder
    than a defender resting on its own depots — the historical asymmetry falls
-   straight out of the geography. */
+   straight out of the geography. A scenario can opt out with
+   weatherLogistics:false, but by default it is ON everywhere. */
 function weatherSupplyRangeFor(wx){
-  if (!SCN.weatherLogistics) return 0;
+  if (SCN.weatherLogistics === false) return 0;
   if (wx === 'mud')    return -3;   // trucks bog to the axles; the net collapses inward
   if (wx === 'snow')   return -2;   // deep snow and blizzards bury the supply roads
   if (wx === 'freeze') return -1;   // cold hampers, but hard ground keeps the rail rolling
@@ -6550,7 +6550,7 @@ function endPhase(){
       if (msg) logMsg('sys', (SCN.wxMsg ? '🌪 ' : '❄ ') + msg);
       // logistics realism: warn when the weather chokes the supply lines, so a
       // cut-off spearhead reads as the Rasputitsa's doing — not a mystery
-      if (SCN.weatherLogistics && weatherSupplyRange() < weatherSupplyRangeFor(wxOld))
+      if (SCN.weatherLogistics !== false && weatherSupplyRange() < weatherSupplyRangeFor(wxOld))
         logMsg('sys', '🚚 The supply net contracts — forward spearheads that outran the railhead risk running dry. Check the supply map (S).');
     }
     if (typeof setAmbient==='function') setAmbient(wxNew);   // shift the weather ambience

@@ -241,9 +241,17 @@ say('— weather logistics —');
   // a unit sitting on a depot city is never starved by weather alone (min-range clamp)
   const cap = G.cities.find(c=>c.owner==='G'); G.turn = 17;
   check('depots still feed their own hex in the mud', E.computeSupply('G').has(E.keyOf(cap.x,cap.y)));
-  // gating: a scenario without the flag is untouched, even in mud
-  E.newGame('G','normal','hotseat','kursk'); E.getState().turn = 17;   // kursk mud, no flag
-  check('scenarios without the flag are unaffected', E.weatherSupplyRange()===0);
+  // universal rule: the same contraction applies on every scenario
+  E.newGame('G','normal','hotseat','kursk'); E.getState().turn = 2;     // kursk mud (turn 2 storm)
+  check('weather logistics is universal (applies on kursk too)', E.weatherSupplyRange() < 0);
+  E.newGame('G','normal','hotseat','stalingrad'); E.getState().turn = 21; // stalingrad snow
+  check('weather logistics is universal (applies on stalingrad too)', E.weatherSupplyRange() < 0);
+  // opt-out: a scenario can switch it off with weatherLogistics:false
+  E.newGame('G','normal','hotseat','barbarossa'); const Gs = E.getState(); Gs.turn = 17;
+  const on = E.weatherSupplyRange();
+  E.SCENARIOS.barbarossa.weatherLogistics = false;
+  check('a scenario can opt out (weatherLogistics:false)', on < 0 && E.weatherSupplyRange()===0);
+  delete E.SCENARIOS.barbarossa.weatherLogistics;   // restore the default (on)
   E.newGame('G','normal','hotseat','barbarossa');
 }
 
