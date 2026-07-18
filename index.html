@@ -1055,6 +1055,7 @@ SCENARIOS.barbarossa = {
      one man in five. Divert supply trains to winter equipment — or gamble,
      as the OKH did, that the war ends before the snow falls? */
   winterQuestion: {turn:9, cost:10},
+  weatherLogistics: true,           // the Rasputitsa strangles supply, not just movement
   /* Strategic crossroads. apply(G) runs in engine scope (unitsOf, hexDist,
      KINDS, axisVP, G.pp all available); only the chosen index is serialized. */
   decisions: [
@@ -2832,6 +2833,7 @@ SCENARIOS.realistic = {
   },
   fuel: true,                                   // mechanized formations burn & refuel fuel
   harshOOS: true,                               // pockets fight at a fraction and starve fast
+  weatherLogistics: true,                       // the Rasputitsa strangles supply reach, not just movement
   railhead: {G: true},                          // German forward depots lag behind the railhead
   supplyRange: 12,                              // hexes are ~half-scale here, so supply reaches further
                                                 //   (keeps the depot chain intact on the 60-wide map;
@@ -5182,6 +5184,22 @@ function railNetwork(side){
   return { railed: new Set(dist.keys()), parent, dist };
 }
 
+/* LOGISTICS REALISM (SCN.weatherLogistics): bad weather throttles supply
+   THROUGHPUT, not just movement. The whole network's reach contracts, so an
+   army that outran its railhead in the summer culminates the moment the mud
+   arrives — the Rasputitsa is the supply-killer; a hard freeze restores the
+   roads. Applied symmetrically, but it bites the overextended ATTACKER (its
+   spearheads sit at the very edge of range, deep in enemy country) far harder
+   than a defender resting on its own depots — the historical asymmetry falls
+   straight out of the geography. */
+function weatherSupplyRangeFor(wx){
+  if (!SCN.weatherLogistics) return 0;
+  if (wx === 'mud')    return -3;   // trucks bog to the axles; the net collapses inward
+  if (wx === 'snow')   return -2;   // deep snow and blizzards bury the supply roads
+  if (wx === 'freeze') return -1;   // cold hampers, but hard ground keeps the rail rolling
+  return 0;                          // clear: the network reaches full depth
+}
+function weatherSupplyRange(){ return weatherSupplyRangeFor(weatherFor(G.turn)); }
 function computeSupply(side){
   const foe = enemyOf(side);
   const foeZOC = computeZOC(foe);
@@ -5196,7 +5214,9 @@ function computeSupply(side){
   }
   const cityKeys = new Set(myCities.map(c=>keyOf(c.x,c.y)));
   const dist = new Map();             // hex -> hexes since last depot
-  const range = (SCN.supplyRange ?? SUPPLY_RANGE) + docSupplyBonus(side);   // Motorised Supply extends reach
+  // depots always feed at least their own ring (min 2), so weather can strangle
+  // a deep spearhead but never starve a unit sitting on a supply source
+  const range = Math.max(2, (SCN.supplyRange ?? SUPPLY_RANGE) + docSupplyBonus(side) + weatherSupplyRange());   // Motorised Supply extends reach; weather contracts it
   // Dijkstra over a binary heap (stepping costs 1; arriving at a friendly depot
   // city costs 0 and re-sources the network). The heap keeps this near-linear —
   // vital because the AI computes supply hundreds of times a turn, and on the
@@ -6528,6 +6548,10 @@ function endPhase(){
                      ? 'DEEP SNOW. The army shivers — but it is clothed. The winter-equipment gamble pays off. Siberian divisions are arriving.'
                      : 'DEEP SNOW. German attacks falter in -30° cold — frostbite claims more men than bullets. Siberian divisions are arriving.'}[wxNew];
       if (msg) logMsg('sys', (SCN.wxMsg ? '🌪 ' : '❄ ') + msg);
+      // logistics realism: warn when the weather chokes the supply lines, so a
+      // cut-off spearhead reads as the Rasputitsa's doing — not a mystery
+      if (SCN.weatherLogistics && weatherSupplyRange() < weatherSupplyRangeFor(wxOld))
+        logMsg('sys', '🚚 The supply net contracts — forward spearheads that outran the railhead risk running dry. Check the supply map (S).');
     }
     if (typeof setAmbient==='function') setAmbient(wxNew);   // shift the weather ambience
     fireEvents();
@@ -13727,7 +13751,7 @@ window.__dbgCenter = (hx,hy,z) => {                    // centre the camera on a
 if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
-    computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork,
+    computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
     threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey,

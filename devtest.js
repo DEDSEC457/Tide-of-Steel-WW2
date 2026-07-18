@@ -223,6 +223,30 @@ say('— rules sanity —');
   check('fully surrounded unit is cut off', !net.has(E.keyOf(victim.x,victim.y)));
 }
 
+/* logistics realism: bad weather contracts supply REACH (SCN.weatherLogistics) */
+say('— weather logistics —');
+{
+  E.newGame('G','normal','hotseat','barbarossa');
+  const G = E.getState();
+  G.turn = 1;    check('clear weather: full supply reach', E.weatherSupplyRange()===0);
+  G.turn = 17;   check('mud (Rasputitsa) contracts supply reach', E.weatherSupplyRange() < 0);
+  G.turn = 22;   check('deep snow contracts supply reach', E.weatherSupplyRange() < 0);
+  // the network physically pulls inward when the mud arrives
+  G.turn = 1;  const clearNet = E.computeSupply('G');
+  G.turn = 17; const mudNet = E.computeSupply('G');
+  check('the mud pulls the supply network inward', mudNet.size < clearNet.size,
+    `${clearNet.size} clear → ${mudNet.size} mud`);
+  let deep=null; for (const k of clearNet) if (!mudNet.has(k)){ deep=k; break; }
+  check('a forward hex supplied in the clear is cut off in the mud', deep!=null);
+  // a unit sitting on a depot city is never starved by weather alone (min-range clamp)
+  const cap = G.cities.find(c=>c.owner==='G'); G.turn = 17;
+  check('depots still feed their own hex in the mud', E.computeSupply('G').has(E.keyOf(cap.x,cap.y)));
+  // gating: a scenario without the flag is untouched, even in mud
+  E.newGame('G','normal','hotseat','kursk'); E.getState().turn = 17;   // kursk mud, no flag
+  check('scenarios without the flag are unaffected', E.weatherSupplyRange()===0);
+  E.newGame('G','normal','hotseat','barbarossa');
+}
+
 /* encirclement bites: savage combat debuffs and fast attrition */
 {
   E.newGame('G','normal','hotseat');
