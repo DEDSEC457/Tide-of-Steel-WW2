@@ -6955,12 +6955,15 @@ function amphibRange(){ const a = amphibCfg(); return (a && a.range) || AMPHIB.r
 function amphibCost(){ const a = amphibCfg(); return (a && a.cost != null) ? a.cost : AMPHIB.cost; }
 function amphibBeachLife(){ const a = amphibCfg(); return (a && a.beachLife) || AMPHIB.beachLife; }
 function isWater(x,y){ if (!inMap(x,y)) return false; const t = terrainAt(x,y); return t==='~' || t==='o'; }
-function isCoast(x,y){ if (!inMap(x,y) || !passable(x,y)) return false; return neighbors(x,y).some(([nx,ny])=>isWater(nx,ny)); }
+// a coast is DRY LAND touching water — open ocean ('o') is passable but is itself
+// water, so it must never count as a shore to embark from or land onto
+function isCoast(x,y){ if (!inMap(x,y) || !passable(x,y) || isWater(x,y)) return false; return neighbors(x,y).some(([nx,ny])=>isWater(nx,ny)); }
 function canEmbark(u){
   if (!u || u.moved || u.attacked || u.oos) return false;
   if (!amphibCanSide(u.side)) return false;
+  if (KINDS[u.kind].sea) return false;            // ships already sail the sea — they don't embark on transports
   if (KINDS[u.kind].noAmphib) return false;       // flagged kinds can't take ship (e.g. static coastal)
-  return isCoast(u.x,u.y);                         // must launch from a coastal hex
+  return isCoast(u.x,u.y);                         // must launch from a coastal (dry-land) hex
 }
 /* Beaches this unit could assault: BFS over water from the hexes adjacent to the
    unit (embark = 1), sailing up to `range` sea-steps; every coastal land hex
@@ -6986,7 +6989,7 @@ function navalReach(u){
   for (const [wk,d] of seaDist){
     const [wx,wy] = unkey(wk);
     for (const [nx,ny] of neighbors(wx,wy)){
-      if (!passable(nx,ny)) continue;               // must be land to wade ashore
+      if (!passable(nx,ny) || isWater(nx,ny)) continue;   // must be DRY land — open ocean ('o') is passable but you can't wade ashore onto it
       const occ = unitAt(nx,ny);
       if (occ && occ.side===u.side) continue;       // can't land atop our own troops
       const lk = keyOf(nx,ny), cost = d;            // sea distance to the adjacent water
@@ -7742,7 +7745,12 @@ function endPhase(){
     for (const [t,kind,name] of (G.sched || SOV_SCHEDULE)){   // shuffled-reserves variant stores its own copy
       if (t === G.turn){
         const sd = KINDS[kind].side;                   // schedules can reinforce either side
-        const spot = deploySpots(sd)[0];
+        // pick a spawn matching the unit's DOMAIN — a ship must arrive on open
+        // ocean, a division on dry land. The spawn lists mix both (a naval theatre
+        // has coastal and blue-water spawn points), so [0] alone could beach a ship
+        // or maroon a division at sea. If no in-domain spawn is open this turn the
+        // reinforcement simply doesn't arrive — better skipped than spawned stuck.
+        const spot = deploySpots(sd).find(([x,y]) => domainOk(kind, x, y)) || null;
         if (spot){
           const u = makeUnit(kind, name, spot[0], spot[1]);
           G.units.push(u);

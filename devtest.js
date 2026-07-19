@@ -259,6 +259,25 @@ say('— naval domain —');
   let landOnly = true;
   for (const k of rg.keys()){ const [x,y]=E.unkey(k); if (E.terrainAt(x,y)==='o') landOnly=false; }
   check('the garrison cannot wade into the Pacific', landOnly, rg.size+' hexes');
+  // REGRESSION (the "ship spawned on the island / can't move" bug): open ocean is
+  // passable to ships, but it is NOT a shore — a unit must never embark from it or
+  // land onto it, and scheduled reinforcements must arrive in their own domain.
+  E.newGame('G','normal','ai','guadalcanal');
+  { const Gd = E.getState();
+    // an ocean hex touching land must not be treated as a coast (embark/land shore)
+    let oceanByLand = null;
+    for (let y=0; y<E.ROWS && !oceanByLand; y++) for (let x=0; x<E.COLS; x++){
+      if (E.terrainAt(x,y)==='o' && E.neighbors(x,y).some(([nx,ny])=>E.passable(nx,ny) && !E.isWater(nx,ny))){ oceanByLand=[x,y]; break; } }
+    check('open ocean beside land is not a landing shore', oceanByLand ? !E.isCoast(oceanByLand[0],oceanByLand[1]) : false, oceanByLand?oceanByLand.join(','):'no coast found');
+    // play the whole campaign out and assert no unit is ever on forbidden terrain
+    let ph=0, wrong=null;
+    while(!Gd.over && ph < E.SCENARIOS.guadalcanal.maxTurn*2 + 6){
+      E.aiFullPhase(Gd.phase); if(!Gd.over) E.endPhase(); ph++;
+      for(const u of Gd.units){ if(!E.domainOk(u.kind,u.x,u.y)){ wrong = u.name+'@'+u.x+','+u.y+' on '+E.terrainAt(u.x,u.y); break; } }
+      if(wrong) break;
+    }
+    check('no unit is ever stranded on the wrong domain (full Guadalcanal game)', !wrong, wrong||'clean');
+  }
   // land scenarios are untouched: no kind carries the sea flag
   E.newGame('G','normal','hotseat','barbarossa');
   check('land theaters have no sea kinds', Object.values(E.KINDS).every(k=>!k.sea));
