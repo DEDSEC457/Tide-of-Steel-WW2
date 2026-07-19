@@ -289,6 +289,16 @@ say('— pacific campaign —');
   // stars respect the stage side: at Midway (US=S) LOW axis VP is the win
   E.newGame('S','normal','ai','midway');
   check('stage stars flip with the stage side', E.rvStars(0,'S')===5 && E.rvStars(0,'G')===0);
+  // campaign medals: one per finished arc, metal by difficulty, never downgraded
+  memLS.removeItem('hoi5-medals-v1');
+  E.medalAward('pac','normal');
+  check('finishing an arc hangs a medal', E.medalGet('pac') && E.medalGet('pac').diff==='normal');
+  E.medalAward('pac','easy');
+  check('an easier re-clear never downgrades the medal', E.medalGet('pac').diff==='normal');
+  E.medalAward('pac','brutal');
+  check('a harder clear upgrades the medal', E.medalGet('pac').diff==='brutal');
+  check('other arcs are untouched', E.medalGet('rv')===null);
+  memLS.removeItem('hoi5-medals-v1');
 }
 
 /* amphibious no-retreat fix: a cornered defender is never stacked under the attacker */

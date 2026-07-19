@@ -7319,6 +7319,25 @@ function rvOnStageEnd(){
   } else if (won && RV.cleared[i] && stars > RV.cleared[i].stars){      // replayed a past front, did better
     RV.score += score - RV.cleared[i].score; RV.cleared[i] = { stars, score }; rvSaveState();
   }
+  // a fully cleared arc hangs a medal on the wall — permanent, survives restarts
+  if (RV.cleared.filter(Boolean).length >= rvCamp().stages.length) medalAward(rvCampId, RV.diff);
+}
+
+/* ---- campaign medals: one per finished arc, metal by difficulty ---- */
+const MEDAL_KEY = 'hoi5-medals-v1';
+const MEDAL_RANK = { easy:1, normal:2, hard:3, brutal:4 };
+const MEDAL_ICON = { easy:'🥉', normal:'🥈', hard:'🥇', brutal:'💀' };
+const MEDAL_NAME = { easy:'Bronze', normal:'Silver', hard:'Gold', brutal:'Death or Glory' };
+function medalsAll(){ try{ return JSON.parse(localStorage.getItem(MEDAL_KEY)) || {}; }catch(e){ return {}; } }
+function medalGet(campId){ return medalsAll()[campId] || null; }
+function medalAward(campId, diff){
+  try{
+    const all = medalsAll(), cur = all[campId];
+    if (cur && MEDAL_RANK[cur.diff] >= MEDAL_RANK[diff]) return cur;   // never downgrade the wall
+    all[campId] = { diff, stars: RV ? RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0) : 0 };
+    localStorage.setItem(MEDAL_KEY, JSON.stringify(all));
+    return all[campId];
+  }catch(e){ return null; }
 }
 
 /* ============================ PRODUCTION ============================ */
@@ -14275,15 +14294,18 @@ function rvBattleSave(){
 }
 function rvRender(){
   const camp = rvCamp(), STAGES = camp.stages;
-  $('rv-title').textContent = '🎖 ' + camp.title;
+  const tm = medalGet(rvCampId);
+  $('rv-title').textContent = '🎖 ' + camp.title + (tm ? ' ' + MEDAL_ICON[tm.diff] : '');
   $('rv-sub').textContent = camp.sub;
   if (camp.blurb) $('rv-intro').innerHTML = camp.blurb;   // each arc introduces itself
   // campaign selector: one card per arc, with its progress at a glance
   $('rv-camps').innerHTML = Object.entries(RV_CAMPS).map(([id,c])=>{
     let prog = '';
     try{ const s = JSON.parse(localStorage.getItem(c.key)); if (s) prog = ` · ${s.cleared.filter(Boolean).length}/${c.stages.length} fronts`; }catch(e){}
+    const m = medalGet(id);
+    const medal = m ? ` <span title="${MEDAL_NAME[m.diff]} — campaign completed on ${m.diff}${m.stars?` · ${m.stars}★ total`:''}">${MEDAL_ICON[m.diff]}</span>` : '';
     const sel = id===rvCampId;
-    return `<div class="rv-camp" data-c="${id}" style="cursor:pointer;padding:7px 16px;border-radius:8px;border:1.5px solid ${sel?'var(--amber)':'var(--line)'};background:${sel?'#2a3119':'#181d12'};font-size:13px;${sel?'color:var(--amber);font-weight:700;':'color:var(--dim);'}">${c.flag} ${c.title}${prog}</div>`;
+    return `<div class="rv-camp" data-c="${id}" style="cursor:pointer;padding:7px 16px;border-radius:8px;border:1.5px solid ${sel?'var(--amber)':'var(--line)'};background:${sel?'#2a3119':'#181d12'};font-size:13px;${sel?'color:var(--amber);font-weight:700;':'color:var(--dim);'}">${c.flag} ${c.title}${prog}${medal}</div>`;
   }).join('');
   for (const el of $('rv-camps').querySelectorAll('.rv-camp')) el.onclick = ()=>rvPickCamp(el.dataset.c);
   const started = !!RV;
@@ -15002,6 +15024,7 @@ if (typeof module !== 'undefined' && module.exports){
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
     rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvStageSide, RV_CAMPS, rvCurrent: ()=>RV,
+    medalAward, medalGet, medalsAll, MEDAL_RANK, MEDAL_ICON,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
