@@ -122,25 +122,39 @@ for (const id of Object.keys(E.SCENARIOS)){
   E.loadScenario('barbarossa'); E.newGame('G','normal','hotseat','barbarossa');
 }
 
-/* TWO SAVE SLOTS — Arcade and Realistic must never overwrite each other */
+/* PER-BATTLE SAVE SLOTS — every battle keeps its own save; nothing clobbers */
 say('— save slots —');
 {
   E.newGame('S','normal','ai','realistic'); E.saveGame();
   E.newGame('G','normal','ai','barbarossa'); E.saveGame();
-  check('arcade and realistic use different slots',
+  check('barbarossa and realistic use different slots',
     E.saveKeyFor('barbarossa') !== E.saveKeyFor('realistic'));
   check('saving an arcade game does NOT wipe the realistic save',
-    E.hasSaveSlot('realistic') && E.hasSaveSlot('arcade'));
-  E.loadSlot('realistic'); check('realistic slot restores realistic', E.getState().scenario === 'realistic');
-  E.loadSlot('arcade');    check('arcade slot restores barbarossa',  E.getState().scenario === 'barbarossa');
-  check('all arcade scenarios share the arcade slot',
-    ['barbarossa','winter41','stalingrad','kursk','alamein','dday','bulge','midway'].every(s => E.saveSlotFor(s)==='arcade'));
+    E.hasSaveSlot('realistic') && E.hasSaveSlot('barbarossa'));
+  E.loadSlot('realistic');  check('realistic slot restores realistic', E.getState().scenario === 'realistic');
+  E.loadSlot('barbarossa'); check('barbarossa slot restores barbarossa', E.getState().scenario === 'barbarossa');
+  const ids = ['barbarossa','winter41','stalingrad','kursk','alamein','dday','bulge','midway','guadalcanal','okinawa','leyte','marketgarden'];
+  check('every battle has its own save key',
+    new Set(ids.map(s => E.saveKeyFor(s))).size === ids.length);
+  // the user story that motivated this: a Guadalcanal campaign survives starting Market Garden
+  E.newGame('G','normal','ai','guadalcanal'); E.saveGame();
+  E.newGame('G','normal','ai','marketgarden'); E.saveGame();
+  check('starting Market Garden does not wipe the Guadalcanal save',
+    E.hasSaveSlot('guadalcanal') && E.hasSaveSlot('marketgarden'));
+  E.loadSlot('guadalcanal'); check('guadalcanal save restores guadalcanal', E.getState().scenario === 'guadalcanal');
   // a pre-slots save migrates into the slot matching its own scenario
   memLS.removeItem(E.saveKeyFor('realistic'));
   E.newGame('G','normal','ai','realistic'); memLS.setItem('barbarossa-save-v1', E.serialize());
   E.migrateSaves();
   check('legacy single-slot save migrates by scenario',
     E.hasSaveSlot('realistic') && memLS.getItem('barbarossa-save-v1') === null);
+  // the old shared arcade slot folds into its battle's own key
+  E.newGame('G','normal','ai','kursk');
+  memLS.removeItem(E.saveKeyFor('kursk'));
+  memLS.setItem('hoi5-save-arcade-v1', E.serialize());
+  E.migrateSaves();
+  check('legacy shared arcade save migrates to its battle slot',
+    E.hasSaveSlot('kursk') && memLS.getItem('hoi5-save-arcade-v1') === null);
   E.newGame('G','normal','hotseat','barbarossa');
 }
 

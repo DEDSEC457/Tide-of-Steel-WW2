@@ -8644,16 +8644,28 @@ function aiFullPhase(side){
 }
 
 /* ============================ SAVE / LOAD ============================ */
-/* Two independent slots — Arcade and Realistic — so starting (or autosaving)
-   a game in one mode never clobbers the other's campaign. A pre-slots save is
-   migrated into the slot matching its own scenario. */
+/* Every battle has its own save slot — starting Market Garden never clobbers
+   your half-finished Guadalcanal. The key formula matches the legacy per-mode
+   keys (realistic/france/italy/normandy), so those saves carry over untouched;
+   the old shared Arcade slot is migrated into its battle's own key on boot. */
 const SAVE_KEYS = { arcade:'hoi5-save-arcade-v1', realistic:'hoi5-save-realistic-v1', wawtest:'hoi5-save-wawtest-v1', france:'hoi5-save-france-v1', italy:'hoi5-save-italy-v1', normandy:'hoi5-save-normandy-v1', road:'hoi5-save-road-v1' };
 const OLD_SAVE_KEY = 'barbarossa-save-v1';
 function saveSlotFor(scnId){ return scnId === 'realistic' ? 'realistic' : scnId === 'wawtest' ? 'wawtest' : scnId === 'france' ? 'france' : scnId === 'italy' ? 'italy' : scnId === 'normandy' ? 'normandy' : 'arcade'; }
+function slotKey(slot){ return SAVE_KEYS[slot] || ('hoi5-save-' + slot + '-v1'); }
 function saveKeyFor(scnId){
   // Road to Victory battles autosave into their own slot — never over a standalone campaign
   if (typeof G!=='undefined' && G && G.campaign && G.campaign.mode==='rv') return 'hoi5-save-road-v1';
-  return SAVE_KEYS[saveSlotFor(scnId)];
+  return slotKey(scnId);
+}
+/* shallow peek at a battle's save for menu labels — turn + side, or null */
+function savePeek(scnId){
+  try {
+    if (typeof localStorage==='undefined') return null;
+    const j = localStorage.getItem(slotKey(scnId));
+    if (!j) return null;
+    const d = JSON.parse(j);
+    return d && d.G ? { turn: d.G.turn, side: d.G.playerSide, over: !!d.G.over } : null;
+  } catch(e){ return null; }
 }
 function serialize(){ return JSON.stringify({G, nextId}); }
 function deserialize(json){
@@ -8678,12 +8690,12 @@ function saveGame(){
   try { if (typeof localStorage!=='undefined' && G) localStorage.setItem(saveKeyFor(G.scenario), serialize()); } catch(e){}
 }
 function hasSaveSlot(slot){
-  try { return typeof localStorage!=='undefined' && !!localStorage.getItem(SAVE_KEYS[slot]); } catch(e){ return false; }
+  try { return typeof localStorage!=='undefined' && !!localStorage.getItem(slotKey(slot)); } catch(e){ return false; }
 }
 function loadSlot(slot){
   try {
     if (typeof localStorage==='undefined') return false;
-    const j = localStorage.getItem(SAVE_KEYS[slot]);
+    const j = localStorage.getItem(slotKey(slot));
     if (!j) return false;
     deserialize(j);
     return true;
@@ -8692,16 +8704,27 @@ function loadSlot(slot){
 function clearSave(){
   try { if (typeof localStorage!=='undefined' && G) localStorage.removeItem(saveKeyFor(G.scenario)); } catch(e){}
 }
-/* one-time migration of a single-slot save into its proper slot */
+/* one-time migrations: the ancient single-slot save, then the shared Arcade
+   slot — each save moves into the per-battle key its own scenario id names */
 function migrateSaves(){
   try {
     if (typeof localStorage==='undefined') return;
     const old = localStorage.getItem(OLD_SAVE_KEY);
-    if (!old) return;
-    let slot = 'arcade';
-    try { const d = JSON.parse(old); slot = saveSlotFor(d.G && d.G.scenario); } catch(e){}
-    if (!localStorage.getItem(SAVE_KEYS[slot])) localStorage.setItem(SAVE_KEYS[slot], old);
-    localStorage.removeItem(OLD_SAVE_KEY);
+    if (old){
+      let key = SAVE_KEYS.arcade;
+      try { const d = JSON.parse(old); if (d.G && d.G.scenario) key = slotKey(d.G.scenario); } catch(e){}
+      if (!localStorage.getItem(key)) localStorage.setItem(key, old);
+      localStorage.removeItem(OLD_SAVE_KEY);
+    }
+    const shared = localStorage.getItem(SAVE_KEYS.arcade);
+    if (shared){
+      try {
+        const d = JSON.parse(shared);
+        const key = slotKey((d.G && d.G.scenario) || 'barbarossa');
+        if (key !== SAVE_KEYS.arcade && !localStorage.getItem(key)) localStorage.setItem(key, shared);
+      } catch(e){}
+      localStorage.removeItem(SAVE_KEYS.arcade);
+    }
   } catch(e){}
 }
 
@@ -14136,8 +14159,7 @@ $('waw-continue').onclick = ()=>{
 };
 $('mc-arcade').onclick = ()=>{
   show('mode-select', false); show('menu', true); sClick();
-  $('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
-  applyScenarioMenu();                        // refresh the service-record line
+  applyScenarioMenu();                        // refreshes the record line + per-battle Continue
 };
 let rmSide = 'G', rmDiff = 'normal', rmScenario = 'realistic', rmPendingUntil = 0;
 /* keep the side-pick cards and Continue button in step with the chosen scenario */
@@ -14793,6 +14815,11 @@ function applyScenarioMenu(){
   $('pick-ger').innerHTML = `<h4>${s.menu.ger.h}</h4><p>${s.menu.ger.p}</p>`;
   $('pick-sov').innerHTML = `<h4>${s.menu.sov.h}</h4><p>${s.menu.sov.p}</p>`;
   $('menu-rec').textContent = recordLine(mScn);
+  // every battle has its own save — Continue follows the selected battle
+  const pk = savePeek(mScn);
+  $('btn-continue').classList.toggle('hidden', !pk || pk.over);
+  if (pk && !pk.over) $('btn-continue').textContent = `CONTINUE SAVE — TURN ${pk.turn}`;
+  startPendingUntil = 0; $('btn-start').textContent = 'BEGIN CAMPAIGN';
 }
 /* theater tabs: show only the active front's battles, so the picker stays
    readable however many scenarios the game grows */
@@ -14841,9 +14868,10 @@ $('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.a
 
 let startPendingUntil = 0;
 $('btn-start').onclick = ()=>{
-  // safeguard: an unfinished Arcade campaign is saved — ask before wiping it
-  // (the Realistic slot is independent and untouched)
-  if (hasSaveSlot('arcade') && performance.now() > startPendingUntil){
+  // safeguard: an unfinished campaign is saved in THIS battle's slot — ask
+  // before wiping it (every other battle's save is independent and untouched)
+  const pk0 = savePeek(mScn);
+  if (pk0 && !pk0.over && performance.now() > startPendingUntil){
     startPendingUntil = performance.now() + 3000;
     $('btn-start').textContent = '⚠ OVERWRITES YOUR SAVE — SURE?';
     setTimeout(()=>{ if (performance.now() >= startPendingUntil) $('btn-start').textContent = 'BEGIN CAMPAIGN'; }, 3100);
@@ -14857,7 +14885,7 @@ $('btn-start').onclick = ()=>{
 };
 $('btn-continue').onclick = ()=>{
   eventQueue.length = 0; show('event-modal', false);
-  if (loadSlot('arcade')) startCampaign(true);
+  if (loadSlot(mScn)) startCampaign(true);
 };
 function startCampaign(loaded){
   undoSnap = null;
@@ -14880,8 +14908,8 @@ function startCampaign(loaded){
   if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
   if (!G.over && G.mode==='hotseat') updateAll();
 }
-migrateSaves();                                        // fold any old single-slot save into its slot
-$('btn-continue').classList.toggle('hidden', !hasSaveSlot('arcade'));
+migrateSaves();                                        // fold legacy shared-slot saves into per-battle slots
+applyScenarioMenu();                                   // sets the per-battle Continue button
 
 // tiny debug hooks for automated QA (game internals live inside this closure)
 window.__dbgCam = () => ({ x: cam.x, y: cam.y, z: cam.z, inertia: !!panVel });
@@ -14919,7 +14947,7 @@ if (typeof module !== 'undefined' && module.exports){
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,
     isWater, isCoast, canEmbark, navalReach, amphibiousAssault, amphibOn, amphibCanSide, aiAmphibPlan,
     canParadrop, paraReach, paradropAssault, airborneOn, airborneCanSide,
-    saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, clearSave, migrateSaves,
+    saveGame, loadSlot, hasSaveSlot, saveKeyFor, saveSlotFor, slotKey, savePeek, clearSave, migrateSaves,
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
     wwSetup, wwAtWar, wwAllied, wwArmyAt, wwArmiesOf, wwReachable, wwAttackTargets, wwMoveArmy,
