@@ -1750,6 +1750,10 @@ function uiSmoke(side){
   if ($('ui-scale').oninput){ $('ui-scale').value = 110; $('ui-scale').oninput(); }   // interface-size slider
   if ($('view-3d').onclick){ $('view-3d').onclick(); $('view-2d').onclick(); }        // 3D battlefield view toggle
   if ($('btn-tilt').onclick){ $('btn-tilt').onclick(); $('btn-tilt').onclick(); }      // experimental camera tilt on/off
+  // the top-bar Pause button opens the pause screen (the discoverable home for
+  // settings/save/help) — open it and resume
+  if ($('btn-menu').onclick){ $('btn-menu').onclick();
+    if ($('btn-pause-resume').onclick) $('btn-pause-resume').onclick(); }
   $('btn-help2').onclick(); $('btn-help-close').onclick();
   if ($('wx-chip').onclick){ $('wx-chip').onclick(); $('btn-clock-close').onclick(); }
   if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();

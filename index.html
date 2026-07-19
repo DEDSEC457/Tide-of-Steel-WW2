@@ -308,7 +308,7 @@
   <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋<span class="bl"> Units</span></button>
   <button id="btn-help2" title="How to play">❓<span class="bl"> Help</span></button>
   <button id="btn-sound" title="Sound & graphics settings">🔊</button>
-  <button id="btn-menu" title="Save and return to the menu">☰<span class="bl"> Menu</span></button>
+  <button id="btn-menu" title="Pause — settings, save, help, quit (Esc)">⏸<span class="bl"> Pause</span></button>
   <button id="btn-next" class="hidden" title="Jump to your next unit with orders left (N / Space / Tab)">⏭ Next</button>
   <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩<span class="bl"> Undo</span></button>
   <button id="btn-endturn" class="primary">End Turn ▶</button>
@@ -14447,10 +14447,13 @@ $('btn-continue-realistic').onclick = ()=>{
 };
 $('btn-back-arcade').onclick = ()=>{ show('menu', false); show('mode-select', true); };
 
-$('btn-menu').onclick = ()=>{
+// the top-bar button now opens the Pause screen (same as Esc) — a discoverable
+// home for Settings, Save, Help and Quit, which players could never find before
+$('btn-menu').onclick = ()=>{ openPause(); };
+function quitToMenu(){
   saveGame();                        // autosave into this game's own slot
   showModeSelect();                  // continue buttons are set when each sub-menu opens
-};
+}
 
 /* ======================= ROAD TO VICTORY — screen, rendering & wiring =======================
    The campaign core (state, progression, persistence) lives at engine level so the headless
@@ -14603,7 +14606,7 @@ $('btn-pause-save').onclick = ()=>{
 };
 $('btn-pause-settings').onclick = ()=>{ sClick(); closePause(); $('btn-sound').onclick(); };
 $('btn-pause-help').onclick = ()=>{ sClick(); closePause(); show('help-modal', true); };
-$('btn-pause-menu').onclick = ()=>{ sClick(); closePause(); $('btn-menu').onclick(); };
+$('btn-pause-menu').onclick = ()=>{ sClick(); closePause(); quitToMenu(); };
 $('pause-modal').addEventListener('click', e=>{ if (e.target === $('pause-modal')) closePause(); });
 
 /* ---------------- end turn & AI driver ---------------- */
