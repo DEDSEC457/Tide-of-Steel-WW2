@@ -508,21 +508,30 @@
   <div class="modal">
     <h1 id="menu-title">OPERATION BARBAROSSA</h1>
     <div class="sub" id="menu-sub">EASTERN FRONT · JUNE — DECEMBER 1941 · TURN-BASED STRATEGY</div>
+    <!-- theaters keep the scenario list readable: one row of fronts, then only
+         that front's battles — the list stops sprawling as scenarios are added -->
+    <div class="opt-row" id="theater-row">
+      <span style="color:var(--dim);padding:6px 0;">Theater:</span>
+      <span class="opt sel" data-t="east">⚔ Eastern Front</span>
+      <span class="opt" data-t="west">🌍 West &amp; Africa</span>
+      <span class="opt" data-t="pacific">🌊 The Pacific</span>
+    </div>
     <div class="opt-row" id="scn-row">
-      <span style="color:var(--dim);padding:6px 0;">Scenario:</span>
-      <span class="opt" data-s="poland">🦅 Poland 1939</span>
-      <span class="opt" data-s="winterwar">⛷ Winter War 1939</span>
-      <span class="opt sel" data-s="barbarossa">⚙ Barbarossa 1941</span>
-      <span class="opt" data-s="winter41">❄ Winter Counteroffensive</span>
-      <span class="opt" data-s="stalingrad">🏭 Stalingrad 1942</span>
-      <span class="opt" data-s="midway">⚓ Midway 1942</span>
-      <span class="opt" data-s="guadalcanal">🌴 Guadalcanal 1942</span>
-      <span class="opt" data-s="leyte">⚔ Leyte Gulf 1944</span>
-      <span class="opt" data-s="okinawa">🌊 Okinawa 1945</span>
-      <span class="opt" data-s="kursk">🔥 Kursk 1943</span>
-      <span class="opt" data-s="alamein">🐪 El Alamein 1942</span>
-      <span class="opt" data-s="dday">🟦 D-Day 1944</span>
-      <span class="opt" data-s="bulge">🎄 The Bulge 1944</span>
+      <span style="color:var(--dim);padding:6px 0;">Battle:</span>
+      <span class="opt" data-s="poland" data-t="east">🦅 Poland 1939</span>
+      <span class="opt" data-s="winterwar" data-t="east">⛷ Winter War 1939</span>
+      <span class="opt sel" data-s="barbarossa" data-t="east">⚙ Barbarossa 1941</span>
+      <span class="opt" data-s="winter41" data-t="east">❄ Winter Counteroffensive</span>
+      <span class="opt" data-s="stalingrad" data-t="east">🏭 Stalingrad 1942</span>
+      <span class="opt" data-s="kursk" data-t="east">🔥 Kursk 1943</span>
+      <span class="opt" data-s="alamein" data-t="west">🐪 El Alamein 1942</span>
+      <span class="opt" data-s="dday" data-t="west">🟦 D-Day 1944</span>
+      <span class="opt" data-s="marketgarden" data-t="west">🌉 Market Garden 1944</span>
+      <span class="opt" data-s="bulge" data-t="west">🎄 The Bulge 1944</span>
+      <span class="opt" data-s="midway" data-t="pacific">⚓ Midway 1942</span>
+      <span class="opt" data-s="guadalcanal" data-t="pacific">🌴 Guadalcanal 1942</span>
+      <span class="opt" data-s="leyte" data-t="pacific">⚔ Leyte Gulf 1944</span>
+      <span class="opt" data-s="okinawa" data-t="pacific">🌊 Okinawa 1945</span>
     </div>
     <div class="pick-row">
       <div class="pick p-ger sel" id="pick-ger">
@@ -1168,8 +1177,8 @@ SCENARIOS.barbarossa = {
   // weather: turns 1-15 clear · 16-19 mud · 20-21 freeze · 22+ snow
   weather(turn){ return turn>=22?'snow' : turn>=20?'freeze' : turn>=16?'mud' : 'clear'; },
   pp(side, turn){
-    if (side==='G') return turn<=13 ? 6 : 4;           // overstretch after autumn
-    return turn<=6 ? 4 : turn<=14 ? 6 : 8;             // Soviet mobilization ramps up
+    if (side==='G') return turn<=13 ? 8 : 6;           // overstretch after autumn — but the replacement trains still run
+    return turn<=6 ? 4 : turn<=10 ? 6 : 3;             // the offensive broadens, dilutes, and culminates — Stalin asks for too much
   },
   // Axis victory tiers by objective points held at the end of the campaign
   victoryTiers: [
@@ -1257,13 +1266,13 @@ SCENARIOS.winter41 = {
      The Red Army: fresh shock armies and Siberians around the capital. */
   startUnits: [
     // — Axis, north to south —
-    ['g_inf','18. Armee',       12,2, 7], ['g_inf','16. Armee',      13,3, 6],
-    ['g_pz' ,'3. Panzerarmee',  21,3, 5], ['g_inf','9. Armee',       21,4, 7],
-    ['g_pz' ,'4. Panzerarmee',  22,4, 5], ['g_inf','4. Armee',       21,6, 7],
-    ['g_pz' ,'2. Panzerarmee',  23,8, 5], ['g_inf','2. Armee',       21,9, 6],
-    ['g_inf','6. Armee',        19,11,7], ['g_inf','17. Armee',      17,13,6],
-    ['g_pz' ,'1. Panzerarmee',  21,14,6], ['g_inf','11. Armee',      12,16,7],
-    ['g_ally','Romanian 3rd',   10,15,6],
+    ['g_inf','18. Armee',       12,2, 9], ['g_inf','16. Armee',      13,3, 8],
+    ['g_pz' ,'3. Panzerarmee',  21,3, 5], ['g_inf','9. Armee',       21,4, 9],
+    ['g_pz' ,'4. Panzerarmee',  22,4, 5], ['g_inf','4. Armee',       21,6, 9],
+    ['g_pz' ,'2. Panzerarmee',  23,8, 5], ['g_inf','2. Armee',       21,9, 8],
+    ['g_inf','6. Armee',        19,11,9], ['g_inf','17. Armee',      17,13,8],
+    ['g_pz' ,'1. Panzerarmee',  21,14,6], ['g_inf','11. Armee',      12,16,9],
+    ['g_ally','Romanian 3rd',   10,15,8],
     // — Soviet fronts —
     ['s_inf','42nd Army',  14,1, 7], ['s_inf','4th Army',   15,2, 7],
     ['s_inf','54th Army',  16,2, 6], ['s_inf','26th Army',  17,1, 6],
@@ -1281,12 +1290,16 @@ SCENARIOS.winter41 = {
     ['g_hq','Heeresgruppe Mitte HQ', 14,3, 6], ['g_hq','Heeresgruppe Süd HQ', 19,13, 6],
     ['s_hq','Western Front HQ', 26,4, 6], ['s_hq','Southern Front HQ', 26,15, 6],
   ],
+  gerSchedule: [
+    // the stabilizers: drafts combed out of France and the Reich reach the front through the winter
+    [6,'g_inf','Drafts from France'], [9,'g_inf','OKH Reserve'],
+    [11,'g_pz','Refitted Panzer Group'],
+  ],
   sovSchedule: [
     [2,'s_inf','39th Army'], [3,'s_guard','2nd Siberian Gds'],
     [4,'s_tank','1st Gds Tank Corps'], [5,'s_inf','61st Army'],
     [6,'s_inf','28th Army'], [7,'s_guard','3rd Siberian Gds'],
-    [8,'s_inf','3rd Shock Army'], [10,'s_tank','2nd Tank Corps'],
-    [12,'s_inf','48th Army'],
+    [8,'s_inf','3rd Shock Army'],
   ],
   generals: [
     // — German: the defensive specialists take over —
@@ -1314,7 +1327,7 @@ SCENARIOS.winter41 = {
     announce:'⭐ Zhukov commands the Western Front — the Moscow axis is a wall.'},
   /* the Road of Life: trucks cross the Ladoga ice — besieged Leningrad
      stays supplied as long as the city itself holds */
-  supplySeeds: {S: [[14,1]]},
+  supplySeeds: {S: [[14,1]], G: [[9,7],[16,6],[18,8]]},   // the German rail lifeline: Minsk, Smolensk, Bryansk feed the front through the snow
   gerAI: 'defend',                  // the Westheer is on the back foot all winter — dig in
   sovAI: 'attack',                  // Zhukov's counteroffensive — Soviets push forward
   /* no winterQuestion: it is December, and the gamble has already been lost */
@@ -1374,6 +1387,9 @@ SCENARIOS.winter41 = {
   events: [
     {turn:1,  date:'5 December 1941',  title:'THE SLEDGEHAMMER FALLS', pp:{S:2},
      text:'At dawn, in -25° cold, the Kalinin Front attacks. By the next day the whole Moscow line is ablaze. The German army — exhausted, frostbitten, 30 kilometres from the Kremlin — discovers the Red Army it destroyed three times over still has reserves.'},
+    {turn:6,  date:'January 1942', title:'THE WINTERHILFE ARRIVES', pp:{G:1},
+     text:'The collection drives at home — furs, skis, felt boots, every sledge in the Reich — finally reach the front, along with the first purpose-flown winter equipment. The army that froze in December fights in January.',
+     apply(G){ G.winterGear = true; }},
     {turn:2,  date:'11 December 1941', title:'WAR ON AMERICA',
      text:'Four days after Pearl Harbor, Hitler declares war on the United States — gratuitously, before America could decide for itself. Whatever happens in the snow this winter, Germany is now at war with the three greatest industrial powers on Earth.'},
     {turn:3,  date:'16 December 1941', title:'THE HALTEBEFEHL', pp:{G:2},
@@ -1388,7 +1404,7 @@ SCENARIOS.winter41 = {
   maxTurn: 14,                              // 14 weeks: 5 Dec 1941 → early Mar 1942
   startDate: Date.UTC(1941,11,5),
   // deep snow into February, then hard frost until the spring thaw looms
-  weather(turn){ return turn<=9 ? 'snow' : 'freeze'; },
+  weather(turn){ return turn<=9 ? 'snow' : turn<=13 ? 'freeze' : 'mud'; },   // deep winter → hard frost → the March rasputitsa that ends the offensive
   pp(side, turn){
     if (side==='G') return turn<=8 ? 4 : 5;            // the line slowly stabilizes
     return turn<=6 ? 9 : 7;                            // the winter surge spends itself
@@ -1397,8 +1413,8 @@ SCENARIOS.winter41 = {
   victoryTiers: [
     [10,'AXIS WINTER TRIUMPH','Moscow falls in the dead of winter — the Haltebefehl gamble succeeds beyond imagination, and the Soviet state staggers.'],
     [8,'AXIS DEFENSIVE VICTORY','The line holds nearly everywhere. The counteroffensive bleeds out in the snowdrifts, and the Ostheer survives the winter intact.'],
-    [4,'HISTORY REPEATS — THE FRONT FREEZES','The Wehrmacht is hurled back from Moscow with terrible loss — but it does not break. Rzhev, and three more years of war, lie ahead.'],
-    [2,'SOVIET OPERATIONAL VICTORY','Smolensk lost, whole German armies mauled and frostbitten — the Ostheer will never fully recover from this winter.'],
+    [2,'HISTORY REPEATS — THE FRONT FREEZES','The Wehrmacht is hurled back from Moscow with terrible loss — but it does not break. Rzhev, and three more years of war, lie ahead.'],
+    [1,'SOVIET OPERATIONAL VICTORY','Smolensk lost, whole German armies mauled and frostbitten — the Ostheer will never fully recover from this winter.'],
     [0,'DECISIVE SOVIET VICTORY','Army Group Center disintegrates in the snow. The war has turned two years early.'],
   ],
   sudden: {
@@ -1690,6 +1706,7 @@ SCENARIOS.kursk = {
     s_hq:   {side:'S', label:'Front HQ',         atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#6e2620'},
   },
   deployNames: {g_inf:'Ersatz-Korps', g_pz:'Panzer Reserve', s_inf:'Reserve Army', s_gd:'Guards Reserve', s_tank:'Tank Reserve'},
+  supplyRange: 8,                  // Bryansk→Orel is 8 hexes — the rail net feeds both pincers
   cols: 30, rows: 20,
   /* The salient: Orel shoulder north, Belgorod–Kharkov shoulder south, Kursk in
      the bulge. The Oka guards Orel's flank, the Seim runs west of Kursk, the
@@ -1761,8 +1778,9 @@ SCENARIOS.kursk = {
     // — Voronezh Front (Vatutin) mans the south —
     ['s_gd','6th Guards Army',      10,12, 9], ['s_gd','7th Guards Army',    15,13, 9],
     ['s_inf','69th Army',           12,11, 8], ['s_tank','1st Tank Army',     9,11, 9],
-    // — the deep reserve —
+    // — the deep reserve — and the city itself, dug into six fortified belts
     ['s_tank','2nd Tank Army',      13,9, 8], ['s_inf','38th Army',           5,12, 7],
+    ['s_inf','Kursk Fortified Region', 10,10, 9],
     ['s_hq','Central Front HQ',     15,8, 6], ['s_hq','Voronezh Front HQ',   12,10, 6],
   ],
   /* the Steppe Front pours in as the German blow spends itself */
@@ -1869,10 +1887,10 @@ SCENARIOS.kursk = {
   // the July thunderstorms that bogged the Donets crossings on the southern face
   weather(turn){ return turn===2 ? 'mud' : 'clear'; },
   pp(side, turn){
-    if (side==='G') return turn<=4 ? 9 : 7;   // after Sicily, the East is starved
-    return turn<=2 ? 8 : 12;                  // the Stavka reserve flows once the blow is spent
+    if (side==='G') return turn<=4 ? 9 : 6;   // after Sicily, the East is starved
+    return turn<=2 ? 9 : 15;                  // the Stavka reserve flows once the blow is spent
   },
-  capitalDefense: {turn:1, range:4, def:1.2, city:'Kursk',
+  capitalDefense: {turn:1, range:4, def:1.3, city:'Kursk',
     announce:'🟥 Six fortified belts ring Kursk — a million mines, three thousand kilometres of trench.'},
   /* Axis VP held at the end (11 total; history ≈ 0 — the tide turned) */
   victoryTiers: [
@@ -2853,6 +2871,10 @@ SCENARIOS.guadalcanal = {
   sub: 'THE SOLOMONS · AUGUST 1942 — FEBRUARY 1943 · TURN-BASED STRATEGY',
   reversed: true,                  // the US supplies from the EAST edge; Japan from the west (Rabaul)
   harshOOS: true,                  // Starvation Island: cut-off troops waste away fast
+  /* the US feeds from its anchorage — the Lunga beachhead and Tulagi harbour —
+     so a tropical storm shortens the reach without starving the island. Japan
+     has no such anchorage: the Tokyo Express alone (Starvation Island). */
+  supplySeeds: {G: [[13,12],[16,6]]},
   sides: {
     G: {name:'United States', flag:'🟦', color:'#3a5c40', tint:'rgba(80,130,90,0.24)'},
     S: {name:'Japan',         flag:'🟥', color:'#9c2e22', tint:'rgba(186,52,40,0.24)'},
@@ -3120,7 +3142,7 @@ SCENARIOS.okinawa = {
     g_art:  {side:'G', label:'Corps Artillery',   atk:10, def:4, mp:2, maxStr:8, cost:13, sym:'art', color:'#2d4a3a'},
     s_inf:  {side:'S', label:'Infantry Division',  atk:5, def:6, mp:2, maxStr:9,  cost:9,  sym:'inf'},
     s_art:  {side:'S', label:'Artillery Command',  atk:9, def:5, mp:2, maxStr:8,  cost:13, sym:'art', color:'#7a2d3c', noBuy:true},
-    s_mil:  {side:'S', label:'Boeitai Militia',    atk:3, def:5, mp:2, maxStr:7,  cost:5,  sym:'inf', color:'#5a5244'},
+    s_mil:  {side:'S', label:'Boeitai Militia',    atk:3, def:6, mp:2, maxStr:8,  cost:5,  sym:'inf', color:'#5a5244'},
     g_hq:   {side:'G', label:'Tenth Army HQ', atk:1, def:4, mp:3, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3c34'},
     s_hq:   {side:'S', label:'32nd Army HQ',  atk:1, def:5, mp:2, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#57303c'},
   },
@@ -3168,9 +3190,12 @@ SCENARIOS.okinawa = {
   gerSpawns: [[14,7],[15,8],[14,9],[8,10],[7,6]],
   sovSpawns: [[14,16],[15,16],[12,16]],
   /* Japan's supply is the cave stores under Shuri and Mabuni — lose them and
-     the 32nd Army fights on what it carries. The US feeds over the beaches. */
+     the 32nd Army fights on what it carries. The US feeds over the beaches:
+     the Hagushi anchorage seeds the whole army (the west edge alone is too far
+     across open water to reach the island). */
   edgeSupply: {G:true, S:false},
-  supplySeeds: {S: [[13,14],[14,17]]},
+  supplyRange: 12,
+  supplySeeds: {G: [[13,7],[13,9]], S: [[13,14],[14,17]]},
   startUnits: [
     // — Tenth Army ashore on L-Day: the walk before the wall —
     ['g_mar','1st Marine Division',  13,7, 10], ['g_mar','6th Marine Division', 14,7, 10],
@@ -3306,7 +3331,7 @@ SCENARIOS.okinawa = {
   weather(turn){ return (turn>=6 && turn<=7) ? 'mud' : 'clear'; },   // the May rains
   pp(side, turn){
     if (side==='G') return 8;                          // the fleet train is bottomless
-    return turn<=4 ? 3 : 2;                      // no replacements ever come — the caves spend what they stored                            // the caves spend what they stored
+    return 3;                      // no replacements ever come — the caves spend what they stored                            // the caves spend what they stored
   },
   victoryTiers: [
     [13,'THE ISLAND FALLS EARLY','The Shuri line cracks weeks ahead of schedule and the 32nd Army dies in the open — the cheapest great victory of the Pacific.'],
@@ -3520,7 +3545,7 @@ SCENARIOS.leyte = {
   startDate: Date.UTC(1944,9,23),
   weather(turn){ return 'clear'; },
   pp(side, turn){
-    if (side==='G') return turn<=4 ? 6 : 4;
+    if (side==='G') return turn<=4 ? 7 : 5;
     return 8;
   },
   /* Japan's score: what it takes and holds of the beachhead (it starts with Ormoc) */
@@ -3554,6 +3579,286 @@ SCENARIOS.leyte = {
     playerSide==='G'
       ? '🟥 The fleet exists for this morning. Get a force — any force — through the straits to the transports, whatever it costs.'
       : '🟦 Guard both straits, don\'t take the bait, and finish the Japanese navy. The beachhead must never hear the guns.',
+  ]; },
+};
+
+/* ---------- Scenario: MARKET GARDEN — 17–26 September 1944 ----------
+   The largest airborne operation in history: three divisions dropped in a
+   carpet along one road, and XXX Corps driving up it to the Rhine. The paras
+   start ON their drop zones with a ticking air-bridge for supply; the Germans
+   converge from every side to cut the highway — and the intelligence photos
+   showing panzers at Arnhem were filed and forgotten. One-day turns. */
+SCENARIOS.marketgarden = {
+  id: 'marketgarden',
+  title: 'MARKET GARDEN — A BRIDGE TOO FAR', short: 'MARKET GARDEN',
+  sub: 'HOLLAND · 17 — 26 SEPTEMBER 1944 · ONE TURN = ONE DAY',
+  sides: {
+    G: {name:'Allies',  flag:'🟦', color:'#3a4f7a', tint:'rgba(70,100,170,0.24)'},
+    S: {name:'Germany', flag:'⬛', color:'#454d58', tint:'rgba(108,118,132,0.30)'},
+  },
+  menu: {
+    ger: {h:'🟦 The Allies', p:'Lay an airborne carpet over five rivers and drive XXX Corps sixty miles up a single road to Arnhem — the war over by Christmas. Everything must go right. Everything.'},
+    sov: {h:'⬛ Germany', p:'Paratroopers are scattered along one narrow road — and by luck, two SS panzer divisions are refitting beside the far bridge. Cut the highway, crush the pockets, and hand the Allies their first great defeat in the west.'},
+  },
+  kinds: {
+    g_arm:  {side:'G', label:'Armoured Division',  atk:8, def:5, mp:5, maxStr:10, cost:16, sym:'arm'},
+    g_inf:  {side:'G', label:'Infantry Division',  atk:6, def:6, mp:3, maxStr:10, cost:11, sym:'inf'},
+    g_para: {side:'G', label:'Airborne Division',  atk:6, def:8, mp:3, maxStr:8,  cost:14, sym:'para'},
+    s_kg:   {side:'S', label:'Kampfgruppe',        atk:5, def:5, mp:3, maxStr:8,  cost:8,  sym:'inf'},
+    s_pz:   {side:'S', label:'Panzer Kampfgruppe', atk:7, def:5, mp:5, maxStr:9,  cost:15, sym:'arm'},
+    s_inf:  {side:'S', label:'Infantry Division',  atk:5, def:6, mp:3, maxStr:9,  cost:9,  sym:'inf'},
+    g_hq:   {side:'G', label:'Corps HQ',       atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3a52'},
+    s_hq:   {side:'S', label:'Army Group HQ',  atk:1, def:4, mp:4, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3742'},
+  },
+  deployNames: {g_arm:'Armoured Reinforcement', g_inf:'Infantry Reinforcement', g_para:'Airborne Reserve', s_kg:'Alarm Kampfgruppe', s_pz:'Panzer Reserve', s_inf:'Volksgrenadier Division'},
+  wxLabel: { mud:'Fog & Rain' },
+  wxFx: { mud:['Fog and rain','The airfields in England are socked in: +1 movement cost, no air, the resupply lift cancelled, the corridor drowning.'] },
+  wxMsg: { mud:'FOG AND RAIN close over England and the corridor — the resupply lift is cancelled, the Typhoons are grounded, and the paras count their ammunition.' },
+  cols: 30, rows: 20,
+  /* One road west→east: Eindhoven, the Wilhelmina at Son, Veghel, the Maas at
+     Grave, the Waal at Nijmegen, the Lower Rhine at Arnhem. Four rivers cross
+     the whole map; polder and woods pin the flanks to that single highway. */
+  map: [
+  /* 0*/ "ssssssssrsssssrssssrssssrsssss",
+  /* 1*/ "ssssssssrsssssrssssrssssrsssss",
+  /* 2*/ "ssssssssrsssssrssssrssssrsssss",
+  /* 3*/ "ffffffffrfffffrffffrffffrfffff",
+  /* 4*/ "ffffffffrfffffrffffrffffrfffff",
+  /* 5*/ "ffffffffrfffffrffffrffffrfffff",
+  /* 6*/ "ssssssssrsssssrssssrssssrsssss",
+  /* 7*/ "........r.....r....r....rff...",
+  /* 8*/ "........r.....r....r....rff...",
+  /* 9*/ "........r.....r....r....r.....",
+  /*10*/ "........r.....r....r....r.....",
+  /*11*/ "........r.....r....rhh..r.....",
+  /*12*/ "ssssssssrsssssrssssrhhssrsssss",
+  /*13*/ "ffffffffrfffffrffffrffffrfffff",
+  /*14*/ "ffffffffrfffffrffffrffffrfffff",
+  /*15*/ "ffffffffrfffffrffffrffffrfffff",
+  /*16*/ "ssssssssrsssssrssssrssssrsssss",
+  /*17*/ "ssssssssrsssssrssssrssssrsssss",
+  /*18*/ "ssssssssrsssssrssssrssssrsssss",
+  /*19*/ "ssssssssrsssssrssssrssssrsssss",
+  ],
+  /* vp>0 are Allied objectives — the towns and, above all, the bridges */
+  cities: [
+    {x:5, y:10, name:'Eindhoven',      vp:1, owner:'S'},
+    {x:8, y:10, name:'Son Bridge',     vp:1, owner:'S'},
+    {x:11,y:9,  name:'Veghel',         vp:1, owner:'G'},
+    {x:14,y:9,  name:'Grave Bridge',   vp:1, owner:'G'},
+    {x:19,y:9,  name:'Nijmegen',       vp:3, owner:'S'},
+    {x:24,y:8,  name:'Arnhem',         vp:4, owner:'S'},
+    {x:22,y:8,  name:'Oosterbeek',     vp:0, owner:'S'},
+    {x:20,y:12, name:'Groesbeek',      vp:0, owner:'S'},
+  ],
+  gerSpawns: [[0,9],[0,11],[1,8],[13,10]],
+  sovSpawns: [[28,7],[28,10],[27,12],[2,17]],
+  startUnits: [
+    // — XXX Corps at the Meuse-Escaut bridgehead —
+    ['g_arm','Guards Armoured',      1,10, 10],
+    ['g_inf','43rd Wessex Division', 1,11, 10],
+    ['g_inf','50th Northumbrian',    2,9,  10],
+    ['g_hq','XXX Corps HQ',          0,10, 6],
+    // — the carpet, already on its DZs (D-Day of the operation) —
+    ['g_para','101st Airborne',      9,10, 8],
+    ['g_para','82nd Airborne',       16,9, 8],
+    ['g_para','1st Airborne',        23,8, 8],
+    // — the Germans: scratch forces everywhere, and the worst surprise at Arnhem —
+    ['s_kg','KG Walther',            6,9,  6],
+    ['s_kg','59th Infantry KG',      7,7,  6],
+    ['s_inf','406th Division',       12,8, 6],
+    ['s_kg','KG Henke',              19,9, 5],
+    ['s_kg','SS Depot Bn Krafft',    26,9, 5],
+    ['s_pz','9th SS Hohenstaufen',   24,8, 9],
+    ['s_pz','10th SS Frundsberg',    25,10, 8],
+    ['s_inf','15th Army Kampfgruppe',3,13, 7],
+    ['s_hq','Army Group B HQ',       26,8, 6],
+  ],
+  gerSchedule: [
+    [3,'g_inf','VIII Corps Vanguard'],
+    [5,'g_inf','XII Corps Vanguard'],
+  ],
+  sovSchedule: [
+    [2,'s_kg','KG Chill'],
+    [2,'g_para','1st Polish Para Bde'],
+    [3,'s_pz','107th Panzer Brigade'],
+  ],
+  generals: [
+    {side:'G', unit:'Guards Armoured', name:'Horrocks', atk:1.12,
+     bio:'Leads XXX Corps up the one road with the whole plan riding on his timetable — "and we might just do it."'},
+    {side:'G', unit:'82nd Airborne', name:'Gavin', atk:1.12,
+     bio:'The youngest divisional commander in the US Army, dropped astride the Waal with too many objectives and one afternoon.'},
+    {side:'G', unit:'1st Airborne', name:'Urquhart', def:1.10,
+     bio:'Dropped eight miles from his bridge with radios that don\'t work — and holds a shrinking perimeter for nine days anyway.'},
+    {side:'G', unit:'101st Airborne', name:'Taylor', def:1.10,
+     bio:'His Screaming Eagles hold fifteen miles of Hell\'s Highway against attacks from both sides at once.'},
+    {side:'S', unit:'Army Group B HQ', name:'Model', trait:'bulwark', def:1.12,
+     bio:'The Führer\'s fireman is lunching in Oosterbeek when the parachutes open over his head. He reacts in minutes, not days.'},
+    {side:'S', unit:'9th SS Hohenstaufen', name:'Bittrich', atk:1.12,
+     bio:'His battered SS corps was sent to Arnhem to rest. Within hours his panzers are rolling over the drop zones.'},
+    {side:'S', unit:'10th SS Frundsberg', name:'Harmel', def:1.10,
+     bio:'Holds the Nijmegen bridge against everything — until the impossible river assault crosses under his guns.'},
+  ],
+  capitalDefense: {turn:1, range:1, def:1.5, city:'Arnhem',
+    announce:'⭐ Two SS panzer divisions are refitting beside the far bridge — the photographs were filed and forgotten.'},
+  airborne: { sides:['G'], range:14, cost:3, dropLife:3 },   // the Polish brigade can be dropped where it's needed
+  decisions: [
+    {
+      id:'gavin', turn:2, side:'G',
+      date:'18 September 1944', title:'THE NIJMEGEN PRIORITY',
+      text:'Gavin\'s 82nd holds the Groesbeek heights — but the great Waal bridge at Nijmegen is still German, and every hour it stands, the SS dig deeper. Browning\'s order was heights first: lose them and the corridor dies. But the whole operation is a race for bridges.',
+      options:[
+        {label:'Rush the Waal bridge NOW',
+         effect:'The 82nd Airborne +2 strength and +1⚙ — everything into the bridge assault',
+         blurb:'Take the great bridge before the SS harden. The heights must look after themselves.',
+         log:'🟦 The 82nd goes for the bridge with everything it has.',
+         apply(G){
+           const u = unitsOf('G').find(t=>t.name==='82nd Airborne');
+           if (u) u.str = Math.min(KINDS[u.kind].maxStr, u.str+2);
+           G.pp.G = Math.min(40, G.pp.G+1);
+         }},
+        {label:'Hold the Groesbeek heights first',
+         effect:'+4⚙ and the 82nd digs in +1 — Browning\'s order, and history\'s choice',
+         blurb:'Secure the shoulder, then the bridge. Prudent — and the Waal crossing will cost a river assault in daylight.',
+         log:'🟦 "The heights first." The bridge waits — and hardens.',
+         apply(G){
+           const u = unitsOf('G').find(t=>t.name==='82nd Airborne');
+           if (u) u.entrench = Math.min(effTerrain(u.x,u.y).dig, u.entrench+1);
+           G.pp.G = Math.min(40, G.pp.G+4);
+         }},
+      ],
+      ai(G){ return 1; },   // history held the heights — and paid at the Waal
+    },
+    {
+      id:'model', turn:3, side:'S',
+      date:'19 September 1944', title:'MODEL\'S COUNTERSTROKE',
+      text:'The Allied corridor is sixty miles long and one road wide. Model can throw his gathering Kampfgruppen at the highway itself — cut it anywhere and everything north starves — or mass against the trapped 1st Airborne at Oosterbeek and erase the far end of the carpet first.',
+      options:[
+        {label:'Cut Hell\'s Highway',
+         effect:'Your three units nearest Veghel +2 strength — the road is the target',
+         blurb:'A single blown culvert stops a corps. Attack the road, everywhere, every day.',
+         log:'⬛ The Kampfgruppen strike the highway from both sides at once.',
+         apply(G){
+           const tgt = G.cities.find(c=>c.name==='Veghel');
+           unitsOf('S').slice().sort((a,b)=>hexDist(a.x,a.y,tgt.x,tgt.y)-hexDist(b.x,b.y,tgt.x,tgt.y))
+             .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+         }},
+        {label:'Crush the Arnhem pocket',
+         effect:'Your three units nearest Oosterbeek +2 strength — erase the far end first',
+         blurb:'Kill the airhead at the Rhine and the whole operation becomes a road to nowhere.',
+         log:'⬛ Everything within reach converges on the Oosterbeek perimeter.',
+         apply(G){
+           const tgt = G.cities.find(c=>c.name==='Oosterbeek');
+           unitsOf('S').slice().sort((a,b)=>hexDist(a.x,a.y,tgt.x,tgt.y)-hexDist(b.x,b.y,tgt.x,tgt.y))
+             .slice(0,3).forEach(u=>{ u.str = Math.min(KINDS[u.kind].maxStr, u.str+2); });
+         }},
+      ],
+      ai(G){ return 0; },   // history hit the road (and the pocket — but the road first)
+    },
+  ],
+  events: [
+    {turn:1, date:'17 September 1944', title:'THE CARPET UNROLLS', pp:{G:2},
+     text:'Thirty-five thousand men ride two thousand aircraft and gliders into Holland in daylight — the largest airborne operation in history. In England, Browning worries they may be going "a bridge too far."'},
+    {turn:2, date:'17 September · evening', title:'THE SON BRIDGE GOES UP', pp:{S:1},
+     text:'As the 101st closes on the Wilhelmina Canal, the bridge erupts in their faces. Bailey bridging must come up the one road, through the traffic of an entire corps. The timetable — Arnhem in two days — is already dead.'},
+    {turn:3, date:'18–19 September 1944', title:'FROST AT THE BRIDGE',
+     text:'One battalion — Frost\'s 2nd Para — has reached the north ramp of Arnhem bridge and will not leave it. Radios dead, ammunition counted in belts, they hold the whole objective of the operation with seven hundred men.'},
+    {turn:4, date:'20 September 1944', title:'THE WEATHER CLOSES', pp:{S:1},
+     text:'Fog on the English airfields: the resupply lift is cancelled, the Poles sit grounded, and the drop containers that do fall drift into German hands. The paras fight on captured ammunition.',
+     apply(G){ unitsOf('G').filter(u=>KINDS[u.kind].sym==='para').forEach(u=>{ u.str=Math.max(1,u.str-1); }); }},
+    {turn:4, date:'20 September 1944', title:'THE WAAL CROSSING', pp:{G:1},
+     text:'Twenty-six canvas boats, half the paddles missing, cross four hundred metres of open river into machine-gun fire. Half the boats come back for a second wave. By dusk the 82nd holds both ends of the Nijmegen bridge — the garrison is broken, and the great Waal span falls intact.',
+     apply(G){
+       // the historical mechanism: the crossing breaks the bridge garrison — if the
+       // Allies are at the river, the defenders abandon Nijmegen for the north bank
+       unitsOf('S').filter(u=>hexDist(u.x,u.y,19,9)<=1).forEach(u=>{ u.str=Math.max(1,u.str-3); u.entrench=0; });
+       const near = unitsOf('G').filter(u=>hexDist(u.x,u.y,19,9)<=2);
+       const def = unitAt(19,9);
+       if (near.length && def && def.side==='S'){
+         for (const [x,y] of [[21,8],[21,9],[22,9],[20,7],[22,10]]){
+           if (passable(x,y) && !unitAt(x,y) && terrainAt(x,y)!=='o'){ def.x=x; def.y=y; def.entrench=0; break; }
+         }
+       }
+       // ...and by dusk the crossing force holds both ends of the bridge
+       if (near.length && !unitAt(19,9)){
+         const grab = near.sort((a,b)=>b.str-a.str)[0];
+         grab.x=19; grab.y=9; grab.entrench=2;                      // both ends held, the span intact
+         grab.str = Math.min(KINDS[grab.kind].maxStr, grab.str+2);  // reinforcements pour across the bridge
+         const c = G.cities.find(c=>c.name==='Nijmegen');
+         if (c) c.owner = 'G';
+       }
+       // Harmel's Frundsberg abandons the lost bridge and falls back to block
+       // the raised Island road to Arnhem — history's next move, made in hours
+       const ss10 = unitsOf('S').find(u=>u.name==='10th SS Frundsberg');
+       if (ss10 && unitAt(19,9) && unitAt(19,9).side==='G'){
+         for (const [x,y] of [[21,8],[22,9],[21,9],[23,8]]){
+           if (passable(x,y) && !unitAt(x,y)){ ss10.x=x; ss10.y=y; ss10.entrench=1; break; }
+         }
+       }
+     }},
+    {turn:5, date:'21 September 1944', title:'BLACK FRIDAY',
+     text:'The last attempt to break through to the bridge dies in the streets of Oosterbeek. Frost\'s battalion, out of everything, is overrun. The 1st Airborne\'s war is now a shrinking perimeter with its back to the Rhine.'},
+    {turn:6, date:'22 September 1944', title:'HELL\'S HIGHWAY', pp:{G:1},
+     text:'German attacks cut the corridor at Veghel — for a day nothing moves. The 101st retakes the road, loses it, retakes it. The men have renamed the whole sixty miles: Hell\'s Highway.',
+     apply(G){
+       // the road is always reopened: any corridor town with paras still beside
+       // it and no German garrison on it comes back under Allied control
+       for (const name of ['Eindhoven','Son Bridge','Veghel','Grave Bridge']){
+         const c = G.cities.find(t=>t.name===name);
+         if (!c || c.owner==='G') continue;
+         const holder = unitAt(c.x,c.y);
+         const near = unitsOf('G').some(u=>hexDist(u.x,u.y,c.x,c.y)<=2);
+         if (!holder && near) c.owner = 'G';
+       }
+     }},
+    {turn:8, date:'24 September 1944', title:'THE ISLAND',
+     text:'Between the Waal and the Rhine, XXX Corps fights up the last miles of raised road through drowned polder — one tank wide, ditched on both sides, under observed fire. The Rhine is five miles and a world away.'},
+    {turn:10, date:'25–26 September 1944', title:'OPERATION BERLIN',
+     text:'In rain and darkness, the survivors of the 1st Airborne muffle their boots and slip across the Rhine in assault boats. Of ten thousand who dropped, fewer than two thousand come back. "We have no regrets," Urquhart signals. History files the rest.'},
+  ],
+  maxTurn: 10, turnDays: 1,
+  holdKeyCities: true,        // captured bridges are the whole objective — the AI garrisons them under fire
+  startDate: Date.UTC(1944,8,17),
+  weather(turn){ return (turn===4 || turn===5) ? 'mud' : 'clear'; },   // the fog that killed the resupply
+  pp(side, turn){
+    if (side==='G') return turn<=4 ? 6 : 4;            // one road: the buildup chokes as the corridor lengthens
+    return 2;                                          // Model has no army — only what the schedule scrapes together
+  },
+  victoryTiers: [
+    [10,'OVER THE RHINE — THE WAR BY CHRISTMAS','Arnhem holds and the Ruhr lies open. The gamble of the war has come off, and the timetable to Berlin is measured in weeks.'],
+    [7,'HISTORY REPEATS — A BRIDGE TOO FAR','Eindhoven, Grave, Nijmegen — a sixty-mile salient of hard-won bridges, ending five miles short of the one that mattered. "We have no regrets."'],
+    [4,'HELL\'S HIGHWAY CUT','The corridor is severed and the carpet dies pocket by pocket. The largest airborne operation in history becomes its largest disaster.'],
+    [2,'THE CARPET IS ROLLED UP','Even the first bridges are lost. XXX Corps ends the month where it started, minus an airborne army.'],
+    [0,'MARKET GARDEN ANNIHILATED','Three airborne divisions destroyed to no purpose at all — the worst Allied defeat since the fall of France.'],
+  ],
+  sudden: {
+    axisCities: ['Eindhoven','Nijmegen','Arnhem'], minAxisUnits: 3,
+    axisTitle: 'OVER THE RHINE — THE WAR BY CHRISTMAS',
+    axisText:  'The whole carpet is seized and XXX Corps crosses the last bridge intact. The plan worked — every piece of it.',
+    sovTitle:  'MARKET GARDEN ANNIHILATED',
+    sovText:   'The corridor collapses and the airborne army is destroyed in its pockets. No Allied commander will propose daring again for a year.',
+  },
+  airInit: [
+    ['G','2nd TAF (Typhoons)', 8],
+    ['G','ADGB Spitfires', 5],
+    ['S','Luftflotte 3 KG', 4],
+  ],
+  sovAirSchedule: [],
+  setup(st){
+    // the paras came down digging, each DZ fed by a ticking air-bridge — link
+    // up the corridor before the lifts run out
+    for (const u of st.units) if (u.side==='G' && KINDS[u.kind].sym==='para') u.entrench = 1;
+    st.airdrops = [
+      {x:9,  y:10, side:'G', turns:3},
+      {x:16, y:9,  side:'G', turns:3},
+      {x:23, y:8,  side:'G', turns:3},
+    ];
+  },
+  opening(playerSide){ return [
+    '17 September 1944 — thirty-five thousand paratroopers ride into Holland in broad daylight, and XXX Corps crosses the start line at 14:35.',
+    playerSide==='G'
+      ? '🟦 Sixty miles, five bridges, one road, ten days of airborne supply. Drive hard, link the pockets, and take Arnhem — the last bridge is the only one that counts.'
+      : '⬛ The corridor is one road wide and sixty miles long. Cut it anywhere, crush the far pocket at Arnhem — and Germany wins its last victory in the west.',
   ]; },
 };
 
@@ -5820,6 +6125,11 @@ function lineBonus(u, x, y){
    sharp AI saves the formation, an easy AI lets it be encircled. */
 function aiEscape(u){
   if (aiSkill(u.side) === 0) return null;
+  // you don't abandon the fortress: a supplied garrison on its own key city stands
+  // and fights (Moscow, Bastogne, the Nijmegen bridge) — it only slips out when
+  // broken or starving
+  const c0 = cityAt(u.x,u.y);
+  if (c0 && c0.owner===u.side && c0.vp>=3 && u.str>2 && !u.oos) return null;
   const adj = adjacentEnemies(u);
   const danger = adj.length>=3 || u.oos || (u.str<=3 && adj.length>=1) || (u.str<=4 && adj.length>=2);
   if (!danger) return null;
@@ -6906,6 +7216,15 @@ const PAC_STAGES = [
   { scn:'leyte',       side:'S', name:'The Return',       sub:'Leyte Gulf · October 1944',  goal:'Guard the beachhead, refuse the bait, and destroy the Combined Fleet forever.' },
   { scn:'okinawa',     side:'G', name:'Typhoon of Steel', sub:'Okinawa · April 1945',       goal:'Break the Shuri line at the gates of Japan — and end it.' },
 ];
+/* The Western Allies' arc — Alamein to the Ardennes. Like the Pacific, the
+   engine side swaps under the hood (the Eighth Army defends as S at Alamein,
+   the US holds the Bulge as S); the player is the Allies throughout. */
+const WEST_STAGES = [
+  { scn:'alamein',      side:'S', name:'Lightfoot',     sub:'Egypt · July 1942',        goal:'Hold the last line before the Nile — and break the Panzerarmee on it.' },
+  { scn:'dday',         side:'G', name:'Overlord',      sub:'Normandy · June 1944',     goal:'Storm the beaches, break out of the bocage, and liberate France.' },
+  { scn:'marketgarden', side:'G', name:'Market Garden', sub:'Holland · September 1944', goal:'Lay the airborne carpet and drive XXX Corps to the Rhine.' },
+  { scn:'bulge',        side:'S', name:'The Ardennes',  sub:'Belgium · December 1944',  goal:'Hold the shoulders, relieve Bastogne, and throw back the last gamble.' },
+];
 const RV_CAMPS = {
   rv:  { title:'ROAD TO VICTORY',        sub:'THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT',
          blurb:'Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.',
@@ -6913,6 +7232,9 @@ const RV_CAMPS = {
   gpw: { title:'THE GREAT PATRIOTIC WAR', sub:'THE SOVIET WAR · 1941–1943 · WIN EACH FRONT TO OPEN THE NEXT',
          blurb:'Fight the war as the Soviet Union, front by front. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.',
          side:'S', flag:'🟥', key:'hoi5-gpw-v1',          stages:GPW_STAGES },
+  wal: { title:'CRUSADE IN EUROPE',       sub:'THE WESTERN ALLIES · 1942–1944 · WIN EACH FRONT TO OPEN THE NEXT',
+         blurb:'Fight the Anglo-American war from the desert to the Rhine — the stand at Alamein, the greatest invasion in history, the airborne gamble, and the winter counterblow. Doctrines, veterans and the war chest carry from front to front.',
+         side:'G', flag:'🟩', key:'hoi5-crusade-v1',      stages:WEST_STAGES },
   pac: { title:'THE PACIFIC WAR',         sub:'FROM MIDWAY TO OKINAWA · 1942–1945 · WIN EACH FRONT TO OPEN THE NEXT',
          blurb:'Fight the American war across the Pacific — carrier ambush, island perimeter, the great fleet action, and the last assault. Doctrines, veterans and the war chest carry from front to front.',
          side:'G', flag:'🟦', key:'hoi5-pacific-v1',      stages:PAC_STAGES },
@@ -7774,7 +8096,7 @@ function gerPickTarget(u){
     let best=null, bestW=-1e9;
     for (const c of G.cities){
       if (c.owner!=='G' || c.vp===0) continue;
-      const w = threatToCity(c)*(c.vp+1)*3 - hexDist(u.x,u.y,c.x,c.y)*0.4;
+      const w = threatToCity(c)*(c.vp+1)*3 - hexDist(u.x,u.y,c.x,c.y)*(SCN.gerAI==='defend' ? 1.1 : 0.4);   // a defensive war is fought in sectors — armies don't cross the whole front to herd at one city
       if (w > bestW){ bestW=w; best=c; }
     }
     if (best) return best;
@@ -7796,7 +8118,13 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   s += (effTerrain(x,y).def - 1) * (offensive ? 3 : 6);        // dig into good ground when defending
   const c = cityAt(x,y);
   if (c && c.owner!=='G' && !KINDS[u.kind].noCapture) s += 6 + c.vp*4;   // capture!
-  if (c && c.owner==='G' && c.vp>0 && !offensive && !unitAt(x,y)) s += 6;  // garrison our own
+  if (c && c.owner==='G' && c.vp>0 && (!unitAt(x,y) || unitAt(x,y).id===u.id)){
+    if (!offensive) s += SCN.gerAI==='defend' ? 9 : 6;          // garrison our own — an army fighting a defensive war holds its towns hardest
+    else if (c.vp>=3 && SCN.holdKeyCities){                     // opt-in (Market Garden): even on the attack, a key city with the enemy at the gates keeps its garrison
+      let foes=0; for (const t of unitsOf('S')) if (hexDist(c.x,c.y,t.x,t.y)<=3) foes++;
+      if (foes) s += 12 + c.vp*2;                               // the bridge is the objective — it does not get abandoned
+    }
+  }
   // don't outrun the supply net — fast units on the attack accept a little risk
   // (capturing a city restores supply, so the capture hex is exempt)
   let oosPen = (isArm && offensive) ? 6 : 7;
@@ -14466,14 +14794,39 @@ function applyScenarioMenu(){
   $('pick-sov').innerHTML = `<h4>${s.menu.sov.h}</h4><p>${s.menu.sov.p}</p>`;
   $('menu-rec').textContent = recordLine(mScn);
 }
+/* theater tabs: show only the active front's battles, so the picker stays
+   readable however many scenarios the game grows */
+function syncTheater(t){
+  document.querySelectorAll('#theater-row .opt').forEach(o=>o.classList.toggle('sel', o.dataset.t===t));
+  document.querySelectorAll('#scn-row .opt').forEach(o=>{ if (o.dataset.s) o.style.display = (o.dataset.t===t) ? '' : 'none'; });
+}
+for (const el of document.querySelectorAll('#theater-row .opt')){
+  el.onclick = ()=>{
+    syncTheater(el.dataset.t);
+    // if the selected battle belongs to another front, hop to this front's first
+    const cur = document.querySelector('#scn-row .opt.sel');
+    if (!cur || cur.dataset.t !== el.dataset.t){
+      const first = document.querySelector(`#scn-row .opt[data-t="${el.dataset.t}"]`);
+      if (first){
+        mScn = first.dataset.s;
+        document.querySelectorAll('#scn-row .opt').forEach(o=>o.classList.remove('sel'));
+        first.classList.add('sel');
+        applyScenarioMenu();
+      }
+    }
+    sClick();
+  };
+}
 for (const el of document.querySelectorAll('#scn-row .opt')){
   el.onclick = ()=>{
     mScn = el.dataset.s;
     document.querySelectorAll('#scn-row .opt').forEach(o=>o.classList.remove('sel'));
     el.classList.add('sel');
+    if (el.dataset.t) syncTheater(el.dataset.t);     // keep the tabs honest
     applyScenarioMenu(); sClick();
   };
 }
+syncTheater('east');                                  // the default battle is Barbarossa
 $('pick-ger').onclick = ()=>{ mSide='G'; $('pick-ger').classList.add('sel'); $('pick-sov').classList.remove('sel'); };
 $('pick-sov').onclick = ()=>{ mSide='S'; $('pick-sov').classList.add('sel'); $('pick-ger').classList.remove('sel'); };
 for (const el of document.querySelectorAll('#diff-row .opt')){

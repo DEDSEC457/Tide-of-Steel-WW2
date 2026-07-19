@@ -260,6 +260,18 @@ say('— pacific campaign —');
     E.rvStageSide('pac',0)==='S' && E.rvStageSide('pac',1)==='G' &&
     E.rvStageSide('pac',2)==='S' && E.rvStageSide('pac',3)==='G');
   check('campaigns without overrides keep their side', E.rvStageSide('rv',3)==='G' && E.rvStageSide('gpw',1)==='S');
+  // CRUSADE IN EUROPE: the Western Allies arc swaps sides per stage too
+  const wal = E.RV_CAMPS.wal;
+  check('the Crusade arc exists with four fronts', !!wal && wal.stages.length===4 && wal.stages.every(s=>!!E.SCENARIOS[s.scn]));
+  check('the player is the Allies on both engine sides',
+    E.rvStageSide('wal',0)==='S' && E.rvStageSide('wal',1)==='G' &&
+    E.rvStageSide('wal',2)==='G' && E.rvStageSide('wal',3)==='S');
+  // Market Garden opens with the airborne carpet already down and supplied by air
+  const Gm = E.newGame('G','normal','hotseat','marketgarden');
+  check('the carpet starts with three air-bridge pockets', (Gm.airdrops||[]).length===3 && Gm.airdrops.every(a=>a.side==='G'&&a.turns>0));
+  const para = E.unitsOf('G').find(u=>u.name==='1st Airborne');
+  check('the far pocket at Arnhem starts in supply', !!para && E.computeSupply('G').has(E.keyOf(para.x,para.y)));
+  E.newGame('G','normal','hotseat','barbarossa');
   // stars respect the stage side: at Midway (US=S) LOW axis VP is the win
   E.newGame('S','normal','ai','midway');
   check('stage stars flip with the stage side', E.rvStars(0,'S')===5 && E.rvStars(0,'G')===0);
