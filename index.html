@@ -9675,6 +9675,49 @@ function wwEndTurn(){
    Everything below is browser-only: rendering, input, UI, sound.
    The game engine above runs headless too (used by the test harness).
    ==================================================================== */
+/* ---- theater music palettes (engine scope: the tests verify them) ---- */
+/* Three palettes, one per theater — the score follows the front you're on.
+   ch: chord pad (Hz) · mel: [freq, beats] · drum: timpani (2 = taiko double) · snare */
+const MUSIC = {
+  east: { bpm: 56, bars: [        // the original: somber A-minor strings, a lone horn
+    {ch:[110.00,130.81,164.81], mel:[[329.63,2],[261.63,2]], drum:1},   // Am
+    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[220.00,2]]},           // F
+    {ch:[130.81,164.81,196.00], mel:[[196.00,2],[329.63,2]]},           // C
+    {ch:[ 98.00,123.47,146.83], mel:[[293.66,2],[246.94,2]], drum:1},   // G
+    {ch:[110.00,130.81,164.81], mel:[[220.00,4]]},                      // Am
+    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[293.66,2]]},           // F
+    {ch:[ 73.42, 87.31,110.00], mel:[[349.23,2],[293.66,2]], drum:1},   // Dm
+    {ch:[ 82.41,103.83,123.47], mel:[[329.63,4]], snare:1},             // E
+  ]},
+  west: { bpm: 60, bars: [        // the Crusade: a brighter C-major march, resolve and momentum
+    {ch:[130.81,164.81,196.00], mel:[[329.63,2],[392.00,2]], drum:1},   // C
+    {ch:[ 98.00,123.47,146.83], mel:[[293.66,2],[246.94,2]]},           // G
+    {ch:[110.00,130.81,164.81], mel:[[220.00,2],[261.63,2]]},           // Am
+    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[293.66,2]], snare:1},  // F
+    {ch:[130.81,164.81,196.00], mel:[[392.00,4]], drum:1},              // C
+    {ch:[ 87.31,110.00,130.81], mel:[[440.00,2],[392.00,2]]},           // F
+    {ch:[ 98.00,123.47,146.83], mel:[[293.66,2],[329.63,2]], snare:1},  // G
+    {ch:[130.81,164.81,196.00], mel:[[261.63,4]], drum:1},              // C — home
+  ]},
+  pacific: { bpm: 50, bars: [     // the Pacific: open-fifth swells, pentatonic horn, taiko
+    {ch:[110.00,164.81,220.00], mel:[[329.63,2],[293.66,2]], drum:2},   // A5
+    {ch:[ 98.00,146.83,196.00], mel:[[293.66,2],[261.63,2]], drum:1},   // G5
+    {ch:[ 87.31,130.81,174.61], mel:[[261.63,2],[220.00,2]]},           // F5
+    {ch:[110.00,164.81,220.00], mel:[[220.00,4]], drum:2},              // A5
+    {ch:[ 73.42,110.00,146.83], mel:[[293.66,2],[329.63,2]], drum:1},   // D5
+    {ch:[ 98.00,146.83,196.00], mel:[[392.00,2],[329.63,2]]},           // G5
+    {ch:[ 87.31,130.81,174.61], mel:[[261.63,2],[293.66,2]], drum:1},   // F5
+    {ch:[110.00,164.81,220.00], mel:[[220.00,4]], drum:2, snare:1},     // A5 — the long swell home
+  ]},
+};
+/* which front's palette a battle uses — the score follows the map */
+function theaterOf(id){
+  if (['midway','guadalcanal','okinawa','leyte'].includes(id)) return 'pacific';
+  if (['alamein','dday','marketgarden','bulge','france','italy','normandy'].includes(id)) return 'west';
+  return 'east';
+}
+function musicTheme(){ return MUSIC[typeof SCN!=='undefined' && SCN ? theaterOf(SCN.id) : 'east'] || MUSIC.east; }
+
 if (typeof document !== 'undefined') (function(){
 
 /* ---------------- canvas & camera ---------------- */
@@ -10032,19 +10075,7 @@ function noise(dur, vol=0.12){
    In the somber-orchestral spirit of the grand-strategy classics: slow minor-key
    string pads, a lone horn-like melody, distant timpani and a military snare.
    Composed for this game — eight bars in A minor, looping with variations. */
-const MUSIC = {
-  bpm: 56,
-  bars: [   // ch: chord pad (Hz) · mel: [freq, beats] · drum/snare: percussion
-    {ch:[110.00,130.81,164.81], mel:[[329.63,2],[261.63,2]], drum:1},   // Am
-    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[220.00,2]]},           // F
-    {ch:[130.81,164.81,196.00], mel:[[196.00,2],[329.63,2]]},           // C
-    {ch:[ 98.00,123.47,146.83], mel:[[293.66,2],[246.94,2]], drum:1},   // G
-    {ch:[110.00,130.81,164.81], mel:[[220.00,4]]},                      // Am
-    {ch:[ 87.31,110.00,130.81], mel:[[261.63,2],[293.66,2]]},           // F
-    {ch:[ 73.42, 87.31,110.00], mel:[[349.23,2],[293.66,2]], drum:1},   // Dm
-    {ch:[ 82.41,103.83,123.47], mel:[[329.63,4]], snare:1},             // E
-  ],
-};
+/* (music palettes + theaterOf live at engine scope, above the UI closure) */
 let musicGain = null, musicTimer = null, musicBar = 0;
 function applyMusicVol(){ if (musicGain) musicGain.gain.value = muted ? 0 : musicVol*0.55; }
 function startMusic(){
@@ -10098,16 +10129,17 @@ function snareHit(a, t, vol){
 function scheduleBar(){
   if (!musicGain || !AC) return;
   const a = AC;
-  const beat = 60/MUSIC.bpm, barDur = beat*4;
+  const M = musicTheme();                               // the palette follows the current front
+  const beat = 60/M.bpm, barDur = beat*4;
   const t = a.currentTime + 0.08;
-  const bar = MUSIC.bars[musicBar % MUSIC.bars.length];
-  const loop = Math.floor(musicBar / MUSIC.bars.length);
+  const bar = M.bars[musicBar % M.bars.length];
+  const loop = Math.floor(musicBar / M.bars.length);
   for (const f of bar.ch) padNote(a, f, t, barDur);
   if (loop % 2 === 0){                                  // melody alternates with pad-only passes
     let bt = 0;
     for (const [f, beats] of bar.mel){ hornNote(a, f, t + bt*beat, beats*beat*0.96); bt += beats; }
   }
-  if (bar.drum) timpani(a, t);
+  if (bar.drum){ timpani(a, t); if (bar.drum > 1) timpani(a, t + beat*2); }   // taiko doubles on the Pacific
   if (bar.snare) for (let i=0;i<3;i++) snareHit(a, t + barDur - (0.45 - i*0.15), 0.05 + i*0.015);
   musicBar++;
   musicTimer = setTimeout(scheduleBar, barDur*1000 - 60);
@@ -10165,6 +10197,11 @@ function setAmbient(wx){
     ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(950,t,0.6);
     ambLFOg.gain.value=140; ambLFO.frequency.value=0.22;
     ambGain.gain.setTargetAtTime(ambTarget()*0.15, t, 1.0);
+  } else if (typeof SCN!=='undefined' && SCN && theaterOf(SCN.id)==='pacific'){
+    // clear skies at sea — a slow ocean swell instead of silence
+    ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(420,t,0.8);
+    ambLFOg.gain.value=260; ambLFO.frequency.value=0.07;                // long, slow rollers
+    ambGain.gain.setTargetAtTime(ambTarget()*0.12, t, 1.4);
   } else {                // clear skies — let it die away
     ambGain.gain.setTargetAtTime(0, t, 1.6);
   }
@@ -14976,6 +15013,7 @@ function startCampaign(loaded){
   // would draw onto the new map
   anims = []; scars = []; moveAnim = null; hitFlash.clear(); recoilMap.clear(); shakeMag = 0;
   _clouds = null;                              // reseed the overcast for this map's dimensions
+  ambWx = null;                                // re-evaluate the ambience for this theater (ocean surf vs silence)
   bannerTurn = 0; aiReport = null;             // a fresh campaign gets a fresh turn banner
   $('game-title').textContent = '⚙ ' + SCN.short;
   show('menu', false);
@@ -15025,6 +15063,7 @@ if (typeof module !== 'undefined' && module.exports){
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
     rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvStageSide, RV_CAMPS, rvCurrent: ()=>RV,
     medalAward, medalGet, medalsAll, MEDAL_RANK, MEDAL_ICON,
+    theaterOf, MUSIC,
     SCENARIOS, loadScenario,
     fowActive, sightFor, computeSight, isSpotted, fowMovePlan, airRecon, tracePath, viewerSide,
     recordReplay, executeOrder, orderObjective, onFront, stepToward, encircledIds, isEncircled,

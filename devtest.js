@@ -299,6 +299,14 @@ say('— pacific campaign —');
   check('a harder clear upgrades the medal', E.medalGet('pac').diff==='brutal');
   check('other arcs are untouched', E.medalGet('rv')===null);
   memLS.removeItem('hoi5-medals-v1');
+  // theater soundtracks: every battle maps to a palette, every palette is playable
+  check('every scenario has a music theater',
+    Object.keys(E.SCENARIOS).every(id => ['east','west','pacific'].includes(E.theaterOf(id))));
+  check('the Pacific and the Crusade sound like themselves',
+    E.theaterOf('okinawa')==='pacific' && E.theaterOf('marketgarden')==='west' && E.theaterOf('barbarossa')==='east');
+  check('all three palettes are complete 8-bar loops',
+    ['east','west','pacific'].every(t => E.MUSIC[t] && E.MUSIC[t].bpm>0 && E.MUSIC[t].bars.length===8 &&
+      E.MUSIC[t].bars.every(b => b.ch.length===3 && b.mel.every(([f,n])=>f>60&&n>0))));
 }
 
 /* amphibious no-retreat fix: a cornered defender is never stacked under the attacker */
