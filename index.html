@@ -849,6 +849,9 @@
         <button id="view-2d">Flat 2D</button><button id="view-3d">3D board</button>
       </div></div>
     <div id="view3d-desc" style="color:var(--dim);font-size:12px;margin-top:2px;">Raised counters and embossed terrain — the map as a table of miniatures. Switch back to flat any time; it changes only the look, never the play.</div>
+    <div class="setrow" style="margin-top:8px;"><span>🎥 Camera tilt <span style="opacity:.55;font-size:11px;">experimental</span></span>
+      <button id="btn-tilt">Tilt: OFF</button></div>
+    <div style="color:var(--dim);font-size:12px;margin-top:2px;">Pitches the whole board back like a table — best paired with the 3D board. A separate switch: if a click ever feels off, flip it back to flat.</div>
     <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
     <div class="setrow"><span>🔍 Interface size</span>
       <input type="range" id="ui-scale" min="90" max="125" step="5">
@@ -9799,6 +9802,72 @@ function setView3d(on){
   if (typeof requestRender === 'function') requestRender();
   if (typeof syncGfxUI === 'function') syncGfxUI();
 }
+
+// ---- Camera tilt (experimental, independent toggle) ----
+// A real GPU perspective applied to the whole map canvas via a CSS 3D transform:
+// the board pitches back like a table. The render code is UNTOUCHED — only the
+// finished <canvas> element is tilted — so every draw stays byte-identical. The
+// one thing that must follow is picking: a click lands in the tilted display
+// space, so we invert the exact same projective transform (a 2D homography, since
+// the canvas is a flat plane) before feeding the point to toWorld/hexFromPixel.
+// Off by default; if a click ever feels off, one toggle restores flat play.
+let tilt = false;
+const TILT_DEG = 24, TILT_SCALE = 1.06, TILT_P = 1500;
+let _tiltInv = null;
+try{ tilt = localStorage.getItem('hoi5-tilt')==='1'; }catch(e){}
+function _inv3(m){                                   // inverse of a row-major 3x3
+  const [a,b,c,d,e,f,g,h,i] = m;
+  const A=(e*i-f*h), B=-(d*i-f*g), C=(d*h-e*g);
+  const det = a*A + b*B + c*C; if (!det) return null;
+  const q = 1/det;
+  return [ A*q, (c*h-b*i)*q, (b*f-c*e)*q,
+           B*q, (a*i-c*g)*q, (c*d-a*f)*q,
+           C*q, (b*g-a*h)*q, (a*e-b*d)*q ];
+}
+function buildTilt(){
+  if (!tilt || typeof DOMMatrix === 'undefined'){ _tiltInv = null; return; }
+  try{
+    const persp = new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,-1/TILT_P, 0,0,0,1]);
+    const M = persp.multiply(new DOMMatrix().rotate(TILT_DEG,0,0)).multiply(new DOMMatrix().scale(TILT_SCALE));
+    // forward homography (element-local relative to origin) → screen-relative:
+    // rows map [ex,ey,1] to [X,Y,W]; screenRel = (X/W, Y/W)
+    const Hf = [ M.m11, M.m21, M.m41,
+                 M.m12, M.m22, M.m42,
+                 M.m14, M.m24, M.m44 ];
+    _tiltInv = _inv3(Hf);
+  }catch(e){ _tiltInv = null; }
+}
+// screen (client) point → the pre-tilt canvas pixel the renderer thinks in
+function untilt(cx, cy){
+  if (!tilt || !_tiltInv) return [cx, cy];
+  const ox = innerWidth/2, oy = innerHeight/2;       // transform-origin 50% 50%
+  const rx = cx - ox, ry = cy - oy, H = _tiltInv;
+  const a = H[0]*rx + H[1]*ry + H[2];
+  const b = H[3]*rx + H[4]*ry + H[5];
+  const w = H[6]*rx + H[7]*ry + H[8];
+  return w ? [a/w + ox, b/w + oy] : [cx, cy];
+}
+function applyTilt(){
+  if (canvas && canvas.style){
+    canvas.style.transformOrigin = '50% 50%';
+    canvas.style.transform = tilt ? `perspective(${TILT_P}px) rotateX(${TILT_DEG}deg) scale(${TILT_SCALE})` : '';
+  }
+  buildTilt();
+  if (typeof requestRender === 'function') requestRender();
+}
+function setTilt(on){
+  tilt = !!on;
+  try{ localStorage.setItem('hoi5-tilt', tilt?'1':'0'); }catch(e){}
+  applyTilt();
+  if (typeof syncGfxUI === 'function') syncGfxUI();
+}
+// restore a persisted tilt on boot — set the CSS + homography now, but don't
+// poke the render loop yet (its state is still initialising below)
+if (canvas && canvas.style && tilt){
+  canvas.style.transformOrigin = '50% 50%';
+  canvas.style.transform = `perspective(${TILT_P}px) rotateX(${TILT_DEG}deg) scale(${TILT_SCALE})`;
+}
+buildTilt();
 function _reGfx(){                                            // re-apply density + re-bake terrain
   if (typeof resize === 'function') resize();
   try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}
@@ -12396,7 +12465,7 @@ window.addEventListener('mousemove', e=>{
   // only refresh the hover cards (and the combat preview's Monte-Carlo forecast)
   // when the cursor actually crosses into a new hex — not on every pixel of a
   // 120Hz mousemove stream. Cuts most of the per-move work, so hover stays snappy.
-  const [wx,wy] = toWorld(e.clientX, e.clientY);
+  const [wx,wy] = toWorld(...untilt(e.clientX, e.clientY));
   const nh = hexFromPixel(wx,wy);
   const moved = (!hover !== !nh) || (hover && nh && (hover[0]!==nh[0] || hover[1]!==nh[1]));
   hover = nh;
@@ -12408,9 +12477,10 @@ canvas.addEventListener('wheel', e=>{
   const f = e.deltaY < 0 ? 1.15 : 1/1.15;
   const cur = zoomGlide ? zoomGlide.target : cam.z;         // stack notches onto the glide
   const target = Math.max(minZoom(), Math.min(2.2, cur*f));
-  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  const [tx,ty] = untilt(e.clientX, e.clientY);
+  const [wx,wy] = toWorld(tx,ty);
   camGlide = null;
-  zoomGlide = {target, sx:e.clientX, sy:e.clientY, wx, wy};
+  zoomGlide = {target, sx:tx, sy:ty, wx, wy};
   requestRender();
 }, {passive:false});
 
@@ -12419,7 +12489,7 @@ canvas.addEventListener('click', e=>{
   { const c=$('coach-amphib'); if (c && !c.classList.contains('hidden')) c.classList.add('hidden'); }   // any map click retires the coach
   const isHuman = G.mode==='hotseat' || G.phase===G.playerSide;
   if (!isHuman) return;
-  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  const [wx,wy] = toWorld(...untilt(e.clientX,e.clientY));
   const h = hexFromPixel(wx,wy);
   if (!h) { deselect(); return; }
   const [x,y] = h;
@@ -13430,11 +13500,14 @@ function syncGfxUI(){
   const v2 = $('view-2d'), v3 = $('view-3d');
   if (v2) v2.classList.toggle('sel', !view3d);
   if (v3) v3.classList.toggle('sel', view3d);
+  const tb = $('btn-tilt');
+  if (tb){ tb.textContent = 'Tilt: ' + (tilt?'ON':'OFF'); tb.classList.toggle('sel', tilt); }
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
 $('view-2d').onclick = ()=>{ setView3d(false); sClick(); };
 $('view-3d').onclick = ()=>{ setView3d(true); sClick(); };
+$('btn-tilt').onclick = ()=>{ setTilt(!tilt); sClick(); };
 $('gfx-adv-toggle').onclick = ()=>{
   const adv = $('gfx-adv'), open = adv.classList.toggle('hidden');
   $('gfx-adv-toggle').textContent = open ? 'Advanced ▸' : 'Advanced ▾';
@@ -15117,6 +15190,20 @@ window.__dbgSelect = (name) => {                       // select a unit by name 
 window.__dbgCenter = (hx,hy,z) => {                    // centre the camera on a hex (QA)
   if (z) cam.z = z; const [cx,cy] = hexCenter(hx,hy);
   cam.x = cx - innerWidth/2/cam.z; cam.y = cy - innerHeight/2/cam.z; requestRender();
+};
+window.__dbgSel = () => sel;                           // currently-selected unit id (QA)
+// where a hex centre actually appears on screen — through the tilt if it's on (QA)
+window.__dbgHexScreen = (hx,hy) => {
+  const [wx,wy] = hexCenter(hx,hy);
+  let [sx,sy] = toScreen(wx,wy);
+  if (tilt && typeof DOMMatrix !== 'undefined'){
+    const ox=innerWidth/2, oy=innerHeight/2;
+    const persp = new DOMMatrix([1,0,0,0,0,1,0,0,0,0,1,-1/TILT_P,0,0,0,1]);
+    const M = persp.multiply(new DOMMatrix().rotate(TILT_DEG,0,0)).multiply(new DOMMatrix().scale(TILT_SCALE));
+    const p = M.transformPoint(new DOMPoint(sx-ox, sy-oy, 0, 1));
+    sx = p.x/p.w + ox; sy = p.y/p.w + oy;
+  }
+  return [sx, sy];
 };
 
 })();
