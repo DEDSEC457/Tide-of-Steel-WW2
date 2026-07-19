@@ -12455,8 +12455,12 @@ window.addEventListener('mouseup', ()=>{
 });
 window.addEventListener('mousemove', e=>{
   if (dragging){
-    const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
-    if (Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
+    // untilt both endpoints so a drag tracks the cursor faithfully even under the
+    // perspective tilt (near the receding top edge a small screen move is a larger
+    // world move). With tilt off, untilt is the identity — behaviour is unchanged.
+    const [ux,uy] = untilt(e.clientX, e.clientY), [lux,luy] = untilt(lastMx, lastMy);
+    const dx = ux - lux, dy = uy - luy;
+    if (Math.abs(e.clientX-lastMx)+Math.abs(e.clientY-lastMy) > 3) dragMoved=true;
     cam.x -= dx/cam.z; cam.y -= dy/cam.z; lastMx=e.clientX; lastMy=e.clientY;
     const now = performance.now(), dt = Math.max(1, now - _dragT); _dragT = now;
     _dragVx = 0.7*(dx/dt) + 0.3*_dragVx;            // smoothed screen-px/ms velocity
@@ -12595,7 +12599,7 @@ canvas.addEventListener('contextmenu', e=>{
 // double-click recenters the map on that spot (handy on the big maps)
 canvas.addEventListener('dblclick', e=>{
   if (!G || dragMoved) return;
-  const [wx,wy] = toWorld(e.clientX,e.clientY);
+  const [wx,wy] = toWorld(...untilt(e.clientX,e.clientY));
   const h = hexFromPixel(wx,wy);
   if (h) centerOn(h[0],h[1]);
 });
@@ -15192,6 +15196,34 @@ window.__dbgCenter = (hx,hy,z) => {                    // centre the camera on a
   cam.x = cx - innerWidth/2/cam.z; cam.y = cy - innerHeight/2/cam.z; requestRender();
 };
 window.__dbgSel = () => sel;                           // currently-selected unit id (QA)
+// the EXACT production pick: screen(client) px → hex, through the tilt inverse (QA)
+window.__dbgPickAt = (sx,sy) => hexFromPixel(...toWorld(...untilt(sx,sy)));
+// exhaustive picking audit across zoom + pan states (QA). For every on-screen hex
+// we project its centre to the tilted screen, then run the production pick from
+// there and require the same hex back. Returns {tested, ok, fails[]}.
+window.__dbgTiltAudit = () => {
+  const out = { tested:0, ok:0, fails:[] };
+  const z0=cam.z, x0=cam.x, y0=cam.y;
+  const zooms = [minZoom()*1.05, 0.7, 1.0, 1.6];
+  const pans = [[0,0],[-0.25,-0.2],[0.25,0.2]];
+  for (const z of zooms) for (const [px,py] of pans){
+    cam.z = Math.max(minZoom(), Math.min(2.2, z));
+    const mw = mapW(), mh = mapH();
+    cam.x = (mw - innerWidth/cam.z)/2 + px*mw;
+    cam.y = (mh - innerHeight/cam.z)/2 + py*mh;
+    const sx0 = Math.max(1, Math.floor(COLS/9)), sy0 = Math.max(1, Math.floor(ROWS/9));
+    for (let hy=0; hy<ROWS; hy+=sy0) for (let hx=0; hx<COLS; hx+=sx0){
+      const [sx,sy] = window.__dbgHexScreen(hx,hy);
+      if (sx < 12 || sx > innerWidth-230 || sy < 66 || sy > innerHeight-24) continue;
+      const pick = window.__dbgPickAt(sx,sy);
+      out.tested++;
+      if (pick && pick[0]===hx && pick[1]===hy) out.ok++;
+      else if (out.fails.length < 8) out.fails.push({hx,hy,sx:Math.round(sx),sy:Math.round(sy),got:pick,z:+cam.z.toFixed(2)});
+    }
+  }
+  cam.z=z0; cam.x=x0; cam.y=y0; requestRender();
+  return out;
+};
 // where a hex centre actually appears on screen — through the tilt if it's on (QA)
 window.__dbgHexScreen = (hx,hy) => {
   const [wx,wy] = hexCenter(hx,hy);
