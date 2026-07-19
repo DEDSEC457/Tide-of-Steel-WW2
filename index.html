@@ -18,8 +18,23 @@
 
   /* ---------- top bar ---------- */
   #topbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
-    gap:14px;padding:0 14px;background:linear-gradient(#181c13ee,#12150eee);
+    gap:8px;padding:0 10px;background:linear-gradient(#181c13ee,#12150eee);
     border-bottom:1px solid var(--line);z-index:20;font-size:14px;}
+  #topbar button{flex-shrink:0;}
+  /* the bar must never push End Turn off-screen — shed weight as the window narrows */
+  @media (max-width:1500px){
+    #topbar{gap:6px;font-size:13px;}
+    #topbar .t-title{display:none;}
+  }
+  @media (max-width:1450px){
+    #topbar button .bl{display:none;}      /* icon-only buttons — the tooltips still name them */
+  }
+  @media (max-width:1250px){
+    #topbar{font-size:12px;}
+    #topbar button{padding:4px 6px;}
+    #topbar .t-chip{padding:4px 6px;}
+    #wx-chip .fc{display:none;}
+  }
   #topbar .t-title{font-weight:700;letter-spacing:2px;color:var(--amber);font-size:15px;white-space:nowrap;}
   #topbar .t-chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
     padding:4px 10px;white-space:nowrap;}
@@ -276,17 +291,17 @@
   <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
   <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
   <span class="spacer"></span>
-  <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚 Supply</button>
-  <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠ Threat</button>
+  <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚<span class="bl"> Supply</span></button>
+  <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠<span class="bl"> Threat</span></button>
   <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
-  <button id="btn-objectives" title="Objective cities & victory tiers">Objectives</button>
-  <button id="btn-doctrine" title="Adopt war doctrines — permanent bonuses bought with production (D)">🎖 Doctrine</button>
-  <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋 Units</button>
-  <button id="btn-help2" title="How to play">Help</button>
+  <button id="btn-objectives" title="Objective cities & victory tiers">🎯<span class="bl"> Objectives</span></button>
+  <button id="btn-doctrine" title="Adopt war doctrines — permanent bonuses bought with production (D)">🎖<span class="bl"> Doctrine</span></button>
+  <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋<span class="bl"> Units</span></button>
+  <button id="btn-help2" title="How to play">❓<span class="bl"> Help</span></button>
   <button id="btn-sound" title="Sound & graphics settings">🔊</button>
-  <button id="btn-menu" title="Save and return to the menu">Menu</button>
+  <button id="btn-menu" title="Save and return to the menu">☰<span class="bl"> Menu</span></button>
   <button id="btn-next" class="hidden" title="Jump to your next unit with orders left (N / Space / Tab)">⏭ Next</button>
-  <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩ Undo</button>
+  <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩<span class="bl"> Undo</span></button>
   <button id="btn-endturn" class="primary">End Turn ▶</button>
 </div>
 
@@ -12726,12 +12741,14 @@ function updateTop(){
     const w = weatherFor(t); fc += wxIcon[w] || '·';
     fcTip += `\nTurn ${t}: ${wxLabelOf(w)}`;
   }
-  chip.innerHTML = `Weather: <b>${wxLabelOf(wx)}</b>${fc?` <span style="opacity:.65;font-size:11px;letter-spacing:1px;">→ ${fc}</span>`:''}`;
+  chip.innerHTML = `${wxIcon[wx]||'☀'} <b>${wxLabelOf(wx)}</b>${fc?` <span class="fc" style="opacity:.65;font-size:11px;letter-spacing:1px;">→ ${fc}</span>`:''}`;
   chip.className = 't-chip ' + wx;
   chip.title = `${wxFxOf(wx)[1] || wxLabelOf(wx)}${fcTip ? '\n\nForecast:'+fcTip : ''}\n\n(click for the campaign clock)`;
-  $('vp-chip').innerHTML = `${sideName('G')} objectives: <b>${axisVP()}</b>/${TOTAL_VP}`;
+  $('vp-chip').innerHTML = `🎯 <b>${axisVP()}</b>/${TOTAL_VP}`;
+  $('vp-chip').title = `${sideName('G')} objectives held — the victory tiers count these (click Objectives for the map)`;
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
-  $('pp-chip').innerHTML = `${sideName(side)} production: <b>${G.pp[side]}</b> ⚙`;
+  $('pp-chip').innerHTML = `⚙ <b>${G.pp[side]}</b>`;
+  $('pp-chip').title = `${sideName(side)} production points — spend them on reinforcements and deployments`;
   // "Next" button: shows how many of the active human's units still have orders
   const human = !G.over && !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
   const ready = human ? actionableUnits(G.phase).length : 0;
