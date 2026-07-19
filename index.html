@@ -10285,10 +10285,10 @@ function setAmbient(wx){
     ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(700,t,0.6);
     ambLFOg.gain.value=320; ambLFO.frequency.value=0.10;
     ambGain.gain.setTargetAtTime(ambTarget()*0.20, t, 1.0);
-  } else if(wx==='mud'){  // a steady hiss of rain
+  } else if(wx==='mud'){  // a soft hiss of rain, kept well under the score
     ambFilter.type='highpass'; ambFilter.frequency.setTargetAtTime(950,t,0.6);
     ambLFOg.gain.value=140; ambLFO.frequency.value=0.22;
-    ambGain.gain.setTargetAtTime(ambTarget()*0.15, t, 1.0);
+    ambGain.gain.setTargetAtTime(ambTarget()*0.08, t, 1.0);
   } else if (typeof SCN!=='undefined' && SCN && theaterOf(SCN.id)==='pacific'){
     // clear skies at sea — a slow ocean swell instead of silence
     ambFilter.type='lowpass'; ambFilter.frequency.setTargetAtTime(420,t,0.8);
