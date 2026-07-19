@@ -1748,6 +1748,7 @@ function uiSmoke(side){
   // exercise the modals & QoL controls too
   $('btn-objectives').onclick(); $('btn-obj-close').onclick();
   if ($('ui-scale').oninput){ $('ui-scale').value = 110; $('ui-scale').oninput(); }   // interface-size slider
+  if ($('view-3d').onclick){ $('view-3d').onclick(); $('view-2d').onclick(); }        // 3D battlefield view toggle
   $('btn-help2').onclick(); $('btn-help-close').onclick();
   if ($('wx-chip').onclick){ $('wx-chip').onclick(); $('btn-clock-close').onclick(); }
   if ($('btn-aispeed').onclick) $('btn-aispeed').onclick();

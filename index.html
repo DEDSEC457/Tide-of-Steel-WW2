@@ -844,6 +844,12 @@
       <div id="gfx-tog-note" style="color:var(--dim);font-size:11px;margin-top:4px;">Fine-tune individual effects — switch any off to claw back frames. Changing the quality preset resets these.</div>
     </div>
     <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
+    <div class="setrow"><span>🧊 Battlefield view</span>
+      <div class="gfx-seg">
+        <button id="view-2d">Flat 2D</button><button id="view-3d">3D board</button>
+      </div></div>
+    <div id="view3d-desc" style="color:var(--dim);font-size:12px;margin-top:2px;">Raised counters and embossed terrain — the map as a table of miniatures. Switch back to flat any time; it changes only the look, never the play.</div>
+    <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
     <div class="setrow"><span>🔍 Interface size</span>
       <input type="range" id="ui-scale" min="90" max="125" step="5">
       <span class="vlabel" id="ui-scale-val">100%</span></div>
@@ -9781,6 +9787,18 @@ function applyGfx(){                                          // preset baseline
 }
 function loadGfx(){ try{ const l = localStorage.getItem('hoi5-gfx'); if (l && GFX_PRESETS[l]) GFX.level = l; }catch(e){} applyGfx(); }
 loadGfx();
+// 3D battlefield view — a purely cosmetic render mode (raised block counters,
+// embossed terrain relief). It moves NO hex centres, so picking/input are
+// identical to 2D; a full toggle, off by default, switch any time.
+let view3d = false;
+try{ view3d = localStorage.getItem('hoi5-view3d')==='1'; }catch(e){}
+function setView3d(on){
+  view3d = !!on;
+  try{ localStorage.setItem('hoi5-view3d', view3d?'1':'0'); }catch(e){}
+  try{ _cacheKey=''; _terrCacheCv=null; }catch(e){}   // rebuild terrain with/without extrusion
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof syncGfxUI === 'function') syncGfxUI();
+}
 function _reGfx(){                                            // re-apply density + re-bake terrain
   if (typeof resize === 'function') resize();
   try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}
@@ -10696,6 +10714,22 @@ function renderTerrCache(wx, depth){
       : (hv&1)?'rgba(255,255,255,0.030)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')';
     c.fill();
     c.strokeStyle='#00000033'; c.lineWidth=1; c.stroke();
+    // 3D view: an embossed directional relief baked per tile — sunlit top-left,
+    // shadowed bottom-right — scaled by the tile's "height" so hills and woods
+    // read as raised ground. No cross-tile shadows: the hex centres never move,
+    // so this is a pure skin over the same board.
+    if (view3d && t!=='~' && t!=='o' && c.createLinearGradient){
+      const elev = t==='h' ? 1 : t==='f' ? 0.6 : t==='s' ? 0.34 : 0.28;
+      c.save(); hexPathC(c,cx,cy,S-0.6); c.clip();
+      const g = c.createLinearGradient(cx-HX/2, cy-S, cx+HX/2, cy+S);
+      if (g && g.addColorStop){
+        g.addColorStop(0,   `rgba(255,246,214,${(0.05+0.17*elev).toFixed(3)})`);
+        g.addColorStop(0.48,'rgba(0,0,0,0)');
+        g.addColorStop(1,   `rgba(0,0,0,${(0.07+0.24*elev).toFixed(3)})`);
+        c.fillStyle = g; c.fillRect(cx-HX, cy-S*1.3, HX*2, S*2.6);
+      }
+      c.restore();
+    }
     // high: baked relief shading in the big-map cache too, so the far zoom matches
     if (GFX.cine && t!=='~' && t!=='o'){
       const hw = HX/2*0.86, hh = S*0.86, sunk = t==='q';
@@ -10773,7 +10807,7 @@ function ensureBigCache(wx){
   // (and the map visibly whitens) as the snow deepens, without thrashing per-frame
   const depth = (wx==='mud') ? 0 : snowDepth(G.turn);
   const snowB = Math.round(depth*4);
-  const key = SCN.id+'|'+wx+'|s'+snowB+'|'+COLS+'x'+ROWS;
+  const key = SCN.id+'|'+wx+'|s'+snowB+'|'+COLS+'x'+ROWS+(view3d?'|3d':'');
   if (key!==_cacheKey || !_terrCacheCv){ _cacheKey=key; renderTerrCache(wx, snowB/4); _tintDirty=true; }
   if (_tintDirty || !_tintCacheCv) renderTintCache();
 }
@@ -12048,6 +12082,19 @@ let _glossGrad = null, _glossH = -1;                 // gloss-gradient cache (se
 function drawUnit(u, cx, cy, wx){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   ctx.save(); ctx.translate(cx,cy);
+  // 3D view: the counter stands off the board like a miniature — a cast shadow
+  // on the ground, then the whole piece lifts, with a dark extruded side-wall
+  // peeking below it so the block has real thickness.
+  const lift = (view3d && cam.z >= 0.5) ? S*0.30 : 0;
+  if (lift){
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath(); ctx.ellipse(3, h*0.34, w*0.50, h*0.28, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.translate(0, -lift);
+    ctx.fillStyle = 'rgba(18,14,10,0.88)';                 // the shadowed wall of the block
+    roundRect(-w/2, -h/2, w, h+lift, 5); ctx.fill();
+  }
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
   // blurred shadow; otherwise a cheap hard-offset shadow
   if (GFX.softShadow && cam.z >= 0.62){
@@ -13380,9 +13427,14 @@ function syncGfxUI(){
   $('gfx-desc').textContent = GFX_DESC[GFX.level] || '';
   buildGfxToggles();
   for (const t of GFX_TOGGLES){ const cb = $('gfxt-'+t.k); if (cb) cb.checked = !!GFX[t.k]; }
+  const v2 = $('view-2d'), v3 = $('view-3d');
+  if (v2) v2.classList.toggle('sel', !view3d);
+  if (v3) v3.classList.toggle('sel', view3d);
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
+$('view-2d').onclick = ()=>{ setView3d(false); sClick(); };
+$('view-3d').onclick = ()=>{ setView3d(true); sClick(); };
 $('gfx-adv-toggle').onclick = ()=>{
   const adv = $('gfx-adv'), open = adv.classList.toggle('hidden');
   $('gfx-adv-toggle').textContent = open ? 'Advanced ▸' : 'Advanced ▾';
