@@ -1705,6 +1705,10 @@ function uiSmoke(side){
   if (side==='S') $('pick-sov').onclick();
   $('btn-start').onclick(); drain();         // begin campaign (AI opens if player is S)
   const UI = sb.module.exports;
+  // the mission briefing card opens on every fresh battle — read and dismiss it
+  const briefed = !$('briefing-modal').classList.contains('hidden') &&
+                  ($('brief-objectives').innerHTML||'').includes('VP');
+  if ($('btn-briefing-close').onclick) $('btn-briefing-close').onclick();
   // the replayability variants are always-on now — starting through the real
   // menu must hand the campaign all four (proves the always-on wiring works)
   const v0 = UI.getState().variants;
@@ -1804,7 +1808,7 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded};
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded, briefed};
 }
 
 for (const side of ['G','S']){
@@ -1815,6 +1819,7 @@ for (const side of ['G','S']){
       r.over ? (r.uiErrors+' UI errors') : 'never ended');
     check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
     check(`UI variants are always-on through the menu (${side})`, r.variantsForced, 'campaign started without all variants');
+    check(`UI mission briefing opens on a fresh battle (${side})`, r.briefed, 'briefing modal missing or empty');
     check(`UI variant chips are inert indicators (${side})`, r.chipsInert, 'a variant chip is still clickable');
     check(`UI campaign replay recorded turn by turn (${side})`, r.replayRecorded, 'no valid replay frames');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');

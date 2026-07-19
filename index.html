@@ -150,6 +150,15 @@
   .modal ul{margin:8px 0 8px 20px;}
   .modal .mrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
   .hidden{display:none!important;}
+  /* mission briefing */
+  .brief-h{color:var(--amber);letter-spacing:2px;font-size:12px;margin:4px 0 6px;}
+  .brief-row{display:flex;justify-content:space-between;gap:8px;font-size:13px;line-height:1.6;
+    border-bottom:1px dotted #ffffff14;}
+  .brief-row .bv{color:var(--amber);white-space:nowrap;}
+  .brief-row.held{opacity:.62;}
+  .brief-tier{font-size:12.5px;line-height:1.55;color:var(--dim);}
+  .brief-tier b{color:var(--ink);font-weight:600;}
+  .brief-tier.hist b{color:var(--amber);}
 
   /* ---------- title screen ---------- */
   #menu{background:radial-gradient(1200px 700px at 50% 30%, #1d2415 0%, #0a0c08 70%);}
@@ -856,6 +865,29 @@
     <p id="event-text"></p>
     <p id="event-effect" style="color:var(--amber);margin-top:8px;"></p>
     <div class="mrow"><button class="primary" id="btn-event-close">Continue</button></div>
+  </div>
+</div>
+
+<!-- ============ MISSION BRIEFING ============ -->
+<div id="briefing-modal" class="modal-back hidden" style="z-index:60;">
+  <div class="modal" style="max-width:620px;">
+    <h2 id="brief-head" style="font-size:14px;letter-spacing:4px;">📋 MISSION BRIEFING</h2>
+    <div id="brief-sub" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
+    <h3 id="brief-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0 4px;"></h3>
+    <p id="brief-orders" style="margin:6px 0 10px;"></p>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:240px;">
+        <div class="brief-h">🎯 OBJECTIVES</div>
+        <div id="brief-objectives"></div>
+      </div>
+      <div style="flex:1;min-width:240px;">
+        <div class="brief-h">⚔ YOUR FORCES</div>
+        <div id="brief-forces" style="margin-bottom:10px;"></div>
+        <div class="brief-h">🏅 VICTORY</div>
+        <div id="brief-tiers"></div>
+      </div>
+    </div>
+    <div class="mrow"><button class="primary" id="btn-briefing-close">TO BATTLE ▶</button></div>
   </div>
 </div>
 
@@ -14887,6 +14919,34 @@ $('btn-continue').onclick = ()=>{
   eventQueue.length = 0; show('event-modal', false);
   if (loadSlot(mScn)) startCampaign(true);
 };
+/* mission briefing — one card, one glance, the whole mission */
+function showBriefing(){
+  const side = (G.mode==='hotseat') ? 'G' : (G.playerSide || 'G');
+  const menu = side==='G' ? SCN.menu.ger : SCN.menu.sov;
+  $('brief-sub').textContent = SCN.sub || '';
+  $('brief-title').textContent = menu.h || SCN.short;
+  $('brief-orders').textContent = menu.p || '';
+  const rows = G.cities.filter(c=>c.vp>0).sort((a,b)=>b.vp-a.vp).map(c=>{
+    const held = c.owner===side;
+    return `<div class="brief-row${held?' held':''}"><span>${c.name}${held?' — held':''}</span><span class="bv">${c.vp} VP</span></div>`;
+  }).join('');
+  $('brief-objectives').innerHTML = rows || '<div class="brief-tier">Hold the line — survival is the objective.</div>';
+  const mine = unitsOf(side).filter(u=>!KINDS[u.kind].hq);
+  const byLabel = {};
+  for (const u of mine) byLabel[KINDS[u.kind].label] = (byLabel[KINDS[u.kind].label]||0)+1;
+  const air = (G.air||[]).filter(a=>a.side===side).length;
+  $('brief-forces').innerHTML =
+    Object.entries(byLabel).map(([l,n])=>`<div class="brief-row"><span>${l}</span><span class="bv">×${n}</span></div>`).join('') +
+    (air?`<div class="brief-row"><span>Air groups</span><span class="bv">×${air}</span></div>`:'') +
+    `<div class="brief-row"><span>Time limit</span><span class="bv">${MAX_TURN} turns</span></div>`;
+  const note = side==='S'
+    ? `<div class="brief-tier" style="margin-bottom:4px;">You are ${sideName('S')} — hold the enemy BELOW these marks:</div>` : '';
+  $('brief-tiers').innerHTML = note + (SCN.victoryTiers||[]).map(([v,t])=>
+    `<div class="brief-tier${/HISTORY/.test(t)?' hist':''}"><b>${v}+</b> — ${t}</div>`).join('');
+  show('briefing-modal', true);
+}
+$('btn-briefing-close').onclick = ()=>{ show('briefing-modal', false); sClick(); };
+
 function startCampaign(loaded){
   undoSnap = null;
   // wipe the previous game's transient stage effects — unit ids restart at 1, so a
@@ -14903,7 +14963,7 @@ function startCampaign(loaded){
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
   // resuming a save exactly at the start of your turn: run any standing orders
   if (loaded && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide)){ runStandingOrders(G.phase); updateAll(); }
-  if (!loaded) saveGame();
+  if (!loaded){ saveGame(); showBriefing(); }   // a fresh battle opens with its mission card
   // if the human plays the Soviets, the German AI opens the war
   if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
   if (!G.over && G.mode==='hotseat') updateAll();
