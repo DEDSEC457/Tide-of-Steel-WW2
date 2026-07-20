@@ -77,6 +77,7 @@
   .ros .ros-str{font-weight:700;width:44px;text-align:right;font-variant-numeric:tabular-nums;}
   .ros .ros-tag{font-size:11px;padding:1px 6px;border-radius:10px;background:#2a2f22;color:var(--dim);white-space:nowrap;}
   .ros .ros-tag.oos{background:#3a1712;color:var(--redL);}
+  .ros .ros-tag.strn{background:#3a2c10;color:#ffb020;}
   .ros .ros-tag.rdy{background:#20301a;color:var(--grn);}
   .ros .ros-tag.ord{background:#2f2a13;color:var(--amber);}
   /* controls cheat-sheet */
@@ -6439,13 +6440,23 @@ function computeSupply(side){
       if (nc < (dist.get(k) ?? 1e9)){ dist.set(k, nc); heap.push(nc,nx,ny); }
     }
   }
-  return new Set(dist.keys());
+  const out = new Set(dist.keys());
+  out.dist = dist; out.range = range;   // supply depth per hex + the reach cap — feeds the amber "strained" fringe
+  return out;
 }
 
 function refreshSupply(){
   for (const side of ['G','S']){
     const net = computeSupply(side);
-    for (const u of unitsOf(side)) u.oos = !net.has(keyOf(u.x,u.y));
+    const dist = net.dist, range = net.range || 99;
+    for (const u of unitsOf(side)){
+      const k = keyOf(u.x,u.y);
+      u.oos = !net.has(k);
+      // amber "strained": still fed, but supply barely reaches — the outer ring of
+      // the net. This is what losing a depot to the enemy, or weather contracting
+      // the range, does to the units out front. It is the fuse before the pocket.
+      u.strained = !u.oos && !!dist && (dist.get(k) ?? 0) >= range - 1;
+    }
   }
   claimTerritory();
 }
@@ -12411,8 +12422,8 @@ function drawUnit(u, cx, cy, wx){
       ctx.fillStyle = _glossGrad; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
     }
   }
-  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : '#000c';
-  ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : 1.2; ctx.stroke();
+  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : u.strained ? '#ffb020' : '#000c';
+  ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : u.strained ? 1.8 : 1.2; ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.1;
   ctx.beginPath(); ctx.moveTo(-w/2+4,-h/2+1.3); ctx.lineTo(w/2-4,-h/2+1.3); ctx.stroke();
   ctx.strokeStyle = 'rgba(0,0,0,0.30)';
@@ -12511,10 +12522,13 @@ function drawUnit(u, cx, cy, wx){
       ctx.beginPath(); ctx.moveTo(cxp-4, yy+2.6); ctx.lineTo(cxp, yy); ctx.lineTo(cxp+4, yy+2.6); ctx.stroke();
     }
   }
-  // out of supply
+  // out of supply (red ⚠) or supply strained at the fringe (amber ◔)
   if (u.oos){
     ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
     ctx.fillText('⚠', w/2-8, -h/2+10);
+  } else if (u.strained){
+    ctx.fillStyle = '#ffb020'; ctx.font='700 12px Segoe UI';
+    ctx.fillText('◔', w/2-8, -h/2+10);
   }
   // weather skin — frost rime in the snow, mud splatter in the thaw. Land units
   // only (a ship doesn't cake with mud); clipped to the counter so it reads as
@@ -13084,6 +13098,10 @@ function supplyHelp(u){
     : `Close the gap back to a supplied city, and clear any enemy whose zone of control is cutting the line.`;
   return `<div class="supply-help">⚠ <b>Cut off</b> — it ${bleed}. ${where}${fix} <span style="color:var(--dim)">Press <b>S</b> to shade the break.</span></div>`;
 }
+/* the note shown under the Supply row for a unit at the fringe — fed, but only just */
+function supplyStrainHelp(u){
+  return `<div class="supply-help" style="border-left-color:#ffb020">◔ <b>Supply strained</b> — this formation sits at the far edge of the line, and the trucks barely reach it. Lose a depot behind it, or let the enemy tighten the corridor, and it goes <span style="color:var(--redL)">cut off</span>. Shorten the line — take or hold a city closer to the front, or clear the ground the supply runs through.</div>`;
+}
 
 function isHumanTurn(){ return G && !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide); }
 
@@ -13102,6 +13120,7 @@ function doReinforceAll(){
 /* ---- army roster ---- */
 function rosterStatus(u){
   if (u.oos) return {tag:'⚠ cut off', cls:'oos', rank:0};
+  if (u.strained) return {tag:'◔ strained', cls:'strn', rank:0.5};
   if (u.order) return {tag: u.order==='attack'?'⚔ advance':'🛡 hold', cls:'ord', rank:2};
   if (!(u.moved || u.attacked || u.held)) return {tag:'ready', cls:'rdy', rank:1};
   return {tag:'done', cls:'', rank:3};
@@ -13206,8 +13225,8 @@ function updateUnitCard(){
     ${(u.kills||0) > 0 ? `<div class="statrow"><span>Confirmed kills</span><span class="good">☠ ${u.kills} formation${u.kills===1?'':'s'}</span></div>` : ''}
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
-    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':'good'}">${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':'In supply'}</span></div>
-    ${u.oos ? supplyHelp(u) : ''}
+    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':u.strained?'':'good'}"${u.strained&&!u.oos?' style="color:#ffb020"':''}>${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':u.strained?'◔ strained':'In supply'}</span></div>
+    ${u.oos ? supplyHelp(u) : u.strained ? supplyStrainHelp(u) : ''}
     <div class="statrow"><span>This turn</span><span>${
       u.order ? `<span style="color:var(--amber)">${u.order==='attack'?'⚔ advance order':'🛡 hold-line order'}</span>`
       : u.held ? '<span style="color:var(--cyan)">⏭ skipped</span>'
@@ -14852,11 +14871,13 @@ $('btn-endturn').onclick = ()=>{
   // safeguard: units still have orders, or divisions starving? ask for a second click
   const ready = actionableUnits(G.phase).length;
   const oos = unitsOf(G.phase).filter(u=>u.oos).length;
+  const strained = unitsOf(G.phase).filter(u=>u.strained && !u.oos).length;
   if ((ready > 0 || oos > 0) && performance.now() > endPendingUntil){
     endPendingUntil = performance.now() + 2500;
     const parts = [];
     if (ready > 0) parts.push(`${ready} still ready`);
     if (oos > 0) parts.push(`${oos} cut off`);
+    if (strained > 0) parts.push(`${strained} supply-strained`);   // mentioned only when the safeguard already fires
     $('btn-endturn').textContent = `⚠ ${parts.join(' · ')} — end anyway?`;
     setTimeout(()=>{ if (performance.now() >= endPendingUntil) $('btn-endturn').textContent = 'End Turn ▶'; }, 2600);
     return;

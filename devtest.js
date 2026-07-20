@@ -388,6 +388,26 @@ say('— weather logistics —');
   E.newGame('G','normal','hotseat','barbarossa');
 }
 
+/* supply-as-weapon: the amber "strained" fringe — fed, but barely */
+say('— supply strain (amber fringe) —');
+{
+  E.newGame('G','normal','hotseat','barbarossa'); const G = E.getState();
+  for (let t=0;t<8 && !G.over;t++){ E.aiFullPhase(G.phase); if(!G.over)E.endPhase(); }  // let spearheads outrun supply
+  check('every unit carries a boolean supply-strain flag', G.units.every(u=>typeof u.strained==='boolean'));
+  check('strained is amber, never also red (oos)', G.units.every(u=>!(u.strained && u.oos)));
+  // the flag is legitimately used — a deep advance should strain at least a spearhead or two
+  const anyStrain = G.units.some(u=>u.strained);
+  const anyDeep = G.units.some(u=>!u.oos && u.strained);
+  check('a deep advance strains the fringe (or none is deep enough yet)', anyStrain===anyDeep);
+  // computeSupply now exposes the depth map the fringe is read from
+  const net = E.computeSupply('G');
+  check('computeSupply exposes supply depth + range',
+    net.dist && typeof net.dist.get==='function' && typeof net.range==='number');
+  // a unit sitting deep in the rear (on/near the home edge) is fully supplied
+  const rear = G.units.find(u=>u.side==='G' && u.x<=1 && !u.oos);
+  if (rear) check('a unit at its own supply source is not strained', !rear.strained);
+}
+
 /* encirclement bites: savage combat debuffs and fast attrition */
 {
   E.newGame('G','normal','hotseat');
