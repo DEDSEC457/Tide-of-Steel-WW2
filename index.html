@@ -156,6 +156,27 @@
   .modal p,.modal li{font-size:14px;line-height:1.55;color:var(--ink);}
   .modal ul{margin:8px 0 8px 20px;}
   .modal .mrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  /* ===== newspaper skin: the narrative popups read as period war dispatches ===== */
+  .modal.newspaper{background:linear-gradient(178deg,#efe9d6,#e2d9be)!important;color:#2b2318!important;
+    border:1px solid #b3a684!important;border-radius:3px!important;
+    font-family:Georgia,'Times New Roman',serif!important;
+    box-shadow:0 20px 64px #000b, inset 0 0 90px #cbb98a44, inset 0 0 0 1px #ffffff77!important;position:relative;}
+  .modal.newspaper::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:3px;
+    box-shadow:inset 0 0 70px #6f5c3033;}
+  .newspaper h2{color:#1e160c!important;text-align:center;font-family:Georgia,'Times New Roman',serif!important;
+    font-size:29px!important;line-height:1.05;letter-spacing:1px!important;font-weight:700!important;
+    border-top:3px double #362b18;border-bottom:1px solid #362b18;padding:8px 4px 6px!important;margin:2px 0 8px!important;text-shadow:none!important;}
+  .newspaper #event-date,.newspaper #decision-date{color:#6a5a3a!important;text-align:center!important;
+    font-style:italic;font-size:12px!important;letter-spacing:1px!important;margin-bottom:2px;}
+  .newspaper h3{color:#5a241a!important;text-align:center!important;font-size:23px!important;font-weight:700!important;
+    letter-spacing:0!important;line-height:1.2;margin:10px 14px!important;text-shadow:none!important;}
+  .newspaper p{color:#2b2318!important;text-align:justify;line-height:1.6;font-size:15px;margin:9px 16px;}
+  .newspaper #event-effect{color:#7a3b12!important;text-align:center!important;font-style:italic;font-weight:700;}
+  .newspaper button,.newspaper .primary{font-family:Georgia,'Times New Roman',serif!important;font-weight:700!important;
+    font-size:15px!important;letter-spacing:.5px;color:#f0d288!important;
+    background:linear-gradient(180deg,#4b4127,#332b17)!important;border:1px solid #211a0e!important;border-radius:2px!important;
+    text-shadow:0 1px 0 #000a!important;box-shadow:0 2px 0 #00000055, inset 0 1px 0 #ffffff22!important;}
+  .newspaper button:hover,.newspaper .primary:hover{background:linear-gradient(180deg,#5c5030,#3d341c)!important;color:#ffe6a0!important;}
   .hidden{display:none!important;}
   /* mission briefing */
   .brief-h{color:var(--amber);letter-spacing:2px;font-size:12px;margin:4px 0 6px;}
@@ -888,7 +909,7 @@
 
 <!-- ============ HISTORICAL EVENT ============ -->
 <div id="event-modal" class="modal-back hidden">
-  <div class="modal" style="max-width:540px;">
+  <div class="modal newspaper" style="max-width:540px;">
     <h2 id="event-head" style="font-size:14px;letter-spacing:4px;">📰 THIS WEEK IN THE WAR</h2>
     <div id="event-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
     <h3 id="event-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
@@ -947,7 +968,7 @@
 
 <!-- ============ STRATEGIC DECISION ============ -->
 <div id="decision-modal" class="modal-back hidden">
-  <div class="modal" style="max-width:600px;">
+  <div class="modal newspaper" style="max-width:600px;">
     <h2 style="font-size:14px;letter-spacing:4px;">⚑ A DECISION IS DEMANDED</h2>
     <div id="decision-date" style="color:var(--dim);letter-spacing:2px;font-size:12px;"></div>
     <h3 id="decision-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:8px 0;"></h3>
@@ -958,8 +979,8 @@
 
 <!-- ============ DYNAMIC DISPATCH (random events / side-missions) ============ -->
 <div id="dyn-modal" class="modal-back hidden">
-  <div class="modal" style="max-width:560px;">
-    <div style="color:var(--dim);letter-spacing:3px;font-size:11px;">📻 FIELD DISPATCH</div>
+  <div class="modal newspaper" style="max-width:560px;">
+    <h2 style="font-size:14px;letter-spacing:4px;">📻 FIELD DISPATCH</h2>
     <h3 id="dyn-title" style="color:var(--amber);font-size:19px;letter-spacing:1px;margin:6px 0 8px;"></h3>
     <p id="dyn-text"></p>
     <div id="dyn-options" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
