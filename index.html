@@ -11295,6 +11295,55 @@ function drawScars(){
   }
 }
 
+/* ---------------- supply arteries ----------------
+   With the supply overlay up, draw the logistics web itself: a thread from every
+   division back down the supply gradient to the depot that feeds it — green when
+   healthy, amber (dashed) when strained at the fringe, and a severed red stub with
+   a break-mark when the line has been cut. So you SEE the enemy throttle your
+   supply, not just read a shaded map. The soft glow is High-graphics only. */
+function _strokePts(pts){
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+  for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+}
+function drawSupplyArteries(net){
+  if (!net || !net.dist) return;
+  const side = G.mode==='hotseat' ? G.phase : G.playerSide;
+  const dist = net.dist, hi = GFX.level==='high';
+  ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+  for (const u of unitsOf(side)){
+    if (KINDS[u.kind].hq) continue;
+    const [ux,uy] = hexCenter(u.x,u.y);
+    if (net.has(keyOf(u.x,u.y))){
+      // walk down the supply gradient to a depot (dist 0) — the real artery
+      const pts = [[ux,uy]]; let cx=u.x, cy=u.y, guard=0;
+      while ((dist.get(keyOf(cx,cy))||0) > 0 && guard++ < 40){
+        let best=null, bestD=dist.get(keyOf(cx,cy));
+        for (const [nx,ny] of neighbors(cx,cy)){ const d=dist.get(keyOf(nx,ny)); if (d!=null && d<bestD){ bestD=d; best=[nx,ny]; } }
+        if (!best) break;
+        cx=best[0]; cy=best[1]; const [px,py]=hexCenter(cx,cy); pts.push([px,py]);
+      }
+      if (pts.length < 2) continue;
+      const col = u.strained ? '255,176,32' : '90,210,120';
+      if (hi){ ctx.strokeStyle='rgba('+col+',0.13)'; ctx.lineWidth=6; _strokePts(pts); }   // glow
+      ctx.strokeStyle='rgba('+col+','+(u.strained?0.85:0.55)+')'; ctx.lineWidth=hi?2:1.4;
+      ctx.setLineDash(u.strained?[5,4]:[]); _strokePts(pts); ctx.setLineDash([]);
+    } else {
+      // cut off: a broken red stub toward the nearest supplied ground, marked ✕
+      let near=null, nd=1e9;
+      for (const k of net){ const [x,y]=unkey(k); const d=hexDist(u.x,u.y,x,y); if (d<nd){ nd=d; near=[x,y]; } }
+      if (!near) continue;
+      const [tx,ty]=hexCenter(near[0],near[1]);
+      const mx=ux+(tx-ux)*0.42, my=uy+(ty-uy)*0.42;
+      ctx.strokeStyle='rgba(255,83,64,0.7)'; ctx.lineWidth=hi?2:1.4; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(ux,uy); ctx.lineTo(mx,my); ctx.stroke(); ctx.setLineDash([]);
+      if (hi){ ctx.strokeStyle='rgba(255,83,64,0.9)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(mx-3,my-3); ctx.lineTo(mx+3,my+3); ctx.moveTo(mx+3,my-3); ctx.lineTo(mx-3,my+3); ctx.stroke(); }
+    }
+  }
+  ctx.restore();
+}
+
 /* ---------------- minimap (main hex game) ----------------
    A strategic thumbnail bottom-left: terrain + territory tint + cities + unit
    dots + the camera's viewport box. Click or drag to fly the camera anywhere.
@@ -11617,6 +11666,7 @@ function draw(){
       const [cx,cy] = hexCenter(x,y);
       hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fill();
     }
+    drawSupplyArteries(supplyView);          // the logistics web, drawn over the shaded ground
   }
 
   // fog of war: dim every hex your troops can't currently see. The first ring
