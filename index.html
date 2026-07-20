@@ -12566,11 +12566,19 @@ function drawUnit(u, cx, cy, wx){
   ctx.fillStyle = u.str<=3 ? '#ff8d80' : '#ffe9a8';
   ctx.font = '700 10px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(u.str, w/2-8.5, h/2-5.5);
-  // strength bar along the bottom edge
+  // strength bar along the bottom edge — segmented into steps like a real counter,
+  // so you read a division's exact strength at a glance, with a glossy top highlight
   const frac = Math.max(0, Math.min(1, u.str / k.maxStr));
-  ctx.fillStyle = '#000a'; ctx.fillRect(-w/2+3, h/2-2.6, w-6, 2);
+  const barX = -w/2+3, barY = h/2-2.6, barW = w-6, barH = 2;
+  ctx.fillStyle = '#000a'; ctx.fillRect(barX, barY, barW, barH);
   ctx.fillStyle = frac > 0.55 ? '#7a9d54' : frac > 0.3 ? '#e8b34b' : '#e2493b';
-  ctx.fillRect(-w/2+3, h/2-2.6, (w-6)*frac, 2);
+  ctx.fillRect(barX, barY, barW*frac, barH);
+  ctx.fillStyle = 'rgba(255,255,255,0.20)'; ctx.fillRect(barX, barY, barW*frac, 0.8);   // gloss
+  if (k.maxStr > 1 && k.maxStr <= 12){                                                  // step ticks
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6;
+    for (let i=1;i<k.maxStr;i++){ const sx = barX + barW*(i/k.maxStr);
+      ctx.beginPath(); ctx.moveTo(sx, barY); ctx.lineTo(sx, barY+barH); ctx.stroke(); }
+  }
   // fuel strip just above it (realistic mode, mechanized only)
   if (usesFuel(u)){
     const ff = Math.max(0, Math.min(1, fuelOf(u)/FUEL_MAX));
