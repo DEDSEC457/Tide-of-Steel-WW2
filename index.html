@@ -8535,6 +8535,50 @@ function aiParaPlan(side){
   return best;
 }
 
+/* RESERVE INTERCEPTION (Hard+): an enemy that has slipped past our line into the
+   rear — loose in our supply zone, heading for a soft objective — is the classic
+   human breakthrough. Instead of marching the whole army forward and letting the
+   raider run wild, a spare unit peels off to hunt it down. Skill-2 gated, so the
+   AI-vs-AI balance (played at skill 1) is untouched by construction. Not cached:
+   recomputing fresh each call lets `cover` update as interceptors close in, so at
+   most a couple of units commit to one raider instead of the whole reserve. */
+function rearRaiders(side){
+  const foe = enemyOf(side), mine = unitsOf(side);
+  const depth = h => rearDir(side)>0 ? h : (COLS-1 - h);   // how deep into OUR rear a column sits
+  const ds = mine.map(u=>depth(u.x)).sort((a,b)=>a-b);
+  const front = ds.length ? ds[Math.floor(ds.length/2)] : 0;   // our line sits around the median depth
+  const out = [];
+  for (const e of unitsOf(foe)){
+    if (KINDS[e.kind].sea || KINDS[e.kind].carrier || KINDS[e.kind].hq) continue;
+    if (depth(e.x) <= front + 1) continue;                 // still out front — that's the line, not a raider
+    let cover = 0; for (const f of mine) if (hexDist(e.x,e.y,f.x,f.y) <= 1) cover++;
+    if (cover >= 2) continue;                              // already boxed in
+    out.push(e);
+  }
+  return out;
+}
+function aiIntercept(u){
+  if (aiSkill(u.side) < 2) return null;
+  const k = KINDS[u.kind];
+  if (k.hq || k.sea || k.carrier) return null;
+  if (adjacentEnemies(u).length > 0) return null;          // pinned on the front — needed there
+  const home = cityAt(u.x,u.y);
+  if (home && home.owner===u.side && home.vp>=3) return null;   // a key garrison never abandons its post
+  const raiders = rearRaiders(u.side);
+  if (!raiders.length) return null;
+  let target=null, tD=1e9;
+  for (const r of raiders){ const d = hexDist(u.x,u.y,r.x,r.y); if (d < tD){ tD=d; target=r; } }
+  if (!target || tD > 6) return null;                      // only commit units already near the breach
+  const reach = reachable(u);
+  let best=null, bestD=hexDist(u.x,u.y,target.x,target.y);
+  for (const key of reach.keys()){
+    const [x,y] = unkey(key);
+    if (unitAt(x,y)) continue;
+    const d = hexDist(x,y,target.x,target.y);
+    if (d < bestD){ bestD=d; best=[x,y]; }                 // step onto the hex that closes on the raider
+  }
+  return best ? {type:'move', u:u.id, x:best[0], y:best[1]} : null;
+}
 function aiPlanGerman(){
   aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
   // sea-borne invasion: ship the units that have no other way to the enemy
@@ -8557,6 +8601,9 @@ function aiPlanGerman(){
     // 1b. pull a spearhead back before it is encircled (sharper AI saves its army)
     const esc = aiEscape(u);
     if (esc) return esc;
+    // 1c. hunt down a raider loose in our rear (Hard+)
+    const icp = aiIntercept(u);
+    if (icp) return icp;
     // 2. otherwise move with purpose
     const isArm = KINDS[u.kind].sym==='arm' || KINDS[u.kind].fast;
     const city = gerPickTarget(u);
@@ -8686,6 +8733,9 @@ function aiPlanSoviet(){
       if (best && (adj.length>=3 ? true : !net.has(keyOf(u.x,u.y))))
         return {type:'move', u:u.id, x:best[0], y:best[1]};
     }
+    // 2b. hunt down a raider loose in our rear (Hard+)
+    const icp = aiIntercept(u);
+    if (icp) return icp;
     // 3. garrisons sit tight; frontline units in good ground dig in
     const onCity = cityAt(u.x,u.y);
     if (onCity && onCity.owner==='S' && onCity.vp>0){ return {type:'hold', u:u.id}; }
@@ -15378,7 +15428,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
-    threatField, threatPenalty, seamPenalty, aiSkill, aiPlanAction, clearAICache,
+    threatField, threatPenalty, seamPenalty, rearRaiders, aiIntercept, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,

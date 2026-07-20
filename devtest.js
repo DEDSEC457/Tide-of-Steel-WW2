@@ -778,6 +778,35 @@ say('— AI defensive coherence (seam sealing) —');
   check('sealing the lane removes the penalty', sealed < open, `open ${open.toFixed(1)} sealed ${sealed.toFixed(1)}`);
 }
 
+/* RESERVE INTERCEPTION: a Hard AI peels a spare unit off to hunt a rear raider */
+say('— AI reserve interception (hunt rear raiders) —');
+{
+  // build the same breakthrough scene at a given difficulty; player is Soviet so
+  // the German AI's skill is what `diff` selects
+  function scene(diff){
+    E.newGame('S',diff,'ai','barbarossa'); const G=E.getState(); G.units.length=0; let id=1;
+    const mk=(k,n,x,y,side)=>{const u={id:id++,kind:k,name:n,side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+    // a German line holds to the east; a lone Soviet raider is loose deep in the
+    // German (west) rear; one spare German sits a few hexes off, free to react
+    mk('g_inf','L1',18,9,'G'); mk('g_inf','L2',18,10,'G'); mk('g_inf','L3',18,11,'G');
+    const react = mk('g_inf','Reserve',16,10,'G');
+    const raider = mk('s_inf','Raider',13,10,'S');
+    E.clearAICache();
+    return { G, react, raider };
+  }
+  const hard = scene('hard');
+  const raiders = E.rearRaiders('G');
+  check('a rear raider is spotted behind the line', raiders.some(r=>r.name==='Raider'), `${raiders.length} raider(s)`);
+  const before = E.hexDist(hard.react.x,hard.react.y,hard.raider.x,hard.raider.y);
+  const mv = E.aiIntercept(hard.react);
+  check('a Hard reserve moves to hunt it down',
+    mv && mv.type==='move' && E.hexDist(mv.x,mv.y,hard.raider.x,hard.raider.y) < before,
+    mv ? `${before}→${E.hexDist(mv.x,mv.y,hard.raider.x,hard.raider.y)}` : 'no move');
+  // Normal AI (skill 1) never peels off — the AI-vs-AI balance is untouched
+  const norm = scene('normal');
+  check('a Normal reserve holds formation (balance untouched)', E.aiIntercept(norm.react)===null);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {
