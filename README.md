@@ -1,4 +1,4 @@
-# ⚔ Hex's at War WW2
+# ⚔ Tide of Steel WW2
 
 **A turn-based WW2 hex-strategy game — 19 historical battles, one file, plays
 100% offline.** Developed & published by **Tyler Wanuga**. Version 1.0.
@@ -63,7 +63,7 @@ The whole game is one file (`index.html`) that runs in any browser:
 
 ## ▶ How to play
 - **On any PC:** download `index.html` and double-click it (or use
-  `Play Hex's at War WW2.bat` on Windows). It opens in your browser — **100%
+  `Play Tide of Steel WW2.bat` on Windows). It opens in your browser — **100%
   offline, nothing to install, no account.**
 - Pick a battle from the main menu and choose your side. Play **vs the computer**
   (four difficulties, Easy → Brutal — where the AI genuinely plays *smarter*, not
@@ -156,7 +156,7 @@ so you can see which feature moves the victory distribution.
 - More scenarios — the framework makes them pure data
 
 ## © Credits & license
-**Hex's at War WW2** — version 1.0. Developed & published by **Tyler Wanuga**.
+**Tide of Steel WW2** — version 1.0. Developed & published by **Tyler Wanuga**.
 
 Copyright © 2026 Tyler Wanuga. All rights reserved. Free to download, play, and
 share unmodified for personal, non-commercial use; not for sale or modification
