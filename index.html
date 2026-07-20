@@ -3186,8 +3186,8 @@ SCENARIOS.okinawa = {
     g_ca:   {side:'G', label:'Radar Picket Group', atk:4, def:5, mp:5, maxStr:8,  cost:16, sym:'ca', fast:true, noCapture:true, sea:true},
     g_bb:   {side:'G', label:'Bombardment Force',  atk:7, def:7, mp:4, maxStr:10, cost:26, sym:'bb', range:2, noCapture:true, sea:true},
     g_art:  {side:'G', label:'Corps Artillery',   atk:10, def:4, mp:2, maxStr:8, cost:13, sym:'art', color:'#2d4a3a'},
-    s_inf:  {side:'S', label:'Infantry Division',  atk:5, def:6, mp:2, maxStr:9,  cost:9,  sym:'inf'},
-    s_art:  {side:'S', label:'Artillery Command',  atk:9, def:5, mp:2, maxStr:8,  cost:13, sym:'art', color:'#7a2d3c', noBuy:true},
+    s_inf:  {side:'S', label:'Infantry Division',  atk:5, def:7, mp:2, maxStr:10, cost:9,  sym:'inf'},
+    s_art:  {side:'S', label:'Artillery Command',  atk:9, def:6, mp:2, maxStr:9,  cost:13, sym:'art', color:'#7a2d3c', noBuy:true},
     s_mil:  {side:'S', label:'Boeitai Militia',    atk:3, def:6, mp:2, maxStr:8,  cost:5,  sym:'inf', color:'#5a5244'},
     g_hq:   {side:'G', label:'Tenth Army HQ', atk:1, def:4, mp:3, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#2f3c34'},
     s_hq:   {side:'S', label:'32nd Army HQ',  atk:1, def:5, mp:2, maxStr:6, cost:0, sym:'hq', hq:true, noBuy:true, noCapture:true, color:'#57303c'},
@@ -3359,7 +3359,7 @@ SCENARIOS.okinawa = {
        // the historical mechanism: the fortress is abandoned under pressure, not stormed.
        // Ushijima pre-planned the move — it happens once the Americans have ground
        // far enough forward (a lower bar now the caves cost the US so much longer)
-       if (axisVP() < 5) return;
+       if (axisVP() < 3) return;
        const shuri=G.cities.find(c=>c.name==='Shuri');
        const def=unitAt(shuri.x,shuri.y);
        if (def && def.side==='S'){
@@ -3401,8 +3401,10 @@ SCENARIOS.okinawa = {
   ],
   sovAirSchedule: [],
   setup(st){
-    // a year of digging: the 32nd Army starts at full entrenchment everywhere
-    for (const u of st.units) if (u.side==='S') u.entrench = effTerrain(u.x,u.y).dig;
+    // a year of digging: the 32nd Army starts in DEEP caves — dug in a level beyond
+    // what open ground allows, the reverse-slope fortifications that made every ridge
+    // a month's work
+    for (const u of st.units) if (u.side==='S' && !KINDS[u.kind].hq) u.entrench = effTerrain(u.x,u.y).dig + 1;
   },
   opening(playerSide){ return [
     '1 April 1945 — Love Day. Sixty thousand men walk ashore against no resistance at all, and the silence is the worst omen of the Pacific war.',
