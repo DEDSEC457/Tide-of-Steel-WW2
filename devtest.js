@@ -1852,7 +1852,16 @@ function uiSmoke(side){
     realisticOk = UI.getState().scenario === 'realistic';
     $('btn-endturn').onclick(); $('btn-endturn').onclick(); drain();   // Soviet AI phase on the big map
   }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded, briefed};
+  // combat juice: a fresh game, force a contact, and run the real player-attack path
+  // (resolveCombat → combatJuice: scaled damage numbers, knockback, shake). It must
+  // resolve cleanly and spawn its floating feedback without throwing.
+  let juiceOk = false;
+  try {
+    UI.newGame('G','normal','hotseat','barbarossa');
+    const j = sb.window.__dbgStageAttack && sb.window.__dbgStageAttack();
+    juiceOk = !!(j && j.anims > 0 && j.defBefore > 0);
+  } catch(e){ juiceOk = false; }
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded, briefed, juiceOk};
 }
 
 for (const side of ['G','S']){
@@ -1864,6 +1873,7 @@ for (const side of ['G','S']){
     check(`UI service record keeps the finished campaign (${side})`, r.recOk, 'no record entry');
     check(`UI variants are always-on through the menu (${side})`, r.variantsForced, 'campaign started without all variants');
     check(`UI mission briefing opens on a fresh battle (${side})`, r.briefed, 'briefing modal missing or empty');
+    check(`UI combat juice resolves an attack cleanly (${side})`, r.juiceOk, 'staged attack threw or produced no feedback');
     check(`UI variant chips are inert indicators (${side})`, r.chipsInert, 'a variant chip is still clickable');
     check(`UI campaign replay recorded turn by turn (${side})`, r.replayRecorded, 'no valid replay frames');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
