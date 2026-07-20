@@ -8903,7 +8903,7 @@ function applyAction(a){
   }
   if (a.type==='move'){
     const u = G.units.find(t=>t.id===a.u);
-    if (u && !unitAt(a.x,a.y)){ doMove(u, a.x, a.y); return {type:'move', unit:u}; }
+    if (u && !unitAt(a.x,a.y)){ const ox=u.x, oy=u.y; doMove(u, a.x, a.y); return {type:'move', unit:u, from:[ox,oy]}; }
     return {type:'hold'};
   }
   if (a.type==='attack'){
@@ -14979,6 +14979,13 @@ function runAIPhase(){
       setTimeout(step, mult ? Math.max(aDelay, 550)*mult : 0);
     } else if (res && res.type==='move'){
       if (mult) sMove();
+      // watch the enemy actually advance — the counter slides from its old hex.
+      // High graphics only, and only when the AI isn't running at instant speed;
+      // the slide duration tracks the step delay so it always lands cleanly.
+      if (GFX.level==='high' && mult && res.from && res.unit){
+        const [fx,fy] = hexCenter(res.from[0], res.from[1]);
+        moveAnim = {unit:res.unit, fx, fy, t0:performance.now(), dur:Math.max(90, mDelay*mult)};
+      }
       setTimeout(step, mDelay*mult);
     } else if (res && res.type==='attack'){
       sShot();
