@@ -6201,6 +6201,34 @@ function seamPenalty(u, x, y){
   }
   return Math.min(seams,3) * 2.0;
 }
+/* ENCIRCLEMENT (Hard+): a defender forced to retreat with nowhere to go is mauled
+   in the pocket — sealing its escape turns the next attack from a push into a
+   kill. This rewards stepping into the empty ground beside an enemy that shuts its
+   last door (or the rear door on a nearly-trapped foe), so two units naturally
+   pincer a pocket closed instead of just shoving the enemy back. Skill-2 gated. */
+function pocketBonus(u, x, y){
+  if (aiSkill(u.side) < 2) return 0;
+  const foe = enemyOf(u.side);
+  const eRear = rearDir(foe);
+  let bonus = 0;
+  for (const e of unitsOf(foe)){
+    if (hexDist(x,y,e.x,e.y) !== 1 || KINDS[e.kind].sea) continue;   // we must end up beside a land enemy
+    let escapes = 0, sealsRear = false;
+    for (const [nx,ny] of neighbors(e.x,e.y)){
+      if (!passable(nx,ny) || !domainOk(e.kind,nx,ny)) continue;     // a hex e could actually retreat onto
+      if (nx===x && ny===y){                                        // the hex we'd occupy — no longer an escape
+        const beh = eRear>0 ? (nx >= e.x) : (nx <= e.x);
+        if (beh) sealsRear = true;                                  // and it's the back door
+        continue;
+      }
+      if (unitAt(nx,ny)) continue;                                  // already blocked by a body
+      escapes++;
+    }
+    if (escapes===0) bonus += 5;                                    // last door shut — the pocket kills
+    else if (sealsRear && escapes<=1) bonus += 1.5;                 // closing the rear on a nearly-trapped foe
+  }
+  return bonus;
+}
 /* a unit about to be cut off pulls back toward its own supply. Skill-gated: a
    sharp AI saves the formation, an easy AI lets it be encircled. */
 function aiEscape(u){
@@ -8274,6 +8302,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   if (friendsNear===0) s -= isArm ? 1.5 : 4;                    // infantry keeps a line
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
+  s += pocketBonus(u, x, y);                                    // slam the escape door shut (Hard+)
   s -= threatPenalty(u, x, y, offensive);                      // don't step where the enemy can punish you
   if (!offensive) s -= seamPenalty(u, x, y);                    // seal the line — no lane to our rear (Hard+)
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
@@ -8713,6 +8742,7 @@ function sovScoreHex(u, x, y, df, myNet){
   else if (adjE === 2) s -= 3;
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
+  s += pocketBonus(u, x, y);                                    // slam the escape door shut (Hard+)
   s -= threatPenalty(u, x, y, SCN.sovAI==='attack');          // don't step where the enemy can punish you
   if (SCN.sovAI!=='attack') s -= seamPenalty(u, x, y);         // seal the line — no lane to our rear (Hard+)
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
@@ -15468,7 +15498,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
-    threatField, threatPenalty, seamPenalty, rearRaiders, aiIntercept, aiPursue, aiSkill, aiPlanAction, clearAICache,
+    threatField, threatPenalty, seamPenalty, pocketBonus, rearRaiders, aiIntercept, aiPursue, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,

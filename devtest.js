@@ -832,6 +832,27 @@ say('— AI coordinated pursuit (run down the broken) —');
   check('a Normal unit does not pursue (balance untouched)', E.aiPursue(norm.hunter)===null);
 }
 
+/* ENCIRCLEMENT: a Hard AI values the hex that shuts an enemy's last escape door */
+say('— AI encirclement (seal the pocket) —');
+{
+  // hem a Soviet unit in so its only empty neighbour is one "door" hex, then check
+  // a German scores stepping onto that hex (the kill-seal) as a real bonus
+  E.newGame('S','hard','ai','barbarossa'); const G=E.getState(); G.units.length=0; let id=1;
+  const mk=(k,n,x,y,side)=>{const u={id:id++,kind:k,name:n,side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+  mk('s_inf','Trapped',15,10,'S');
+  const ring = E.neighbors(15,10).filter(([x,y])=>E.passable(x,y) && E.domainOk('s_inf',x,y));
+  const door = ring[0];                                      // leave this one empty — the last door
+  for (let i=1;i<ring.length;i++) mk('g_inf','Wall'+i,ring[i][0],ring[i][1],'G');
+  const closer = mk('g_pz','Closer',door[0],door[1],'G');
+  E.clearAICache();
+  const seal = E.pocketBonus(closer, door[0], door[1]);      // occupying the door shuts the last escape
+  check('closing the last escape hex is rewarded', seal >= 5, `bonus ${seal}`);
+  // Normal-skill side gets no such bonus — balance untouched
+  E.newGame('S','normal','ai','barbarossa');
+  check('Normal side gets no pocket bonus (balance untouched)',
+    E.pocketBonus({...closer, side:'G'}, door[0], door[1])===0);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {
