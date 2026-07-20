@@ -273,7 +273,9 @@ say('— naval domain —');
     let ph=0, wrong=null;
     while(!Gd.over && ph < E.SCENARIOS.guadalcanal.maxTurn*2 + 6){
       E.aiFullPhase(Gd.phase); if(!Gd.over) E.endPhase(); ph++;
-      for(const u of Gd.units){ if(!E.domainOk(u.kind,u.x,u.y)){ wrong = u.name+'@'+u.x+','+u.y+' on '+E.terrainAt(u.x,u.y); break; } }
+      // an embarked division riding a transport at sea is legitimate — only a unit
+      // sitting on terrain its domain forbids AND not embarked is truly stranded
+      for(const u of Gd.units){ if(!u.embarked && !E.domainOk(u.kind,u.x,u.y)){ wrong = u.name+'@'+u.x+','+u.y+' on '+E.terrainAt(u.x,u.y); break; } }
       if(wrong) break;
     }
     check('no unit is ever stranded on the wrong domain (full Guadalcanal game)', !wrong, wrong||'clean');

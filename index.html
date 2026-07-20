@@ -3357,7 +3357,8 @@ SCENARIOS.okinawa = {
      text:'With Naha and Yonabaru under pressure and the flanks peeling, Ushijima slips the whole 32nd Army out of Shuri by night, south to the Kiyan line — in the rain, under the guns, brilliantly. The Marines take the castle and find the caves empty. The fortress must be taken twice.',
      apply(G){
        // the historical mechanism: the fortress is abandoned under pressure, not stormed.
-       // Ushijima pre-planned the move — it happens unless the Americans are being thrown back
+       // Ushijima pre-planned the move — it happens once the Americans have ground
+       // far enough forward (a lower bar now the caves cost the US so much longer)
        if (axisVP() < 5) return;
        const shuri=G.cities.find(c=>c.name==='Shuri');
        const def=unitAt(shuri.x,shuri.y);
@@ -3376,8 +3377,8 @@ SCENARIOS.okinawa = {
   startDate: Date.UTC(1945,3,1),
   weather(turn){ return (turn>=6 && turn<=7) ? 'mud' : 'clear'; },   // the May rains
   pp(side, turn){
-    if (side==='G') return 8;                          // the fleet train is bottomless
-    return 3;                      // no replacements ever come — the caves spend what they stored                            // the caves spend what they stored
+    if (side==='G') return 8;                          // the fleet resupplies, but the caves make every yard cost
+    return 3;                      // no replacements ever come — the caves spend what they stored
   },
   victoryTiers: [
     [13,'THE ISLAND FALLS EARLY','The Shuri line cracks weeks ahead of schedule and the 32nd Army dies in the open — the cheapest great victory of the Pacific.'],
@@ -3479,7 +3480,7 @@ SCENARIOS.leyte = {
     {x:11,y:17, name:'Surigao',  vp:0, owner:'G'},
   ],
   gerSpawns: [[4,8],[3,12],[6,10]],
-  sovSpawns: [[24,10],[25,13],[23,7]],
+  sovSpawns: [[20,8],[19,10],[18,12]],   // the US fleet stands just off the eastern beaches — reinforcement convoys land in a turn
   supplyRange: 40,                          // fleet trains — nobody starves in a week
   startUnits: [
     // — Shō-Gō: three forces converge —
@@ -5909,6 +5910,13 @@ function domainOk(kind, x, y){
   if (k.sea) return k.landing ? true : terrainAt(x,y) === 'o';
   return terrainAt(x,y) !== 'o';
 }
+// domain check that respects an EMBARKED land unit — a division riding a transport
+// at sea. While embarked it sails like a landing convoy (anywhere passable, ocean
+// or shore); once it beaches it reverts to ordinary land rules.
+function unitDomainOk(u, x, y){
+  if (u.embarked) return true;                 // passable() gates impassable deep water separately
+  return domainOk(u.kind, x, y);
+}
 // the six neighbour offsets are constant per row parity — hoisted so neighbors()
 // doesn't rebuild them (seven array allocations) on every call. It's one of the
 // hottest functions in the AI's supply/ZOC/reach floods.
@@ -6634,7 +6642,7 @@ function reachable(u){
     if (c > (best.get(keyOf(x,y)) ?? 1e9)) continue;
     if (foeZOC.has(keyOf(x,y)) && !(x===u.x&&y===u.y)) continue;  // ZOC: stop here
     for (const [nx,ny] of neighbors(x,y)){
-      if (!passable(nx,ny) || !domainOk(u.kind,nx,ny)) continue;   // ships stay at sea, infantry stays ashore
+      if (!passable(nx,ny) || !unitDomainOk(u,nx,ny)) continue;   // ships stay at sea, infantry stays ashore (embarked troops may do both)
       const k = keyOf(nx,ny);
       if (occ[k] === enemyOf(u.side)) continue;
       const nc = c + moveCost(u,nx,ny);
@@ -6659,6 +6667,12 @@ function doMove(u, x, y){
   }
   u.x = x; u.y = y; u.moved = true; u.entrench = 0;
   G.mv = (G.mv||0) + 1;                          // ticks the fog-of-war sight cache
+  // a transport that beaches lands its division: the counter reverts to infantry
+  if (u.embarked && !isWater(x,y)){
+    u.embarked = false;
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${u.name} wades ashore and deploys.`);
+    if (typeof onDisembark === 'function') onDisembark(u);
+  }
   const c = cityAt(x,y);
   if (c && c.owner !== u.side && !KINDS[u.kind].noCapture){
     c.owner = u.side;
@@ -6692,6 +6706,11 @@ function combatMods(att, def){
   if (ag && ag.trait==='bulwark' && ag.def) {} // (bulwark is a defensive trait; no attack effect)
   if (dg && dg.trait==='bulwark') df('🛡 '+dg.name+' — Master of Defence', 1.15);
   if (att.oos && ag && ag.trait==='logi') af('🚚 '+ag.name+' — Iron Logistician', SCN.harshOOS ? (1/0.35) : (1/OOS_ATK));  // cancels the cut-off penalty
+  // troops caught at sea in their transports are terribly exposed — a loaded convoy
+  // is a soft target, and men can't fight well from landing craft. Sink them before
+  // they land, or land them before you fight.
+  if (att.embarked) af('⚓ Attacking from transports', 0.5);
+  if (def.embarked) df('⚓ Caught loading at sea', 0.4);
   if (hasDoc(att.side,'combined')) af('⚙ Combined Arms', 1.10);
   if (hasDoc(def.side,'depth') && def.entrench>0) df('⚙ Defense in Depth', 1.12);
   if (zhukovDefends(def)) df('⭐ '+ (SCN.capitalDefense.city) +' defense', SCN.capitalDefense.def);
@@ -6910,7 +6929,7 @@ function resolveCombat(att, def, supports){
   if ((events.destroyed || events.retreated) && lead && adjacentKill && !unitAt(...events.defFrom)){
     const [fx,fy] = events.defFrom;
     const eligible = group.filter(u => u.str>0 && hexDist(u.x,u.y,fx,fy)===1 &&
-      (domainOk(u.kind,fx,fy) || KINDS[u.kind].landing) &&   // ships don't advance ashore — except invasion convoys, which beach to land the troops
+      (unitDomainOk(u,fx,fy) || KINDS[u.kind].landing) &&   // ships don't advance ashore — except invasion convoys, which beach to land the troops
       !(KINDS[u.kind].noCapture && cityAt(fx,fy) && cityAt(fx,fy).owner!==u.side));
     if (combined && eligible.length){
       events.choose = eligible.map(u => u.id);                  // the player picks who advances
@@ -7383,7 +7402,11 @@ function reinforceAll(side){
   for (const u of list) if (doReinforce(u)) count++;
   return { count, spent: before - G.pp[side] };
 }
-function deploySpots(side){
+// where a NEW formation can arrive. When a `kind` is given the spots are filtered
+// to its own domain — ships to open water, divisions to dry land. In a naval theatre
+// a division whose whole approach is by sea (no dry-land spawn — Leyte) arrives
+// EMBARKED on the water, riding a transport it must sail ashore to unload.
+function deploySpots(side, kind){
   const spawns = side==='G' ? GER_SPAWNS : SOV_SPAWNS;
   const net = computeSupply(side);
   const spots = spawns.filter(([x,y]) => {
@@ -7398,7 +7421,18 @@ function deploySpots(side){
     if (c.owner!==side || !isCoast(c.x,c.y) || unitAt(c.x,c.y)) continue;
     if (net.has(keyOf(c.x,c.y)) && !spots.some(s=>s[0]===c.x&&s[1]===c.y)) spots.push([c.x,c.y]);
   }
-  return spots;
+  if (!kind) return spots;                                     // legacy callers: every open spot
+  if (KINDS[kind].sea) return spots.filter(([x,y]) => domainOk(kind,x,y));   // ships → open water
+  const land = spots.filter(([x,y]) => terrainAt(x,y) !== 'o');              // divisions → dry land
+  if (land.length) return land;
+  return spots.filter(([x,y]) => terrainAt(x,y) === 'o');       // sea-approach only: embark on open water
+}
+// build a reinforcement — a division dropped onto open water arrives embarked, a
+// transport it must sail to the beach and unload
+function arriveUnit(kind, name, x, y, str){
+  const u = makeUnit(kind, name, x, y, str);
+  if (!KINDS[kind].sea && terrainAt(x,y) === 'o') u.embarked = true;
+  return u;
 }
 function buyableKinds(side){
   return Object.keys(KINDS).filter(k => KINDS[k].side===side && k!=='g_ally' && k!=='s_guard' && !KINDS[k].noBuy)
@@ -7407,17 +7441,18 @@ function buyableKinds(side){
 function doDeploy(side, kind, x, y){
   const k = KINDS[kind];
   if (!k || k.side!==side || G.pp[side] < k.cost) return false;
-  if (!domainOk(kind, x, y)) return false;   // ships deploy to sea spawns, land formations to land ones
-  if (!deploySpots(side).some(([sx,sy]) => sx===x && sy===y)) return false;
+  if (!deploySpots(side, kind).some(([sx,sy]) => sx===x && sy===y)) return false;   // enforces domain + sea-approach
   G.pp[side] -= k.cost;
   const names = SCN.deployNames || {g_inf:'Ersatz Armee', g_pz:'Panzer Reserve', s_inf:'Reserve Army',
                  s_tank:'Tank Reserve', s_mil:'People’s Militia'};
-  const u = makeUnit(kind, names[kind]||k.label, x, y, k.maxStr);
+  const u = arriveUnit(kind, names[kind]||k.label, x, y, k.maxStr);
   u.moved = true; u.attacked = true;        // arrives unready
   G.units.push(u);
   // fog of war: enemy deployments in unscouted hexes go unreported
   if (!fowActive() || side===viewerSide() || sightFor(viewerSide()).has(keyOf(x,y)))
-    logMsg(side==='G'?'l-g':'l-s', `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
+    logMsg(side==='G'?'l-g':'l-s', u.embarked
+      ? `${flag(side)} ${u.name} (${k.label}) embarks offshore — sail it to the beach to land.`
+      : `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
   refreshSupply();
   return true;
 }
@@ -7750,13 +7785,15 @@ function endPhase(){
         // has coastal and blue-water spawn points), so [0] alone could beach a ship
         // or maroon a division at sea. If no in-domain spawn is open this turn the
         // reinforcement simply doesn't arrive — better skipped than spawned stuck.
-        const spot = deploySpots(sd).find(([x,y]) => domainOk(kind, x, y)) || null;
+        const spot = deploySpots(sd, kind)[0] || null;   // domain-matched: ships at sea, divisions ashore (or embarked if sea-only)
         if (spot){
-          const u = makeUnit(kind, name, spot[0], spot[1]);
+          const u = arriveUnit(kind, name, spot[0], spot[1]);
           G.units.push(u);
           // fog of war: enemy reinforcements arriving out of sight go unreported
           if (!fowActive() || sd===viewerSide() || sightFor(viewerSide()).has(keyOf(spot[0],spot[1])))
-            logMsg(sd==='G'?'l-g':'l-s', `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
+            logMsg(sd==='G'?'l-g':'l-s', u.embarked
+              ? `${flag(sd)} ${name} (${KINDS[kind].label}) steams in offshore — bound for the beaches.`
+              : `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
         }
       }
     }
@@ -8060,12 +8097,6 @@ function aiSpend(side){
   // 2. deploy fresh formations
   let guard = 0;
   while (guard++ < 6){
-    let spots = deploySpots(side);
-    if (!spots.length) break;
-    // an invader with captured ports (Italy) reinforces at the port CLOSEST to the
-    // front, not back at its home base — otherwise the whole army piles up overseas
-    if (SCN.portDeploy)
-      spots = spots.slice().sort((a,b)=> nearestEnemyObjDist(side,a[0],a[1]) - nearestEnemyObjDist(side,b[0],b[1]));
     let kind = null;
     // per-side fielded-force caps: default keeps historical behaviour (G:15, S:uncapped),
     // scenarios can raise the invader's ceiling or rein in the defender's (Italy)
@@ -8083,6 +8114,14 @@ function aiSpend(side){
       else if (KINDS.g_inf && G.pp.G >= 16 && unitsOf('G').length < capG) kind='g_inf';
     }
     if (!kind) break;
+    // spawn spots matched to THIS kind's domain (ships at sea, divisions ashore or,
+    // in a sea-only theatre, embarked offshore to be sailed in)
+    let spots = deploySpots(side, kind);
+    if (!spots.length) break;
+    // an invader with captured ports (Italy) reinforces at the port CLOSEST to the
+    // front, not back at its home base — otherwise the whole army piles up overseas
+    if (SCN.portDeploy)
+      spots = spots.slice().sort((a,b)=> nearestEnemyObjDist(side,a[0],a[1]) - nearestEnemyObjDist(side,b[0],b[1]));
     // an amphibious invader must keep production in hand for sea crossings, or it
     // deploys its whole army into its rear base and never ships it to the front
     const reserve = amphibCanSide(side) ? amphibCost()*3 : 0;
@@ -8648,9 +8687,29 @@ function aiPlanSoviet(){
   return null;
 }
 
+// bring an embarked division ashore: a transport at sea sails for the nearest
+// landing and unloads. Without this the AI would leave sea-borne reinforcements
+// bobbing offshore forever (the Leyte convoys).
+function aiSailEmbarked(side){
+  for (const u of unitsOf(side)){
+    if (!u.embarked || u.moved) continue;
+    const reach = reachable(u);
+    let best=null, bestS=-1e9;
+    for (const k of reach.keys()){
+      const [x,y] = unkey(k);
+      const ashore = terrainAt(x,y)!=='o' && !isWater(x,y) && !unitAt(x,y);
+      const s = (ashore ? 400 : 0) - nearestEnemyObjDist(side, x, y);   // land if you can, else close the distance to the front
+      if (s > bestS){ bestS=s; best=[x,y]; }
+    }
+    if (best && (best[0]!==u.x || best[1]!==u.y)) return {type:'move', u:u.id, x:best[0], y:best[1]};
+  }
+  return null;
+}
 function aiPlanAction(side){
   const ev = aiEvacuate(side);          // pull survivors off a lost island before anything else
   if (ev) return ev;
+  const sail = aiSailEmbarked(side);    // land any reinforcements riding transports at sea
+  if (sail) return sail;
   const drop = aiParaPlan(side);        // fling the airborne behind the enemy line
   if (drop) return drop;
   return side==='G' ? aiPlanGerman() : aiPlanSoviet();
@@ -11447,7 +11506,7 @@ function draw(){
 
   // movement / deploy / attack overlays
   if (deployKind){
-    for (const [x,y] of deploySpots(G.phase)){
+    for (const [x,y] of deploySpots(G.phase, deployKind)){
       const [cx,cy] = hexCenter(x,y);
       hexPath(cx,cy,S-3); ctx.fillStyle = '#69c5c94d'; ctx.fill();
       ctx.strokeStyle = '#69c5c9'; ctx.lineWidth = 2; ctx.stroke();
@@ -12219,32 +12278,33 @@ function drawUnit(u, cx, cy, wx){
   ctx.strokeStyle = pale; ctx.lineWidth = 1.6;
   ctx.strokeRect(bx-bw/2, -bh/2, bw, bh);
   ctx.fillStyle = pale;
-  if (k.sym==='inf'){
+  const kSym = u.embarked ? 'tr' : k.sym;   // a division still at sea shows a transport
+  if (kSym==='inf'){
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
     ctx.moveTo(bx+bw/2,-bh/2); ctx.lineTo(bx-bw/2,bh/2); ctx.stroke();
-  } else if (k.sym==='arm'){
+  } else if (kSym==='arm'){
     ctx.beginPath(); ctx.ellipse(bx,0,bw*0.32,bh*0.3,0,0,Math.PI*2); ctx.stroke();
-  } else if (k.sym==='para'){
+  } else if (kSym==='para'){
     ctx.beginPath();                                      // airborne: X under a canopy
     ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/6);
     ctx.moveTo(bx+bw/2,bh/2); ctx.lineTo(bx-bw/2,-bh/6); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, -bh/6, bw*0.36, Math.PI, 0); ctx.stroke();
-  } else if (k.sym==='mot'){                              // motorized: infantry cross + wheels
+  } else if (kSym==='mot'){                              // motorized: infantry cross + wheels
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
     ctx.moveTo(bx+bw/2,-bh/2); ctx.lineTo(bx-bw/2,bh/2); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(bx,0,bw*0.36,bh*0.22,0,0,Math.PI*2); ctx.stroke();
-  } else if (k.sym==='cav'){                              // cavalry: single diagonal slash
+  } else if (kSym==='cav'){                              // cavalry: single diagonal slash
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,bh/2); ctx.lineTo(bx+bw/2,-bh/2); ctx.stroke();
-  } else if (k.sym==='art'){                              // artillery: the filled ball
+  } else if (kSym==='art'){                              // artillery: the filled ball
     ctx.beginPath(); ctx.arc(bx, 0, bw*0.17, 0, Math.PI*2); ctx.fill();
-  } else if (k.sym==='cv'){
+  } else if (kSym==='cv'){
     ctx.fillRect(bx-bw*0.42, -2.6, bw*0.84, 2.6);         // flight deck
     ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 3);              // hull
     ctx.fillRect(bx+bw*0.10, -5.6, 3.6, 3);               // island
-  } else if (k.sym==='bb'){
+  } else if (kSym==='bb'){
     ctx.beginPath();                                      // hull with raked bow
     ctx.moveTo(bx-bw*0.42, 0); ctx.lineTo(bx+bw*0.34, 0);
     ctx.lineTo(bx+bw*0.46, -2.4); ctx.lineTo(bx-bw*0.42, -2.4);
@@ -12253,18 +12313,18 @@ function drawUnit(u, cx, cy, wx){
     ctx.fillRect(bx-bw*0.24, -5.2, 4, 3);                 // fore turret
     ctx.fillRect(bx+bw*0.05, -5.2, 4, 3);                 // aft turret
     ctx.fillRect(bx-bw*0.04, -7, 1.6, 4.5);               // mast
-  } else if (k.sym==='ca'){
+  } else if (kSym==='ca'){
     ctx.fillRect(bx-bw*0.34, 0, bw*0.68, 2.4);            // hull
     ctx.fillRect(bx-bw*0.12, -4.4, 3.4, 2.6);             // turret
     ctx.fillRect(bx+bw*0.08, -5.2, 1.6, 3.4);             // funnel
-  } else if (k.sym==='tr'){
+  } else if (kSym==='tr'){
     ctx.fillRect(bx-bw*0.36, 0, bw*0.72, 2.6);            // hull
     ctx.fillRect(bx-3.8, -4.6, 7.6, 4);                   // deck cargo
-  } else if (k.sym==='ss'){
+  } else if (kSym==='ss'){
     ctx.beginPath(); ctx.ellipse(bx, 0, bw*0.38, 2.6, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillRect(bx-1.6, -4.6, 3.2, 3.2);                 // sail
     ctx.fillRect(bx+0.2, -6.4, 1, 2.4);                   // periscope
-  } else if (k.sym==='hq'){
+  } else if (kSym==='hq'){
     ctx.fillRect(bx-bw*0.34, -bh*0.42, 1.6, bh*0.84);     // flagpole
     ctx.beginPath();                                      // command pennant
     ctx.moveTo(bx-bw*0.34+1.6, -bh*0.42);
@@ -12967,7 +13027,11 @@ function updateUnitCard(){
         const b = document.createElement('button');
         b.textContent = `Deploy ${KINDS[k].label} (${KINDS[k].cost}⚙)`;
         b.onclick = ()=>{ deployKind = (deployKind===k?null:k); sClick();
-          $('hint').innerHTML = deployKind ? 'Click a <b>highlighted city</b> to deploy — Esc cancels.' : defaultHint(); };
+          $('hint').innerHTML = deployKind
+            ? (KINDS[deployKind].sea || deploySpots(G.phase, deployKind).every(([x,y])=>terrainAt(x,y)==='o')
+               ? 'Click a <b>highlighted sea hex</b> to bring the force in — Esc cancels.'
+               : 'Click a <b>highlighted hex</b> to deploy — Esc cancels.')
+            : defaultHint(); };
         act.appendChild(b);
       }
     }
@@ -12979,6 +13043,7 @@ function updateUnitCard(){
   body.innerHTML = `
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
+    ${u.embarked ? `<div style="color:#7fc4f0;font-size:12px;margin-bottom:4px;">⚓ <b>At sea in transports</b> — sail onto the shore to land the division (fragile until it does).</div>` : ''}
     ${g ? `<div style="color:var(--amber);margin-bottom:2px;">⭐ Gen. ${g.name} · ${genBonusText(g)}</div>
            ${g.trait && GEN_TRAITS[g.trait] ? `<div style="color:#ffe4a8;font-size:12px;margin-bottom:2px;" title="${GEN_TRAITS[g.trait].desc}">${GEN_TRAITS[g.trait].icon} <b>${GEN_TRAITS[g.trait].name}</b> — ${GEN_TRAITS[g.trait].desc}</div>` : ''}
            <div style="color:var(--dim);font-size:12px;font-style:italic;margin-bottom:4px;">${g.bio}</div>` : ''}
