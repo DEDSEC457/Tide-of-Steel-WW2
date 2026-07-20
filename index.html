@@ -8579,6 +8579,40 @@ function aiIntercept(u){
   }
   return best ? {type:'move', u:u.id, x:best[0], y:best[1]} : null;
 }
+/* COORDINATED PURSUIT (Hard+): a broken enemy — low strength, trying to slip away
+   and heal — gets run down instead of let off the hook. A unit with no better
+   fight this turn closes on the nearest weak, poorly-defended enemy so it can
+   finish it next turn. Bounded (won't drag the line across the map, won't chase
+   into a hornet's nest, won't leave a fortress) and skill-2 gated. */
+function aiPursue(u){
+  if (aiSkill(u.side) < 2) return null;
+  const k = KINDS[u.kind];
+  if (k.hq || k.carrier) return null;
+  const home = cityAt(u.x,u.y);
+  if (home && home.owner===u.side && home.vp>=3) return null;     // never abandon a key garrison
+  const foe = enemyOf(u.side);
+  let target=null, tD=1e9;
+  for (const e of unitsOf(foe)){
+    if (e.str > 3) continue;                                      // only the broken are worth chasing
+    if (KINDS[e.kind].sea && !k.sea) continue;                    // can't run down ships on land
+    const ec = cityAt(e.x,e.y);
+    if (ec && ec.owner===e.side && ec.vp>=3) continue;            // dug into a fortress — not a soft kill
+    const d = hexDist(u.x,u.y,e.x,e.y);
+    if (d >= 2 && d < tD){ tD=d; target=e; }                      // d===1 is bestAttack's job, not pursuit's
+  }
+  if (!target || tD > 5) return null;
+  const reach = reachable(u);
+  let best=null, bestD=hexDist(u.x,u.y,target.x,target.y);
+  for (const key of reach.keys()){
+    const [x,y]=unkey(key);
+    if (unitAt(x,y)) continue;
+    let adjE=0; for (const [nx,ny] of neighbors(x,y)){ const t=unitAt(nx,ny); if (t && t.side===foe) adjE++; }
+    if (adjE >= 3) continue;                                      // don't sprint into a pocket to make the kill
+    const d=hexDist(x,y,target.x,target.y);
+    if (d < bestD){ bestD=d; best=[x,y]; }
+  }
+  return best ? {type:'move', u:u.id, x:best[0], y:best[1]} : null;
+}
 function aiPlanGerman(){
   aiPostureG = computePosture('G');           // offensive when we outweigh the enemy
   // sea-borne invasion: ship the units that have no other way to the enemy
@@ -8604,6 +8638,9 @@ function aiPlanGerman(){
     // 1c. hunt down a raider loose in our rear (Hard+)
     const icp = aiIntercept(u);
     if (icp) return icp;
+    // 1d. run down a broken enemy before it heals (Hard+)
+    const pur = aiPursue(u);
+    if (pur) return pur;
     // 2. otherwise move with purpose
     const isArm = KINDS[u.kind].sym==='arm' || KINDS[u.kind].fast;
     const city = gerPickTarget(u);
@@ -8736,6 +8773,9 @@ function aiPlanSoviet(){
     // 2b. hunt down a raider loose in our rear (Hard+)
     const icp = aiIntercept(u);
     if (icp) return icp;
+    // 2c. run down a broken enemy before it heals (Hard+)
+    const pur = aiPursue(u);
+    if (pur) return pur;
     // 3. garrisons sit tight; frontline units in good ground dig in
     const onCity = cityAt(u.x,u.y);
     if (onCity && onCity.owner==='S' && onCity.vp>0){ return {type:'hold', u:u.id}; }
@@ -15428,7 +15468,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
-    threatField, threatPenalty, seamPenalty, rearRaiders, aiIntercept, aiSkill, aiPlanAction, clearAICache,
+    threatField, threatPenalty, seamPenalty, rearRaiders, aiIntercept, aiPursue, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,

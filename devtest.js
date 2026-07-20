@@ -807,6 +807,31 @@ say('— AI reserve interception (hunt rear raiders) —');
   check('a Normal reserve holds formation (balance untouched)', E.aiIntercept(norm.react)===null);
 }
 
+/* COORDINATED PURSUIT: a Hard AI runs down a broken enemy instead of letting it heal */
+say('— AI coordinated pursuit (run down the broken) —');
+{
+  function scene(diff){
+    E.newGame('S',diff,'ai','barbarossa'); const G=E.getState(); G.units.length=0; let id=1;
+    const mk=(k,n,x,y,side,str)=>{const u={id:id++,kind:k,name:n,side,x,y,str:str==null?8:str,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+    const hunter = mk('g_pz','Hunter',16,10,'G',8);            // a fresh, mobile German
+    const broken = mk('s_inf','Cripple',13,10,'S',2);          // a shattered Soviet 3 hexes off
+    E.clearAICache();
+    return { G, hunter, broken };
+  }
+  const hard = scene('hard');
+  const before = E.hexDist(hard.hunter.x,hard.hunter.y,hard.broken.x,hard.broken.y);
+  const mv = E.aiPursue(hard.hunter);
+  check('a Hard unit closes on a broken enemy',
+    mv && mv.type==='move' && E.hexDist(mv.x,mv.y,hard.broken.x,hard.broken.y) < before,
+    mv ? `${before}→${E.hexDist(mv.x,mv.y,hard.broken.x,hard.broken.y)}` : 'no move');
+  // a healthy enemy is not chased down like a cripple
+  const hp = scene('hard'); hp.broken.str = 8; E.clearAICache();
+  check('a healthy enemy is not treated as prey', E.aiPursue(hp.hunter)===null);
+  // Normal AI (skill 1) does not pursue — balance untouched
+  const norm = scene('normal');
+  check('a Normal unit does not pursue (balance untouched)', E.aiPursue(norm.hunter)===null);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {
