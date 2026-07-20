@@ -562,6 +562,7 @@
       <span class="opt" data-d="hard">Hard</span>
       <span class="opt" data-d="brutal" title="The enemy out-produces you and gives no quarter — sharp play, relentless pressure, no mercy for a weakened division.">Brutal 💀</span>
     </div>
+    <div id="diff-desc" style="color:var(--dim);font-size:12px;margin:4px auto 0;min-height:32px;max-width:600px;text-align:center;line-height:1.5;"></div>
     <div class="opt-row" id="var-row">
       <span style="color:var(--dim);padding:6px 0;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
       <span class="opt" id="var-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
@@ -15372,13 +15373,27 @@ for (const el of document.querySelectorAll('#scn-row .opt')){
 syncTheater('east');                                  // the default battle is Barbarossa
 $('pick-ger').onclick = ()=>{ mSide='G'; $('pick-ger').classList.add('sel'); $('pick-sov').classList.remove('sel'); };
 $('pick-sov').onclick = ()=>{ mSide='S'; $('pick-sov').classList.add('sel'); $('pick-ger').classList.remove('sel'); };
+/* what each difficulty actually means — surfaced live so a new player knows Hard
+   is genuinely sharp play, not just a stat buff. Higher difficulty changes how the
+   AI THINKS (these behaviours switch on at Hard and Brutal), on top of its economy. */
+const DIFF_DESC = {
+  easy:   `<b style="color:var(--grn)">Easy</b> — the enemy plays it safe: it waits for sure things, leaves gaps in its line, and won't chase a beaten division. A forgiving way to learn the ropes.`,
+  normal: `<b>Normal</b> — a fair fight, no bonuses either way. The enemy presses reasonable attacks and holds a sensible line. This is the balance every campaign is tuned around.`,
+  hard:   `<b style="color:var(--amber)">Hard</b> — a genuinely sharp opponent. It <b>seals the gaps</b> in its front, <b>hunts down</b> anything that breaks into its rear, <b>runs your wounded to ground</b>, <b>pincers</b> over-extended units into pockets, and <b>drives for the depots</b> that feed your line. It also presses attacks harder and out-produces you a little.`,
+  brutal: `<b style="color:var(--redL)">Brutal 💀</b> — everything Hard does, without mercy. It out-produces you, presses every good attack, and gives a weakened division no quarter. The line seals, the breakthroughs get hunted, the pockets close. Bring your best.`,
+};
+function updateDiffDesc(d){ const el = $('diff-desc'); if (el) el.innerHTML = DIFF_DESC[d] || ''; }
 for (const el of document.querySelectorAll('#diff-row .opt')){
   el.onclick = ()=>{
     mDiff = el.dataset.d;
     document.querySelectorAll('#diff-row .opt').forEach(o=>o.classList.remove('sel'));
     el.classList.add('sel');
+    updateDiffDesc(mDiff);
   };
+  el.onmouseenter = ()=>{ if (el.dataset.d) updateDiffDesc(el.dataset.d); };
+  el.onmouseleave = ()=>{ updateDiffDesc(mDiff); };
 }
+updateDiffDesc(mDiff);
 $('mode-ai').onclick = ()=>{ mMode='ai'; $('mode-ai').classList.add('sel'); $('mode-hotseat').classList.remove('sel'); };
 $('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.add('sel'); $('mode-ai').classList.remove('sel'); };
 
