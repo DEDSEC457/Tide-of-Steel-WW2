@@ -1,24 +1,26 @@
-# ⚙ Hearts of Iron 5
+# ⚔ Hex's at War WW2
 
-Tyler's personal turn-based WW2 strategy game project. A fan-made hobby game —
-not affiliated with Paradox or the real Hearts of Iron series; the name is a
-loving nickname for "the strategy game I always wanted."
+**A turn-based WW2 hex-strategy game — 19 historical battles, one file, plays
+100% offline.** Developed & published by **Tyler Wanuga**. Version 1.0.
 
-Three ways to play, chosen from the main menu.
+Command either side across the great campaigns of the Second World War — the
+panzers racing the winter to Moscow, the carrier duel at Midway, the invasion
+beaches of Normandy and the island fights of the Pacific — on a hex map, one
+week (or one day, or one month) at a time. Three ways to play, chosen from the
+main menu.
 
-**🎮 Arcade Mode — five campaigns**, streamlined and quick to learn:
-- **⚙ Operation Barbarossa 1941** — Germany races the winter to Moscow
-- **❄ The Winter Counteroffensive 1941** — Zhukov throws the frozen Wehrmacht
-  back from the gates (now the *Soviets* attack)
-- **🏭 Case Blue — Stalingrad 1942** — the Don bend, the Volga, the Caucasus
-  oil — and Operation Uranus waiting in November
-- **⚓ The Battle of Midway 1942** — carrier war in the Pacific, one turn per
-  day: float­ing airfields, fragile flattops, and the ambush of the century
-- **🟦 D-Day 1944** — the Allies hit five beaches: win the buildup race, take
-  a port, break out of the bocage, and liberate Paris before autumn
+**🎮 Arcade Mode — 14 battles across three theaters**, streamlined and quick to
+learn:
+- **⚔ Eastern Front** — 🦅 Poland 1939 · ⛷ Winter War 1939 · ⚙ Barbarossa 1941 ·
+  ❄ Winter Counteroffensive 1941 · 🏭 Stalingrad 1942 · 🔥 Kursk 1943
+- **🌍 West & Africa** — 🐪 El Alamein 1942 · 🟦 D-Day 1944 · 🌉 Market Garden 1944 ·
+  🎄 The Bulge 1944
+- **🌊 The Pacific** — ⚓ Midway 1942 · 🌴 Guadalcanal 1942 · ⚔ Leyte Gulf 1944 ·
+  🌊 Okinawa 1945 (with amphibious landings, airborne drops, carrier air and
+  naval gunnery where the history calls for them)
 
-**🗺 Realistic Mode — War in the East 1941–42** *(early preview)* — the entire
-Eastern Front at operational scale on a 60×36 map, the Baltic to the Caucasus:
+**🗺 Realistic Mode — War in the East 1941–42** — the entire Eastern Front at
+operational scale on a 60×36 map, the Baltic to the Caucasus:
 - **⛽ Fuel logistics** — panzers, motorized and SS corps burn fuel to move and
   refuel only in supply; a spearhead that outruns its trains runs dry and
   culminates, exactly as the real ones did
@@ -29,9 +31,9 @@ Eastern Front at operational scale on a 60×36 map, the Baltic to the Caucasus:
 - A **40-week campaign** through the autumn mud, the deep winter and the Soviet
   counteroffensive, with the historical mobilization deluge arriving by rail
 
-**🌍 The World at War — grand strategy 1939–45** *(early build)* — a whole second
-game: pick a great power (Germany · USSR · Britain · France · Italy) and fight
-the entire war across Europe and the Mediterranean, **one month per turn**.
+**🌍 The World at War — grand strategy 1939–45** — a whole second game: pick a
+great power (Germany · USSR · Britain · France · Italy) and fight the entire war
+across Europe and the Mediterranean, **one month per turn**.
 - **Build a war economy** — civilian factories pour into a construction queue
   (build *more* factories, compounding your output); military factories produce
   the divisions that become your field armies; manpower limits how many you raise
@@ -60,10 +62,13 @@ The whole game is one file (`index.html`) that runs in any browser:
 **100% offline, no installs, no accounts, autosaves every turn.**
 
 ## ▶ How to play
-- **On any PC:** download `index.html` and double-click it (or use `Play Barbarossa.bat` on Windows).
-- Germany invades the USSR on 22 June 1941. Each turn is one week; the campaign
-  runs 28 turns into the Russian winter. Play **either side** vs the computer
-  (3 difficulties) or **2-player hotseat** on one machine.
+- **On any PC:** download `index.html` and double-click it (or use
+  `Play Hex's at War WW2.bat` on Windows). It opens in your browser — **100%
+  offline, nothing to install, no account.**
+- Pick a battle from the main menu and choose your side. Play **vs the computer**
+  (four difficulties, Easy → Brutal — where the AI genuinely plays *smarter*, not
+  just tougher) or **2-player hotseat** on one machine. Progress **autosaves every
+  turn**, and each battle keeps its own save slot.
 
 ## 🧠 What makes it a strategy game
 - **Supply & encirclement** — supply reaches only 7 hexes from your map edge or
@@ -147,7 +152,13 @@ so you can see which feature moves the victory distribution.
 - **Soviet rail redeployment** — shuttle one army per turn between friendly cities
 - **Factory evacuation** — dismantle industry in a threatened city: lose production
   now, gain it back behind the Urals later
-- **Partisans** — from October, partisan bands cut German supply behind the lines
-- More scenarios — the framework makes them pure data: Kursk 1943, the
-  Destruction of Army Group Center 1944, Guadalcanal, Market Garden,
-  the Battle of the Bulge
+- **Partisans** — partisan bands that cut supply behind the lines
+- More scenarios — the framework makes them pure data
+
+## © Credits & license
+**Hex's at War WW2** — version 1.0. Developed & published by **Tyler Wanuga**.
+
+Copyright © 2026 Tyler Wanuga. All rights reserved. Free to download, play, and
+share unmodified for personal, non-commercial use; not for sale or modification
+without permission. See [`LICENSE`](LICENSE) for the full terms. The in-game
+**⚙ Settings** panel shows the version and credit at any time.

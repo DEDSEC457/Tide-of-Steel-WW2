@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Operation Barbarossa — Eastern Front 1941</title>
+<title>Hex's at War WW2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Hex's at War WW2 — a single-file, offline WW2 hex-strategy game. Command 19 historical battles from Barbarossa to the Pacific. Developed and published by Tyler Wanuga.">
+<meta name="author" content="Tyler Wanuga">
+<meta property="og:title" content="Hex's at War WW2">
+<meta property="og:description" content="A WW2 hex-strategy game — 19 historical battles, one file, plays 100% offline.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='25,4 75,4 98,50 75,96 25,96 2,50' fill='%23e8b34b'/%3E%3Cpolygon points='38,29 62,29 74,50 62,71 38,71 26,50' fill='%23161a14'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#0d0f0c; --panel:#161a14; --panel2:#1d2218; --line:#3a4430;
@@ -339,16 +345,16 @@
 <div id="mode-select" class="modal-back">
   <div class="modal">
     <button id="btn-settings-main">⚙ Settings</button>
-    <h1>HEARTS OF IRON 5</h1>
+    <h1>HEX'S AT WAR WW2</h1>
     <div class="sub">SELECT YOUR EXPERIENCE</div>
     <!-- Arcade — featured hero card -->
     <div class="mode-card mc-hero" id="mc-arcade">
       <div class="mc-inner">
         <div class="mc-icon">⚔</div>
         <div class="mc-text">
-          <span class="mc-badge ready">9 CAMPAIGNS</span>
+          <span class="mc-badge ready">14 BATTLES</span>
           <h2>ARCADE MODE</h2>
-          <p class="mc-desc">Historical battles from Operation Barbarossa to the Battle of the Bulge — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
+          <p class="mc-desc">Historical battles across three theaters — the Eastern Front, West &amp; Africa, and the Pacific — streamlined mechanics, quick to learn, deep enough to surprise you.</p>
         </div>
         <button class="primary mc-btn">PLAY NOW ▶</button>
       </div>
@@ -859,6 +865,14 @@
       <input type="range" id="ui-scale" min="90" max="125" step="5">
       <span class="vlabel" id="ui-scale-val">100%</span></div>
     <div style="color:var(--dim);font-size:12px;margin-top:2px;">Scales the panels, top bar and pop-ups — the map itself keeps its own zoom.</div>
+    <div style="border-top:1px solid var(--line);margin:18px 0 8px;"></div>
+    <div id="about-box" style="text-align:center;color:var(--dim);font-size:12px;line-height:1.65;">
+      <div style="color:var(--amber);letter-spacing:3px;font-size:14px;">HEX'S AT WAR WW2</div>
+      <div>Version <b style="color:var(--ink)">1.0</b></div>
+      <div>Developed &amp; published by <b style="color:var(--ink)">Tyler Wanuga</b></div>
+      <div style="opacity:.8">© 2026 Tyler Wanuga · All rights reserved</div>
+      <div style="opacity:.7;margin-top:2px;">Runs 100% offline — nothing leaves your device.</div>
+    </div>
     <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
   </div>
 </div>
