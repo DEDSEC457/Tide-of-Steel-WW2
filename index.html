@@ -6177,6 +6177,30 @@ function lineBonus(u, x, y){
   const isoPen = sk >= 2 ? -5 : -3;                     // Hard AI never leaves a 1-hex gap
   return (adj===0 ? isoPen : Math.min(adj,2)*1.4) * sk;
 }
+/* DEFENSE IN DEPTH (Hard+ only): a coherent front has no open hex beside a
+   defender that an enemy can slip through toward the rear. This finds "seams" —
+   empty ground next to us that also touches an enemy AND lies rear-ward of us —
+   so the sharp AI backs its line against water, terrain and its neighbours
+   instead of dangling the 1-hex gaps a human pours a fast unit through. Gated to
+   skill 2, so the AI-vs-AI balance (tuned at skill 1) is untouched by construction. */
+function seamPenalty(u, x, y){
+  if (aiSkill(u.side) < 2) return 0;
+  const foe = enemyOf(u.side);
+  const rear = rearDir(u.side);                          // +1 => home is west (small x)
+  let seams = 0;
+  for (const [nx,ny] of neighbors(x,y)){
+    if (!inMap(nx,ny) || !passable(nx,ny) || isWater(nx,ny) || unitAt(nx,ny)) continue;
+    let touchesFoe = false;                              // an enemy could step into this empty hex
+    for (const [ex,ey] of neighbors(nx,ny)){
+      const t = unitAt(ex,ey);
+      if (t && t.side===foe){ touchesFoe = true; break; }
+    }
+    if (!touchesFoe) continue;
+    const behindMe = rear>0 ? (nx >= x) : (nx <= x);     // and doing so carries them past us (home is small-x when rear<0)
+    if (behindMe) seams++;
+  }
+  return Math.min(seams,3) * 2.0;
+}
 /* a unit about to be cut off pulls back toward its own supply. Skill-gated: a
    sharp AI saves the formation, an easy AI lets it be encircled. */
 function aiEscape(u){
@@ -8251,6 +8275,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
   s -= threatPenalty(u, x, y, offensive);                      // don't step where the enemy can punish you
+  if (!offensive) s -= seamPenalty(u, x, y);                    // seal the line — no lane to our rear (Hard+)
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
   // EXPLOITATION: when we hold the initiative, a fast unit in a clean lane
   // (no adjacent enemy) that gets meaningfully closer to its objective pours
@@ -8605,6 +8630,7 @@ function sovScoreHex(u, x, y, df, myNet){
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
   s -= threatPenalty(u, x, y, SCN.sovAI==='attack');          // don't step where the enemy can punish you
+  if (SCN.sovAI!=='attack') s -= seamPenalty(u, x, y);         // seal the line — no lane to our rear (Hard+)
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
   const wx = weatherFor(G.turn);
   if (wx==='snow' && weakest){
@@ -15352,7 +15378,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
-    threatField, threatPenalty, aiSkill, aiPlanAction, clearAICache,
+    threatField, threatPenalty, seamPenalty, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,

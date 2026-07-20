@@ -753,6 +753,31 @@ say('— AI skill & threat awareness —');
     E.threatPenalty({...pz2,side:'S',kind:'s_inf'}, cityHex.x, cityHex.y, false)===0);
 }
 
+/* DEFENSE IN DEPTH: a Hard AI seals the seams a human pours a fast unit through */
+say('— AI defensive coherence (seam sealing) —');
+{
+  // Hard game: player is Soviet, so the German AI plays at skill 2
+  E.newGame('S','hard','ai','barbarossa'); const G=E.getState(); G.units.length=0; let id=1;
+  const mk=(k,n,x,y,side)=>{const u={id:id++,kind:k,name:n,side:side||E.KINDS[k].side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+  // a German defender at (20,10); find an empty rear-ward neighbour (toward the German home, west)
+  const U = mk('g_inf','Wall',20,10,'G');
+  const rearHex = E.neighbors(20,10).find(([x,y])=>x<=20 && E.passable(x,y) && !E.isWater(x,y));
+  // put a Soviet unit adjacent to that rear lane so an enemy can step through it
+  const foeHex = E.neighbors(rearHex[0],rearHex[1]).find(([x,y])=>!(x===20&&y===10) && E.passable(x,y) && !E.isWater(x,y));
+  mk('s_inf','Raider',foeHex[0],foeHex[1],'S');
+  E.clearAICache();
+  const open = E.seamPenalty(U,20,10);
+  check('a Hard AI feels an open lane to its rear', open>0, `pen ${open.toFixed(1)}`);
+  // the player side (Soviet, skill 1 here) is never affected — keeps AI-vs-AI balance intact
+  const playerSeam = E.seamPenalty({...U,side:'S'},20,10);
+  check('skill-1 side is exempt (balance norm untouched)', playerSeam===0, `pen ${playerSeam}`);
+  // plug the lane with a friendly body → the seam is sealed
+  mk('g_inf','Plug',rearHex[0],rearHex[1],'G');
+  E.clearAICache();
+  const sealed = E.seamPenalty(U,20,10);
+  check('sealing the lane removes the penalty', sealed < open, `open ${open.toFixed(1)} sealed ${sealed.toFixed(1)}`);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {
