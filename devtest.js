@@ -873,6 +873,26 @@ say('— AI encirclement (seal the pocket) —');
     E.pocketBonus({...closer, side:'G'}, door[0], door[1])===0);
 }
 
+/* SUPPLY OFFENSIVE: a Hard AI prizes seizing an enemy depot that feeds his front */
+say('— AI supply offensive (take the depots) —');
+{
+  E.newGame('S','hard','ai','barbarossa'); const G=E.getState();
+  const depot = G.cities.find(c=>c.owner==='S');             // a Soviet-held forward depot
+  let id=9000;
+  const mk=(k,n,x,y,side)=>{const u={id:id++,kind:k,name:n,side,x,y,str:8,entrench:0,moved:false,attacked:false,oos:false,oosTurns:0,xp:0};G.units.push(u);return u;};
+  for (const [dx,dy] of E.neighbors(depot.x,depot.y)) if (E.passable(dx,dy) && !E.unitAt(dx,dy)) mk('s_inf','Fed'+(id),dx,dy,'S');
+  const pz = mk('g_pz','Raider',depot.x,depot.y,'G');        // a German poised to take the depot hex
+  E.clearAICache();
+  const feeds = E.supplyStrikeValue(pz, depot.x, depot.y);
+  check('taking a depot that feeds a cluster is rewarded', feeds > 0, `strike ${feeds.toFixed(1)}`);
+  const empty = E.neighbors(depot.x,depot.y).find(([x,y])=>E.passable(x,y) && !E.cityAt(x,y));
+  check('empty ground is not a supply target', empty ? E.supplyStrikeValue(pz, empty[0], empty[1])===0 : true);
+  // Normal AI is not driven by it — balance untouched
+  E.newGame('S','normal','ai','barbarossa');
+  check('Normal AI gets no supply-strike bonus (balance untouched)',
+    E.supplyStrikeValue({...pz, side:'G'}, depot.x, depot.y)===0);
+}
+
 /* combat readability: the forecast exposes a legible modifier breakdown */
 say('— combat readability —');
 {

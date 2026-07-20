@@ -8314,6 +8314,7 @@ function gerScoreHex(u, x, y, df, isArm, myNet){
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
   s += pocketBonus(u, x, y);                                    // slam the escape door shut (Hard+)
+  s += supplyStrikeValue(u, x, y);                              // take the depot that feeds his front (Hard+)
   s -= threatPenalty(u, x, y, offensive);                      // don't step where the enemy can punish you
   if (!offensive) s -= seamPenalty(u, x, y);                    // seal the line — no lane to our rear (Hard+)
   if (!offensive && adjEnemy >= 3) s -= 8;                      // when weak, don't walk into a pocket
@@ -8352,6 +8353,23 @@ function cutoffValue(u, x, y){
   for (const t of unitsOf('S')) if (!net.has(keyOf(t.x,t.y)) && !t.oos) cut++;
   u.x=ox; u.y=oy;
   return cut;
+}
+
+/* SUPPLY OFFENSIVE (Hard+): logistics as a weapon. Every enemy-held city is a
+   forward depot; take the one that feeds a cluster of his front-line units and the
+   supply behind it collapses — his corps slide from supplied to strained to cut
+   off, and the pocket does the rest. So the sharp AI values seizing a depot for the
+   starvation it causes, not just its victory points (a connective depot has none).
+   Cheap by design — no supply recompute, just a proximity count. Skill-2 gated. */
+function supplyStrikeValue(u, x, y){
+  if (aiSkill(u.side) < 2 || KINDS[u.kind].noCapture) return 0;
+  const foe = enemyOf(u.side);
+  const c = cityAt(x,y);
+  if (!(c && c.owner===foe)) return 0;                         // the weapon is taking his depots
+  const range = SCN.supplyRange ?? SUPPLY_RANGE ?? 6;
+  let fed = 0;
+  for (const e of unitsOf(foe)) if (hexDist(x,y,e.x,e.y) <= range) fed++;   // units that lean on this depot
+  return Math.min(fed,6) * 1.3;
 }
 
 /* proactive gang-up: moving next to an enemy a comrade is already beside sets up
@@ -8754,6 +8772,7 @@ function sovScoreHex(u, x, y, df, myNet){
   s += lineBonus(u, x, y);                                      // hold an unbroken front (skill-scaled)
   s += gangSetup(u, x, y);                                      // converge force on a shared target
   s += pocketBonus(u, x, y);                                    // slam the escape door shut (Hard+)
+  s += supplyStrikeValue(u, x, y);                              // take the depot that feeds his front (Hard+)
   s -= threatPenalty(u, x, y, SCN.sovAI==='attack');          // don't step where the enemy can punish you
   if (SCN.sovAI!=='attack') s -= seamPenalty(u, x, y);         // seal the line — no lane to our rear (Hard+)
   if (KINDS[u.kind].carrier && adjE >= 1) s -= 12;              // carriers stand off and strike
@@ -15519,7 +15538,7 @@ if (typeof module !== 'undefined' && module.exports){
   module.exports = {
     newGame, aiFullPhase, endPhase, startPhase, axisVP, weatherFor, snowDepth,
     computeSupply, computeZOC, reachable, previewCombat, resolveCombat, railNetwork, weatherSupplyRange,
-    threatField, threatPenalty, seamPenalty, pocketBonus, rearRaiders, aiIntercept, aiPursue, aiSkill, aiPlanAction, clearAICache,
+    threatField, threatPenalty, seamPenalty, pocketBonus, supplyStrikeValue, rearRaiders, aiIntercept, aiPursue, aiSkill, aiPlanAction, clearAICache,
     doMove, doReinforce, doDeploy, deploySpots, serialize, deserialize,
     unitsOf, unitAt, cityAt, neighbors, hexDist, passable, terrainAt, keyOf, unkey, domainOk,
     airOf, airStrike, setPatrol, setSupport, casCover, casBonus, aiAir, airWxMul, strikeTargets, airfieldCovered, previewStrike,
