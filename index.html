@@ -10093,7 +10093,7 @@ function setView3d(on){
 // the canvas is a flat plane) before feeding the point to toWorld/hexFromPixel.
 // Off by default; if a click ever feels off, one toggle restores flat play.
 let tilt = false;
-const TILT_DEG = 24, TILT_SCALE = 1.06, TILT_P = 1500;
+const TILT_DEG = 30, TILT_SCALE = 1.08, TILT_P = 1400;
 let _tiltInv = null;
 try{ tilt = localStorage.getItem('hoi5-tilt')==='1'; }catch(e){}
 function _inv3(m){                                   // inverse of a row-major 3x3
