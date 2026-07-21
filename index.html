@@ -9890,11 +9890,45 @@ function wwAdvanceDate(days){
   while(true){ const md=WW_MDAYS[d.m-1]+((d.m===2 && d.y%4===0)?1:0);
     if(d.d<=md) break; d.d-=md; d.m++; if(d.m>12){ d.m=1; d.y++; } }
 }
+// the whole war is decided by New Year 1948 if it hasn't been settled by arms first
+const WW_WAR_END = {y:1948, m:1, d:1};
+function wwDateNum(dt){ return dt.y*384 + (dt.m-1)*32 + dt.d; }
+/* score the war into a tier from the strategic balance: who capitulated, who still
+   fights, how much of the continent each side holds, when it ended, and the blood
+   spent. 'conquest' = every enemy beaten, 'capitulated' = the player fell,
+   'timeout' = the war was called by 1948 with the outcome still open. */
+function wwScoreVictory(reason){
+  const me=WW.byKey[WW.player], myFac=me.fac, enemyFacs=WW_ENEMY[myFac]||{};
+  const foe = n => n.key!==WW.player && n.fac!=='neutral' && n.fac!==myFac &&
+    (enemyFacs[n.fac] || (me.atWar&&me.atWar.has(n.key)) || (n.atWar&&n.atWar.has(WW.player)));
+  const foes=WW.nat.filter(foe), foesGone=foes.filter(n=>n.capitulated), foesLive=foes.filter(n=>!n.capitulated);
+  const allies=WW.nat.filter(n=>n.fac===myFac), alliesGone=allies.filter(n=>n.capitulated && n.key!==WW.player);
+  let myHex=0, foeHex=0, cas=0;
+  for(const n of WW.nat){ cas+=n.casualties||0; if(n.fac===myFac) myHex+=n.hexes||0; else if(foe(n)) foeHex+=n.hexes||0; }
+  const ctrl = myHex/(myHex+foeHex+1), yr=WW.date.y;
+  let key,title,blurb,win=false,draw=false;
+  if(reason==='capitulated'){ key='total-defeat'; title=me.name.toUpperCase()+' HAS FALLEN';
+    blurb='The capital is taken and the government sues for peace. The war is lost, and the map of Europe is redrawn by the victors.'; }
+  else if(reason==='conquest' || foesLive.length===0){ win=true;
+    if(yr<=1942){ key='total-victory'; title='TOTAL VICTORY'; blurb='Every enemy that took up arms is brought to capitulation — and in record time. '+me.name+' bestrides the continent, its war won before the world expected it to begin in earnest.'; }
+    else { key='decisive-victory'; title='DECISIVE VICTORY'; blurb='The last enemy capital falls. After years of grinding war, '+me.name+' stands triumphant over every foe.'; } }
+  else if(foesGone.length>=Math.max(1,foesLive.length) && ctrl>0.57){ win=true; key='marginal-victory'; title='MARGINAL VICTORY';
+    blurb='The war is called with '+me.name+' ascendant — most of the enemy alliance broken and the initiative firmly in hand, though the last foe fights stubbornly on.'; }
+  else if(ctrl>0.43){ draw=true; key='stalemate'; title='STALEMATE — AN ARMISTICE';
+    blurb='Neither side could force a decision. The exhausted powers accept an uneasy armistice along the lines where the armies stand — a peace that settles nothing.'; }
+  else { key='defeat'; title='STRATEGIC DEFEAT';
+    blurb=me.name+' has been driven back and outlasted. Though the capital still stands, the strategic war is lost — it is only a matter of time.'; }
+  return { over:true, win, draw, key, title, blurb,
+    stats:{ reason, year:yr, foesGone:foesGone.map(n=>n.name), foesLive:foesLive.map(n=>n.name),
+            alliesGone:alliesGone.map(n=>n.name), ctrl:Math.round(ctrl*100), casualties:cas } };
+}
 function wwCheckVictory(){
   const me=WW.byKey[WW.player];
-  if(me.capitulated){ WW.result={over:true,win:false}; return WW.result; }
-  const enemies=WW.nat.filter(n=>!n.capitulated && wwAtWar(WW.player,n.key));
-  if(enemies.length===0){ WW.result={over:true,win:true}; return WW.result; }
+  if(me.capitulated){ WW.result=wwScoreVictory('capitulated'); return WW.result; }
+  const atWarNow = WW.nat.some(n=>!n.capitulated && wwAtWar(WW.player,n.key));
+  const everFought = WW.warOn || (me.atWar && me.atWar.size>0);
+  if(everFought && !atWarNow){ WW.result=wwScoreVictory('conquest'); return WW.result; }
+  if(wwDateNum(WW.date) >= wwDateNum(WW_WAR_END)){ WW.result=wwScoreVictory('timeout'); return WW.result; }
   return {over:false};
 }
 function wwSerialize(){
@@ -14686,10 +14720,25 @@ function wwToast(msg){ const box=$('ww-toast'); if(!box) return;
   const el=document.createElement('div'); el.className='ww-toast-msg'; el.textContent=msg; box.appendChild(el);
   setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, 3600); }
 function wwShowEnd(v){ const el=$('ww-end'); if(!el) return; el.classList.remove('hidden'); wwSfx(v.win?'win':'lose');
-  const me=WW.byKey[WW.player];
-  el.innerHTML = v.win
-    ? '<h1 style="color:#ffe08a">VICTORY</h1><p>'+me.name+' stands triumphant over Europe. Every enemy that took up arms against you has been brought to capitulation.</p>'
-    : '<h1 style="color:#e08a7a">DEFEAT</h1><p>'+me.name+' has capitulated. The war is lost.</p>';
+  wwClearSave(); // the war is decided — don't offer it as a "continue"
+  const me=WW.byKey[WW.player], s=v.stats||{};
+  const col = v.win ? '#ffe08a' : v.draw ? '#d8d2b0' : '#e08a7a';
+  const facName={axis:'Axis',allies:'Allies',comintern:'Comintern',neutral:'Neutral'}[me.fac]||'—';
+  const list = a => (a&&a.length) ? a.join(', ') : '<span style="color:#8ba2b8">none</span>';
+  el.innerHTML =
+    '<div class="ww-end-band" style="color:'+col+'">'+(v.win?'★':v.draw?'≈':'☠')+'</div>'+
+    '<h1 style="color:'+col+'">'+(v.title||(v.win?'VICTORY':'DEFEAT'))+'</h1>'+
+    '<p>'+(v.blurb||'')+'</p>'+
+    '<div class="ww-aar-title">After-Action Report</div>'+
+    '<table class="ww-aar">'+
+    '<tr><td>Nation</td><td>'+me.name+' <span style="color:#8ba2b8">('+facName+')</span></td></tr>'+
+    '<tr><td>War ended</td><td>'+wwDateStr()+'</td></tr>'+
+    '<tr><td>Enemies defeated</td><td>'+list(s.foesGone)+'</td></tr>'+
+    '<tr><td>Still fighting</td><td>'+list(s.foesLive)+'</td></tr>'+
+    (s.alliesGone&&s.alliesGone.length?'<tr><td>Allies lost</td><td><span style="color:#e0a06a">'+s.alliesGone.join(', ')+'</span></td></tr>':'')+
+    '<tr><td>Territory held</td><td>'+(s.ctrl!=null?s.ctrl+'%':'—')+' of the contested front</td></tr>'+
+    '<tr><td>Total casualties</td><td>'+wwFmtNum(s.casualties||0)+'</td></tr>'+
+    '</table>';
   const b=document.createElement('button'); b.textContent='RETURN TO MENU'; b.onclick=()=>{ wwClose(); showModeSelect(); }; el.appendChild(b); }
 
 function wwBindInput(){
@@ -15689,7 +15738,7 @@ if (typeof module !== 'undefined' && module.exports){
     MAP_ROWS, CITIES_INIT, START_UNITS, SOV_SCHEDULE, KINDS, COLS, ROWS, MAX_TURN, TOTAL_VP,
     WW_DATA, WW, wwBuildState, wwComputeStats, wwFactions, wwNb, wwOwnerAt, wwSea, wwCapitalHex,
     wwSetup, wwAtWar, wwAllied, wwArmyAt, wwArmiesOf, wwReachable, wwAttackTargets, wwMoveArmy,
-    wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwProduction, wwAINation,
+    wwAttack, wwCaptureHex, wwCapitulate, wwEndTurn, wwCheckVictory, wwScoreVictory, wwDateNum, WW_WAR_END, wwProduction, wwAINation,
     wwPlaceArmies, wwAdvanceDate, wwTerrDef, wwPassableFor, wwNearestEnemyHex,
     wwDeclareWar, wwForeignAdj, wwAttackTargetsPlayer, wwRetreat, wwAIObjective, wwAIPlan, wwRelation,
     wwSupplyField, wwRailNetwork, wwRecomputeSupply, wwInSupply, wwAtkPower, wwDefPower, wwSupport, wwCombinedArms, wwAIStep2,
@@ -15866,10 +15915,17 @@ if (typeof module !== 'undefined' && module.exports){
     .ww-rbtn:hover{border-color:#4f8fce;} .ww-rbtn.sel{background:#1d3553;color:#eaf2fb;border-color:#5a9fde;}
     /* win/lose */
     #ww-end{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;
-      justify-content:center;gap:14px;background:#060a10ee;}
+      justify-content:center;gap:12px;background:#060a10ee;overflow:auto;padding:24px;}
     #ww-end.hidden{display:none;}
-    #ww-end h1{font-size:40px;font-weight:900;letter-spacing:6px;margin:0;}
-    #ww-end p{color:#a9bccf;font-size:14px;max-width:440px;text-align:center;}
+    #ww-end .ww-end-band{font-size:34px;line-height:1;opacity:.9;}
+    #ww-end h1{font-size:40px;font-weight:900;letter-spacing:6px;margin:0;text-align:center;}
+    #ww-end p{color:#a9bccf;font-size:14px;max-width:460px;text-align:center;line-height:1.5;}
+    #ww-end .ww-aar-title{color:#8fb0cf;font:700 12px 'Segoe UI',sans-serif;letter-spacing:2px;
+      text-transform:uppercase;margin-top:4px;border-bottom:1px solid #2a3f57;padding-bottom:4px;}
+    #ww-end .ww-aar{border-collapse:collapse;font-size:13px;max-width:460px;width:100%;}
+    #ww-end .ww-aar td{padding:5px 10px;border-bottom:1px solid #17222f;vertical-align:top;}
+    #ww-end .ww-aar td:first-child{color:#8ba2b8;white-space:nowrap;width:38%;}
+    #ww-end .ww-aar td:last-child{color:#dceaf8;}
     #ww-end button{margin-top:8px;background:#1d3553;border:1px solid #3d6ea0;color:#dceaf8;
       font:700 14px 'Segoe UI',sans-serif;letter-spacing:1px;padding:11px 24px;border-radius:8px;cursor:pointer;}
   </style>

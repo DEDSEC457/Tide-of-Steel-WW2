@@ -1299,6 +1299,28 @@ say('— The World at War —');
   E.wwDeclareWar('GER','SWE');
   check('WW declaring war makes nations mutual enemies', E.wwAtWar('GER','SWE') && E.wwAtWar('SWE','GER'));
 
+  // the endgame scores the war into a tier (not a flat win/lose) and issues an After-Action Report
+  { const Wv=E.wwSetup('GER','normal');
+    Wv.byKey.GER.capitulated=true;
+    const vDef=E.wwCheckVictory();
+    check('WW endgame: the player falling is a scored defeat with an AAR',
+      vDef.over && !vDef.win && vDef.key==='total-defeat' && vDef.stats && typeof vDef.stats.casualties==='number');
+    Wv.byKey.GER.capitulated=false;
+    Wv.warOn=true; Wv.date={y:1941,m:6,d:1};
+    for(const n of Wv.nat){ if(n.fac==='allies') n.capitulated=true; }
+    const vCon=E.wwCheckVictory();
+    check('WW endgame: every foe beaten by 1942 → TOTAL VICTORY', vCon.over && vCon.win && vCon.key==='total-victory');
+    check('WW endgame: the AAR reports foes defeated, control % and casualties',
+      Array.isArray(vCon.stats.foesGone) && vCon.stats.foesGone.length>0 &&
+      typeof vCon.stats.ctrl==='number' && typeof vCon.stats.casualties==='number');
+    Wv.date={y:1944,m:6,d:1};
+    check('WW endgame: the same conquest late in the war is DECISIVE, not total',
+      E.wwScoreVictory('conquest').key==='decisive-victory'); }
+  // the whole war is force-resolved by New Year 1948 even if the front is still open
+  { const Wt=E.wwSetup('GER','normal'); Wt.warOn=true; Wt.date={y:1948,m:2,d:1};
+    const vTo=E.wwCheckVictory();
+    check('WW endgame: an unsettled war is decided by 1948 at the latest', vTo.over && !!vTo.stats); }
+
   // attacking a neutral auto-declares war and seizes the hex
   const Gn = E.wwSetup('GER'); const sw=Gn.byKey.SWE;
   let sx=-1,sy=-1;
