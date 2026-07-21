@@ -10093,7 +10093,7 @@ function setView3d(on){
 // the canvas is a flat plane) before feeding the point to toWorld/hexFromPixel.
 // Off by default; if a click ever feels off, one toggle restores flat play.
 let tilt = false;
-const TILT_DEG = 30, TILT_SCALE = 1.08, TILT_P = 1400;
+const TILT_DEG = 24, TILT_SCALE = 1.06, TILT_P = 1500;
 let _tiltInv = null;
 try{ tilt = localStorage.getItem('hoi5-tilt')==='1'; }catch(e){}
 function _inv3(m){                                   // inverse of a row-major 3x3
@@ -10240,7 +10240,7 @@ function pocketsFor(side){
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
-let _hazeGrad = null, _hazeH = 0, _tiltHaze = null, _tiltHazeH = 0;
+let _hazeGrad = null, _hazeH = 0;
 let _seasonGrad = null, _seasonKey = '';
 /* smooth camera: pan glides ease toward a target, wheel zoom eases toward a
    target scale anchored under the cursor (the old camera teleported) */
@@ -11473,105 +11473,6 @@ mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation();
 window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
 
-/* ---- diorama: raised terrain blocks (3D board, zoomed-in live view) ----
-   Hills, mountains and forest are re-drawn as blocks that stand proud of the
-   board — a cast shadow, dark side-walls, and a lit top face — so the map reads
-   as a table of miniatures, not a flat tint. Only in the live (zoomed-in) pass,
-   so the far-zoom cache path is untouched. High + 3D board only. */
-function terrElev(x,y){
-  const t = terrainAt(x,y);
-  // hills stand tallest (they are the mountains of Italy, France, the Ardennes),
-  // forest a shorter woodland. 'q' is excluded — in El Alamein it is the sunken
-  // Qattara depression (a pit, not a peak), so raising it would be wrong.
-  return t==='h' ? 0.8 : t==='f' ? 0.42 : 0;
-}
-function _hash01(x,y){                                // stable per-hex pseudo-random in [0,1)
-  let h = (x*374761393 + y*668265263) | 0;
-  h = (h ^ (h>>>13)) * 1274126177;
-  return ((h>>>0) % 1000) / 1000;
-}
-function terrBlockLift(x,y){                          // pixels a hex's top stands above the board
-  const e = terrElev(x,y);
-  if (e<=0) return 0;
-  const varia = 0.80 + 0.42*_hash01(x,y);            // rugged: neighbouring peaks differ in height
-  return S*(0.45 + 0.95*e)*varia;
-}
-function shadeCol(hex, f){                            // darken (f<0) / lighten (f>0) a #rrggbb
-  if (typeof hex!=='string' || hex[0]!=='#' || hex.length!==7) return hex;
-  const k = f<0 ? 1+f : 1, add = f>0 ? 255*f : 0;
-  const ch = i => { const v = Math.round(parseInt(hex.slice(i,i+2),16)*k + add); return v<0?0:v>255?255:v; };
-  return `rgb(${ch(1)},${ch(3)},${ch(5)})`;
-}
-/* one raised terrain block: a long cast shadow, dark extruded side-walls with a
-   sunlit rim, and a top face carrying real procedural terrain — a dense stand of
-   conifers for forest, a rounded grass dome or a rocky snow-capped peak for hills
-   (the taller the block, the more it becomes a mountain). Sun is up and to the
-   left throughout, so the whole diorama models under one light. */
-function _tree(dx, dy, sc, snow){                     // a little conifer at (dx,dy) on the top face
-  ctx.fillStyle = '#1c2a15';                          // shadow side
-  ctx.beginPath(); ctx.moveTo(dx, dy-9*sc); ctx.lineTo(dx+4.5*sc, dy+3*sc); ctx.lineTo(dx-4.5*sc, dy+3*sc); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#33502a';                          // sunlit left face
-  ctx.beginPath(); ctx.moveTo(dx, dy-9*sc); ctx.lineTo(dx, dy+3*sc); ctx.lineTo(dx-4.5*sc, dy+3*sc); ctx.closePath(); ctx.fill();
-  if (snow>0.15){ ctx.fillStyle='rgba(255,255,255,0.7)';
-    ctx.beginPath(); ctx.moveTo(dx, dy-9*sc); ctx.lineTo(dx+2*sc, dy-3*sc); ctx.lineTo(dx-2*sc, dy-3*sc); ctx.closePath(); ctx.fill(); }
-}
-function drawTerrBlock(cx, cy, x, y, t, elev, wx, snow){
-  const s = S-0.6, RX = 0.866*s, HY = 0.5*s, liftH = terrBlockLift(x,y), tcy = cy - liftH;
-  const base = terrColor(t), tall = liftH / S;         // >~1.2 reads as a mountain
-  // 1) long cast shadow on the ground, thrown down-right from the upper-left sun
-  ctx.fillStyle = 'rgba(0,0,0,0.30)';
-  hexPath(cx + liftH*0.42, cy + liftH*0.22, s*1.02); ctx.fill();
-  // 2) side-walls: the three lower hex edges extruded down to the base
-  const wall = () => { ctx.beginPath();
-    ctx.moveTo(cx-RX, tcy+HY); ctx.lineTo(cx, tcy+s); ctx.lineTo(cx+RX, tcy+HY);
-    ctx.lineTo(cx+RX, cy+HY);  ctx.lineTo(cx, cy+s);  ctx.lineTo(cx-RX, cy+HY); ctx.closePath(); };
-  wall(); ctx.fillStyle = shadeCol(base, -0.55); ctx.fill();
-  wall(); ctx.fillStyle = 'rgba(14,9,5,0.5)'; ctx.fill();       // deep shadow so the cliff reads on any ground
-  if (ctx.createLinearGradient){                       // sunlit left face → shadowed right face
-    const wg = ctx.createLinearGradient(cx-RX, 0, cx+RX, 0);
-    if (wg && wg.addColorStop){ wg.addColorStop(0,'rgba(255,236,200,0.20)'); wg.addColorStop(0.5,'rgba(0,0,0,0)'); wg.addColorStop(1,'rgba(0,0,0,0.34)');
-      wall(); ctx.fillStyle = wg; ctx.fill(); }
-  }
-  // 3) top face — terrain colour, ownership tint, sunlit emboss, a lit rim
-  hexPath(cx, tcy, s); ctx.fillStyle = snowyCol(t, base, snow); ctx.fill();
-  const to = terrOwner(x,y); if (to){ hexPath(cx, tcy, s); ctx.fillStyle = SIDES[to].tint; ctx.fill(); }
-  if (ctx.createLinearGradient){
-    const g = ctx.createLinearGradient(cx-HX/2, tcy-s, cx+HX/2, tcy+s);
-    if (g && g.addColorStop){ g.addColorStop(0,'rgba(255,248,220,0.34)'); g.addColorStop(0.5,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.26)');
-      ctx.save(); hexPath(cx, tcy, s); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(cx-HX, tcy-s*1.3, HX*2, s*2.6); ctx.restore(); }
-  }
-  ctx.save(); ctx.beginPath();
-  ctx.moveTo(cx-RX, tcy+HY); ctx.lineTo(cx, tcy-s); ctx.lineTo(cx+RX, tcy-HY);   // sunlit upper rim (left+top edges)
-  ctx.strokeStyle = 'rgba(255,246,216,0.5)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.restore();
-  // 4) real terrain on the top
-  ctx.save(); ctx.translate(cx, tcy);
-  if (t==='f'){
-    ctx.save(); hexPath(0,0,s); ctx.clip();
-    const n = cam.z < 0.85 ? 4 : (7 + Math.floor(_hash01(x,y)*3));   // fewer trees when zoomed out (can't see the detail)
-    for (let i=0;i<n;i++){ const hx=_hash01(x*7+i,y*13+i), hy=_hash01(x*3+i*5,y*11+i*2);
-      const dx=(hx-0.5)*s*1.5, dy=(hy-0.5)*s*1.5 - 2, sc=0.9+hx*0.6;
-      _tree(dx, dy, sc, snow); }
-    ctx.restore();
-  } else if (t==='h'){
-    if (tall > 1.32){                                  // the tallest ridges break into rocky peaks
-      ctx.fillStyle = shadeCol('#6b6258', -0.15);
-      ctx.beginPath(); ctx.moveTo(-s*0.6, s*0.34); ctx.lineTo(0, -s*0.5); ctx.lineTo(s*0.6, s*0.34); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.14)';        // sunlit left face of the peak
-      ctx.beginPath(); ctx.moveTo(-s*0.6, s*0.34); ctx.lineTo(0, -s*0.5); ctx.lineTo(0, s*0.34); ctx.closePath(); ctx.fill();
-      if (snow > 0.12){                                // snow only crowns the peaks in winter
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.beginPath(); ctx.moveTo(-s*0.2, -s*0.16); ctx.lineTo(0, -s*0.5); ctx.lineTo(s*0.2, -s*0.16);
-        ctx.lineTo(s*0.08,-s*0.22); ctx.lineTo(-s*0.05,-s*0.14); ctx.closePath(); ctx.fill();
-      }
-    } else {                                           // a grassy hill: rounded highlight + shaded flank
-      ctx.fillStyle = 'rgba(255,250,210,0.18)';
-      ctx.beginPath(); ctx.ellipse(-s*0.12, -s*0.1, s*0.44, s*0.3, 0, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(-s*0.5, s*0.2); ctx.quadraticCurveTo(0, -s*0.14, s*0.5, s*0.16); ctx.stroke();
-    }
-  }
-  ctx.restore();
-}
 let _animPrev = 0;
 function draw(){
   // step the camera animations before the frame is transformed. dt-correct the
@@ -11784,18 +11685,6 @@ function draw(){
     }
   }
   }  // end live terrain/coastline draw (else of useCache)
-
-  // diorama: raise hills, mountains and forest into standing blocks — runs over
-  // BOTH the cached and live terrain, drawn back-to-front (row order) so nearer
-  // blocks overlap the ones behind. High + 3D board, once zoomed in enough to read.
-  if (view3d && GFX.cine && cam.z >= 0.5){          // same zoom the counters start standing up at
-    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      const [cx,cy] = hexCenter(x,y);
-      if (cx<vL || cx>vR || cy<vT || cy>vB) continue;
-      const elev = terrElev(x,y);
-      if (elev>0) drawTerrBlock(cx, cy, x, y, terrainAt(x,y), elev, wx, snowNow);
-    }
-  }
 
   if (GFX.clouds) drawCloudShadows(now, vL, vT, vR, vB);   // high: drifting overcast
   if (GFX.glint)  drawWaterGlint(now, vL, vT, vR, vB);     // high: sun sparkling on the sea
@@ -12540,17 +12429,6 @@ function draw(){
       }
     }
   }
-  // diorama depth: under the tilted board the far (top) edge hazes into the
-  // distance, so the table of miniatures recedes even zoomed in. Tilt + 3D + High.
-  if (tilt && view3d && GFX.lighting && cam.z >= 0.5){
-    if (!_tiltHaze || _tiltHazeH !== innerHeight){
-      const g = ctx.createLinearGradient && ctx.createLinearGradient(0, 0, 0, innerHeight*0.62);
-      if (g && g.addColorStop){ g.addColorStop(0,'rgba(150,170,205,0.75)'); g.addColorStop(1,'rgba(150,170,205,0)');
-        _tiltHaze = g; _tiltHazeH = innerHeight; }
-    }
-    if (_tiltHaze){ ctx.save(); ctx.globalAlpha = 0.15; ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = _tiltHaze; ctx.fillRect(0, 0, innerWidth, innerHeight*0.62); ctx.restore(); }
-  }
   drawPremiumOverlay();                          // high: directional sun grade + film grain
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
 
@@ -12621,18 +12499,15 @@ function drawUnit(u, cx, cy, wx){
   // 3D view: the counter stands off the board like a miniature — a cast shadow
   // on the ground, then the whole piece lifts, with a dark extruded side-wall
   // peeking below it so the block has real thickness.
-  const on3d = view3d && cam.z >= 0.5;
-  const stand = on3d ? S*0.30 : 0;                          // the counter's own standoff off the ground
-  const perch = (on3d && GFX.cine) ? terrBlockLift(u.x,u.y) : 0;   // ride on top of a raised terrain block
-  if (stand){
+  const lift = (view3d && cam.z >= 0.5) ? S*0.30 : 0;
+  if (lift){
     ctx.save();
-    ctx.translate(0, -perch);                               // the shadow falls on the block top, not the ground
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(3, h*0.34, w*0.50, h*0.28, 0, 0, Math.PI*2); ctx.fill();
     ctx.restore();
-    ctx.translate(0, -(perch + stand));
+    ctx.translate(0, -lift);
     ctx.fillStyle = 'rgba(18,14,10,0.88)';                 // the shadowed wall of the block
-    roundRect(-w/2, -h/2, w, h+stand, 5); ctx.fill();
+    roundRect(-w/2, -h/2, w, h+lift, 5); ctx.fill();
   }
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
   // blurred shadow; otherwise a cheap hard-offset shadow
