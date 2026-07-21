@@ -10240,7 +10240,7 @@ function pocketsFor(side){
 let aiSpeed = 0;           // 0 normal · 1 fast · 2 instant
 try { aiSpeed = Math.min(2, parseInt(localStorage.getItem('barb-aispeed'),10) || 0); } catch(e){}
 let vignette = null, vgW = 0, vgH = 0;
-let _hazeGrad = null, _hazeH = 0;
+let _hazeGrad = null, _hazeH = 0, _tiltHaze = null, _tiltHazeH = 0;
 let _seasonGrad = null, _seasonKey = '';
 /* smooth camera: pan glides ease toward a target, wheel zoom eases toward a
    target scale anchored under the cursor (the old camera teleported) */
@@ -12500,6 +12500,17 @@ function draw(){
         ctx.restore();
       }
     }
+  }
+  // diorama depth: under the tilted board the far (top) edge hazes into the
+  // distance, so the table of miniatures recedes even zoomed in. Tilt + 3D + High.
+  if (tilt && view3d && GFX.lighting && cam.z >= 0.5){
+    if (!_tiltHaze || _tiltHazeH !== innerHeight){
+      const g = ctx.createLinearGradient && ctx.createLinearGradient(0, 0, 0, innerHeight*0.62);
+      if (g && g.addColorStop){ g.addColorStop(0,'rgba(150,170,205,0.75)'); g.addColorStop(1,'rgba(150,170,205,0)');
+        _tiltHaze = g; _tiltHazeH = innerHeight; }
+    }
+    if (_tiltHaze){ ctx.save(); ctx.globalAlpha = 0.15; ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = _tiltHaze; ctx.fillRect(0, 0, innerWidth, innerHeight*0.62); ctx.restore(); }
   }
   drawPremiumOverlay();                          // high: directional sun grade + film grain
   ctx.scale(cam.z,cam.z); ctx.translate(-cam.x,-cam.y);
