@@ -21,7 +21,9 @@ const FAST = process.argv.includes('--fast') || process.argv.includes('-f');
 const say = (...a) => { if (!QUIET) console.log(...a); };
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-const m = html.match(/<script>([\s\S]*)<\/script>/);
+// non-greedy: grab only the first <script> block (the game engine); the trailing
+// PWA service-worker glue is a separate browser-only block and isn't tested here.
+const m = html.match(/<script>([\s\S]*?)<\/script>/);
 if (!m){ console.error('FAIL: no <script> block found'); process.exit(1); }
 
 const memLS = (()=>{ const s = {}; return {

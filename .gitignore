@@ -1,5 +1,10 @@
 # generated preview / diagnostic images — not game assets
 /*.png
+# ...except the installable-app (PWA) icons, which ARE shipped assets
+!/icon-192.png
+!/icon-512.png
+!/icon-maskable-512.png
+!/apple-touch-icon.png
 
 # node tooling (map generator deps)
 node_modules/

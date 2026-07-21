@@ -130,12 +130,31 @@ is synthesized live by the game itself (no audio files, still a single
 `index.html`). The Settings menu (🔊 button, or from the title screen) has
 sliders for music and effects volume.
 
-## 🌐 Play from anywhere (optional)
-If you make this repo **public**, you can turn on GitHub Pages
-(*Settings → Pages → Deploy from branch → main*) and GitHub gives you a link like
-`https://yourguyty.github.io/hearts-of-iron-5/` — the game playable from any
+## 🌐 Play from anywhere & install as an app (recommended)
+Make this repo **public** and turn on GitHub Pages (*Settings → Pages → Deploy
+from branch → `main` → `/ (root)`*). GitHub gives you a link like
+`https://yourname.github.io/hearts-of-iron-5/` — the game playable from any
 browser, anywhere, no downloads. (The game contains no personal data — it is
 just the game.)
+
+That link is also an **installable app (PWA)**, which is the easiest way to share
+it and keep everyone in sync:
+
+- **Install it like a program.** Open the link in Chrome or Edge and click the
+  **Install** icon in the address bar (or *⋮ menu → Install Tide of Steel*). Your
+  friends get a **desktop icon** and the game opens in its own window — it looks
+  and feels like an `.exe`, no app store, no account.
+- **It works offline.** After the first visit the whole game is cached, so it
+  plays with **no internet** — on a laptop on a plane, wherever.
+- **Everyone stays up to date automatically.** Whenever you push a change, players
+  who are online get your newest version the next time they open the app, and a
+  one-tap **“Update & reload”** banner appears so they can grab it instantly. No
+  re-sending files, no reinstalling — you push, they’re current.
+
+Prefer a single file? The plain `index.html` still works exactly as before —
+double-click it and play **100% offline**. The install/update features simply
+switch on when the game is served from a web address (like GitHub Pages) and stay
+out of the way otherwise.
 
 ## 🔧 For development
 `node devtest.js [runs]` — headless test & balance harness. Validates the map

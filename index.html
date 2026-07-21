@@ -9,6 +9,15 @@
 <meta property="og:title" content="Tide of Steel WW2">
 <meta property="og:description" content="A WW2 hex-strategy game — 19 historical battles, one file, plays 100% offline.">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#0b1017">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tide of Steel">
+<!-- Installable app (PWA): served over http(s) this makes the game install to the
+     desktop, run offline, and auto-pull your latest release. Harmless as a plain
+     double-clicked file — the manifest/icons/service worker simply no-op on file://. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='25,4 75,4 98,50 75,96 25,96 2,50' fill='%23e8b34b'/%3E%3Cpolygon points='38,29 62,29 74,50 62,71 38,71 26,50' fill='%23161a14'/%3E%3C/svg%3E">
 <style>
   :root{
@@ -15987,5 +15996,53 @@ if (typeof module !== 'undefined' && module.exports){
   </div>
   <div id="ww-end" class="hidden"></div>
 </div>
+<script>
+/* ---- Installable-app (PWA) glue: register the service worker and offer a
+   one-tap "Update ready — reload" banner when a new release is deployed.
+   Only runs when the game is served over http(s); a plain double-clicked
+   file:// copy skips this entirely and still plays fully offline. ---- */
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  if (!/^https?:$/.test(location.protocol)) return;   // file:// double-click → no SW, unchanged offline play
+  function banner(reg){
+    if (document.getElementById('pwa-update')) return;
+    var bar = document.createElement('div');
+    bar.id = 'pwa-update';
+    bar.setAttribute('style',
+      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;'+
+      'display:flex;align-items:center;gap:12px;background:#12233b;color:#dceaf8;'+
+      'border:1px solid #3d6ea0;border-radius:10px;padding:11px 14px;'+
+      'font:600 13px "Segoe UI",system-ui,sans-serif;box-shadow:0 8px 26px #000a;');
+    bar.innerHTML = '<span>A new version of Tide of Steel is ready.</span>';
+    var btn = document.createElement('button');
+    btn.textContent = 'Update & reload';
+    btn.setAttribute('style','background:#2a6e3a;border:1px solid #3f9152;color:#eaffef;'+
+      'font:700 13px "Segoe UI",system-ui,sans-serif;padding:7px 14px;border-radius:7px;cursor:pointer;');
+    btn.onclick = function(){ if (reg.waiting) reg.waiting.postMessage('skipWaiting'); btn.disabled = true; btn.textContent = 'Updating…'; };
+    var later = document.createElement('button');
+    later.textContent = 'Later';
+    later.setAttribute('style','background:transparent;border:0;color:#8fb0cf;cursor:pointer;font:600 12px "Segoe UI",sans-serif;');
+    later.onclick = function(){ bar.remove(); };
+    bar.appendChild(btn); bar.appendChild(later);
+    document.body.appendChild(bar);
+  }
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      if (reg.waiting && navigator.serviceWorker.controller) banner(reg);   // an update was already waiting
+      reg.addEventListener('updatefound', function(){
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', function(){
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) banner(reg);
+        });
+      });
+    }).catch(function(){});
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if (reloaded) return; reloaded = true; location.reload();
+    });
+  });
+})();
+</script>
 </body>
 </html>
