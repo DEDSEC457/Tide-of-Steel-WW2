@@ -11486,7 +11486,7 @@ function terrElev(x,y){
 }
 function terrBlockLift(x,y){                          // pixels a hex's top stands above the board
   const e = terrElev(x,y);
-  return e>0 ? S*(0.34 + 0.62*e) : 0;
+  return e>0 ? S*(0.40 + 0.70*e) : 0;
 }
 function shadeCol(hex, f){                            // darken (f<0) / lighten (f>0) a #rrggbb
   if (typeof hex!=='string' || hex[0]!=='#' || hex.length!==7) return hex;
@@ -11495,7 +11495,7 @@ function shadeCol(hex, f){                            // darken (f<0) / lighten 
   return `rgb(${ch(1)},${ch(3)},${ch(5)})`;
 }
 function drawTerrBlock(cx, cy, x, y, t, elev, wx, snow){
-  const s = S-0.6, RX = 0.866*s, HY = 0.5*s, liftH = S*(0.40 + 0.70*elev), tcy = cy - liftH;
+  const s = S-0.6, RX = 0.866*s, HY = 0.5*s, liftH = terrBlockLift(x,y), tcy = cy - liftH;
   const base = terrColor(t);
   // 1) cast shadow on the ground, thrown away from the upper-left sun
   ctx.fillStyle = 'rgba(0,0,0,0.26)';
@@ -12571,15 +12571,18 @@ function drawUnit(u, cx, cy, wx){
   // 3D view: the counter stands off the board like a miniature — a cast shadow
   // on the ground, then the whole piece lifts, with a dark extruded side-wall
   // peeking below it so the block has real thickness.
-  const lift = (view3d && cam.z >= 0.5) ? S*0.30 : 0;
-  if (lift){
+  const on3d = view3d && cam.z >= 0.5;
+  const stand = on3d ? S*0.30 : 0;                          // the counter's own standoff off the ground
+  const perch = (on3d && GFX.cine) ? terrBlockLift(u.x,u.y) : 0;   // ride on top of a raised terrain block
+  if (stand){
     ctx.save();
+    ctx.translate(0, -perch);                               // the shadow falls on the block top, not the ground
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(3, h*0.34, w*0.50, h*0.28, 0, 0, Math.PI*2); ctx.fill();
     ctx.restore();
-    ctx.translate(0, -lift);
+    ctx.translate(0, -(perch + stand));
     ctx.fillStyle = 'rgba(18,14,10,0.88)';                 // the shadowed wall of the block
-    roundRect(-w/2, -h/2, w, h+lift, 5); ctx.fill();
+    roundRect(-w/2, -h/2, w, h+stand, 5); ctx.fill();
   }
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
   // blurred shadow; otherwise a cheap hard-offset shadow
