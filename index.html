@@ -11547,7 +11547,7 @@ function drawTerrBlock(cx, cy, x, y, t, elev, wx, snow){
   ctx.save(); ctx.translate(cx, tcy);
   if (t==='f'){
     ctx.save(); hexPath(0,0,s); ctx.clip();
-    const n = 7 + Math.floor(_hash01(x,y)*3);
+    const n = cam.z < 0.85 ? 4 : (7 + Math.floor(_hash01(x,y)*3));   // fewer trees when zoomed out (can't see the detail)
     for (let i=0;i<n;i++){ const hx=_hash01(x*7+i,y*13+i), hy=_hash01(x*3+i*5,y*11+i*2);
       const dx=(hx-0.5)*s*1.5, dy=(hy-0.5)*s*1.5 - 2, sc=0.9+hx*0.6;
       _tree(dx, dy, sc, snow); }
