@@ -10283,9 +10283,12 @@ function minZoom(){
 function fitCamera(){
   killGlides();
   const mw = mapW(), mh = mapH();
-  const z = Math.min(innerWidth/mw, (innerHeight-60)/mh);
+  // the right-hand card column overlays the map — fit against the width it leaves clear
+  // so the whole eastern edge is visible on first load instead of hiding under the panel
+  const panel = innerWidth > 720 ? 278 : 0, availW = innerWidth - panel;
+  const z = Math.min(availW/mw, (innerHeight-60)/mh);
   cam.z = Math.max(minZoom(), Math.min(1.4, z));
-  cam.x = (mw - innerWidth/cam.z)/2;
+  cam.x = (mw - availW/cam.z)/2;
   cam.y = (mh - (innerHeight)/cam.z)/2 - 20/cam.z;
 }
 function hexCenter(x,y){ return [M + HX*(x + 0.5*(y&1)) + HX/2, M + VY*y + S]; }
