@@ -902,6 +902,10 @@
       <div>Developed &amp; published by <b style="color:var(--ink)">Tyler Wanuga</b></div>
       <div style="opacity:.8">© 2026 Tyler Wanuga · All rights reserved</div>
       <div style="opacity:.7;margin-top:2px;">Runs 100% offline — nothing leaves your device.</div>
+      <div style="margin-top:10px;">
+        <button id="btn-check-update" style="background:#1d3553;border:1px solid #3d6ea0;color:#dceaf8;font:600 12px inherit;padding:7px 16px;border-radius:7px;cursor:pointer;">⭯ Check for updates</button>
+        <div id="upd-status" style="min-height:15px;margin-top:6px;opacity:.85;"></div>
+      </div>
     </div>
     <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
   </div>
@@ -16002,8 +16006,8 @@ if (typeof module !== 'undefined' && module.exports){
    Only runs when the game is served over http(s); a plain double-clicked
    file:// copy skips this entirely and still plays fully offline. ---- */
 (function(){
-  if (!('serviceWorker' in navigator)) return;
-  if (!/^https?:$/.test(location.protocol)) return;   // file:// double-click → no SW, unchanged offline play
+  var hasSW = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
+  function setStatus(msg){ var el = document.getElementById('upd-status'); if (el) el.textContent = msg; }
   function banner(reg){
     if (document.getElementById('pwa-update')) return;
     var bar = document.createElement('div');
@@ -16026,6 +16030,30 @@ if (typeof module !== 'undefined' && module.exports){
     bar.appendChild(btn); bar.appendChild(later);
     document.body.appendChild(bar);
   }
+  // The Settings → "⭯ Check for updates" button. Present in every copy; on the plain
+  // offline file it just explains that updates ride on the installed / web version.
+  function wireCheckButton(){
+    var btn = document.getElementById('btn-check-update');
+    if (!btn) return;
+    btn.onclick = function(){
+      if (!hasSW){ setStatus('This is the offline file — updates apply automatically when you play the installed app (or the web link).'); return; }
+      setStatus('Checking for a new version…'); btn.disabled = true;
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if (!reg){ setStatus('Update service not ready yet — reopen the app once online.'); btn.disabled = false; return; }
+        return reg.update().then(function(){
+          setTimeout(function(){
+            btn.disabled = false;
+            if (reg.waiting || reg.installing){ setStatus('A new version was found — tap “Update & reload” below.'); if (reg.waiting) banner(reg); }
+            else setStatus('You’re on the latest version. ✓');
+          }, 1400);
+        });
+      }).catch(function(){ setStatus('Couldn’t check right now — try again when you’re online.'); btn.disabled = false; });
+    };
+  }
+  if (document.readyState !== 'loading') wireCheckButton();
+  else window.addEventListener('DOMContentLoaded', wireCheckButton);
+
+  if (!hasSW) return;   // file:// double-click → no service worker, unchanged offline play
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('sw.js').then(function(reg){
       if (reg.waiting && navigator.serviceWorker.controller) banner(reg);   // an update was already waiting
