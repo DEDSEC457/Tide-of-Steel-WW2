@@ -488,6 +488,7 @@
       <span class="opt" data-d="hard">Hard</span>
       <span class="opt" data-d="brutal" title="The enemy out-produces you and gives no quarter — sharp play, relentless pressure, no mercy for a weakened division.">Brutal 💀</span>
     </div>
+    <div id="rm-diff-desc" style="color:var(--dim);font-size:12px;margin:6px auto 0;max-width:560px;text-align:center;line-height:1.5;min-height:30px;"></div>
     <div class="opt-row" id="rvar-row" style="justify-content:center;">
       <span style="color:var(--dim);padding:6px 0;font-size:13px;" title="These systems are always on — every campaign rolls its own war">Always on:</span>
       <span class="opt" id="rvar-wx"  title="The seasons shift up to two weeks and any week can bring a freak storm — no more playing to a memorised weather script">🎲 Chaos weather</span>
@@ -519,6 +520,7 @@
         <span class="opt" data-d="hard">Hard</span>
         <span class="opt" data-d="brutal" title="No quarter — the enemy out-produces you and gives none.">Brutal 💀</span>
       </div>
+      <div id="rv-diff-desc" style="color:var(--dim);font-size:12px;margin:4px auto 0;max-width:560px;text-align:center;line-height:1.5;min-height:30px;"></div>
     </div>
     <div id="rv-stages" style="display:flex;gap:6px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin:14px 0;"></div>
     <div id="rv-status" style="color:var(--dim);font-size:13px;min-height:18px;"></div>
@@ -13442,6 +13444,14 @@ function updateUnitCard(){
   const k = KINDS[u.kind];
   const g = generalOf(u);
   const cls = u.side==='G'?'ger':'sov';
+  // effective fighting power: base × veterancy × attached general × HQ command aura
+  // (the always-on multipliers; the forecast adds terrain/OOS/river/ring on top)
+  const _vm=vetMul(u), _hqM=underHQ(u)?HQ_MUL:1;
+  const _genA=(g&&g.atk&&g.trait!=='panzer')?g.atk:1;
+  const _genD=g?((g.def||1)*(g.trait==='bulwark'?1.15:1)):1;
+  const _effA=k.atk*_vm*_genA*_hqM, _effD=k.def*_vm*_genD*_hqM, _effMp=k.mp+(underHQ(u)?1:0);
+  const _fmt=v=>Math.abs(v-Math.round(v))<0.05?String(Math.round(v)):v.toFixed(1);
+  const _effStat=(e,b)=>Math.abs(e-b)>=0.05?`${_fmt(e)} <span style="color:var(--dim)">(base ${b})</span>`:`${b}`;
   body.innerHTML = `
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
@@ -13450,8 +13460,8 @@ function updateUnitCard(){
            ${g.trait && GEN_TRAITS[g.trait] ? `<div style="color:#ffe4a8;font-size:12px;margin-bottom:2px;" title="${GEN_TRAITS[g.trait].desc}">${GEN_TRAITS[g.trait].icon} <b>${GEN_TRAITS[g.trait].name}</b> — ${GEN_TRAITS[g.trait].desc}</div>` : ''}
            <div style="color:var(--dim);font-size:12px;font-style:italic;margin-bottom:4px;">${g.bio}</div>` : ''}
     <div class="statrow"><span>Strength</span><span>${u.str} / ${k.maxStr}</span></div>
-    <div class="statrow"><span>Attack / Defense</span><span>${k.atk} / ${k.def}</span></div>
-    <div class="statrow"><span>Movement</span><span>${k.mp}</span></div>
+    <div class="statrow"><span>Attack / Defense</span><span>${_effStat(_effA,k.atk)} / ${_effStat(_effD,k.def)}</span></div>
+    <div class="statrow"><span>Movement</span><span>${_effMp}${underHQ(u)?' <span style="color:var(--dim)">(+1 HQ)</span>':''}</span></div>
     ${usesFuel(u) ? `<div class="statrow"><span>⛽ Fuel</span><span class="${fuelOf(u)<=3?'bad':fuelOf(u)>=FUEL_MAX?'good':''}">${fuelOf(u)} / ${FUEL_MAX}${fuelOf(u)<=0?' — DRY':''}</span></div>` : ''}
     ${(k.range||1)>1 ? `<div class="statrow"><span>Gunnery range</span><span>${k.range} hexes</span></div>` : ''}
     ${k.carrier ? `<div class="statrow"><span>Air operations</span><span>✈ floating airfield</span></div>` : ''}
@@ -14972,8 +14982,11 @@ $('btn-back-realistic').onclick = ()=>{ show('realistic-menu', false); show('mod
 for (const el of document.querySelectorAll('#rm-scn-row .pick')) el.onclick = ()=>{ rmScenario=el.dataset.scn; rmPendingUntil=0; syncRmMenu(); };
 $('rm-pick-ger').onclick = ()=>{ rmSide='G'; $('rm-pick-ger').classList.add('sel'); $('rm-pick-sov').classList.remove('sel'); };
 $('rm-pick-sov').onclick = ()=>{ rmSide='S'; $('rm-pick-sov').classList.add('sel'); $('rm-pick-ger').classList.remove('sel'); };
-for (const el of document.querySelectorAll('#rm-diff-row .opt')) el.onclick = ()=>{ rmDiff=el.dataset.d;
-  document.querySelectorAll('#rm-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); };
+function setRmDiffDesc(d){ const el=$('rm-diff-desc'); if (el) el.innerHTML = DIFF_DESC[d]||''; }
+for (const el of document.querySelectorAll('#rm-diff-row .opt')){
+  el.onclick = ()=>{ rmDiff=el.dataset.d; document.querySelectorAll('#rm-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); setRmDiffDesc(rmDiff); };
+  if (el.dataset.d){ el.onmouseenter = ()=>setRmDiffDesc(el.dataset.d); el.onmouseleave = ()=>setRmDiffDesc(rmDiff); }
+}
 $('btn-play-realistic').onclick = ()=>{
   // warn before wiping an unfinished campaign in this scenario's own save slot
   if (hasSaveSlot(saveSlotFor(rmScenario)) && performance.now() > rmPendingUntil){
@@ -15135,8 +15148,11 @@ $('rv-reset').onclick = ()=>{
   if (rvResetPending){ RV = null; rvSaveState(); try{ localStorage.removeItem(SAVE_KEYS.road); }catch(e){} rvResetPending = false; rvRender(); }
   else { rvResetPending = true; $('rv-reset').textContent = '⚠ Erase all progress?'; setTimeout(()=>{ rvResetPending = false; if ($('road-screen') && !$('road-screen').classList.contains('hidden')) rvRender(); }, 3000); }
 };
-for (const el of document.querySelectorAll('#rv-diff-row .opt'))
-  el.onclick = ()=>{ rvDiff = el.dataset.d; document.querySelectorAll('#rv-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); };
+function setRvDiffDesc(d){ const el=$('rv-diff-desc'); if (el) el.innerHTML = DIFF_DESC[d]||''; }
+for (const el of document.querySelectorAll('#rv-diff-row .opt')){
+  el.onclick = ()=>{ rvDiff = el.dataset.d; document.querySelectorAll('#rv-diff-row .opt').forEach(o=>o.classList.toggle('sel', o===el)); setRvDiffDesc(rvDiff); };
+  if (el.dataset.d){ el.onmouseenter = ()=>setRvDiffDesc(el.dataset.d); el.onmouseleave = ()=>setRvDiffDesc(rvDiff); }
+}
 
 /* ---------------- pause menu (Esc) ---------------- */
 function openPause(){
@@ -15701,6 +15717,8 @@ for (const el of document.querySelectorAll('#diff-row .opt')){
   el.onmouseleave = ()=>{ updateDiffDesc(mDiff); };
 }
 updateDiffDesc(mDiff);
+if (typeof setRmDiffDesc==='function') setRmDiffDesc(rmDiff);   // now DIFF_DESC exists (const above)
+if (typeof setRvDiffDesc==='function') setRvDiffDesc(rvDiff);
 $('mode-ai').onclick = ()=>{ mMode='ai'; $('mode-ai').classList.add('sel'); $('mode-hotseat').classList.remove('sel'); };
 $('mode-hotseat').onclick = ()=>{ mMode='hotseat'; $('mode-hotseat').classList.add('sel'); $('mode-ai').classList.remove('sel'); };
 
