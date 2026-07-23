@@ -11840,14 +11840,19 @@ function draw(){
     }
   }
 
-  // cities
+  // cities — labels keep a roughly constant on-screen size (they're drawn in the
+  // zoomed world space, so divide by the clamped zoom); when very zoomed out only
+  // the objective (VP) cities keep their name so the map doesn't turn to soup.
+  const _lz = Math.max(0.55, Math.min(1, cam.z));
+  const _cf = 11 / _lz, _yo = _cf * 2.1;
   for (const c of G.cities){
+    if (!c.vp && cam.z < 0.55) { const [cx,cy]=hexCenter(c.x,c.y); ctx.save(); ctx.translate(cx,cy); drawCity(c.owner, c.vp, c.ruin, c.x*31 + c.y*47, now); ctx.restore(); continue; }
     const [cx,cy] = hexCenter(c.x,c.y);
     ctx.save(); ctx.translate(cx,cy);
     drawCity(c.owner, c.vp, c.ruin, c.x*31 + c.y*47, now);
-    ctx.font = '600 11px Segoe UI'; ctx.textAlign = 'center';
-    ctx.fillStyle = '#000c'; ctx.fillText(c.name, 1, 25);
-    ctx.fillStyle = c.vp>0 ? '#ffe9a8' : '#cfccba'; ctx.fillText(c.name, 0, 24);
+    ctx.font = `${c.vp>0?700:600} ${_cf.toFixed(1)}px Segoe UI`; ctx.textAlign = 'center';
+    ctx.fillStyle = '#000c'; ctx.fillText(c.name, 1, _yo+1);
+    ctx.fillStyle = c.vp>0 ? '#ffe9a8' : '#cfccba'; ctx.fillText(c.name, 0, _yo);
     ctx.restore();
   }
 
