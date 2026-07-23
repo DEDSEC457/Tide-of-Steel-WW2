@@ -31,33 +31,6 @@ operational scale on a 60×36 map, the Baltic to the Caucasus:
 - A **40-week campaign** through the autumn mud, the deep winter and the Soviet
   counteroffensive, with the historical mobilization deluge arriving by rail
 
-**🌍 The World at War — grand strategy 1939–45** — a whole second game: pick a
-great power (Germany · USSR · Britain · France · Italy) and fight the entire war
-across Europe and the Mediterranean, **one month per turn**.
-- **Build a war economy** — civilian factories pour into a construction queue
-  (build *more* factories, compounding your output); military factories produce
-  the divisions that become your field armies; manpower limits how many you raise
-- **Fight a multi-front war** on a strategic map — set each front's posture and
-  pick where to concentrate your offensive; capitals fall, nations capitulate,
-  the victor seizes the loser's industry
-- **Make the great decisions** — at history's crossroads your power faces a
-  **strategic fork**: the Sickle Cut through the Ardennes, the opening shock of
-  Barbarossa, the Battle of Britain, the evacuation of the Soviet factories.
-  **Each option spells out exactly what it grants** — a timed combat bonus for a
-  few months, extra factories, manpower — so you always know what you are
-  choosing before you commit
-- **Play the politics** — open the 🤝 Diplomacy panel (a badge counts the moves
-  you can make) to **court a leaning neutral** into your faction — Romania,
-  Hungary and Finland to the Axis; Yugoslavia, Greece and the Baltics to the
-  Allies — and its factories and divisions join your war. Lead **Germany** and
-  *you* decide when to launch **Operation Barbarossa**; the USSR never strikes
-  first and is caught off guard whenever you choose to strike
-- **The real shape of WWII emerges** — France falls in 1940 (the blitz flanks the
-  Maginot Line through the Low Countries), Britain holds behind the Channel, the
-  USSR is caught off-guard at Barbarossa but its fortified depth turns the tide,
-  and the Axis is ground down by 1944 — unless *you* rewrite history
-- Dated dispatches (Pearl Harbor & Lend-Lease, Stalingrad, D-Day…) and autosave
-
 The whole game is one file (`index.html`) that runs in any browser:
 **100% offline, no installs, no accounts, autosaves every turn.**
 
