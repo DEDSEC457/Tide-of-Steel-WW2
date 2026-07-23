@@ -11425,6 +11425,17 @@ function drawScars(){
   for (const s of scars){
     const [cx,cy] = hexCenter(s.x, s.y);
     const fade = 1 - (now - s.t0)/LIFE, secs = (now - s.t0)/1000;
+    const _wt = terrainAt(s.x,s.y);
+    if (_wt==='~' || _wt==='o'){                                            // a ship goes down: oil, debris, steam
+      const seed = s.x*31 + s.y*47;
+      ctx.fillStyle = 'rgba(14,18,22,'+(0.42*fade).toFixed(3)+')';
+      ctx.beginPath(); ctx.ellipse(cx, cy, S*(0.3+secs*0.03), S*(0.18+secs*0.02), 0, 0, Math.PI*2); ctx.fill();   // spreading slick
+      ctx.fillStyle = 'rgba(205,214,220,'+(0.28*fade).toFixed(3)+')';
+      for (let i=0;i<4;i++){ const a=seed+i*1.7; ctx.beginPath(); ctx.arc(cx+Math.cos(a)*S*0.3, cy+Math.sin(a)*S*0.24, 1.2, 0, Math.PI*2); ctx.fill(); }   // debris flecks
+      for (let i=0;i<2;i++){ const rise=(secs*7+i*15)%36, sa=Math.max(0,0.22*fade*(1-rise/36)); if(sa<=0.01)continue;
+        ctx.fillStyle='rgba(222,230,234,'+sa.toFixed(3)+')'; ctx.beginPath(); ctx.arc(cx+Math.sin((secs+i)*0.7)*3, cy-6-rise, 2.2+rise*0.12, 0, Math.PI*2); ctx.fill(); }   // steam
+      continue;
+    }
     hexPath(cx, cy, S-2.5);                                                  // scorched earth
     ctx.fillStyle = 'rgba(18,12,7,'+(0.42*fade).toFixed(3)+')'; ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,'+(0.26*fade).toFixed(3)+')';                // craters
@@ -11821,6 +11832,7 @@ function draw(){
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
       if (!passable(x,y) || supplyView.has(keyOf(x,y))) continue;
       const [cx,cy] = hexCenter(x,y);
+      if (cx<vL || cx>vR || cy<vT || cy>vB) continue;   // only shade on-screen hexes
       hexPath(cx,cy,S-0.6); ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fill();
     }
     drawSupplyArteries(supplyView);          // the logistics web, drawn over the shaded ground
