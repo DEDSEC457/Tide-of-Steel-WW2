@@ -36,12 +36,15 @@
     gap:8px;padding:0 10px;background:linear-gradient(#181c13ee,#12150eee);
     border-bottom:1px solid var(--line);z-index:20;font-size:14px;}
   #topbar button{flex-shrink:0;}
-  /* the bar must never push End Turn off-screen — shed weight as the window narrows */
-  @media (max-width:1500px){
+  /* the bar must never push End Turn off-screen — shed weight as the window narrows.
+     End Turn is the primary action, so it hugs the right edge and the middle chips
+     shrink (with ellipsis) before anything can spill past it. */
+  #topbar #btn-endturn{margin-left:auto;}
+  @media (max-width:1780px){
     #topbar{gap:6px;font-size:13px;}
     #topbar .t-title{display:none;}
   }
-  @media (max-width:1450px){
+  @media (max-width:1620px){
     #topbar button .bl{display:none;}      /* icon-only buttons — the tooltips still name them */
   }
   @media (max-width:1250px){
@@ -50,6 +53,8 @@
     #topbar .t-chip{padding:4px 6px;}
     #wx-chip .fc{display:none;}
   }
+  #topbar .t-chip{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  #topbar #wx-chip{max-width:24vw;}
   #topbar .t-title{font-weight:700;letter-spacing:2px;color:var(--amber);font-size:15px;white-space:nowrap;}
   #topbar .t-chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
     padding:4px 10px;white-space:nowrap;}
@@ -70,7 +75,11 @@
 
   /* ---------- side panel ---------- */
   #side{position:absolute;top:60px;right:8px;width:262px;z-index:20;display:flex;
-    flex-direction:column;gap:8px;max-height:calc(100% - 130px);}
+    flex-direction:column;gap:8px;max-height:calc(100% - 130px);
+    overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#3a4230 transparent;padding-right:2px;}
+  #side::-webkit-scrollbar{width:8px;}
+  #side::-webkit-scrollbar-thumb{background:#3a4230;border-radius:4px;}
+  #side::-webkit-scrollbar-track{background:transparent;}
   .card{background:#14180fdd;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
     font-size:13px;line-height:1.45;}
   .card h3{font-size:11px;letter-spacing:2px;color:var(--dim);margin-bottom:6px;font-weight:600;}
@@ -128,7 +137,7 @@
   .why-col{color:var(--dim);font-size:10px;letter-spacing:1px;margin:3px 0 1px;}
   #log-card{overflow-y:auto;min-height:60px;}
   #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
-  #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys{color:var(--amber);}
+  #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys,#log .sys{color:var(--amber);}
 
   /* ---------- bottom hint ---------- */
   #hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
@@ -158,6 +167,8 @@
   /* ---------- modals ---------- */
   .modal-back{position:absolute;inset:0;background:#000a;z-index:40;display:flex;
     align-items:center;justify-content:center;}
+  /* hotseat handoff must NOT let the sitting player glimpse the map (fog of war is always on) */
+  #pass-modal{background:#0b0e08;}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
     padding:26px 30px;max-width:660px;width:92%;max-height:88%;overflow-y:auto;
     box-shadow:0 12px 60px #000c;}
@@ -11189,12 +11200,12 @@ function renderTintCache(){
     const [cx,cy]=hexCenter(x,y); hexPathC(c,cx,cy,S-0.6); c.fillStyle=SIDES[to].tint; c.fill();
   }
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){                   // front line
-    const t1=terrainAt(x,y); if (t1==='~') continue;
+    const t1=terrainAt(x,y); if (t1==='~'||t1==='o') continue;
     const fa=terrOwner(x,y); if (!fa) continue;
     const [ax,ay]=hexCenter(x,y);
     for (const [nx,ny] of neighbors(x,y)){
       if (ny<y||(ny===y&&nx<x)) continue;
-      const t2=terrainAt(nx,ny); if (t2==='~') continue;
+      const t2=terrainAt(nx,ny); if (t2==='~'||t2==='o') continue;
       const fb=terrOwner(nx,ny); if (!fb||fb===fa) continue;
       const [bx,by]=hexCenter(nx,ny), mx=(ax+bx)/2, my=(ay+by)/2;
       let dx=bx-ax, dy=by-ay; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
@@ -11617,8 +11628,8 @@ function draw(){
         ctx.fillStyle = `rgba(255,255,255,${(snowNow*0.12).toFixed(3)})`; ctx.fill();
       }
     }
-    // translucent territory tint in each side's color
-    const to = t!=='~' && terrOwner(x,y);
+    // translucent territory tint in each side's color (never tint open ocean — it reads as land-brown)
+    const to = t!=='~' && t!=='o' && terrOwner(x,y);
     if (to){
       hexPath(cx,cy,S-0.6);
       ctx.fillStyle = SIDES[to].tint;
@@ -11712,7 +11723,7 @@ function draw(){
       const w1 = t1==='~'||t1==='o', w2 = t2==='~'||t2==='o';
       const coast = w1 !== w2;
       let front = false;
-      if (t1!=='~' && t2!=='~'){
+      if (t1!=='~' && t1!=='o' && t2!=='~' && t2!=='o'){   // no front line across open water
         const fa = terrOwner(x,y), fb = terrOwner(nx,ny);
         front = !!fa && !!fb && fa!==fb;
       }
@@ -12874,9 +12885,9 @@ function _sceneAnimating(){
 })();
 
 /* ---------------- input ---------------- */
-let dragging=false, dragMoved=false, lastMx=0, lastMy=0;
+let dragging=false, dragMoved=false, lastMx=0, lastMy=0, downX=0, downY=0;
 let panVel=null, _dragVx=0, _dragVy=0, _dragT=0;    // release momentum: the map glides to a stop
-canvas.addEventListener('mousedown', e=>{ killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=e.clientX; lastMy=e.clientY; canvas.classList.add('dragging'); requestRender(); });
+canvas.addEventListener('mousedown', e=>{ if (e.button!==0) return; killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=downX=e.clientX; lastMy=downY=e.clientY; canvas.classList.add('dragging'); requestRender(); });
 window.addEventListener('mouseup', ()=>{
   if (dragging && dragMoved && Math.hypot(_dragVx,_dragVy) > 0.15 && performance.now()-_dragT < 90)
     panVel = { vx:_dragVx, vy:_dragVy, t:performance.now() };   // flick: carry the pan through
@@ -12889,7 +12900,10 @@ window.addEventListener('mousemove', e=>{
     // world move). With tilt off, untilt is the identity — behaviour is unchanged.
     const [ux,uy] = untilt(e.clientX, e.clientY), [lux,luy] = untilt(lastMx, lastMy);
     const dx = ux - lux, dy = uy - luy;
-    if (Math.abs(e.clientX-lastMx)+Math.abs(e.clientY-lastMy) > 3) dragMoved=true;
+    // a drag is judged by cumulative distance from the PRESS ORIGIN, not the per-event
+    // delta — otherwise a slow/high-report-rate pan (≤5px per event) never trips dragMoved
+    // and the release fires a live click (deselect / move / irreversible attack).
+    if (!dragMoved && Math.hypot(e.clientX-downX, e.clientY-downY) > 5) dragMoved=true;
     cam.x -= dx/cam.z; cam.y -= dy/cam.z; lastMx=e.clientX; lastMy=e.clientY;
     const now = performance.now(), dt = Math.max(1, now - _dragT); _dragT = now;
     _dragVx = 0.7*(dx/dt) + 0.3*_dragVx;            // smoothed screen-px/ms velocity
@@ -14814,7 +14828,7 @@ function showModeSelect(){
 /* ---- THE WORLD AT WAR — native Europe grand-strategy (wwOpen defined above) ---- */
 $('mc-hex').onclick = wwOpen;
 /* ---- Grand Eastern Front: side + difficulty select ---- */
-let wawSide = 'G', wawDiff = 'hard';
+let wawSide = 'G', wawDiff = 'hard', wawPendingUntil = 0;
 const WAW_DIFF_DESC = {
   easy:   'A gentler war — the AI is cautious and you out-produce it. Good for learning the bigger map.',
   normal: 'A fair fight — the AI plays a solid game with no bonuses.',
@@ -14837,6 +14851,15 @@ $('waw-pick-sov').onclick = ()=>{ wawSide='S'; syncWawUI(); };
 for (const el of document.querySelectorAll('#waw-diff-row .opt')) el.onclick = ()=>{ wawDiff=el.dataset.d; syncWawUI(); };
 $('waw-back').onclick = ()=>{ show('waw-menu', false); show('mode-select', true); };
 $('waw-play').onclick = ()=>{
+  // this is the longest campaign in the game — warn before wiping an unfinished war
+  if (hasSaveSlot(saveSlotFor('wawtest')) && performance.now() > wawPendingUntil){
+    wawPendingUntil = performance.now() + 3000;
+    $('waw-play').textContent = '⚠ OVERWRITES YOUR SAVED WAR — SURE?';
+    setTimeout(()=>{ if (performance.now() >= wawPendingUntil) $('waw-play').textContent = 'BEGIN THE WAR ▶'; }, 3100);
+    return;
+  }
+  wawPendingUntil = 0;
+  $('waw-play').textContent = 'BEGIN THE WAR ▶';
   eventQueue.length = 0;
   newGame(wawSide, wawDiff, 'ai', 'wawtest', mVar);
   show('waw-menu', false);
