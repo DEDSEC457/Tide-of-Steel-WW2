@@ -300,6 +300,12 @@
     animation:titleGlow 3.5s ease-in-out infinite alternate;}
   #mode-select .sub{color:var(--dim);letter-spacing:4px;font-size:11px;margin:4px 0 20px;}
   #btn-settings-main{position:absolute;top:16px;right:16px;padding:6px 12px;font-size:13px;}
+  #btn-tutorial-main{position:absolute;top:16px;left:16px;padding:6px 12px;font-size:13px;}
+  #resume-bar{margin:-6px 0 16px;}
+  #resume-bar.hidden{display:none;}
+  #resume-bar button{background:linear-gradient(#2a6e3a,#1f5a2e);border:1px solid #3f9152;color:#eaffef;
+    font:700 14px "Segoe UI",sans-serif;letter-spacing:.5px;padding:9px 22px;border-radius:9px;cursor:pointer;}
+  #resume-bar button:hover{filter:brightness(1.12);}
   .mode-row{display:flex;gap:14px;justify-content:center;margin:0;}
   .mode-card{flex:1;max-width:300px;border:1px solid var(--line);border-radius:14px;padding:20px 18px 18px;
     cursor:pointer;background:var(--panel2);text-align:left;position:relative;overflow:hidden;
@@ -386,8 +392,10 @@
 <div id="mode-select" class="modal-back">
   <div class="modal">
     <button id="btn-settings-main">⚙ Settings</button>
+    <button id="btn-tutorial-main">📚 Tutorial</button>
     <h1>TIDE OF STEEL WW2</h1>
     <div class="sub">SELECT YOUR EXPERIENCE</div>
+    <div id="resume-bar" class="hidden"></div>
     <!-- Arcade — featured hero card -->
     <div class="mode-card mc-hero" id="mc-arcade">
       <div class="mc-inner">
@@ -799,6 +807,7 @@
     <div id="pause-menu-btns" style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
       <button class="primary" id="btn-pause-resume">▶ Resume</button>
       <button id="btn-pause-save">💾 Quick Save</button>
+      <button id="btn-pause-restart">⟲ Restart Battle</button>
       <button id="btn-pause-settings">⚙ Settings &amp; Graphics</button>
       <button id="btn-pause-help">❔ How to Play</button>
       <button id="btn-pause-menu">🚪 Save &amp; Quit to Menu</button>
@@ -837,6 +846,7 @@
     <div id="end-stats"></div>
     <div class="mrow">
       <button id="btn-end-replay" class="hidden">📽 Replay the Campaign</button>
+      <button id="btn-end-again" class="hidden">⟲ Play Again</button>
       <button class="primary" id="btn-end-menu">Back to Menu</button>
     </div>
     <div id="end-campaign" class="hidden" style="margin-top:8px;color:var(--dim);font-size:13px;"></div>
@@ -9064,7 +9074,13 @@ function deserialize(json){
 var TUT = { on:false, i:0, steps:[], snap:null, _poll:null, glowEl:null, _busy:false, _mover:null, _atk:null };
 function saveGame(){
   if (TUT.on) return;   // tutorial runs on the Barbarossa slot — never overwrite a real save
-  try { if (typeof localStorage!=='undefined' && G) localStorage.setItem(saveKeyFor(G.scenario), serialize()); } catch(e){}
+  try { if (typeof localStorage!=='undefined' && G){
+    localStorage.setItem(saveKeyFor(G.scenario), serialize());
+    // remember the last live standalone battle so the title screen can offer "Resume"
+    // (saves are keyed by scenario id via saveKeyFor→slotKey, so store the scenario)
+    if (!(G.campaign && G.campaign.mode==='rv') && !G.over && typeof SCN!=='undefined')
+      localStorage.setItem('hoi5-resume-v1', JSON.stringify({ scn: G.scenario, short: SCN.short, turn: G.turn }));
+  } } catch(e){}
 }
 function hasSaveSlot(slot){
   try { return typeof localStorage!=='undefined' && !!localStorage.getItem(slotKey(slot)); } catch(e){ return false; }
@@ -12887,7 +12903,7 @@ function _sceneAnimating(){
 /* ---------------- input ---------------- */
 let dragging=false, dragMoved=false, lastMx=0, lastMy=0, downX=0, downY=0;
 let panVel=null, _dragVx=0, _dragVy=0, _dragT=0;    // release momentum: the map glides to a stop
-canvas.addEventListener('mousedown', e=>{ if (e.button!==0) return; killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=downX=e.clientX; lastMy=downY=e.clientY; canvas.classList.add('dragging'); requestRender(); });
+canvas.addEventListener('mousedown', e=>{ if (e.button!==0) return; killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=downX=e.clientX; lastMy=downY=e.clientY; canvas.style.cursor=''; canvas.classList.add('dragging'); requestRender(); });
 window.addEventListener('mouseup', ()=>{
   if (dragging && dragMoved && Math.hypot(_dragVx,_dragVy) > 0.15 && performance.now()-_dragT < 90)
     panVel = { vx:_dragVx, vy:_dragVy, t:performance.now() };   // flick: carry the pan through
@@ -12909,19 +12925,37 @@ window.addEventListener('mousemove', e=>{
     _dragVx = 0.7*(dx/dt) + 0.3*_dragVx;            // smoothed screen-px/ms velocity
     _dragVy = 0.7*(dy/dt) + 0.3*_dragVy;
   }
-  // only refresh the hover cards (and the combat preview's Monte-Carlo forecast)
-  // when the cursor actually crosses into a new hex — not on every pixel of a
-  // 120Hz mousemove stream. Cuts most of the per-move work, so hover stays snappy.
+  // hover cards only update when the cursor is actually over the MAP — mousing over the
+  // side panel or top bar must not highlight hexes or pop the combat forecast. And only
+  // when the cursor crosses into a NEW hex, not every pixel of a 120Hz stream.
+  if (e.target !== canvas){
+    if (hover){ hover=null; updateTerrainCard(); updatePreview(); }
+    if (dragging) requestRender();
+    return;
+  }
   const [wx,wy] = toWorld(...untilt(e.clientX, e.clientY));
   const nh = hexFromPixel(wx,wy);
   const moved = (!hover !== !nh) || (hover && nh && (hover[0]!==nh[0] || hover[1]!==nh[1]));
   hover = nh;
-  if (moved){ updateTerrainCard(); updatePreview(); }
+  if (moved){
+    updateTerrainCard(); updatePreview();
+    if (!dragging){                                    // reflect what a click will do
+      const targeting = deployKind||airTarget||reconTarget||amphibTarget||paraTarget;
+      canvas.style.cursor = targeting ? 'crosshair' : (nh && unitAt(nh[0],nh[1]) ? 'pointer' : '');
+    }
+  }
   if (moved || dragging) requestRender();
 });
+canvas.addEventListener('mouseleave', ()=>{ if (hover){ hover=null; updateTerrainCard(); updatePreview(); requestRender(); } });
+// a MOUSE-clicked button must not keep keyboard focus, or a later Enter re-fires it
+// (e.detail>0 = real pointer click, so keyboard use inside modals is untouched).
+if (document.addEventListener) document.addEventListener('click', e=>{ const b = e.target && e.target.closest && e.target.closest('button'); if (b && e.detail && b.blur) b.blur(); });
 canvas.addEventListener('wheel', e=>{
   e.preventDefault();
-  const f = e.deltaY < 0 ? 1.15 : 1/1.15;
+  // scale by the actual scroll magnitude: a discrete mouse notch (deltaMode 1, or
+  // deltaY ~±100) keeps roughly the old 1.15x feel, while a precision-trackpad stream
+  // of small pixel deltas zooms smoothly instead of rocketing across the range.
+  const f = Math.exp(-e.deltaY * (e.deltaMode ? 0.06 : 0.0018) * (e.ctrlKey ? 3 : 1));
   const cur = zoomGlide ? zoomGlide.target : cam.z;         // stack notches onto the glide
   const target = Math.max(minZoom(), Math.min(2.2, cur*f));
   const [tx,ty] = untilt(e.clientX, e.clientY);
@@ -13097,10 +13131,14 @@ window.addEventListener('keydown', e=>{
   if (openModal){
     if (e.key==='Escape'){
       if (openModal.id==='pause-modal') closePause();
-      else if (openModal.id==='keys-modal' || openModal.id==='roster-modal' || openModal.id==='settings-modal' || openModal.id==='doc-modal') show(openModal.id, false);
+      // every dismissible info/reference modal closes on Esc (not the gated flow modals:
+      // event / briefing / gear / decision / dyn / pass, which need a real choice)
+      else if (['keys-modal','roster-modal','settings-modal','doc-modal','obj-modal','help-modal','clock-modal','replay-modal'].includes(openModal.id)) show(openModal.id, false);
     }
     return;
   }
+  // never hijack browser/OS chords — Ctrl+S (save page), Cmd+C, Alt+…, etc.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
   if (k==='Escape'){
     // first Esc clears any active selection/targeting; a "clean" Esc opens the pause menu
@@ -13757,11 +13795,27 @@ function updateTop(){
   chip.innerHTML = `${wxIcon[wx]||'☀'} <b>${wxLabelOf(wx)}</b>${fc?` <span class="fc" style="opacity:.65;font-size:11px;letter-spacing:1px;">→ ${fc}</span>`:''}`;
   chip.className = 't-chip ' + wx;
   chip.title = `${wxFxOf(wx)[1] || wxLabelOf(wx)}${fcTip ? '\n\nForecast:'+fcTip : ''}\n\n(click for the campaign clock)`;
-  $('vp-chip').innerHTML = `🎯 <b>${axisVP()}</b>/${TOTAL_VP}`;
-  $('vp-chip').title = `${sideName('G')} objectives held — the victory tiers count these (click Objectives for the map)`;
+  const vpNow = axisVP();
+  $('vp-chip').innerHTML = `🎯 <b>${vpNow}</b>/${TOTAL_VP}`;
+  { // victory-tier ladder with the current tier marked and the next one's gap
+    const asc = (VICTORY_TIERS||[]).slice().reverse();   // stored high→low; show low→high
+    let cur = -1; for (let i=0;i<asc.length;i++) if (vpNow >= asc[i][0]) cur = i;
+    const ladder = asc.map((t,i)=>`${i===cur?'▶':'  '} ${t[0]}+  ${t[1]}`).join('\n');
+    const next = asc[cur+1];
+    const nextLine = next ? `\nNext tier at ${next[0]} VP  (+${next[0]-vpNow} more)` : `\n★ Top tier reached`;
+    const sd = SCN.sudden && SCN.sudden.axisCities ? `\nSudden death if ${sideName('G')} holds: ${SCN.sudden.axisCities.join(', ')}` : '';
+    $('vp-chip').title = `${sideName('G')} objectives held — ${vpNow}/${TOTAL_VP}\n${ladder}${nextLine}${sd}`;
+  }
   const side = (G.mode==='hotseat') ? G.phase : G.playerSide;
-  $('pp-chip').innerHTML = `⚙ <b>${G.pp[side]}</b>`;
-  $('pp-chip').title = `${sideName(side)} production points — spend them on reinforcements and deployments`;
+  { // production stock + income per turn, with a warning as the silent 40-pt cap nears
+    const inc = ppFor(side,G.turn) + diffPP(side) + docIncome(side);
+    const pp = G.pp[side], col = pp>=40 ? '#e0755a' : (pp+inc>=40 ? '#e0a84a' : '');
+    $('pp-chip').innerHTML = `⚙ <b${col?` style="color:${col}"`:''}>${pp}</b>${inc>0?` <span style="opacity:.55;font-size:11px">·&nbsp;+${inc}</span>`:''}`;
+    const parts = [`base ${ppFor(side,G.turn)}`];
+    if (diffPP(side)) parts.push(`difficulty ${diffPP(side)>0?'+':''}${diffPP(side)}`);
+    if (docIncome(side)) parts.push(`War Economy +${docIncome(side)}`);
+    $('pp-chip').title = `${sideName(side)} production — spend on reinforcements & new divisions.\n+${inc} ⚙/turn (${parts.join(', ')}).\nCapped at 40 — spend it or the surplus is lost.`;
+  }
   // "Next" button: shows how many of the active human's units still have orders
   const human = !G.over && !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
   const ready = human ? actionableUnits(G.phase).length : 0;
@@ -13826,10 +13880,20 @@ $('btn-objectives').onclick = ()=>{
   const tierLine = VICTORY_TIERS.slice(0,-1).map(([min,t])=>`★ ${min}+ ${t.toLowerCase()}`).join(' · ');
   const lastTier = VICTORY_TIERS[VICTORY_TIERS.length-1][1].toLowerCase();
   const sdc = SCN.sudden.axisCities;
+  const myLost = G.stats[mySide].lost|0, enLost = G.stats[enemyOf(mySide)].lost|0;
+  const ratio = myLost>0 ? (enLost/myLost).toFixed(2) : (enLost>0?'∞':'—');
+  const rCol = (myLost>0 && enLost/myLost>=1) || (myLost===0 && enLost>0) ? 'var(--grn)' : (myLost>enLost?'var(--redL)':'var(--ink)');
+  const bill = `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;">`
+    + `<div style="color:var(--dim);font-size:11px;letter-spacing:1px;margin-bottom:3px;">☠ THE BUTCHER'S BILL</div>`
+    + `<div style="display:flex;justify-content:space-between;"><span>Your losses</span><b style="color:var(--redL)">${myLost}</b></div>`
+    + `<div style="display:flex;justify-content:space-between;"><span>Enemy losses</span><b style="color:var(--grn)">${enLost}</b></div>`
+    + `<div style="display:flex;justify-content:space-between;"><span>Exchange ratio</span><b style="color:${rCol}">${ratio}${myLost>0?' : 1':''}</b></div>`
+    + `</div>`;
   $('obj-summary').innerHTML =
     `${sideName('G')} hold <b>${vp}</b> of ${TOTAL_VP} objective points. At the end of turn ${MAX_TURN}:<br>
      ${tierLine} · otherwise ${lastTier}.` +
-    (sdc && sdc.length ? `<br>Capturing <b>${sdc.join(' and ')}</b> ends the war at once.` : '');
+    (sdc && sdc.length ? `<br>Capturing <b>${sdc.join(' and ')}</b> ends the war at once.` : '') +
+    bill;
   show('obj-modal', true);
 };
 $('btn-obj-close').onclick = ()=>show('obj-modal', false);
@@ -14824,6 +14888,17 @@ function showModeSelect(){
   eventQueue.length = 0; show('event-modal', false);   // a stale battle event must not float over the menu
   show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false);
   if(typeof wwClose==='function') wwClose();
+  // "continue where you left off" — one button to resume the last unfinished standalone battle
+  const rb = $('resume-bar');
+  if (rb){
+    let rec=null; try { rec = JSON.parse(localStorage.getItem('hoi5-resume-v1')||'null'); } catch(e){}
+    const pk = (rec && rec.scn && hasSaveSlot(rec.scn)) ? savePeek(rec.scn) : null;
+    if (pk && !pk.over){
+      rb.classList.remove('hidden');
+      rb.innerHTML = `<button id="btn-resume-last">▶ Resume: ${rec.short||'your battle'} — Turn ${pk.turn}</button>`;
+      $('btn-resume-last').onclick = ()=>{ if (loadSlot(rec.scn)){ show('mode-select',false); startCampaign(true); } };
+    } else rb.classList.add('hidden');
+  }
 }
 /* ---- THE WORLD AT WAR — native Europe grand-strategy (wwOpen defined above) ---- */
 $('mc-hex').onclick = wwOpen;
@@ -15079,6 +15154,21 @@ $('btn-pause-save').onclick = ()=>{
 $('btn-pause-settings').onclick = ()=>{ sClick(); closePause(); $('btn-sound').onclick(); };
 $('btn-pause-help').onclick = ()=>{ sClick(); closePause(); show('help-modal', true); };
 $('btn-pause-menu').onclick = ()=>{ sClick(); closePause(); quitToMenu(); };
+let _restartPend = 0;
+$('btn-pause-restart').onclick = ()=>{
+  if (performance.now() > _restartPend){          // two-click confirm — this erases the current battle
+    _restartPend = performance.now() + 3000;
+    $('btn-pause-restart').textContent = '⚠ Erase this battle — sure?';
+    setTimeout(()=>{ if (performance.now() >= _restartPend) $('btn-pause-restart').textContent = '⟲ Restart Battle'; }, 3100);
+    return;
+  }
+  _restartPend = 0; $('btn-pause-restart').textContent = '⟲ Restart Battle';
+  sClick(); closePause();
+  const sd=G.playerSide, df=G.difficulty, md=G.mode, sc=G.scenario;
+  eventQueue.length = 0;
+  newGame(sd, df, md, sc, mVar);
+  startCampaign();
+};
 $('pause-modal').addEventListener('click', e=>{ if (e.target === $('pause-modal')) closePause(); });
 
 /* ---------------- end turn & AI driver ---------------- */
@@ -15323,9 +15413,11 @@ function showEnd(){
       $('btn-end-menu').textContent = '◀ Back to the Road';
       cn.innerHTML = `<b style="color:var(--redL)">The front held against you.</b> A <b>★★★ victory</b> is needed to advance — regroup and try ${cs[i].name} again.`;
     }
+    $('btn-end-again').classList.add('hidden');       // Road to Victory has its own retry flow
     show('end-campaign', true);
   } else {
     $('btn-end-menu').textContent = 'Back to Menu';
+    $('btn-end-again').classList.remove('hidden');     // one-click rematch of this battle
     show('end-campaign', false);
   }
   show('end-modal', true);
@@ -15335,6 +15427,13 @@ function showEnd(){
 $('btn-end-menu').onclick = ()=>{ show('end-modal',false);
   if (G && G.campaign && G.campaign.mode==='rv'){ rvOpen(); }
   else { showModeSelect(); $('btn-continue').classList.add('hidden'); }
+};
+$('btn-end-again').onclick = ()=>{                      // rematch the same battle, same settings
+  const sd=G.playerSide, df=G.difficulty, md=G.mode, sc=G.scenario;
+  show('end-modal',false);
+  eventQueue.length = 0;
+  newGame(sd, df, md, sc, mVar);
+  startCampaign();
 };
 
 /* ---------------- campaign replay viewer ---------------- */
@@ -15899,7 +15998,8 @@ function tutEnd(keepGame){
     else { const ms=document.getElementById('mode-select'); if(ms&&ms.classList) ms.classList.remove('hidden'); }
   }
 }
-{ const tb=document.getElementById('btn-tutorial'); if(tb) tb.onclick=tutStart; }
+{ const tb=document.getElementById('btn-tutorial'); if(tb) tb.onclick=tutStart;
+  const tm=document.getElementById('btn-tutorial-main'); if(tm) tm.onclick=tutStart; }
 if(typeof window!=='undefined'){ window.tutStart=tutStart; window.tutNext=tutNext; window.tutGoto=tutGoto; window.tutEnd=tutEnd; window.getTut=function(){ return TUT; }; }
 
 })();
