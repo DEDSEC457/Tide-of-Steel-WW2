@@ -309,7 +309,9 @@
   .mode-row{display:flex;gap:14px;justify-content:center;margin:0;}
   .mode-card{flex:1;max-width:300px;border:1px solid var(--line);border-radius:14px;padding:20px 18px 18px;
     cursor:pointer;background:var(--panel2);text-align:left;position:relative;overflow:hidden;
+    display:flex;flex-direction:column;
     transition:border-color .2s, box-shadow .2s, background .2s;}
+  .mode-card .mc-btn{margin-top:auto;}   /* CTAs bottom-align regardless of description length */
   .mode-card:hover{border-color:var(--amber);box-shadow:0 0 30px #e8b34b22;background:#1d2415;}
   .mc-badge{position:absolute;top:12px;right:12px;font-size:10px;letter-spacing:2px;
     padding:2px 7px;border-radius:4px;font-weight:700;}
@@ -10152,7 +10154,20 @@ function applyGfx(){                                          // preset baseline
   GFX = Object.assign({level:lvl}, base);
   for (const t of GFX_TOGGLES) if (t.k in _gfxOv) GFX[t.k] = !!_gfxOv[t.k];
 }
-function loadGfx(){ try{ const l = localStorage.getItem('hoi5-gfx'); if (l && GFX_PRESETS[l]) GFX.level = l; }catch(e){} applyGfx(); }
+let REDUCED_MOTION = false;
+function loadGfx(){
+  try{
+    const l = localStorage.getItem('hoi5-gfx');
+    if (l && GFX_PRESETS[l]) GFX.level = l;
+    else if (typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches){
+      // OS asks for less motion and the player hasn't chosen a preset — quiet the busiest
+      // animated effects (still fully playable, just calmer). Any manual toggle overrides this.
+      REDUCED_MOTION = true;
+      for (const k of ['grain','particles','tracers','clouds']) if (!(k in _gfxOv)) _gfxOv[k] = false;
+    }
+  }catch(e){}
+  applyGfx();
+}
 loadGfx();
 // 3D battlefield view — a purely cosmetic render mode (raised block counters,
 // embossed terrain relief). It moves NO hex centres, so picking/input are
@@ -11205,6 +11220,10 @@ function renderTerrCache(wx, depth){
       const [bx,by]=hexCenter(nx,ny), mx=(ax+bx)/2, my=(ay+by)/2;
       let dx=bx-ax, dy=by-ay; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
       const ex=-dy*S*0.5, ey=dx*S*0.5;
+      // shallow-water shelf: a soft teal band bleeding into the sea along the shore
+      { const wSign = w1 ? -1 : 1, sx = mx + dx*S*0.2*wSign, sy = my + dy*S*0.2*wSign;
+        c.beginPath(); c.moveTo(sx-ex,sy-ey); c.lineTo(sx+ex,sy+ey);
+        c.strokeStyle='rgba(122,201,206,0.16)'; c.lineWidth=S*0.42; c.stroke(); }
       c.beginPath(); c.moveTo(mx-ex,my-ey); c.lineTo(mx+ex,my+ey);
       c.strokeStyle='#cdbd8a55'; c.lineWidth=2; c.stroke();
     }
@@ -11482,11 +11501,13 @@ function mmSnowMudColor(t, wx){
   else if (wx==='mud' && (t==='.'||t==='s') && !SCN.terrainColors) col = t==='.' ? '#54482e' : '#463f2e';
   return col;
 }
-function mmRebuild(wx, w, h){
+function mmRebuild(wx, w, h, d){
+  d = d || 1;
   if (!_mmBase) _mmBase = document.createElement('canvas');
-  _mmBase.width = w; _mmBase.height = h;
+  _mmBase.width = Math.round(w*d); _mmBase.height = Math.round(h*d);
   const mc = _mmBase.getContext('2d');
   if (!mc) return;
+  if (mc.setTransform) mc.setTransform(d,0,0,d,0,0);   // bake at device resolution — crisp on retina
   mc.fillStyle = '#0d100a'; mc.fillRect(0,0,w,h);
   const sc = _mmScale, hs = Math.max(1.1, HX*sc);        // one soft square per hex
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
@@ -11510,12 +11531,15 @@ function drawMinimap(now, wx){
   const maxW = 208, maxH = 148;
   _mmScale = Math.min(maxW/mapW(), maxH/mapH());
   const w = Math.max(2, Math.round(mapW()*_mmScale)), h = Math.max(2, Math.round(mapH()*_mmScale));
-  if (mmCv.width !== w || mmCv.height !== h){ mmCv.width = w; mmCv.height = h; _mmKey = ''; }
+  const d = Math.min((typeof DPR!=='undefined' && DPR) || 1, 2);   // crisp minimap on hi-DPI screens
+  const bw = Math.round(w*d), bh = Math.round(h*d);
+  if (mmCv.width !== bw || mmCv.height !== bh){ mmCv.width = bw; mmCv.height = bh; mmCv.style.width = w+'px'; mmCv.style.height = h+'px'; _mmKey = ''; }
   const key = (SCN.id||'?') + '|' + wx + '|' + COLS + 'x' + ROWS;
-  if (_mmKey !== key || now - _mmAt > 350){ mmRebuild(wx, w, h); _mmKey = key; _mmAt = now; }
+  if (_mmKey !== key || now - _mmAt > 350){ mmRebuild(wx, w, h, d); _mmKey = key; _mmAt = now; }
   const mc = mmCv.getContext('2d');
   if (!mc) return;
-  if (_mmBase) mc.drawImage(_mmBase, 0, 0);
+  if (mc.setTransform) mc.setTransform(d,0,0,d,0,0);
+  if (_mmBase) mc.drawImage(_mmBase, 0, 0, w, h);
   const sc = _mmScale;
   const mmSight = fowActive() ? sightFor(viewerSide()) : null;
   for (const u of G.units){                               // live unit dots
@@ -11759,6 +11783,11 @@ function draw(){
         ctx.strokeStyle = '#160d08'; ctx.lineWidth = 4; ctx.stroke();
         ctx.strokeStyle = '#c4453a'; ctx.lineWidth = 1.6; ctx.stroke();
       } else {
+        // shallow-water shelf: a soft teal band bleeding into the sea along the shore
+        { const wSign = w1 ? -1 : 1, sx = mx + dx*S*0.2*wSign, sy = my + dy*S*0.2*wSign;
+          ctx.beginPath(); ctx.moveTo(sx-ex,sy-ey); ctx.lineTo(sx+ex,sy+ey);
+          ctx.strokeStyle = 'rgba(122,201,206,0.16)'; ctx.lineWidth = S*0.42; ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(mx-ex,my-ey); ctx.lineTo(mx+ex,my+ey); }
         ctx.strokeStyle = '#cdbd8a55'; ctx.lineWidth = 2; ctx.stroke();
         if (GFX.cine){                                     // surf breaks along the shore
           ctx.strokeStyle = `rgba(238,244,240,${(0.10 + 0.09*Math.sin(now*0.0016 + x*3 + y*2)).toFixed(3)})`;
