@@ -620,6 +620,7 @@
     </div>
     <div class="mrow" style="justify-content:center;">
       <button id="btn-back-arcade">← Back</button>
+      <button id="btn-tutorial">📚 Tutorial</button>
       <button id="btn-help">How to Play</button>
       <button id="btn-settings-menu">Settings</button>
     </div>
@@ -9048,7 +9049,10 @@ function deserialize(json){
   if (!G.dynFlags) G.dynFlags = {};
   refreshSupply();
 }
+// tutorial state (top-level so saveGame/_sceneAnimating can see it; the UI logic lives in the browser IIFE)
+var TUT = { on:false, i:0, steps:[], snap:null, _poll:null, glowEl:null, _busy:false, _mover:null, _atk:null };
 function saveGame(){
+  if (TUT.on) return;   // tutorial runs on the Barbarossa slot — never overwrite a real save
   try { if (typeof localStorage!=='undefined' && G) localStorage.setItem(saveKeyFor(G.scenario), serialize()); } catch(e){}
 }
 function hasSaveSlot(slot){
@@ -12530,6 +12534,7 @@ function draw(){
     }
   }
   drawMinimap(now, wx);
+  try { tutDrawOverlay(); } catch(e){}
 }
 
 function star(x,y,r){
@@ -12838,6 +12843,7 @@ let _needRender = true, _lastFrameTs = 0;
 function requestRender(){ _needRender = true; }
 function _sceneAnimating(){
   if (typeof aiRunning !== 'undefined' && aiRunning) return true;
+  if (typeof TUT !== 'undefined' && TUT.on) return true;   // keep frames flowing for the tutorial spotlight pulse
   if (!G) return false;
   if (GFX.clouds || GFX.grain) return true;                            // high: living overcast/grain
   const wx = weatherFor(G.turn);
@@ -15725,6 +15731,154 @@ window.__dbgHexScreen = (hx,hy) => {
   return [sx, sy];
 };
 
+/* ============ INTERACTIVE TUTORIAL (arcade onboarding) ============
+   A guided first battle on Barbarossa: the camera pans, canvas spotlights ring
+   the target, and step popups teach select → move → attack → supply → air →
+   end turn. Reads only game state (no monkey-patching); each action step
+   auto-advances when the player actually does the thing, and every step has a
+   manual Skip so no one gets stuck. Lives inside the browser IIFE; TUT state is
+   declared top-level so saveGame/_sceneAnimating can see it. */
+function tutEl(){ return document.getElementById('tut'); }
+function tutCanvasReady(){ return typeof canvas!=='undefined' && canvas && (canvas.clientWidth||0) > 0 && typeof DPR!=='undefined' && DPR; }
+function tutCountMoved(){ return unitsOf('G').filter(u=>u.moved).length; }
+function tutCountAttacked(){ return unitsOf('G').filter(u=>u.attacked).length; }
+function tutCountAir(){ const a=(typeof airOf==='function'?airOf('G'):[]); return a.filter(x=>x.mission&&x.mission!=='ready').length; }
+function tutPickMover(){ const us=unitsOf('G'); return us.find(u=>u.kind==='g_pz') || us.find(u=>u.kind&&u.kind.indexOf('hq')<0) || us[0]; }
+function tutPickAttack(){ const gs=unitsOf('G'), ss=unitsOf('S');
+  for(const g of gs){ if(g.kind&&g.kind.indexOf('hq')>=0) continue; for(const s of ss){ if(hexDist(g.x,g.y,s.x,s.y)===1) return {g:g,s:s}; } }
+  return null; }
+function tutFocusHex(x,y,z){ if(typeof cam!=='undefined'&&z) cam.z=z; if(typeof centerOn==='function') centerOn(x,y); if(typeof requestRender==='function') requestRender(); }
+function tutFit(){ if(typeof fitCamera==='function') fitCamera(); if(typeof requestRender==='function') requestRender(); }
+function tutGlow(id){ tutUnglow(); if(!id) return; const el=document.getElementById(id); if(el&&el.classList){ el.classList.add('tut-glow'); TUT.glowEl=el; } }
+function tutUnglow(){ if(TUT.glowEl&&TUT.glowEl.classList) TUT.glowEl.classList.remove('tut-glow'); TUT.glowEl=null; }
+
+function tutBuildSteps(){
+  return [
+    { title:'Welcome, Commander', pos:'center',
+      html:'This is <b>Operation Barbarossa, June 1941</b> — your first battle as the Axis. In a few short steps you’ll learn to move, fight, supply and command an army. Nothing here is timed — take your time.',
+      onEnter:function(){ tutFit(); } },
+    { title:'The map & the front', pos:'bottom',
+      html:'Grey ground is <b style="color:#cbd6e2">yours (Axis)</b>; red is the <b style="color:#e2748a">Soviet</b> enemy. The jagged line between them is the <b>front</b>. Your job: push it east and take the enemy’s cities.',
+      onEnter:function(){ tutFit(); } },
+    { title:'Select a unit', pos:'bottom',
+      html:'Every counter is an army corps. <b>Click the highlighted unit</b> to select it.',
+      cta:'▶ Click the glowing counter on the map.',
+      spot:function(){ return TUT._mover?[TUT._mover.x,TUT._mover.y]:null; },
+      onEnter:function(){ const u=tutPickMover(); if(u){ TUT._mover=u; tutFocusHex(u.x,u.y,1.4); } else tutFit(); },
+      action:function(){ return typeof sel!=='undefined' && sel!=null; } },
+    { title:'Move it forward', pos:'bottom',
+      html:'The glowing tiles are where it can move this turn — fast <b>panzers</b> reach further than infantry, and rough terrain costs more. <b>Click a highlighted tile</b> to advance toward the enemy.',
+      cta:'▶ Click one of the highlighted tiles.',
+      onEnter:function(){ if(TUT._mover) tutFocusHex(TUT._mover.x,TUT._mover.y,1.4); },
+      action:function(){ return tutCountMoved() > (TUT.snap?TUT.snap.moved:0); } },
+    { title:'Attack the enemy', pos:'bottom',
+      html:'To assault: <b>select a unit next to an enemy, then click the enemy</b>. First you’ll see the <b>Battle Forecast</b> — the odds and a full breakdown of why. <b>Tip:</b> shift-click several of your units to attack together — tanks + infantry hit far harder than either alone.',
+      cta:'▶ Launch one attack on the glowing enemy.',
+      spot:function(){ return TUT._atk?[TUT._atk.s.x,TUT._atk.s.y]:null; },
+      onEnter:function(){ const p=tutPickAttack(); TUT._atk=p; if(p) tutFocusHex(p.s.x,p.s.y,1.4); else tutFit(); },
+      action:function(){ return tutCountAttacked() > (TUT.snap?TUT.snap.attacked:0); } },
+    { title:'Supply & encirclement', pos:'bottom',
+      html:'Armies need <b>supply</b>. It reaches about 7 hexes from your map edge or from cities you hold. <b>Cut an enemy off</b> — surround them so nothing reaches — and they fight at a fraction of strength and starve every turn. That is how whole armies are destroyed. The glowing <b>Supply</b> button toggles the overlay any time.',
+      glow:'btn-supply',
+      onEnter:function(){ tutFit(); } },
+    { title:'The air war', pos:'bottom',
+      html:'Your <b>Air Forces</b> fly two missions: <b>Strike</b> — hit enemy troops near your cities to soften them before you attack — and <b>Patrol</b>, fighters that intercept enemy strikes. Idle groups repair. <b>Fly a Strike now:</b> open Air Forces, pick a group, then click an enemy-held hex in range.',
+      cta:'▶ Fly one air Strike — or Skip.',
+      glow:'air-card',
+      onEnter:function(){ tutFit(); },
+      action:function(){ return tutCountAir() > (TUT.snap?TUT.snap.air:0); } },
+    { title:'End your turn', pos:'top',
+      html:'When you’ve moved everyone you want to, <b>End Turn</b> hands over to the enemy — they act, then it’s yours again. (Still have units ready? It warns you once.) <b>Click END TURN.</b>',
+      cta:'▶ Click the glowing END TURN button.',
+      glow:'btn-endturn',
+      onEnter:function(){ tutFit(); },
+      action:function(){ return G.turn > (TUT.snap?TUT.snap.turn:G.turn); } },
+    { title:'You’re ready, Commander', pos:'center', finish:true,
+      html:'That’s the core of it — <b>move, mass your forces, cut the enemy off, use your air, and mind your supply</b>. The rest you’ll pick up by playing. Good luck out there.',
+      onEnter:function(){ tutUnglow(); } }
+  ];
+}
+
+function tutDrawOverlay(){
+  if(!TUT.on || !tutCanvasReady()) return;
+  const s=TUT.steps[TUT.i]; if(!s) return;
+  const spotHex = s.spot ? s.spot() : null;
+  const W=canvas.clientWidth, H=canvas.clientHeight;
+  ctx.save();
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(spotHex){
+    const c=hexCenter(spotHex[0],spotHex[1]); const p=toScreen(c[0],c[1]);
+    const cx=p[0], cy=p[1], r=(typeof S!=='undefined'?S:34)*cam.z*1.7;
+    ctx.beginPath(); ctx.rect(0,0,W,H); ctx.arc(cx,cy,r,0,Math.PI*2,true);
+    ctx.fillStyle='rgba(6,10,16,0.58)'; ctx.fill('evenodd');
+    const t=((typeof performance!=='undefined'&&performance.now?performance.now():0)%1400)/1400;
+    ctx.beginPath(); ctx.arc(cx,cy,r+3+Math.sin(t*Math.PI*2)*3,0,Math.PI*2);
+    ctx.lineWidth=3; ctx.strokeStyle='rgba(232,179,75,0.95)'; ctx.stroke();
+  } else if(s.glow){
+    ctx.fillStyle='rgba(6,10,16,0.40)'; ctx.fillRect(0,0,W,H);   // dim the map so the glowing panel/button stands out
+  }
+  ctx.restore();
+}
+
+function tutRender(){
+  const el=tutEl(); if(!el) return; const s=TUT.steps[TUT.i]; if(!s) return;
+  el.className=s.pos||'bottom'; el.classList.remove('hidden');
+  let foot;
+  if(s.finish){
+    foot='<div class="tut-foot"><button class="tut-skip" id="tut-menu">‹ Main menu</button>'+
+         '<button class="tut-next" id="tut-play">Play on ▶</button></div>';
+  } else {
+    const lbl = s.action ? 'Skip ▸' : (TUT.i===0?'Start ▶':'Next ▶');
+    foot='<div class="tut-foot"><span class="tut-dots">Step '+(TUT.i+1)+' of '+TUT.steps.length+'</span>'+
+         '<span class="tut-btns"><button class="tut-skip" id="tut-exit">Exit</button>'+
+         '<button class="tut-next" id="tut-next">'+lbl+'</button></span></div>';
+  }
+  el.innerHTML='<h3>'+s.title+'</h3><div class="tut-body">'+s.html+'</div>'+
+    (s.cta?'<div class="tut-cta">'+s.cta+'</div>':'')+foot;
+  const b=document.getElementById('tut-next'); if(b) b.onclick=tutNext;
+  const ex=document.getElementById('tut-exit'); if(ex) ex.onclick=function(){ tutEnd(true); };
+  const mp=document.getElementById('tut-menu'); if(mp) mp.onclick=function(){ tutEnd(false); };
+  const pl=document.getElementById('tut-play'); if(pl) pl.onclick=function(){ tutEnd(true); };
+}
+
+function tutGoto(i){
+  if(!TUT.on) return;
+  tutUnglow();
+  TUT.i=i; const s=TUT.steps[i]; if(!s){ tutEnd(true); return; }
+  TUT.snap={ moved:tutCountMoved(), attacked:tutCountAttacked(), air:tutCountAir(), turn:(typeof G!=='undefined'&&G?G.turn:0) };
+  try{ if(s.onEnter) s.onEnter(); }catch(e){}
+  if(s.glow) tutGlow(s.glow);
+  tutRender();
+  if(typeof requestRender==='function') requestRender();
+}
+function tutNext(){ if(!TUT.on) return; if(TUT.i>=TUT.steps.length-1) tutEnd(true); else tutGoto(TUT.i+1); }
+function tutPoll(){ if(!TUT.on||TUT._busy) return; const s=TUT.steps[TUT.i]; if(!s||!s.action) return;
+  try{ if(s.action()){ TUT._busy=true; setTimeout(function(){ TUT._busy=false; tutNext(); }, 550); } }catch(e){}
+}
+function tutStart(){
+  try{ if(typeof newGame==='function') newGame('G','easy','ai','barbarossa'); }catch(e){}
+  try{ if(typeof startCampaign==='function') startCampaign(); }catch(e){}
+  ['mode-select','menu','briefing-modal','event-modal','decision-modal','coach-amphib'].forEach(function(id){ const m=document.getElementById(id); if(m&&m.classList) m.classList.add('hidden'); });
+  TUT.on=true; TUT._busy=false; TUT.steps=tutBuildSteps();
+  if(typeof setInterval==='function'){ if(TUT._poll&&typeof clearInterval==='function') clearInterval(TUT._poll); TUT._poll=setInterval(tutPoll,220); }
+  tutGoto(0);
+}
+function tutEnd(keepGame){
+  TUT.on=false; tutUnglow();
+  if(TUT._poll&&typeof clearInterval==='function'){ clearInterval(TUT._poll); TUT._poll=null; }
+  const el=tutEl(); if(el){ el.classList.add('hidden'); el.innerHTML=''; }
+  if(keepGame){
+    if(typeof saveGame==='function') saveGame();       // now allowed — this becomes their live game
+    if(typeof requestRender==='function') requestRender();
+  } else {
+    if(typeof G!=='undefined'&&G) G.over=true;
+    if(typeof showModeSelect==='function') showModeSelect();
+    else { const ms=document.getElementById('mode-select'); if(ms&&ms.classList) ms.classList.remove('hidden'); }
+  }
+}
+{ const tb=document.getElementById('btn-tutorial'); if(tb) tb.onclick=tutStart; }
+if(typeof window!=='undefined'){ window.tutStart=tutStart; window.tutNext=tutNext; window.tutGoto=tutGoto; window.tutEnd=tutEnd; window.getTut=function(){ return TUT; }; }
+
 })();
 
 /* ============================ HEADLESS EXPORTS (for tests) ============================ */
@@ -15773,6 +15927,32 @@ if (typeof module !== 'undefined' && module.exports){
   };
 }
 </script>
+<!-- ============ INTERACTIVE TUTORIAL — popup + highlight styles ============ -->
+<style>
+  #tut{ position:fixed; z-index:80; left:50%; transform:translateX(-50%); width:min(400px, calc(100vw - 32px));
+    background:linear-gradient(#14263d,#0d1a2b); border:1px solid #35578040; border-radius:13px;
+    padding:15px 17px 13px; box-shadow:0 14px 44px #000b, 0 0 0 1px #ffffff0a inset;
+    color:#e7eef7; font:14px/1.55 'Segoe UI',system-ui,sans-serif; }
+  #tut.hidden{ display:none; }
+  #tut.top{ top:74px; } #tut.bottom{ bottom:22px; } #tut.center{ top:50%; transform:translate(-50%,-50%); }
+  #tut h3{ margin:0 0 7px; color:#ffe08a; font-size:16px; font-weight:800; letter-spacing:.4px; }
+  #tut .tut-body{ color:#d3e0ee; }
+  #tut .tut-cta{ margin-top:9px; padding:7px 10px; background:#1c8a4610; border:1px solid #3f915240;
+    border-radius:7px; color:#8fe0a6; font-size:12.5px; font-weight:700; }
+  #tut .tut-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:13px; }
+  #tut .tut-dots{ font-size:11px; color:#7f9bbb; letter-spacing:1px; }
+  #tut .tut-btns{ display:flex; align-items:center; gap:6px; }
+  #tut .tut-next{ background:#2a6e3a; border:1px solid #3f9152; color:#eaffef; font:800 13px 'Segoe UI',system-ui,sans-serif;
+    padding:8px 16px; border-radius:8px; cursor:pointer; }
+  #tut .tut-next:hover{ background:#31824a; }
+  #tut .tut-skip{ background:none; border:0; color:#8399b3; font:600 12px 'Segoe UI',system-ui,sans-serif; cursor:pointer; padding:6px 8px; }
+  #tut .tut-skip:hover{ color:#c3d3e6; text-decoration:underline; }
+  .tut-glow{ outline:3px solid #e8b34b !important; outline-offset:2px; border-radius:8px;
+    box-shadow:0 0 0 3px #e8b34b55, 0 0 22px 5px #e8b34b70 !important; position:relative; z-index:70;
+    animation:tutGlow 1.25s ease-in-out infinite; }
+  @keyframes tutGlow{ 50%{ box-shadow:0 0 0 4px #e8b34b70, 0 0 34px 9px #e8b34b95 !important; } }
+</style>
+<div id="tut" class="hidden"></div>
 <!-- ============ THE WORLD AT WAR — native screen ============ -->
 <div id="ww-screen" class="hidden">
   <style>

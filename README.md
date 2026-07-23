@@ -38,6 +38,10 @@ The whole game is one file (`index.html`) that runs in any browser:
 - **On any PC:** download `index.html` and double-click it (or use
   `Play Tide of Steel WW2.bat` on Windows). It opens in your browser — **100%
   offline, nothing to install, no account.**
+- **New here? Take the 📚 Tutorial** (button on the Arcade menu) — a short guided
+  first battle that walks you through selecting, moving, attacking, supply &
+  encirclement, the air war, and ending your turn, with the camera and highlights
+  showing you exactly where to click. Under two minutes, and you can skip any step.
 - Pick a battle from the main menu and choose your side. Play **vs the computer**
   (four difficulties, Easy → Brutal — where the AI genuinely plays *smarter*, not
   just tougher) or **2-player hotseat** on one machine. Progress **autosaves every

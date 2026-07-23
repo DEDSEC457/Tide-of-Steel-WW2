@@ -2027,7 +2027,29 @@ function uiSmoke(side){
     const j = sb.window.__dbgStageAttack && sb.window.__dbgStageAttack();
     juiceOk = !!(j && j.anims > 0 && j.defBefore > 0);
   } catch(e){ juiceOk = false; }
-  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded, briefed, juiceOk};
+  // interactive tutorial: launches from the menu, shows step 1, advances, and every
+  // step (including the finish) closes it cleanly with no dead-ends
+  let tutOk = false;
+  try {
+    if ($('btn-tutorial').onclick) $('btn-tutorial').onclick();   // tutStart → fresh Barbarossa + step 1
+    drain();
+    const getTut = sb.window && sb.window.getTut ? sb.window.getTut : null;
+    const T0 = getTut && getTut();
+    const shown = !!T0 && T0.on === true && !$('tut').classList.contains('hidden') && ($('tut').innerHTML||'').includes('Welcome');
+    if ($('tut-next').onclick) $('tut-next').onclick();          // advance to step 2
+    drain();
+    const advanced = !!(getTut && getTut().i === 1);
+    // walk to the finish step and click Play on — must end the tutorial
+    for (let k=0;k<14 && getTut && getTut().on; k++){
+      const t = getTut();
+      if (t.i >= t.steps.length-1){ if ($('tut-play').onclick) $('tut-play').onclick(); else if ($('tut-next').onclick) $('tut-next').onclick(); }
+      else if ($('tut-next').onclick) $('tut-next').onclick();
+      drain();
+    }
+    const closed = $('tut').classList.contains('hidden') && !!(getTut && getTut().on === false);
+    tutOk = shown && advanced && closed;
+  } catch(e){ tutOk = false; }
+  return {over: arcadeOver, realisticOk, result: arcadeResult, uiErrors, wawOk, recOk, variantsForced, chipsInert, replayRecorded, briefed, juiceOk, tutOk};
 }
 
 for (const side of ['G','S']){
@@ -2043,6 +2065,7 @@ for (const side of ['G','S']){
     check(`UI variant chips are inert indicators (${side})`, r.chipsInert, 'a variant chip is still clickable');
     check(`UI campaign replay recorded turn by turn (${side})`, r.replayRecorded, 'no valid replay frames');
     check(`UI realistic-mode preview launches (${side})`, r.realisticOk, 'wrong scenario');
+    check(`UI interactive tutorial runs & exits cleanly (${side})`, r.tutOk, 'tutorial did not show/advance/close');
     check(`UI World at War opens (${side})`, r.wawOk, 'WW.on not set');
   } catch(err){
     failures++;
