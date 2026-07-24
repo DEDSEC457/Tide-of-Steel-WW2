@@ -8064,7 +8064,7 @@ function executeOrder(u){
     if (best && bestR >= (u.order==='attack' ? 0.9 : 1.5)){
       const fx=best.x, fy=best.y;
       const ev = resolveCombat(u, best);
-      out.atk = {ev, x:fx, y:fy, def:best};
+      out.atk = {ev, x:fx, y:fy, def:best, att:u};   // attacker included so the UI can slide his exploit
     }
   }
   if (!u.moved && !(u.order==='hold' && onFront(u))){   // hold units already on the line stay & dig in
@@ -10747,6 +10747,9 @@ onUnitSpawn = function(u){
   // reinforcements & deployments arrive with a ring, a name float and a minimap
   // blip — no more units silently materializing at the map edge
   if (!G || G.over) return;
+  // fog of war: an enemy arriving in unscouted ground must NOT ping its exact hex
+  // (gated here in the handler so every current and future call site is covered)
+  if (fowActive() && u.side!==viewerSide() && !sightFor(viewerSide()).has(keyOf(u.x,u.y))) return;
   const [px,py] = hexCenter(u.x,u.y);
   anims.push({type:'spawn', x:px, y:py, side:u.side, t0:performance.now(), life:1200});
   floatText(u.x, u.y, '+ '+u.name, u.side===viewerSide() ? '#9fd8ff' : '#e2a09a', 0.9);
@@ -13377,7 +13380,7 @@ function orderVisuals(r, sound){
   if (r.atk){
     const ev = r.atk.ev;
     if (ev.defLoss>0 || ev.destroyed) boomAt(r.atk.x, r.atk.y, ev.destroyed);
-    combatJuice(ev, null, r.atk.def, r.atk.x, r.atk.y);
+    combatJuice(ev, r.atk.att||null, r.atk.def, r.atk.x, r.atk.y);
     if (ev.destroyed) floatText(r.atk.x, r.atk.y, '✕', '#ff5340', 1.15);
     if (sound) sShot();
   } else if (r.moved && sound) sMove();
