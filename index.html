@@ -6577,6 +6577,9 @@ function terrOwner(x,y){
 function claimTerritory(){
   _tintDirty = true;   // invalidate the zoomed-out tint cache (declared in outer scope, below)
   const n = COLS*ROWS;
+  // UI hook: remember the old ownership so big swings (pockets absorbed) can pulse on the map.
+  // Headless (hook null) skips the copy entirely — zero cost in the sims.
+  const _watch = (typeof onTerrFlips==='function' && G.terr && G.terr.length===n) ? G.terr.slice() : null;
   if (!G.terr || G.terr.length !== n) G.terr = new Array(n).fill(0);
   else G.terr.fill(0);
   // Collect seeds for each side, then interleave so both BFS fronts expand
@@ -6610,6 +6613,12 @@ function claimTerritory(){
     }
   }
   absorbPockets();
+  if (_watch){
+    const flips = [];
+    for (let i=0;i<n && flips.length<240;i++)
+      if (_watch[i] && G.terr[i] && _watch[i] !== G.terr[i]) flips.push(i);
+    if (flips.length) onTerrFlips(flips);
+  }
 }
 /* A bypassed enemy pocket with no troops in it — ground the front has simply
    flowed around — flips to the side that surrounds it, so the map shows the real
@@ -6982,6 +6991,7 @@ function retreatHex(def, att){
 }
 
 function advanceInto(u, fx, fy, events){
+  events.advanceFrom = [u.x, u.y];          // where the exploiter started (the UI slides him from here)
   u.x = fx; u.y = fy;
   const c = cityAt(fx,fy);
   if (c && c.owner!==u.side && !KINDS[u.kind].noCapture){
@@ -7592,10 +7602,12 @@ function doDeploy(side, kind, x, y){
   u.moved = true; u.attacked = true;        // arrives unready
   G.units.push(u);
   // fog of war: enemy deployments in unscouted hexes go unreported
-  if (!fowActive() || side===viewerSide() || sightFor(viewerSide()).has(keyOf(x,y)))
+  if (!fowActive() || side===viewerSide() || sightFor(viewerSide()).has(keyOf(x,y))){
     logMsg(side==='G'?'l-g':'l-s', u.embarked
       ? `${flag(side)} ${u.name} (${k.label}) embarks offshore — sail it to the beach to land.`
       : `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
+    if (typeof onUnitSpawn === 'function') onUnitSpawn(u);
+  }
   refreshSupply();
   return true;
 }
@@ -7933,10 +7945,12 @@ function endPhase(){
           const u = arriveUnit(kind, name, spot[0], spot[1]);
           G.units.push(u);
           // fog of war: enemy reinforcements arriving out of sight go unreported
-          if (!fowActive() || sd===viewerSide() || sightFor(viewerSide()).has(keyOf(spot[0],spot[1])))
+          if (!fowActive() || sd===viewerSide() || sightFor(viewerSide()).has(keyOf(spot[0],spot[1]))){
             logMsg(sd==='G'?'l-g':'l-s', u.embarked
               ? `${flag(sd)} ${name} (${KINDS[kind].label}) steams in offshore — bound for the beaches.`
               : `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
+            if (typeof onUnitSpawn === 'function') onUnitSpawn(u);
+          }
         }
       }
     }
@@ -9127,7 +9141,8 @@ function migrateSaves(){
 
 /* ============================ HOOKS (used by the engine) ============================ */
 let onLog = null, onCityTaken = null, onGameOver = null, onAirStrike = null,
-    onEvents = null, onWinterDecision = null, onDecision = null, onLevelUp = null;
+    onEvents = null, onWinterDecision = null, onDecision = null, onLevelUp = null,
+    onUnitSpawn = null, onTerrFlips = null;   // UI fanfare: mid-game arrivals & territory swings
 
 const WW_DATA = {
   cols:110, rows:120,
@@ -10323,6 +10338,8 @@ let paraTarget = null;     // {id, dz:Map} — airborne unit picking a drop zone
 let anims = [];            // floating texts / flashes
 let scars = [];            // lingering scorched ground & smoke at battle sites
 let moveAnim = null;       // {unit, fx,fy, tx,ty, t0, dur}
+let slideAnims = new Map();  // unit id → {fx,fy,t0,dur}: combat repositions (retreats, exploits) slide instead of teleporting
+let terrFlips = [];          // [{x,y,t0}]: big territory swings (pockets absorbed) pulse in the new owner's colour
 let aiRunning = false;
 let muted = false;
 try { muted = localStorage.getItem('barb-muted')==='1'; } catch(e){}
@@ -10716,7 +10733,34 @@ onAirStrike = function(au, t, res){
   if (res.killed) floatText(t.x, t.y, '✕', '#ff5340');
 };
 onLevelUp = function(u){
-  if (G && !G.over && u.side===G.phase) floatText(u.x, u.y, '✚ '+RANK_NAME[unitLevel(u)], '#ffe27a');
+  // every promotion celebrates on the map now — defenders included (a unit that
+  // earned Veteran holding the line used to level up in silence). FOW still
+  // hides enemy promotions you can't see.
+  if (!G || G.over) return;
+  if (fowActive() && u.side!==viewerSide() && !sightFor(viewerSide()).has(keyOf(u.x,u.y))) return;
+  floatText(u.x, u.y, '✚ '+RANK_NAME[unitLevel(u)], '#ffe27a');
+  const [px,py] = hexCenter(u.x,u.y);
+  anims.push({type:'promote', x:px, y:py, t0:performance.now(), life:950});
+  requestRender();
+};
+onUnitSpawn = function(u){
+  // reinforcements & deployments arrive with a ring, a name float and a minimap
+  // blip — no more units silently materializing at the map edge
+  if (!G || G.over) return;
+  const [px,py] = hexCenter(u.x,u.y);
+  anims.push({type:'spawn', x:px, y:py, side:u.side, t0:performance.now(), life:1200});
+  floatText(u.x, u.y, '+ '+u.name, u.side===viewerSide() ? '#9fd8ff' : '#e2a09a', 0.9);
+  mmPing(u.x, u.y);
+  requestRender();
+};
+onTerrFlips = function(list){
+  // only meaningful swings pulse (an absorbed pocket, a collapsed salient) —
+  // the routine one-hex creep of the front stays quiet
+  if (!G || G.over || list.length < 4) return;
+  const t0 = performance.now();
+  for (const i of list) terrFlips.push({x:i%COLS, y:(i/COLS)|0, t0});
+  if (terrFlips.length > 240) terrFlips.splice(0, terrFlips.length-240);
+  requestRender();
 };
 
 /* ---------------- historical events, decisions & the winter question ---------------- */
@@ -10799,6 +10843,7 @@ function dynSpawn(side, kind, name, xp){
   const u = makeUnit(kind, name, spot[0], spot[1]);
   if (xp) gainXP(u, xp);
   G.units.push(u);
+  if (typeof onUnitSpawn === 'function') onUnitSpawn(u);
   return { u, at: cityAt(spot[0],spot[1])?.name || 'the rear' };
 }
 function dynRandFrontUnit(side){                       // a unit near the enemy, for a boon/setback
@@ -10998,7 +11043,7 @@ function updateUndoBtn(){ $('btn-undo').classList.toggle('hidden', !undoSnap); }
 $('btn-undo').onclick = ()=>{
   if (!undoSnap || !G || G.over || aiRunning) return;
   deserialize(undoSnap);
-  undoSnap = null; moveAnim = null; scars = [];
+  undoSnap = null; moveAnim = null; scars = []; slideAnims.clear(); terrFlips = [];
   sel = null; reach = null; deployKind = null; airTarget = null; reconTarget = null;
   sMove(); updateAll(); saveGame();
 };
@@ -11827,6 +11872,22 @@ function draw(){
 
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
 
+  // big territory swings (an absorbed pocket, a collapsed salient) pulse in the
+  // new owner's colour for a moment, so encirclements visibly pay off
+  if (terrFlips.length){
+    terrFlips = terrFlips.filter(f => now - f.t0 < 900);
+    for (const f of terrFlips){
+      const [fcx,fcy] = hexCenter(f.x,f.y);
+      if (fcx<vL || fcx>vR || fcy<vT || fcy>vB) continue;
+      const fo = terrOwner(f.x,f.y); if (!fo) continue;
+      const fp = (now - f.t0)/900;
+      hexPath(fcx,fcy,S-0.6);
+      ctx.globalAlpha = 0.30*(1-fp);
+      ctx.fillStyle = SIDES[fo].color; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // the railhead: rail line, sleepers, supplied-corridor wash, forward depots
   if (railSide('G') && G.railDepth) drawRailhead();
 
@@ -12085,6 +12146,10 @@ function draw(){
   const vs = viewerSide();
   const myPocket = pocketsFor(vs), foePocket = pocketsFor(enemyOf(vs));
   const uMargin = S*2.2;                              // counter + ring + smoulder overhang
+  // sweep slides whose unit died mid-animation (a second attack can kill a
+  // retreater before its slide finishes) — a stranded entry would otherwise
+  // keep _sceneAnimating true forever
+  if (slideAnims.size) for (const [sid,sl] of slideAnims) if (now - sl.t0 > sl.dur + 600) slideAnims.delete(sid);
   for (const u of G.units){
     // fog of war: unseen enemy formations simply aren't on your map
     if (fowSight && u.side!==viewerSide() && !fowSight.has(keyOf(u.x,u.y))) continue;
@@ -12096,11 +12161,11 @@ function draw(){
       const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
       const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
       cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
-      // dust kicked up behind a marching column — land moves only, high quality
+      // dust kicked up behind a marching column — foam wake behind a steaming fleet
       if (GFX.cine && p<1){
         const dt = terrainAt(u.x,u.y);
+        const dxp = cx-moveAnim.fx, dyp = cy-moveAnim.fy;
         if (dt!=='~' && dt!=='o'){
-          const dxp = cx-moveAnim.fx, dyp = cy-moveAnim.fy;
           ctx.save();
           for (let i=0;i<5;i++){
             const back = e - i*0.14; if (back<=0) continue;
@@ -12110,9 +12175,32 @@ function draw(){
             ctx.beginPath(); ctx.arc(px + (i%2?1.5:-1.5), py + 2 + i*0.6, 2.2 + (1-back)*3 + i*0.7, 0, Math.PI*2); ctx.fill();
           }
           ctx.restore();
+        } else {
+          // ships trail a churned white wake that widens and fades astern
+          ctx.save();
+          ctx.strokeStyle = 'rgba(223,236,248,1)';
+          ctx.globalAlpha = 0.4*(1-e*0.4); ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.moveTo(moveAnim.fx + dxp*Math.max(0,e-0.5), moveAnim.fy + dyp*Math.max(0,e-0.5)); ctx.lineTo(cx - dxp*0.06, cy - dyp*0.06); ctx.stroke();
+          ctx.fillStyle = 'rgba(238,246,255,1)';
+          for (let i=0;i<4;i++){
+            const back = e - i*0.16; if (back<=0) continue;
+            const px = moveAnim.fx + dxp*back, py = moveAnim.fy + dyp*back;
+            ctx.globalAlpha = Math.max(0, (0.34 - i*0.07)*(1-e*0.3));
+            ctx.beginPath(); ctx.arc(px + (i%2?2:-2), py + (i%2?-1.5:1.5), 1.4 + (1-back)*1.6, 0, Math.PI*2); ctx.fill();
+          }
+          ctx.restore();
         }
       }
       if (p>=1) moveAnim = null;
+    }
+    // combat repositions (retreats, exploit advances) slide the counter instead of teleporting
+    const sl = slideAnims.get(u.id);
+    if (sl){
+      const sp = (now - sl.t0)/sl.dur;
+      if (sp >= 1) slideAnims.delete(u.id);
+      else if (sp <= 0){ cx = sl.fx; cy = sl.fy; }            // staggered start: hold at the origin
+      else { const se = sp<0.5 ? 2*sp*sp : 1-((-2*sp+2)**2)/2;
+        cx = sl.fx + (cx-sl.fx)*se; cy = sl.fy + (cy-sl.fy)*se; }
     }
     // recoil: the counter kicks back the instant it fires, then settles — a bit
     // of physical weight behind every attack
@@ -12398,6 +12486,31 @@ function draw(){
       ctx.lineTo(px - a.dir*2, py);
       ctx.lineTo(px - a.dir*4, py + 4);                    // wing
       ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'promote'){
+      // a formation earns its chevron: two gold rings swell off the counter
+      const pr = Math.min(1, (now - a.t0)/a.life);
+      for (let i=0;i<2;i++){
+        const rp = Math.min(1, pr*1.5 - i*0.3); if (rp<=0) continue;
+        ctx.globalAlpha = (1-rp)*0.85;
+        ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2.6*(1-rp)+0.5;
+        ctx.beginPath(); ctx.arc(a.x, a.y, 8 + rp*22, 0, Math.PI*2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (a.type === 'spawn'){
+      // a fresh formation arrives: a ring in its side's colour blooms at the spawn hex
+      const pr = Math.min(1, (now - a.t0)/a.life);
+      const col = (SIDES[a.side] && SIDES[a.side].color) || '#9fd8ff';
+      for (let i=0;i<2;i++){
+        const rp = Math.min(1, pr*1.4 - i*0.26); if (rp<=0) continue;
+        ctx.globalAlpha = (1-rp)*0.7;
+        ctx.strokeStyle = col; ctx.lineWidth = 2.4*(1-rp)+0.5;
+        ctx.beginPath(); ctx.arc(a.x, a.y, 6 + rp*26, 0, Math.PI*2); ctx.stroke();
+      }
       ctx.globalAlpha = 1;
       continue;
     }
@@ -12880,6 +12993,17 @@ function combatJuice(ev, att, def, dx, dy){
     }
   }
   if (ev.atkLoss > 0 && att){ floatText(att.x, att.y, '-'+ev.atkLoss, '#ffd98a'); flashUnit(att); }
+  // a routed defender falls back visibly instead of teleporting to the rear
+  if (ev.retreated && def && ev.defFrom){
+    const [rfx,rfy] = hexCenter(ev.defFrom[0], ev.defFrom[1]);
+    slideAnims.set(def.id, {fx:rfx, fy:rfy, t0:performance.now()+140, dur:280});
+    floatText(def.x, def.y, '↩ FALLS BACK', '#e8b9a0', 0.9);
+  }
+  // the lone-armor auto-exploit rolls forward into the vacated hex
+  if (ev.advance && ev.advanceFrom && att){
+    const [afx,afy] = hexCenter(ev.advanceFrom[0], ev.advanceFrom[1]);
+    slideAnims.set(att.id, {fx:afx, fy:afy, t0:performance.now()+300, dur:260});
+  }
   kickShake(Math.min(7, (ev.destroyed ? 4 : 0.6) + ((ev.defLoss||0)+(ev.atkLoss||0))*0.6));
 }
 function attackArrow(att, def){
@@ -12938,6 +13062,7 @@ function _sceneAnimating(){
   if ((wx === 'mud' || wx === 'snow') && GFX.particles) return true;    // falling rain/snow
   if (typeof scars !== 'undefined' && scars && scars.length) return true; // drifting smoke
   if (anims.length || moveAnim || shakeMag > 0 || mmPings.length) return true;  // booms, floats, slides, shake, minimap pings
+  if (slideAnims.size || terrFlips.length) return true;                         // combat slides & territory pulses
   if (sel && reach) return true;                                         // selection ants + reachable pulse
   if (camGlide || zoomGlide || panVel || hitFlash.size || recoilMap.size) return true;  // camera glides, flick momentum, damage flashes, recoil
   if (threatView) return true;                                           // threat overlay pulse
@@ -15836,6 +15961,7 @@ function startCampaign(loaded){
   // stale hit-flash/recoil would land on the wrong counter, and old booms/smoke
   // would draw onto the new map
   anims = []; scars = []; moveAnim = null; hitFlash.clear(); recoilMap.clear(); shakeMag = 0;
+  slideAnims.clear(); terrFlips = [];
   _clouds = null;                              // reseed the overcast for this map's dimensions
   ambWx = null;                                // re-evaluate the ambience for this theater (ocean surf vs silence)
   bannerTurn = 0; aiReport = null;             // a fresh campaign gets a fresh turn banner
@@ -15887,6 +16013,25 @@ window.__dbgStageAttack = () => {
   if (!atk || !dfn) return null;
   const before = dfn.str; playerAttack(atk, dfn);
   return { att:atk.name, def:dfn.name, defBefore:before, anims:anims.length };
+};
+// fire every motion/feedback effect at once for visual QA: a promotion ring, a
+// spawn ring + name float, a retreat slide + FALLS BACK float, and a territory
+// pulse — deterministic, no combat dice involved
+window.__dbgMotionFx = () => {
+  const us = unitsOf(G.phase).filter(z=>!KINDS[z.kind].hq);
+  if (us.length < 2) return null;
+  const a = us[0], b = us[1];
+  if (typeof onLevelUp === 'function') onLevelUp(a);
+  if (typeof onUnitSpawn === 'function') onUnitSpawn(b);
+  const nb = neighbors(b.x,b.y).find(([nx,ny])=>passable(nx,ny));
+  if (nb){ const [ofx,ofy] = hexCenter(nb[0],nb[1]);
+    slideAnims.set(b.id, {fx:ofx, fy:ofy, t0:performance.now(), dur:900});
+    floatText(b.x, b.y, '↩ FALLS BACK', '#e8b9a0', 0.9); }
+  const flips = [];
+  for (const [nx,ny] of neighbors(a.x,a.y)) if (passable(nx,ny)) flips.push(ny*COLS+nx);
+  if (typeof onTerrFlips === 'function') onTerrFlips(flips.concat(flips).slice(0,6));
+  requestRender();
+  return { anims:anims.length, slides:slideAnims.size, flips:terrFlips.length };
 };
 // the EXACT production pick: screen(client) px → hex, through the tilt inverse (QA)
 window.__dbgPickAt = (sx,sy) => hexFromPixel(...toWorld(...untilt(sx,sy)));
