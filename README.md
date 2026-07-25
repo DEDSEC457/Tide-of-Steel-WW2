@@ -1,7 +1,7 @@
 # ⚔ Tide of Steel WW2
 
 **A turn-based WW2 hex-strategy game — 19 historical battles, one file, plays
-100% offline.** Developed & published by **Tyler Wanuga**. Version 1.0.
+100% offline.** Developed & published by **Tyler Wanuga**. Version 1.1.
 
 Command either side across the great campaigns of the Second World War — the
 panzers racing the winter to Moscow, the carrier duel at Midway, the invasion
@@ -152,7 +152,7 @@ so you can see which feature moves the victory distribution.
 - More scenarios — the framework makes them pure data
 
 ## © Credits & license
-**Tide of Steel WW2** — version 1.0. Developed & published by **Tyler Wanuga**.
+**Tide of Steel WW2** — version 1.1. Developed & published by **Tyler Wanuga**.
 
 Copyright © 2026 Tyler Wanuga. All rights reserved. Free to download, play, and
 share unmodified for personal, non-commercial use; not for sale or modification
