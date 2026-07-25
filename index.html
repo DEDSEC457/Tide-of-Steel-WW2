@@ -920,6 +920,11 @@
         <button id="view-2d">Flat 2D</button><button id="view-3d">3D board</button>
       </div></div>
     <div id="view3d-desc" style="color:var(--dim);font-size:12px;margin-top:2px;">Raised counters and embossed terrain — the map as a table of miniatures. Switch back to flat any time; it changes only the look, never the play.</div>
+    <div class="setrow" style="margin-top:8px;"><span>🪖 Unit counters</span>
+      <div class="gfx-seg">
+        <button id="sym-nato">NATO symbols</button><button id="sym-sprite">2D sprites</button>
+      </div></div>
+    <div id="sym-desc" style="color:var(--dim);font-size:12px;margin-top:2px;">Classic map-counter symbols, or little drawn troops — riflemen, tanks, trucks, guns, cavalry, ships. Pure looks: the rules never change.</div>
     <div class="setrow" style="margin-top:8px;"><span>🎥 Camera tilt <span style="opacity:.55;font-size:11px;">experimental</span></span>
       <button id="btn-tilt">Tilt: OFF</button></div>
     <div style="color:var(--dim);font-size:12px;margin-top:2px;">Pitches the whole board back like a table — best paired with the 3D board. A separate switch: if a click ever feels off, flip it back to flat.</div>
@@ -10193,6 +10198,15 @@ loadGfx();
 // identical to 2D; a full toggle, off by default, switch any time.
 let view3d = false;
 try{ view3d = localStorage.getItem('hoi5-view3d')==='1'; }catch(e){}
+// counter art: classic NATO symbols (default) or the drawn 2D troop sprites
+let spriteMode = false;
+try{ spriteMode = localStorage.getItem('hoi5-sprites')==='1'; }catch(e){}
+function setSpriteMode(on){
+  spriteMode = !!on;
+  try{ localStorage.setItem('hoi5-sprites', spriteMode?'1':'0'); }catch(e){}
+  if (typeof requestRender === 'function') requestRender();
+  if (typeof syncGfxUI === 'function') syncGfxUI();
+}
 function setView3d(on){
   view3d = !!on;
   try{ localStorage.setItem('hoi5-view3d', view3d?'1':'0'); }catch(e){}
@@ -12883,6 +12897,169 @@ function star(x,y,r){
 }
 
 let _glossGrad = null, _glossH = -1;                 // gloss-gradient cache (see drawUnit)
+/* ============ 2D TROOP SPRITES ============
+   Little illustrated silhouettes for every unit type, drawn procedurally in the
+   same box the NATO symbol occupies — so no image files and the game stays one
+   offline index.html. Players pick sprites or the classic NATO symbols in
+   Settings. Designed at a 17px-tall reference and scaled to the counter, pale
+   fill with dark accents so they read on any side colour. */
+function drawTroopSprite(ctx, sym, bx, bw, bh, pale){
+  const q = bh/17;                                  // reference scale
+  const dark = 'rgba(24,20,15,0.55)';
+  ctx.save();
+  ctx.translate(bx, 0); ctx.scale(q, q);
+  ctx.fillStyle = pale; ctx.strokeStyle = pale;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const wheel = (x,y,r)=>{ ctx.fillStyle=pale; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+                           ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(x,y,r*0.42,0,Math.PI*2); ctx.fill(); ctx.fillStyle=pale; };
+
+  if (sym==='inf'){                                 // rifleman, side view, mid-stride
+    ctx.fillStyle = pale;
+    ctx.fillRect(-4.6,-2.4,2.3,4.0);                                                 // pack, clear of the body
+    ctx.fillStyle = dark; ctx.fillRect(-2.3,-2.4,0.7,4.0);                            // gap so the pack reads separately
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // torso, shoulders to waist
+    ctx.moveTo(-1.6,-2.6); ctx.lineTo(1.9,-2.6); ctx.lineTo(1.3,2.4); ctx.lineTo(-1.2,2.4); ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 1.8;                                                             // legs mid-stride
+    ctx.beginPath(); ctx.moveTo(-0.2,2.4); ctx.lineTo(-2.8,6.6); ctx.moveTo(0.7,2.4); ctx.lineTo(3.2,6.4); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.3,-4.6,1.5,0,Math.PI*2); ctx.fill();                   // head, above a neck gap
+    ctx.beginPath(); ctx.ellipse(0.3,-5.4,3.0,2.0,0,Math.PI,0); ctx.fill();           // helmet dome
+    ctx.fillRect(-2.8,-5.5,6.2,1.0);                                                  // helmet brim
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.6;                                      // slung rifle
+    ctx.beginPath(); ctx.moveTo(-3.4,2.0); ctx.lineTo(4.4,-3.0); ctx.stroke();
+    ctx.strokeStyle = pale;
+  }
+  else if (sym==='mot'){                            // truck: cab, canvas cargo bed, wheels
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // cargo bed (canvas tilt)
+    ctx.moveTo(-8,-1.4); ctx.lineTo(-6.6,-4.6); ctx.lineTo(0.6,-4.6); ctx.lineTo(1.4,-1.4); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-8,-1.4,9.4,3.2);
+    ctx.beginPath();                                                                 // cab
+    ctx.moveTo(1.8,-3.4); ctx.lineTo(5.6,-3.4); ctx.lineTo(7.4,-0.4); ctx.lineTo(7.4,1.8); ctx.lineTo(1.8,1.8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = dark; ctx.fillRect(3.0,-2.6,2.6,2.0);                            // windscreen
+    wheel(-5.2,2.6,2.3); wheel(4.6,2.6,2.3);
+  }
+  else if (sym==='arm'){                            // tank: tracks, hull, turret, gun
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-8.4,1.2,16.8,4.4,2.2) : ctx.rect(-8.4,1.2,16.8,4.4); ctx.fill();   // track run
+    ctx.fillStyle = dark;
+    for (let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(-5.6+i*3.7,3.4,1.2,0,Math.PI*2); ctx.fill(); }                     // road wheels
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // hull, glacis sloped forward
+    ctx.moveTo(-7.6,1.2); ctx.lineTo(-6.6,-1.6); ctx.lineTo(4.6,-1.6); ctx.lineTo(8.0,1.2); ctx.closePath(); ctx.fill();
+    ctx.beginPath();                                                                 // turret
+    ctx.moveTo(-3.4,-1.6); ctx.lineTo(-2.4,-4.8); ctx.lineTo(2.2,-4.8); ctx.lineTo(3.4,-1.6); ctx.closePath(); ctx.fill();
+    ctx.fillRect(2.6,-4.2,6.6,1.5);                                                  // main gun
+  }
+  else if (sym==='cav'){                            // horse & rider
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.ellipse(-0.6,1.2,5.4,2.7,0,0,Math.PI*2); ctx.fill();        // barrel
+    ctx.lineWidth = 1.6;                                                             // legs
+    ctx.beginPath(); ctx.moveTo(-3.6,2.6); ctx.lineTo(-4.6,6.4); ctx.moveTo(-2.2,3.0); ctx.lineTo(-1.2,6.4);
+    ctx.moveTo(2.6,3.0); ctx.lineTo(2.0,6.4); ctx.moveTo(4.0,2.6); ctx.lineTo(5.2,6.4); ctx.stroke();
+    ctx.beginPath();                                                                 // neck, a clean wedge
+    ctx.moveTo(3.0,-0.8); ctx.lineTo(5.4,-4.6); ctx.lineTo(7.0,-3.8); ctx.lineTo(5.0,0.6); ctx.closePath(); ctx.fill();
+    ctx.beginPath();                                                                 // head & muzzle
+    ctx.moveTo(5.2,-5.0); ctx.lineTo(8.8,-5.6); ctx.lineTo(9.0,-3.9); ctx.lineTo(6.6,-3.4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(5.4,-5.0); ctx.lineTo(5.0,-6.6); ctx.lineTo(6.2,-5.2); ctx.closePath(); ctx.fill();  // ear
+    ctx.lineWidth = 1.5;                                                             // tail
+    ctx.beginPath(); ctx.moveTo(-5.6,0.2); ctx.lineTo(-8.0,2.6); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-0.6,-3.0,1.9,2.4,0,0,Math.PI*2); ctx.fill();       // rider torso
+    ctx.beginPath(); ctx.arc(-0.6,-6.2,1.7,0,Math.PI*2); ctx.fill();                 // rider head
+  }
+  else if (sym==='art'){                            // field gun: wheel, barrel, trail
+    ctx.fillStyle = pale;
+    ctx.lineWidth = 2.6;                                                             // barrel, elevated
+    ctx.beginPath(); ctx.moveTo(-1.0,1.0); ctx.lineTo(8.2,-5.2); ctx.stroke();
+    ctx.lineWidth = 1.8;                                                             // split trail
+    ctx.beginPath(); ctx.moveTo(-1.0,1.4); ctx.lineTo(-8.4,5.2); ctx.stroke();
+    ctx.beginPath();                                                                 // gun shield
+    ctx.moveTo(-1.8,-3.0); ctx.lineTo(1.6,-3.8); ctx.lineTo(2.2,2.0); ctx.lineTo(-1.6,2.0); ctx.closePath(); ctx.fill();
+    wheel(-0.4,2.6,3.0);
+  }
+  else if (sym==='para'){                           // canopy + trooper on the shrouds
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.ellipse(0,-3.0,7.4,4.6,0,Math.PI,0); ctx.fill();            // canopy
+    ctx.fillStyle = dark; ctx.fillRect(-7.4,-3.4,14.8,1.0);                          // canopy skirt shadow
+    ctx.strokeStyle = pale; ctx.lineWidth = 0.9;                                     // shroud lines
+    ctx.beginPath(); ctx.moveTo(-6.4,-2.8); ctx.lineTo(-0.6,1.6); ctx.moveTo(6.4,-2.8); ctx.lineTo(0.6,1.6); ctx.stroke();
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.ellipse(0,3.4,1.9,2.6,0,0,Math.PI*2); ctx.fill();           // trooper
+    ctx.beginPath(); ctx.arc(0,0.6,1.6,0,Math.PI*2); ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-0.8,5.6); ctx.lineTo(-2.2,7.4); ctx.moveTo(0.8,5.6); ctx.lineTo(2.2,7.4); ctx.stroke();
+  }
+  else if (sym==='hq'){                             // command tent & pennant
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // tent
+    ctx.moveTo(-7.2,5.4); ctx.lineTo(-1.4,-3.4); ctx.lineTo(4.4,5.4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.moveTo(-2.6,5.4); ctx.lineTo(-1.4,0.2); ctx.lineTo(0.0,5.4); ctx.closePath(); ctx.fill();  // doorway
+    ctx.fillStyle = pale;
+    ctx.fillRect(6.0,-6.6,1.3,12.0);                                                 // flagpole
+    ctx.beginPath();                                                                 // command pennant
+    ctx.moveTo(7.3,-6.4); ctx.lineTo(7.3,-1.6); ctx.lineTo(2.6,-4.0); ctx.closePath(); ctx.fill();
+  }
+  else if (sym==='cv'){                             // carrier: flight deck, island, aircraft
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // hull
+    ctx.moveTo(-9.2,1.6); ctx.lineTo(9.6,1.6); ctx.lineTo(7.6,4.8); ctx.lineTo(-7.6,4.8); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-10.0,-0.6,20.0,2.4);                                               // flight deck
+    ctx.fillRect(3.0,-4.4,2.6,3.8);                                                  // island
+    ctx.fillRect(3.9,-6.8,0.9,2.6);                                                  // mast
+    ctx.fillStyle = dark;                                                            // a plane spotted on deck
+    ctx.fillRect(-6.6,-2.2,3.6,0.9); ctx.fillRect(-5.4,-3.0,0.9,2.4);
+  }
+  else if (sym==='bb'){                             // battleship: turrets, bridge, mast
+    ctx.fillStyle = pale;
+    ctx.beginPath();                                                                 // hull with raked bow
+    ctx.moveTo(-9.0,0.8); ctx.lineTo(8.4,0.8); ctx.lineTo(9.8,2.2); ctx.lineTo(7.4,4.6); ctx.lineTo(-7.6,4.6); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-2.6,-3.6,4.6,4.4);                                                 // superstructure
+    ctx.fillRect(-0.9,-7.0,1.4,3.6);                                                 // mast
+    ctx.fillRect(2.6,-1.8,2.6,2.6);                                                  // funnel
+    ctx.fillStyle = dark;                                                            // main battery
+    ctx.fillRect(-6.6,-1.6,3.2,2.4); ctx.fillRect(4.8,-1.6,3.2,2.4);
+    ctx.fillStyle = pale;
+    ctx.fillRect(-7.6,-2.4,4.0,1.1); ctx.fillRect(5.4,-2.4,4.0,1.1);                 // gun barrels
+  }
+  else if (sym==='ca'){                             // cruiser: leaner, single funnel
+    ctx.fillStyle = pale;
+    ctx.beginPath();
+    ctx.moveTo(-8.2,1.2); ctx.lineTo(8.0,1.2); ctx.lineTo(9.2,2.4); ctx.lineTo(6.8,4.2); ctx.lineTo(-6.8,4.2); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-1.6,-3.0,3.6,4.2);                                                 // bridge
+    ctx.fillRect(-0.4,-5.8,1.1,2.8);                                                 // mast
+    ctx.fillRect(2.6,-1.4,2.2,2.6);                                                  // funnel
+    ctx.fillStyle = dark; ctx.fillRect(-5.8,-1.0,2.8,2.2); ctx.fillRect(5.0,-1.0,2.6,2.2);
+    ctx.fillStyle = pale; ctx.fillRect(-6.6,-1.6,3.4,0.9);
+  }
+  else if (sym==='tr'){                             // transport: cargo hull & derricks
+    ctx.fillStyle = pale;
+    ctx.beginPath();
+    ctx.moveTo(-8.6,0.8); ctx.lineTo(8.4,0.8); ctx.lineTo(9.4,2.4); ctx.lineTo(7.0,4.8); ctx.lineTo(-7.0,4.8); ctx.closePath(); ctx.fill();
+    ctx.fillRect(1.6,-3.6,4.4,4.4);                                                  // bridge house
+    ctx.fillRect(3.2,-5.6,1.3,2.0);                                                  // funnel
+    ctx.fillStyle = dark; ctx.fillRect(-6.6,-2.0,6.0,2.8);                           // deck cargo
+    ctx.fillStyle = pale; ctx.lineWidth = 1.0;                                       // derrick
+    ctx.beginPath(); ctx.moveTo(-3.6,-2.0); ctx.lineTo(-3.6,-6.2); ctx.lineTo(-7.0,-4.0); ctx.stroke();
+  }
+  else if (sym==='ss'){                             // submarine: hull awash, sail, periscope
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.ellipse(0,2.0,9.2,2.5,0,0,Math.PI*2); ctx.fill();           // pressure hull
+    ctx.beginPath();                                                                 // conning tower
+    ctx.moveTo(-2.2,-0.4); ctx.lineTo(-1.6,-4.0); ctx.lineTo(2.0,-4.0); ctx.lineTo(2.6,-0.4); ctx.closePath(); ctx.fill();
+    ctx.fillRect(0.0,-6.6,1.0,2.8);                                                  // periscope
+    ctx.fillStyle = dark; ctx.fillRect(-9.0,2.6,18.0,1.1);                           // waterline
+  }
+  else {                                            // any future type: a rifleman stands in
+    ctx.fillStyle = pale;
+    ctx.beginPath(); ctx.ellipse(0,-4.6,2.6,2.0,0,Math.PI,0); ctx.fill();
+    ctx.fillRect(-1.6,-3.0,3.4,5.6);
+    ctx.lineWidth = 1.7;
+    ctx.beginPath(); ctx.moveTo(-0.2,2.6); ctx.lineTo(-2.4,6.4); ctx.moveTo(0.6,2.6); ctx.lineTo(2.8,6.2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawUnit(u, cx, cy, wx){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
   const far = cam.z < 0.5;   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
@@ -12944,10 +13121,12 @@ function drawUnit(u, cx, cy, wx){
   // NATO-style symbol box (land) and ship silhouettes (naval)
   const bw = w*0.52, bh = h*0.52;
   const bx = -(w*0.13), pale = '#e9e5d2';
+  const kSym = u.embarked ? 'tr' : k.sym;   // a division still at sea shows a transport
+  if (spriteMode){ drawTroopSprite(ctx, kSym, bx, bw, bh, pale); }
+  else {
   ctx.strokeStyle = pale; ctx.lineWidth = 1.6;
   ctx.strokeRect(bx-bw/2, -bh/2, bw, bh);
   ctx.fillStyle = pale;
-  const kSym = u.embarked ? 'tr' : k.sym;   // a division still at sea shows a transport
   if (kSym==='inf'){
     ctx.beginPath();
     ctx.moveTo(bx-bw/2,-bh/2); ctx.lineTo(bx+bw/2,bh/2);
@@ -13000,6 +13179,7 @@ function drawUnit(u, cx, cy, wx){
     ctx.lineTo(bx+bw*0.4, -bh*0.42+3);
     ctx.lineTo(bx-bw*0.34+1.6, -bh*0.42+6);
     ctx.closePath(); ctx.fill();
+  }
   }
   // strength badge (hidden at strategic zoom — the bar below carries the reading)
   if (!far){
@@ -14429,11 +14609,16 @@ function syncGfxUI(){
   const v2 = $('view-2d'), v3 = $('view-3d');
   if (v2) v2.classList.toggle('sel', !view3d);
   if (v3) v3.classList.toggle('sel', view3d);
+  const sn = $('sym-nato'), sp = $('sym-sprite');
+  if (sn) sn.classList.toggle('sel', !spriteMode);
+  if (sp) sp.classList.toggle('sel', spriteMode);
   const tb = $('btn-tilt');
   if (tb){ tb.textContent = 'Tilt: ' + (tilt?'ON':'OFF'); tb.classList.toggle('sel', tilt); }
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
+$('sym-nato').onclick   = ()=>{ setSpriteMode(false); sClick(); };
+$('sym-sprite').onclick = ()=>{ setSpriteMode(true);  sClick(); };
 $('view-2d').onclick = ()=>{ setView3d(false); sClick(); };
 $('view-3d').onclick = ()=>{ setView3d(true); sClick(); };
 $('btn-tilt').onclick = ()=>{ setTilt(!tilt); sClick(); };
@@ -16251,6 +16436,11 @@ window.__dbgMotionFx = () => {
   if (typeof onTerrFlips === 'function') onTerrFlips(flips.concat(flips).slice(0,6));
   requestRender();
   return { anims:anims.length, slides:slideAnims.size, flips:terrFlips.length };
+};
+// render every troop sprite large on a supplied 2D context (art review / QA)
+window.__dbgSpriteSheet = (c, syms, bw, bh) => {
+  for (const [sym,x,y] of syms){ c.save(); c.translate(x,y); drawTroopSprite(c, sym, 0, bw, bh, '#e9e5d2'); c.restore(); }
+  return true;
 };
 // the EXACT production pick: screen(client) px → hex, through the tilt inverse (QA)
 window.__dbgPickAt = (sx,sy) => hexFromPixel(...toWorld(...untilt(sx,sy)));

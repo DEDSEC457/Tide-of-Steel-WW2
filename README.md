@@ -99,6 +99,13 @@ AI turn-speed toggle (normal/fast/instant), "units still ready" end-turn warning
 save-overwrite warning, hotseat turn reports — plus visible rain in the rasputitsa
 and falling snow, drifts and snow-capped forests in winter.
 
+**Two ways to see your army:** counters can wear the **classic NATO symbols** of a
+map wargame, or **drawn 2D troop sprites** — helmeted riflemen, tanks, trucks,
+field guns, cavalry, paratroopers under canopy, and a whole fleet of carriers,
+battleships, cruisers, transports and submarines. Every sprite is drawn by the
+game itself (no image files — still one offline `index.html`), and it is purely
+cosmetic: switch any time in **⚙ Settings → Unit counters**, the rules never change.
+
 **Looks & sound:** a drawn front line snakes across the map between the armies,
 coastlines glow, water shimmers, counters cast shadows, battles explode, and the
 edges of the map fade into the war room's dark. An **original orchestral score**
