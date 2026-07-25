@@ -12254,17 +12254,27 @@ function draw(){
     if (moveAnim && moveAnim.unit.id===u.id){
       const p = Math.min(1,(now-moveAnim.t0)/moveAnim.dur);
       const e = p<0.5 ? 2*p*p : 1-((-2*p+2)**2)/2;
-      cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
+      let tbx = moveAnim.fx, tby = moveAnim.fy, te = e;   // trail origin + progress along the current leg
+      if (moveAnim.wp && moveAnim.wp.length > 1){
+        // follow the actual route the preview traced, leg by leg, one eased sweep
+        const wp = moveAnim.wp, segs = wp.length - 1;
+        const f = Math.min(segs - 1e-6, e*segs), i0 = Math.floor(f), tl = f - i0;
+        cx = wp[i0][0] + (wp[i0+1][0]-wp[i0][0])*tl;
+        cy = wp[i0][1] + (wp[i0+1][1]-wp[i0][1])*tl;
+        tbx = wp[i0][0]; tby = wp[i0][1]; te = tl;
+      } else {
+        cx = moveAnim.fx + (cx-moveAnim.fx)*e; cy = moveAnim.fy + (cy-moveAnim.fy)*e;
+      }
       // dust kicked up behind a marching column — foam wake behind a steaming fleet
       if (GFX.cine && p<1){
         const dt = terrainAt(u.x,u.y);
-        const dxp = cx-moveAnim.fx, dyp = cy-moveAnim.fy;
+        const dxp = cx-tbx, dyp = cy-tby;
         if (dt!=='~' && dt!=='o'){
           ctx.save();
           for (let i=0;i<5;i++){
-            const back = e - i*0.14; if (back<=0) continue;
-            const px = moveAnim.fx + dxp*back, py = moveAnim.fy + dyp*back;
-            ctx.globalAlpha = Math.max(0, (0.26 - i*0.05)*(1-e*0.3));
+            const back = te - i*0.14; if (back<=0) continue;
+            const px = tbx + dxp*back, py = tby + dyp*back;
+            ctx.globalAlpha = Math.max(0, (0.26 - i*0.05)*(1-te*0.3));
             ctx.fillStyle = 'rgba(150,134,104,1)';
             ctx.beginPath(); ctx.arc(px + (i%2?1.5:-1.5), py + 2 + i*0.6, 2.2 + (1-back)*3 + i*0.7, 0, Math.PI*2); ctx.fill();
           }
@@ -12273,13 +12283,13 @@ function draw(){
           // ships trail a churned white wake that widens and fades astern
           ctx.save();
           ctx.strokeStyle = 'rgba(223,236,248,1)';
-          ctx.globalAlpha = 0.4*(1-e*0.4); ctx.lineWidth = 2.2;
-          ctx.beginPath(); ctx.moveTo(moveAnim.fx + dxp*Math.max(0,e-0.5), moveAnim.fy + dyp*Math.max(0,e-0.5)); ctx.lineTo(cx - dxp*0.06, cy - dyp*0.06); ctx.stroke();
+          ctx.globalAlpha = 0.4*(1-te*0.4); ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.moveTo(tbx + dxp*Math.max(0,te-0.5), tby + dyp*Math.max(0,te-0.5)); ctx.lineTo(cx - dxp*0.06, cy - dyp*0.06); ctx.stroke();
           ctx.fillStyle = 'rgba(238,246,255,1)';
           for (let i=0;i<4;i++){
-            const back = e - i*0.16; if (back<=0) continue;
-            const px = moveAnim.fx + dxp*back, py = moveAnim.fy + dyp*back;
-            ctx.globalAlpha = Math.max(0, (0.34 - i*0.07)*(1-e*0.3));
+            const back = te - i*0.16; if (back<=0) continue;
+            const px = tbx + dxp*back, py = tby + dyp*back;
+            ctx.globalAlpha = Math.max(0, (0.34 - i*0.07)*(1-te*0.3));
             ctx.beginPath(); ctx.arc(px + (i%2?2:-2), py + (i%2?-1.5:1.5), 1.4 + (1-back)*1.6, 0, Math.PI*2); ctx.fill();
           }
           ctx.restore();
@@ -12845,6 +12855,7 @@ function star(x,y,r){
 let _glossGrad = null, _glossH = -1;                 // gloss-gradient cache (see drawUnit)
 function drawUnit(u, cx, cy, wx){
   const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
+  const far = cam.z < 0.5;   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
   ctx.save(); ctx.translate(cx,cy);
   // 3D view: the counter stands off the board like a miniature — a cast shadow
   // on the ground, then the whole piece lifts, with a dark extruded side-wall
@@ -12877,7 +12888,7 @@ function drawUnit(u, cx, cy, wx){
   // glossy finish — a soft glass highlight across the top half of the counter.
   // The gradient is identical for every counter (local space), so bake it once
   // per zoom level instead of allocating one per unit per frame.
-  if (GFX.softShadow && ctx.createLinearGradient){
+  if (!far && GFX.softShadow && ctx.createLinearGradient){
     if (_glossH !== h){
       const gg = ctx.createLinearGradient(0,-h/2,0,h*0.12);
       if (gg && gg.addColorStop){
@@ -12960,11 +12971,13 @@ function drawUnit(u, cx, cy, wx){
     ctx.lineTo(bx-bw*0.34+1.6, -bh*0.42+6);
     ctx.closePath(); ctx.fill();
   }
-  // strength badge
+  // strength badge (hidden at strategic zoom — the bar below carries the reading)
+  if (!far){
   ctx.fillStyle = '#101208'; roundRect(w/2-15,h/2-15,13,12,3); ctx.fill();
   ctx.fillStyle = u.str<=3 ? '#ff8d80' : '#ffe9a8';
   ctx.font = '700 10px Segoe UI'; ctx.textAlign='center';
   ctx.fillText(u.str, w/2-8.5, h/2-5.5);
+  }
   // strength bar along the bottom edge — segmented into steps like a real counter,
   // so you read a division's exact strength at a glance, with a glossy top highlight
   const frac = Math.max(0, Math.min(1, u.str / k.maxStr));
@@ -12973,7 +12986,7 @@ function drawUnit(u, cx, cy, wx){
   ctx.fillStyle = frac > 0.55 ? '#7a9d54' : frac > 0.3 ? '#e8b34b' : '#e2493b';
   ctx.fillRect(barX, barY, barW*frac, barH);
   ctx.fillStyle = 'rgba(255,255,255,0.20)'; ctx.fillRect(barX, barY, barW*frac, 0.8);   // gloss
-  if (k.maxStr > 1 && k.maxStr <= 12){                                                  // step ticks
+  if (!far && k.maxStr > 1 && k.maxStr <= 12){                                          // step ticks
     ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6;
     for (let i=1;i<k.maxStr;i++){ const sx = barX + barW*(i/k.maxStr);
       ctx.beginPath(); ctx.moveTo(sx, barY); ctx.lineTo(sx, barY+barH); ctx.stroke(); }
@@ -12986,13 +12999,15 @@ function drawUnit(u, cx, cy, wx){
     ctx.fillRect(-w/2+3, h/2-4.7, (w-6)*ff, 1.4);
   }
   // entrench pips
+  if (!far){
   ctx.fillStyle = '#cfe6a8';
   for (let i=0;i<u.entrench;i++) ctx.fillRect(-w/2+3+i*5, h/2-7, 3.5, 3.5);
+  }
   // a general's command flies his star
-  if (generalOf(u)){ ctx.fillStyle = '#ffd34d'; star(-w/2+8, -h/2+5, 3.5); }
+  if (!far && generalOf(u)){ ctx.fillStyle = '#ffd34d'; star(-w/2+8, -h/2+5, 3.5); }
   // veterancy chevrons (top-right): ✚ rank pips
   const lvl = unitLevel(u);
-  if (lvl > 0){
+  if (!far && lvl > 0){
     ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 1.5;
     for (let i=0;i<lvl;i++){
       const yy = -h/2 + 4 + i*3.4, cxp = w/2 - 8;
@@ -13000,7 +13015,8 @@ function drawUnit(u, cx, cy, wx){
     }
   }
   // out of supply (red ⚠) or supply strained at the fringe (amber ◔)
-  if (u.oos){
+  if (far){ /* the red/amber outline already flags supply state at this zoom */ }
+  else if (u.oos){
     ctx.fillStyle = '#ff5340'; ctx.font='700 12px Segoe UI';
     ctx.fillText('⚠', w/2-8, -h/2+10);
   } else if (u.strained){
@@ -13010,7 +13026,7 @@ function drawUnit(u, cx, cy, wx){
   // weather skin — frost rime in the snow, mud splatter in the thaw. Land units
   // only (a ship doesn't cake with mud); clipped to the counter so it reads as
   // grime on the cardboard. A per-unit seed keeps each counter's pattern stable.
-  if (GFX.weatherSkin && (wx==='snow' || wx==='mud')){
+  if (!far && GFX.weatherSkin && (wx==='snow' || wx==='mud')){
     const t = terrainAt(u.x,u.y);
     if (t!=='~' && t!=='o'){
       const seed = u.x*31 + u.y*47;
@@ -13520,6 +13536,7 @@ function playerMove(u,x,y){
   undoSnap = serialize();                    // one-step undo, until anything else happens
   const plan = fowMovePlan(u, x, y, reach);  // fog of war: the march may be intercepted
   const [fx,fy] = hexCenter(u.x,u.y);
+  const _route = tracePath(u, reach, plan.x, plan.y);   // the exact hexes the preview promised
   doMove(u, plan.x, plan.y);
   if (plan.contact){
     clearUndo();                             // no taking back what the contact taught you
@@ -13527,7 +13544,9 @@ function playerMove(u,x,y){
     floatText(plan.x, plan.y, '⚠ CONTACT', '#ffd23f');
     sShot();
   }
-  moveAnim = {unit:u, fx, fy, t0:performance.now(), dur:240};
+  moveAnim = {unit:u, fx, fy, t0:performance.now(),
+    dur: Math.min(620, 240 + Math.max(0, (_route ? _route.length-2 : 0))*70),
+    wp: _route && _route.length > 2 ? _route.map(([px,py]) => hexCenter(px,py)) : null};
   sMove();
   reach = new Map();
   updateAll(); updateUnitCard();
