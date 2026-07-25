@@ -138,6 +138,9 @@
   #log-card{overflow-y:auto;min-height:60px;}
   #log{font-size:12px;color:var(--dim);max-height:130px;overflow-y:auto;line-height:1.5;}
   #log .l-g{color:#9fb0c4;} #log .l-s{color:#e09a90;} #log .l-sys,#log .sys{color:var(--amber);}
+  #log.big{max-height:340px;}
+  #log .l-turn{color:#5d6b57;font-size:10px;letter-spacing:2px;text-align:center;margin:3px 0 1px;}
+  #log .l-loc{cursor:pointer;} #log .l-loc:hover{text-decoration:underline;color:var(--ink);}
 
   /* ---------- bottom hint ---------- */
   #hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;
@@ -355,6 +358,7 @@
   <span class="t-chip" id="wx-chip">Weather: <b>Clear</b></span>
   <span class="t-chip" id="vp-chip">Axis objectives: <b>0</b>/16</span>
   <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
+  <span class="t-chip hidden" id="mission-chip" title="Objective from HQ"></span>
   <span class="spacer"></span>
   <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚<span class="bl"> Supply</span></button>
   <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠<span class="bl"> Threat</span></button>
@@ -376,7 +380,7 @@
   <div class="card" id="air-card"><h3>✈ AIR FORCES</h3><div id="air-body">—</div></div>
   <div class="card hidden" id="preview-card"><h3>BATTLE FORECAST</h3><div id="preview-body"></div></div>
   <div class="card" id="terrain-card"><h3>TERRAIN</h3><div id="terrain-body">Hover the map.</div></div>
-  <div class="card" id="log-card"><h3>WAR DIARY</h3><div id="log"></div></div>
+  <div class="card" id="log-card"><h3 id="log-head" style="cursor:pointer" title="Click to expand the diary">WAR DIARY</h3><div id="log"></div></div>
 </div>
 
 <div id="hint" class="hidden"></div>
@@ -6336,8 +6340,8 @@ function aiEscape(u){
   return null;
 }
 
-function logMsg(cls, text){
-  G.log.push([cls, text]);
+function logMsg(cls, text, x, y){
+  G.log.push(x != null ? [cls, text, G.turn, x, y] : [cls, text, G.turn]);
   if (G.log.length > 80) G.log.shift();
   if (typeof onLog === 'function') onLog();
 }
@@ -6996,7 +7000,7 @@ function advanceInto(u, fx, fy, events){
   const c = cityAt(fx,fy);
   if (c && c.owner!==u.side && !KINDS[u.kind].noCapture){
     c.owner = u.side;
-    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${u.name}!`);
+    logMsg(u.side==='G'?'l-g':'l-s', `${flag(u.side)} ${c.name} ${c.vp?'— OBJECTIVE —':''} overrun by ${u.name}!`, fx, fy);
     if (typeof onCityTaken === 'function') onCityTaken(c);
   }
   events.advance = [fx,fy];
@@ -7605,7 +7609,7 @@ function doDeploy(side, kind, x, y){
   if (!fowActive() || side===viewerSide() || sightFor(viewerSide()).has(keyOf(x,y))){
     logMsg(side==='G'?'l-g':'l-s', u.embarked
       ? `${flag(side)} ${u.name} (${k.label}) embarks offshore — sail it to the beach to land.`
-      : `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`);
+      : `${flag(side)} ${u.name} (${k.label}) deployed at ${cityAt(x,y)?.name||'the front'}.`, x, y);
     if (typeof onUnitSpawn === 'function') onUnitSpawn(u);
   }
   refreshSupply();
@@ -7691,7 +7695,7 @@ function airStrike(au, t){
     patrol.str -= 1;
     if (patrol.str <= 0) killAir(patrol);
     eff *= 0.5;
-    logMsg('sys', `✈ Air battle over ${cityAt(t.x,t.y)?.name||'the front'} — ${patrol.name} intercepts ${au.name}!`);
+    logMsg('sys', `✈ Air battle over ${cityAt(t.x,t.y)?.name||'the front'} — ${patrol.name} intercepts ${au.name}!`, t.x, t.y);
     if (au.str <= 0){
       killAir(au); res.lostGroup = true;
       logMsg('sys', `✈ ${au.name} is wiped out by enemy fighters.`);
@@ -7948,7 +7952,7 @@ function endPhase(){
           if (!fowActive() || sd===viewerSide() || sightFor(viewerSide()).has(keyOf(spot[0],spot[1]))){
             logMsg(sd==='G'?'l-g':'l-s', u.embarked
               ? `${flag(sd)} ${name} (${KINDS[kind].label}) steams in offshore — bound for the beaches.`
-              : `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`);
+              : `${flag(sd)} ${name} (${KINDS[kind].label}) arrives at ${cityAt(spot[0],spot[1])?.name||'the front'}.`, spot[0], spot[1]);
             if (typeof onUnitSpawn === 'function') onUnitSpawn(u);
           }
         }
@@ -10716,9 +10720,23 @@ function applyAmbientVol(){ if(ambGain && ambWx!=null) setAmbient(ambWx); }
 /* ---------------- engine hooks ---------------- */
 onLog = function(){
   const el = $('log');
-  el.innerHTML = G.log.slice(-30).map(([c,t])=>`<div class="${c}">${t}</div>`).join('');
+  const entries = G.log.slice(-40);
+  let html = '', lastTurn = null;
+  for (let i=0;i<entries.length;i++){
+    const e = entries[i], turn = e[2];
+    if (turn != null && turn !== lastTurn){ html += `<div class="l-turn">— turn ${turn} —</div>`; lastTurn = turn; }
+    const loc = e[3] != null;
+    html += `<div class="${e[0]}${loc?' l-loc':''}"${loc?` data-i="${i}" title="Click to fly the camera there"`:''}>${e[1]}</div>`;
+  }
+  el.innerHTML = html;
+  if (el.querySelectorAll)                          // headless fake-DOM has no querySelectorAll
+    for (const d of el.querySelectorAll('.l-loc')) d.onclick = ()=>{
+      const e = entries[+d.dataset.i];
+      if (e && e[3] != null){ centerOn(e[3], e[4]); mmPing(e[3], e[4]); } };
   el.scrollTop = el.scrollHeight;
 };
+// the WAR DIARY header toggles a taller log for reading back through the battle
+$('log-head').onclick = ()=>{ const l=$('log'); if (l) l.classList.toggle('big'); };
 onCityTaken = function(c){
   if (c.vp>0) sCity();
   boomAt(c.x, c.y, true);
@@ -10909,13 +10927,13 @@ function checkMissions(side){
     else if (m.kind==='take'){ if (c.owner===side) done=true; else if (G.turn>m.deadline) done=false; }
     else { if (c.owner!==side) done=false; else if (G.turn>=m.deadline) done=true; }
     if (done===null){ keep.push(m); continue; }
-    if (done){ dynAddPP(side, m.reward); logMsg(side==='G'?'l-g':'l-s', `✅ Objective met — ${m.title}: +${m.reward}⚙.`);
+    if (done){ dynAddPP(side, m.reward); logMsg(side==='G'?'l-g':'l-s', `✅ Objective met — ${m.title}: +${m.reward}⚙.`, c && c.x, c && c.y);
       if (m.kind==='take' && (m.tier||1) < 3){        // press the advantage: HQ names the next prize
         const nx = dynNearestEnemyVP(side);
         if (nx){ const rw = m.reward + 5;
           dynMission(side, 'take', nx.name, 4, rw, `Take ${nx.name}`, (m.tier||1)+1);
           logMsg(side==='G'?'l-g':'l-s', `▶ HQ presses the advantage — next objective: <b>${nx.name}</b> for +${rw}⚙.`); } }
-    } else logMsg('sys', `❌ Objective failed — ${m.title}.`);
+    } else logMsg('sys', `❌ Objective failed — ${m.title}.`, c && c.x, c && c.y);
   }
   G.missions = keep;
 }
@@ -11980,6 +11998,18 @@ function draw(){
       ctx.fillStyle = SIDES[fo].color; ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // timed HQ objectives: the prize city wears a slow-pulsing amber ring
+  { const _ms = (G.missions||[]).filter(m => m.side === (G.mode==='hotseat' ? G.phase : G.playerSide));
+    for (const m of _ms){
+      const c = G.cities.find(cc=>cc.name===m.city); if (!c) continue;
+      const [mcx,mcy] = hexCenter(c.x,c.y);
+      if (mcx<vL || mcx>vR || mcy<vT || mcy>vB) continue;
+      const pulse = 0.5 + 0.5*Math.sin(now*0.004);
+      ctx.beginPath(); ctx.arc(mcx, mcy, S*(0.95 + 0.1*pulse), 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(255,190,60,${(0.30 + 0.30*pulse).toFixed(3)})`; ctx.lineWidth = 2.5; ctx.stroke();
+    }
   }
 
   // the railhead: rail line, sleepers, supplied-corridor wash, forward depots
@@ -13187,6 +13217,7 @@ function _sceneAnimating(){
   if (G.air && G.air.some(a => a.side===viewerSide() && a.mission==='support' && a.str>0)) return 1;  // CAS umbrella pulse
   const mp = pocketsFor(viewerSide()), fp = pocketsFor(enemyOf(viewerSide()));   // pocket rings pulse
   if ((mp && mp.size) || (fp && fp.size)) return 1;
+  if (G.missions && G.missions.some(m => m.side === (G.mode==='hotseat' ? G.phase : G.playerSide))) return 1;  // objective ring pulse
   return 0;
 }
 (function loop(ts){
@@ -13388,6 +13419,57 @@ canvas.addEventListener('dblclick', e=>{
   if (h) centerOn(h[0],h[1]);
 });
 
+/* ---- touch: the game installs as a PWA on tablets & phones — one finger pans
+   (a still tap = a click, dispatched through the exact mouse path so every
+   select/move/attack behaviour is identical), two fingers pinch-zoom around the
+   midpoint. Purely additive: the mouse handlers above are untouched. ---- */
+canvas.style.touchAction = 'none';
+let _tc = null, _pinch = null;
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  if (e.touches.length === 1){
+    const t = e.touches[0];
+    killGlides(); panVel = null;
+    _tc = {x0:t.clientX, y0:t.clientY, lx:t.clientX, ly:t.clientY, t0:performance.now(), moved:false};
+    _pinch = null;
+  } else if (e.touches.length >= 2){
+    const a = e.touches[0], b = e.touches[1];
+    _tc = null; killGlides();
+    _pinch = { d0: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1, z0: cam.z };
+  }
+}, {passive:false});
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if (_pinch && e.touches.length >= 2){
+    const a = e.touches[0], b = e.touches[1];
+    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1;
+    const mx = (a.clientX+b.clientX)/2, my = (a.clientY+b.clientY)/2;
+    const [wx,wy] = toWorld(mx,my);                       // pin the midpoint's world spot
+    cam.z = Math.max(minZoom(), Math.min(2.2, _pinch.z0 * d/_pinch.d0));
+    cam.x = wx - mx/cam.z; cam.y = wy - my/cam.z;
+    requestRender();
+    return;
+  }
+  if (_tc && e.touches.length === 1){
+    const t = e.touches[0];
+    if (Math.abs(t.clientX-_tc.x0) + Math.abs(t.clientY-_tc.y0) > 8) _tc.moved = true;
+    if (_tc.moved){ cam.x -= (t.clientX-_tc.lx)/cam.z; cam.y -= (t.clientY-_tc.ly)/cam.z; requestRender(); }
+    _tc.lx = t.clientX; _tc.ly = t.clientY;
+  }
+}, {passive:false});
+canvas.addEventListener('touchend', e=>{
+  e.preventDefault();
+  if (_pinch){ if (e.touches.length < 2) _pinch = null; return; }
+  if (_tc && !_tc.moved && performance.now()-_tc.t0 < 600 && e.changedTouches.length){
+    const t = e.changedTouches[0];
+    try { canvas.dispatchEvent(new MouseEvent('click', {clientX:t.clientX, clientY:t.clientY, bubbles:true})); } catch(_){}
+  }
+  _tc = null;
+}, {passive:false});
+// minimap: tap or drag flies the camera, same as the mouse
+mmCv.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); if (e.touches.length) mmFly(e.touches[0]); }, {passive:false});
+mmCv.addEventListener('touchmove',  e=>{ e.preventDefault(); if (e.touches.length) mmFly(e.touches[0]); }, {passive:false});
+
 /* which currently-selected units can actually reach this enemy */
 function combinedAttackers(target){
   const ids = selSet.length ? selSet : (sel ? [sel] : []);
@@ -13540,7 +13622,7 @@ function playerMove(u,x,y){
   doMove(u, plan.x, plan.y);
   if (plan.contact){
     clearUndo();                             // no taking back what the contact taught you
-    logMsg('sys', `⚠ ${u.name} runs into ${plan.contact.name} — advance halted on contact!`);
+    logMsg('sys', `⚠ ${u.name} runs into ${plan.contact.name} — advance halted on contact!`, plan.x, plan.y);
     floatText(plan.x, plan.y, '⚠ CONTACT', '#ffd23f');
     sShot();
   }
@@ -14133,6 +14215,19 @@ function updateTop(){
     if (diffPP(side)) parts.push(`difficulty ${diffPP(side)>0?'+':''}${diffPP(side)}`);
     if (docIncome(side)) parts.push(`War Economy +${docIncome(side)}`);
     $('pp-chip').title = `${sideName(side)} production — spend on reinforcements & new divisions.\n+${inc} ⚙/turn (${parts.join(', ')}).\nCapped at 40 — spend it or the surplus is lost.`;
+  }
+  { // timed HQ objective: a live countdown chip — click flies the camera to the prize
+    const mc = $('mission-chip');
+    const mine = (G.missions||[]).filter(m=>m.side===side);
+    if (mc && mine.length){
+      const m = mine[0], left = m.deadline - G.turn;
+      mc.classList.remove('hidden');
+      mc.style.color = left<=1 ? '#ffb020' : '';
+      mc.innerHTML = `${m.kind==='take'?'⚔':'🛡'} <b>${m.title}</b> · <span style="opacity:.75">${left>0?left+'t left':'due now'} · +${m.reward}⚙</span>`;
+      mc.title = `Objective from HQ — ${m.title}\n${left>0?left+' turn'+(left===1?'':'s')+' left':'due now'} · reward +${m.reward}⚙\nClick to fly to ${m.city}.`;
+      const c = G.cities.find(cc=>cc.name===m.city);
+      mc.onclick = c ? (()=>{ centerOn(c.x,c.y); mmPing(c.x,c.y); }) : null;
+    } else if (mc) mc.classList.add('hidden');
   }
   // "Next" button: shows how many of the active human's units still have orders
   const human = !G.over && !aiRunning && (G.mode==='hotseat' || G.phase===G.playerSide);
