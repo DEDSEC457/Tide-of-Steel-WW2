@@ -6222,9 +6222,14 @@ function applyVariants(v){
    Scale the handicaps by battle length: campaigns of ~22+ turns keep their existing
    tuning exactly, short battles get a proportionally lighter thumb. Difficulty in the
    short ones then comes from how the AI PLAYS, which is the design intent anyway. */
+function shortBattle(){
+  const t = (typeof MAX_TURN === 'number' && MAX_TURN > 0) ? MAX_TURN : 24;
+  return t <= 12;                                  // Midway 7 · Alamein/Leyte 8 · Kursk 9 · Market Garden 10
+}
 function diffScale(){
-  const t = (typeof MAX_TURN === 'number' && MAX_TURN > 0) ? MAX_TURN : 22;
-  return Math.max(0.3, Math.min(1, t/22));
+  const t = (typeof MAX_TURN === 'number' && MAX_TURN > 0) ? MAX_TURN : 24;
+  if (t > 12) return 1;                            // every campaign of 13+ turns keeps its existing tuning exactly
+  return Math.max(0.3, t/16);
 }
 function diffPP(side){
   if (G.mode==='hotseat') return 0;
@@ -6250,7 +6255,13 @@ function diffCombat(side){           // small attack-multiplier tweak for AI dif
    it plays smarter, it isn't just handed bonuses. Humans / hotseat play at 1. */
 function aiSkill(side){
   if (G.mode==='hotseat' || side===G.playerSide) return 1;
-  return G.difficulty==='easy' ? 0 : (G.difficulty==='hard' || G.difficulty==='brutal') ? 2 : 1;
+  if (G.difficulty==='easy') return 0;
+  if (G.difficulty==='brutal') return 2;           // Brutal is merciless in every battle, long or short
+  // Hard: a 7-turn fleet action gives no room to answer sharp play, so the skill
+  // bump is reserved for the longer campaigns. Brutal remains for players who
+  // want the sharp AI in the short battles too.
+  if (G.difficulty==='hard') return shortBattle() ? 1 : 2;
+  return 1;
 }
 /* sharper play presses good-but-not-perfect attacks; sloppier play waits for a
    sure thing (or over-commits to a bad one). */
