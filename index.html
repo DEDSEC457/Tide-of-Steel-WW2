@@ -15738,7 +15738,7 @@ function rvPlayStage(i){
   eventQueue.length = 0; show('event-modal', false);
   const camp = rvCamp();
   const side = rvStageSide(rvCampId, i);     // the Pacific swaps the player's engine side per battle
-  newGame(side, RV.diff, 'ai', camp.stages[i].scn, null);
+  newGame(side, RV.diff, 'ai', camp.stages[i].scn, mVar);   // same always-on variants as every other mode
   G.campaign = { mode:'rv', camp:rvCampId, stage:i };
   G.doc[side] = Object.assign({}, RV.doc);                          // doctrines carry forward
   const chest = rvWarChest(); if (chest) G.pp[side] = Math.min(40, G.pp[side] + chest);
