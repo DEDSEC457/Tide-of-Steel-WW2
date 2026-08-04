@@ -6216,12 +6216,23 @@ function applyVariants(v){
   for (const line of on) logMsg('sys', 'VARIANT: ' + line);
 }
 
+/* A short battle concentrates the difficulty thumb. The same handicaps that make a
+   28-turn campaign tense make a 7-turn fleet action unwinnable — there is no time to
+   recover from one bad turn, and every loss is a large fraction of a small force.
+   Scale the handicaps by battle length: campaigns of ~22+ turns keep their existing
+   tuning exactly, short battles get a proportionally lighter thumb. Difficulty in the
+   short ones then comes from how the AI PLAYS, which is the design intent anyway. */
+function diffScale(){
+  const t = (typeof MAX_TURN === 'number' && MAX_TURN > 0) ? MAX_TURN : 22;
+  return Math.max(0.3, Math.min(1, t/22));
+}
 function diffPP(side){
   if (G.mode==='hotseat') return 0;
   const aiSide = enemyOf(G.playerSide);
+  const f = diffScale();
   if (G.difficulty==='easy')   return side===G.playerSide ? 1 : -1;
-  if (G.difficulty==='hard')   return side===aiSide ? 2 : -1;
-  if (G.difficulty==='brutal') return side===aiSide ? 4 : -2;       // enemy heavily out-produces you
+  if (G.difficulty==='hard')   return side===aiSide ? Math.round(2*f) : -Math.round(1*f);
+  if (G.difficulty==='brutal') return side===aiSide ? Math.round(4*f) : -Math.round(2*f);   // enemy heavily out-produces you
   return 0;
 }
 function diffCombat(side){           // small attack-multiplier tweak for AI difficulty
@@ -6230,7 +6241,8 @@ function diffCombat(side){           // small attack-multiplier tweak for AI dif
   if (side!==aiSide) return 1;
   // the bulk of the difficulty now comes from how the AI PLAYS (aiSkill), so the
   // raw combat thumb-on-the-scale is light
-  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1.15 : G.difficulty==='brutal' ? 1.28 : 1;
+  const f = diffScale();                       // short battles get a lighter thumb (see diffScale)
+  return G.difficulty==='easy' ? 0.9 : G.difficulty==='hard' ? 1+0.15*f : G.difficulty==='brutal' ? 1+0.28*f : 1;
 }
 /* AI SKILL — the heart of difficulty. 0 = sloppy (easy), 1 = solid (normal),
    2 = sharp (hard). A higher skill makes the AI judge odds better, hold an
@@ -6245,7 +6257,7 @@ function aiSkill(side){
 function skillMinR(side, base){
   // sharper play presses attacks harder; Brutal presses hardest of all
   const brutal = G.difficulty==='brutal' && G.mode!=='hotseat' && side===enemyOf(G.playerSide);
-  return base - (aiSkill(side)-1)*0.18 - (brutal ? 0.10 : 0);
+  return base - (aiSkill(side)-1)*0.18 - (brutal ? 0.10*diffScale() : 0);
 }
 /* line coherence: near the front a unit wants friendly units beside it, so the
    line has no 1-hex hole for the enemy to pour through. Skill-scaled — a sharp
