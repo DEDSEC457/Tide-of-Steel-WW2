@@ -23,7 +23,7 @@
   :root{
     --bg:#0d0f0c; --panel:#161a14; --panel2:#1d2218; --line:#3a4430;
     --ink:#d8d4c0; --dim:#8d8a76; --amber:#e8b34b; --red:#c4453a; --redL:#e06a5f;
-    --grn:#7a9d54; --cyan:#69c5c9; --ger:#5a6470; --sov:#a93226;
+    --grn:#7a9d54; --cyan:#69c5c9; --ger:#5a6470; --sov:#a93226; --theater:#e8b34b;
   }
   *{box-sizing:border-box; margin:0; padding:0; user-select:none;}
   html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
@@ -42,7 +42,7 @@
   #topbar #btn-endturn{margin-left:auto;}
   @media (max-width:1780px){
     #topbar{gap:6px;font-size:13px;}
-    #topbar .t-title{display:none;}
+    #topbar .t-title{display:block;max-width:132px;overflow:hidden;text-overflow:ellipsis;}
   }
   @media (max-width:1620px){
     #topbar button .bl{display:none;}      /* icon-only buttons — the tooltips still name them */
@@ -52,6 +52,9 @@
     #topbar button{padding:4px 6px;}
     #topbar .t-chip{padding:4px 6px;}
     #wx-chip .fc{display:none;}
+    .hud-cluster{padding:2px;gap:2px;}
+    .hud-system #btn-help2{display:none;}
+    #topbar .t-title{display:none;}
   }
   #topbar .t-chip{min-width:0;overflow:hidden;text-overflow:ellipsis;}
   #topbar #wx-chip{max-width:24vw;}
@@ -59,6 +62,15 @@
   #topbar .t-chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
     padding:4px 10px;white-space:nowrap;}
   #topbar .t-chip b{color:var(--amber);}
+  #topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+    background:linear-gradient(90deg,transparent,var(--theater),transparent);opacity:.48;pointer-events:none;}
+  .hud-cluster{display:flex;align-items:center;gap:4px;padding:3px 5px;border:1px solid #ffffff0b;
+    border-radius:8px;background:#090c08aa;box-shadow:inset 0 1px #ffffff08;}
+  .hud-cluster button{border-color:#343d2b;background:linear-gradient(#22281a,#171b11);}
+  .hud-command{border-color:color-mix(in srgb,var(--theater) 28%,transparent);}
+  #btn-next{border-color:#6686a0!important;color:#bcd8ee!important;background:linear-gradient(#263644,#19242d)!important;}
+  #btn-endturn{min-width:118px;text-transform:uppercase;letter-spacing:.8px;
+    box-shadow:0 0 0 1px #0008,0 0 16px color-mix(in srgb,var(--theater) 18%,transparent);}
   #wx-chip.mud b{color:#b07d4f;} #wx-chip.snow b{color:#cfe6ef;} #wx-chip.freeze b{color:#9fc7d8;}
   #wx-chip{cursor:pointer;} #wx-chip:hover{border-color:var(--amber);}
   .clk{display:flex;gap:12px;padding:7px 9px;border-radius:6px;margin:3px 0;font-size:13px;line-height:1.45;}
@@ -360,15 +372,21 @@
   <span class="t-chip" id="pp-chip">Production: <b>0</b> ⚙</span>
   <span class="t-chip hidden" id="mission-chip" title="Objective from HQ"></span>
   <span class="spacer"></span>
-  <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚<span class="bl"> Supply</span></button>
-  <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠<span class="bl"> Threat</span></button>
-  <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
-  <button id="btn-objectives" title="Objective cities & victory tiers">🎯<span class="bl"> Objectives</span></button>
-  <button id="btn-doctrine" title="Adopt war doctrines — permanent bonuses bought with production (D)">🎖<span class="bl"> Doctrine</span></button>
-  <button id="btn-roster" title="Your divisions — jump to any of them (find idle or cut-off units fast)">📋<span class="bl"> Units</span></button>
-  <button id="btn-help2" title="How to play">❓<span class="bl"> Help</span></button>
-  <button id="btn-sound" title="Sound & graphics settings">🔊</button>
-  <button id="btn-menu" title="Pause — settings, save, help, quit (Esc)">⏸<span class="bl"> Pause</span></button>
+  <div class="hud-cluster hud-map" title="Map intelligence">
+    <button id="btn-supply" title="Shade hexes outside your supply network (S)">🚚<span class="bl"> Supply</span></button>
+    <button id="btn-threat" title="Shade hexes the enemy could hit next turn (T)">⚠<span class="bl"> Threat</span></button>
+    <button id="btn-objectives" title="Objective cities & victory tiers">🎯<span class="bl"> Objectives</span></button>
+  </div>
+  <div class="hud-cluster hud-command" title="Command tools">
+    <button id="btn-doctrine" title="Adopt war doctrines — permanent bonuses bought with production (D)">🎖<span class="bl"> Doctrine</span></button>
+    <button id="btn-roster" title="Your divisions — jump to any of them (find idle or isolated units fast)">📋<span class="bl"> Units</span></button>
+  </div>
+  <div class="hud-cluster hud-system" title="Game controls">
+    <button id="btn-aispeed" title="Enemy turn speed">AI: ▶</button>
+    <button id="btn-help2" title="How to play">❓<span class="bl"> Help</span></button>
+    <button id="btn-sound" title="Sound & graphics settings">🔊</button>
+    <button id="btn-menu" title="Pause — settings, save, help, quit (Esc)">⏸<span class="bl"> Pause</span></button>
+  </div>
   <button id="btn-next" class="hidden" title="Jump to your next unit with orders left (N / Space / Tab)">⏭ Next</button>
   <button id="btn-undo" class="hidden" title="Take back your last move (U)">↩<span class="bl"> Undo</span></button>
   <button id="btn-endturn" class="primary">End Turn ▶</button>
@@ -2398,6 +2416,15 @@ SCENARIOS.dday = {
   sovSpawns: [[28,11],[25,7],[27,16],[35,8],[35,12],[35,16],[25,13]],
   /* the Mulberries: the five beaches are Allied supply sources; no edge supply */
   supplySeeds: {G: [[8,7],[12,7],[14,7],[15,7],[16,7]]},
+  landmarks: [
+    {x:8, y:7,  label:'UTAH',  kind:'beach'},
+    {x:12,y:7,  label:'OMAHA', kind:'beach'},
+    {x:14,y:7,  label:'GOLD',  kind:'beach'},
+    {x:15,y:7,  label:'JUNO',  kind:'beach'},
+    {x:16,y:7,  label:'SWORD', kind:'beach', dx:-.10, dy:-.18},
+    {x:7, y:8,  label:'US AIRBORNE DZ', kind:'drop'},
+    {x:17,y:7,  label:'BRITISH AIRBORNE DZ', kind:'drop', dx:.34, dy:.18},
+  ],
   edgeSupply: {G:false, S:true},
   startUnits: [
     // — the Allied lodgement, morning of 6 June —
@@ -5950,7 +5977,22 @@ const TERRAIN = {
 };
 /* per-scenario terrain repaint (e.g. the desert): char -> color, falls back to
    the base palette. Kept as a plain lookup so the hot draw path stays cheap. */
-function terrColor(t){ return (SCN.terrainColors && SCN.terrainColors[t]) || (TERRAIN[t]||{color:'#333'}).color; }
+function liftHex(hex, amount){
+  if (!amount || typeof hex!=='string' || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const n=parseInt(hex.slice(1),16), a=Math.max(0,Math.min(1,amount));
+  const ch=s=>Math.round(((n>>s)&255)+(255-((n>>s)&255))*a);
+  return '#'+[ch(16),ch(8),ch(0)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+/* Shared battlefield-clarity pass. Every theater keeps its own palette, but dark
+   midtones are lifted enough that terrain, counters and front lines read at the
+   default zoom. Desert maps need less lift; ocean hexes get a separate treatment. */
+function terrColor(t){
+  const base=(SCN.terrainColors && SCN.terrainColors[t]) || (TERRAIN[t]||{color:'#333'}).color;
+  const water=t==='~'||t==='o'||t==='r';
+  const theater=typeof theaterOf==='function' ? theaterOf(SCN.id) : 'east';
+  const lift=water ? (theater==='pacific'?0.13:0.10) : (SCN.terrainColors?0.055:theater==='west'?0.14:0.12);
+  return liftHex(base,lift);
+}
 /* per-scenario weather relabelling (a 'mud' turn is a Rasputitsa in Russia, a
    Khamsin sandstorm in the desert) — mechanics are unchanged, only the words */
 function wxLabelOf(w){ return (SCN.wxLabel && SCN.wxLabel[w]) || WX_LABEL[w] || w; }
@@ -10361,6 +10403,34 @@ function fitCamera(){
   cam.x = (mw - availW/cam.z)/2;
   cam.y = (mh - (innerHeight)/cam.z)/2 - 20/cam.z;
 }
+/* Frame the battle that matters on turn one instead of always showing the whole
+   theater. The algorithm is scenario-agnostic: it fits the player's formations,
+   nearby opposition and nearby objectives, while broad naval deployments still
+   naturally fall back to the full-map view. */
+function focusOpeningCamera(){
+  if (!G || !G.units || !G.units.length){ fitCamera(); return; }
+  killGlides();
+  const side=G.mode==='hotseat' ? G.phase : (G.playerSide||G.phase);
+  const friends=unitsOf(side).filter(u=>!u.embarked);
+  if (!friends.length){ fitCamera(); return; }
+  const pts=friends.map(u=>[u.x,u.y]);
+  for (const u of unitsOf(enemyOf(side)))
+    if (friends.some(f=>hexDist(f.x,f.y,u.x,u.y)<=5)) pts.push([u.x,u.y]);
+  for (const c of G.cities)
+    if (c.vp>0 && friends.some(f=>hexDist(f.x,f.y,c.x,c.y)<=5)) pts.push([c.x,c.y]);
+  let minX=Math.min(...pts.map(p=>p[0])), maxX=Math.max(...pts.map(p=>p[0]));
+  let minY=Math.min(...pts.map(p=>p[1])), maxY=Math.max(...pts.map(p=>p[1]));
+  const spread=(maxX-minX+1)*(maxY-minY+1), whole=COLS*ROWS;
+  if (spread>whole*0.58){ fitCamera(); return; }
+  const padX=2.6, padY=2.4;
+  const [aX,aY]=hexCenter(Math.max(0,minX-padX),Math.max(0,minY-padY));
+  const [bX,bY]=hexCenter(Math.min(COLS-1,maxX+padX),Math.min(ROWS-1,maxY+padY));
+  const panel=innerWidth>720?286:0, availW=innerWidth-panel, availH=innerHeight-94;
+  const bw=Math.max(HX*5,bX-aX+HX*2), bh=Math.max(VY*5,bY-aY+S*2);
+  cam.z=Math.max(minZoom(),Math.min(1.12,availW/bw,availH/bh));
+  cam.x=(aX+bX)/2-availW/(2*cam.z);
+  cam.y=(aY+bY)/2-innerHeight/(2*cam.z)+18/cam.z;
+}
 function hexCenter(x,y){ return [M + HX*(x + 0.5*(y&1)) + HX/2, M + VY*y + S]; }
 function toScreen(px,py){ return [(px-cam.x)*cam.z, (py-cam.y)*cam.z]; }
 function toWorld(sx,sy){ return [sx/cam.z + cam.x, sy/cam.z + cam.y]; }
@@ -11753,6 +11823,51 @@ mmCv.addEventListener('mousedown', e=>{ e.preventDefault(); e.stopPropagation();
 window.addEventListener('mousemove', e=>{ if (mmDragging) mmFly(e); });
 window.addEventListener('mouseup', ()=>{ mmDragging = false; });
 
+/* Universal operational symbology. Supply origins and coastal ports are always
+   readable; scenarios may add named landmarks (beaches, drop zones, sectors)
+   without teaching the renderer any scenario-specific rules. */
+function drawOperationalMarkers(now){
+  const z=Math.max(0.55,Math.min(1.15,cam.z)), inv=1/z;
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  const seedSeen=new Set();
+  for (const side of ['G','S']){
+    const seeds=SCN.supplySeeds && SCN.supplySeeds[side];
+    if (!Array.isArray(seeds)) continue;
+    for (const p of seeds){
+      const x=p[0],y=p[1],k=keyOf(x,y); if(seedSeen.has(k)||!inMap(x,y))continue; seedSeen.add(k);
+      const [cx,cy]=hexCenter(x,y), coastal=isCoast(x,y);
+      ctx.save(); ctx.translate(cx,cy);
+      hexPath(0,0,S*0.70); ctx.strokeStyle=side==='G'?'rgba(126,196,236,.55)':'rgba(235,130,112,.48)';
+      ctx.lineWidth=1.5*inv; if(ctx.setLineDash)ctx.setLineDash([4*inv,3*inv]); ctx.stroke();
+      if(ctx.setLineDash)ctx.setLineDash([]);
+      ctx.font=`700 ${(10*inv).toFixed(1)}px Segoe UI`; ctx.fillStyle=side==='G'?'#a9ddfa':'#f2ad9f';
+      ctx.fillText(coastal?'⚓':'◆',0,S*0.48); ctx.restore();
+    }
+  }
+  for (const c of G.cities){
+    if(!isCoast(c.x,c.y))continue;
+    const [cx,cy]=hexCenter(c.x,c.y);
+    ctx.font=`700 ${(9*inv).toFixed(1)}px Segoe UI`; ctx.fillStyle='rgba(170,218,238,.82)';
+    ctx.fillText('⚓',cx-S*0.43,cy+S*0.43);
+  }
+  for (const lm of (SCN.landmarks||[])){
+    if(!inMap(lm.x,lm.y))continue;
+    const [cx,cy]=hexCenter(lm.x,lm.y), pulse=.82+.18*Math.sin(now*.003+lm.x);
+    ctx.save();ctx.translate(cx,cy);
+    if(lm.kind==='beach'){
+      hexPath(0,0,S*.79);ctx.strokeStyle=`rgba(119,190,232,${(.68*pulse).toFixed(3)})`;ctx.lineWidth=2.2*inv;ctx.stroke();
+    }else if(lm.kind==='drop'){
+      ctx.strokeStyle=`rgba(225,191,87,${(.7*pulse).toFixed(3)})`;ctx.lineWidth=1.8*inv;
+      if(ctx.setLineDash)ctx.setLineDash([3*inv,3*inv]);ctx.beginPath();ctx.arc(0,0,S*.68,0,Math.PI*2);ctx.stroke();if(ctx.setLineDash)ctx.setLineDash([]);
+    }
+    const yy=-S*(.92-(lm.dy||0)), xx=S*(lm.dx||0);
+    ctx.font=`800 ${(9.5*inv).toFixed(1)}px Segoe UI`;ctx.fillStyle='rgba(5,8,9,.86)';
+    ctx.fillText(lm.label,xx+1*inv,yy+1*inv);ctx.fillStyle=lm.kind==='drop'?'#f3cf70':'#bfe8ff';ctx.fillText(lm.label,xx,yy);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 let _animPrev = 0;
 function draw(){
   // step the camera animations before the frame is transformed. dt-correct the
@@ -12115,6 +12230,8 @@ function draw(){
       }
     }
   }
+
+  drawOperationalMarkers(now);
 
   // cities — labels keep a roughly constant on-screen size (they're drawn in the
   // zoomed world space, so divide by the clamped zoom); when very zoomed out only
@@ -13084,8 +13201,8 @@ function drawTroopSprite(ctx, sym, bx, bw, bh, pale){
 }
 
 function drawUnit(u, cx, cy, wx){
-  const w = S*1.34, h = S*0.96, k = KINDS[u.kind];
-  const far = cam.z < 0.5;   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
+  const w = S*1.46, h = S*1.04, k = KINDS[u.kind];
+  const far = cam.z < 0.46;   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
   ctx.save(); ctx.translate(cx,cy);
   // 3D view: the counter stands off the board like a miniature — a cast shadow
   // on the ground, then the whole piece lifts, with a dark extruded side-wall
@@ -13132,8 +13249,12 @@ function drawUnit(u, cx, cy, wx){
       ctx.fillStyle = _glossGrad; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
     }
   }
-  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : u.strained ? '#ffb020' : '#000c';
-  ctx.lineWidth = (sel===u.id) ? 2.5 : u.oos ? 2 : u.strained ? 1.8 : 1.2; ctx.stroke();
+  // high-contrast side rail: counters stay identifiable even when two factions
+  // use similarly dark historical colours or the map is viewed at a distance.
+  ctx.fillStyle = u.side==='G' ? 'rgba(173,211,234,.88)' : 'rgba(238,148,132,.88)';
+  ctx.fillRect(-w/2+1.7,-h/2+4,3.2,h-8);
+  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : u.strained ? '#ffb020' : 'rgba(235,230,208,.72)';
+  ctx.lineWidth = (sel===u.id) ? 2.8 : u.oos ? 2.2 : u.strained ? 2 : 1.35; ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.1;
   ctx.beginPath(); ctx.moveTo(-w/2+4,-h/2+1.3); ctx.lineTo(w/2-4,-h/2+1.3); ctx.stroke();
   ctx.strokeStyle = 'rgba(0,0,0,0.30)';
@@ -13913,10 +14034,29 @@ function supplyGapInfo(u){
   }
   return { gap: gap===1e9 ? null : gap, dir: toward ? compass8(u.x,u.y,toward[0],toward[1]) : null };
 }
+function isAirbornePocket(u){
+  if (!u || !KINDS[u.kind] || KINDS[u.kind].sym!=='para') return false;
+  if ((G.airdrops||[]).some(a=>a.side===u.side && hexDist(a.x,a.y,u.x,u.y)<=1)) return true;
+  return SCN.id==='dday' && G.turn<=2 && (u.oos || (pocketsFor(u.side)&&pocketsFor(u.side).has(u.id)));
+}
+function airborneReliefText(){
+  if (SCN.id==='dday') return 'link up from the beaches';
+  if (SCN.id==='marketgarden') return 'link up with the ground columns';
+  return 'link up with the main line';
+}
+function supplyStateText(u, caps){
+  if (isAirbornePocket(u)) return caps ? '✈ AIRBORNE POCKET' : '✈ isolated airborne';
+  if (pocketsFor(u.side)&&pocketsFor(u.side).has(u.id)) return caps ? '☒ ENCIRCLED' : '☒ encircled';
+  if (u.oos) return caps ? '⚠ CUT OFF' : '⚠ cut off';
+  if (u.strained) return caps ? '◔ STRAINED' : '◔ strained';
+  return caps ? 'IN SUPPLY' : 'In supply';
+}
 /* the plain-language note shown under the Supply row for a cut-off division */
 function supplyHelp(u){
   const sealed = pocketsFor(u.side) && pocketsFor(u.side).has(u.id);
   const bleed = SCN.harshOOS ? 'bleeds −2 strength a turn' : 'loses strength every turn';
+  if (isAirbornePocket(u))
+    return `<div class="supply-help" style="border-left-color:#e0bd55;color:#e8d99d;background:#2a2411cc">✈ <b>Airborne pocket</b> — this is an expected landing-zone isolation, not a routing error. The air bridge is temporary: ${airborneReliefText()} or seize a nearby depot before it expires.</div>`;
   if (sealed)
     return `<div class="supply-help">☒ <b>Sealed in a pocket</b> — no route back to supply, so it ${bleed}. Break the ring with a relief attack from outside, or pull it out before it starves.</div>`;
   const info = supplyGapInfo(u);
@@ -13949,6 +14089,7 @@ function doReinforceAll(){
 
 /* ---- army roster ---- */
 function rosterStatus(u){
+  if (isAirbornePocket(u)) return {tag:'✈ airborne', cls:'strn', rank:0};
   if (u.oos) return {tag:'⚠ cut off', cls:'oos', rank:0};
   if (u.strained) return {tag:'◔ strained', cls:'strn', rank:0.5};
   if (u.order) return {tag: u.order==='attack'?'⚔ advance':'🛡 hold', cls:'ord', rank:2};
@@ -13975,9 +14116,11 @@ function renderRoster(){
     row.onclick = ()=>{ show('roster-modal', false); selectUnit(u); sClick(); centerOn(u.x,u.y); };
     box.appendChild(row);
   }
-  const oos = list.filter(u=>u.oos).length, rdy = actionableUnits(side).length;
+  const airIso = list.filter(u=>u.oos&&isAirbornePocket(u)).length;
+  const oos = list.filter(u=>u.oos&&!isAirbornePocket(u)).length, rdy = actionableUnits(side).length;
   $('roster-sum').innerHTML = `${list.length} divisions · <span style="color:var(--grn)">${rdy} ready</span>`
-    + (oos ? ` · <span style="color:var(--redL)">${oos} cut off</span>` : '');
+    + (oos ? ` · <span style="color:var(--redL)">${oos} cut off</span>` : '')
+    + (airIso ? ` · <span style="color:#e8c665">${airIso} airborne pocket${airIso===1?'':'s'}</span>` : '');
   const rb = $('btn-roster-reinforce'), n = unitsOf(side).filter(u=>canReinforce(u)).length;
   if (rb){ rb.textContent = `⚙ Reinforce all${n?` (${n})`:''}`; rb.disabled = !n || !isHumanTurn(); rb.style.opacity = rb.disabled?0.5:1; }
 }
@@ -14063,7 +14206,7 @@ function updateUnitCard(){
     ${(u.kills||0) > 0 ? `<div class="statrow"><span>Confirmed kills</span><span class="good">☠ ${u.kills} formation${u.kills===1?'':'s'}</span></div>` : ''}
     ${underHQ(u) ? `<div class="statrow"><span>Command</span><span class="good">⌂ under HQ (+5% · +1 mp)</span></div>` : ''}
     ${k.hq ? `<div class="statrow"><span>Command radius</span><span>⌂ ${HQ_RANGE} hexes</span></div>` : ''}
-    <div class="statrow"><span>Supply</span><span class="${u.oos?'bad':u.strained?'':'good'}"${u.strained&&!u.oos?' style="color:#ffb020"':''}>${(pocketsFor(u.side)&&pocketsFor(u.side).has(u.id))?'☒ ENCIRCLED':u.oos?'⚠ cut off':u.strained?'◔ strained':'In supply'}</span></div>
+    <div class="statrow"><span>Supply</span><span class="${u.oos&&!isAirbornePocket(u)?'bad':u.strained||isAirbornePocket(u)?'':'good'}"${(u.strained||isAirbornePocket(u))?' style="color:#ffcf63"':''}>${supplyStateText(u,true)}</span></div>
     ${u.oos ? supplyHelp(u) : u.strained ? supplyStrainHelp(u) : ''}
     <div class="statrow"><span>This turn</span><span>${
       u.order ? `<span style="color:var(--amber)">${u.order==='attack'?'⚔ advance order':'🛡 hold-line order'}</span>`
@@ -14465,10 +14608,13 @@ function maybeTurnBanner(){
   }
   // encirclement status: warn about your cut-off divisions, celebrate trapped enemies
   const mine = pocketsFor(G.phase), foe = pocketsFor(enemyOf(G.phase));
-  const nMine = mine ? mine.size : 0;
+  const mineUnits = mine ? [...mine].map(id=>G.units.find(u=>u.id===id)).filter(Boolean) : [];
+  const nAir = mineUnits.filter(isAirbornePocket).length;
+  const nMine = mineUnits.length - nAir;
   let nFoe = 0; if (foe) for (const id of foe){ const u = G.units.find(t=>t.id===id); if (u && isSpotted(u, G.phase)) nFoe++; }
   const enc = [];
   if (nMine) enc.push(`<span class="bad">⚠ ${nMine} of your division${nMine===1?'':'s'} cut off — break out!</span>`);
+  if (nAir) enc.push(`<span style="color:#e8c665">✈ ${nAir} airborne division${nAir===1?'':'s'} isolated — ${airborneReliefText()}</span>`);
   if (nFoe)  enc.push(`<span style="color:#8fbf62">☒ ${nFoe} enemy division${nFoe===1?'':'s'} trapped</span>`);
   if (enc.length) sub += ' &nbsp;·&nbsp; ' + enc.join(' · ');
   $('tb-sub').innerHTML = sub;
@@ -16392,10 +16538,15 @@ function startCampaign(loaded){
   _clouds = null;                              // reseed the overcast for this map's dimensions
   ambWx = null;                                // re-evaluate the ambience for this theater (ocean surf vs silence)
   bannerTurn = 0; aiReport = null;             // a fresh campaign gets a fresh turn banner
-  $('game-title').textContent = '⚙ ' + SCN.short;
+  const th=theaterOf(SCN.id), accents={east:'#d5a24a',west:'#77a9d4',pacific:'#55b8c4'};
+  if(document.documentElement&&document.documentElement.style&&document.documentElement.style.setProperty){
+    document.documentElement.style.setProperty('--theater',accents[th]||accents.east);
+  }
+  if(document.body&&document.body.dataset) document.body.dataset.theater=th;
+  $('game-title').textContent = ({east:'⚔ ',west:'🌍 ',pacific:'🌊 '}[th]||'⚙ ') + SCN.short;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true);
-  fitCamera();
+  if (loaded) fitCamera(); else focusOpeningCamera();
   updateAll();
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
   // resuming a save exactly at the start of your turn: run any standing orders
