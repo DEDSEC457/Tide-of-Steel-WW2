@@ -305,6 +305,11 @@
   .gfx-seg button:first-child{border-left-width:1px;border-radius:6px 0 0 6px;}
   .gfx-seg button:last-child{border-radius:0 6px 6px 0;}
   .gfx-seg button.sel{background:#2a3119;color:var(--amber);border-color:var(--amber);}
+  .turn-check-item{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:9px;
+    padding:9px 6px;border-bottom:1px solid #ffffff12;text-align:left;}
+  .turn-check-item:last-child{border-bottom:0}.turn-check-item .tc-icon{font-size:18px;text-align:center;}
+  .turn-check-item small{display:block;color:var(--dim);margin-top:2px;line-height:1.35;}
+  .turn-check-item button{font-size:12px;padding:5px 8px;color:var(--cyan);}
 
   ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
 
@@ -951,6 +956,9 @@
       <input type="range" id="ui-scale" min="90" max="125" step="5">
       <span class="vlabel" id="ui-scale-val">100%</span></div>
     <div style="color:var(--dim);font-size:12px;margin-top:2px;">Scales the panels, top bar and pop-ups — the map itself keeps its own zoom.</div>
+    <div class="setrow" style="margin-top:12px;"><span>✨ Enhanced battlefield UI</span>
+      <button id="btn-enhanced-ui">Enhanced: ON</button></div>
+    <div style="color:var(--dim);font-size:12px;margin-top:2px;">Route costs, attack arrows, operational markers, brighter terrain, larger counters and the end-turn review. Turn this off to compare with the original presentation instantly.</div>
     <div style="border-top:1px solid var(--line);margin:18px 0 8px;"></div>
     <div id="about-box" style="text-align:center;color:var(--dim);font-size:12px;line-height:1.65;">
       <div style="color:var(--amber);letter-spacing:3px;font-size:14px;">TIDE OF STEEL WW2</div>
@@ -964,6 +972,19 @@
       </div>
     </div>
     <div class="mrow"><button class="primary" id="btn-settings-close">Close</button></div>
+  </div>
+</div>
+
+<!-- ============ END-TURN REVIEW ============ -->
+<div id="turn-check-modal" class="modal-back hidden" style="z-index:70;">
+  <div class="modal" style="max-width:520px;">
+    <h2>BEFORE ENDING THE TURN</h2>
+    <div style="color:var(--dim);font-size:12px;margin:2px 0 8px;">Review unfinished orders and battlefield warnings, or end the turn anyway.</div>
+    <div id="turn-check-list"></div>
+    <div class="mrow" style="justify-content:flex-end;">
+      <button id="btn-turn-check-back">Keep commanding</button>
+      <button class="primary" id="btn-turn-check-confirm">End turn anyway ▶</button>
+    </div>
   </div>
 </div>
 
@@ -5977,6 +5998,8 @@ const TERRAIN = {
 };
 /* per-scenario terrain repaint (e.g. the desert): char -> color, falls back to
    the base palette. Kept as a plain lookup so the hot draw path stays cheap. */
+let enhancedUI = true;
+try{ enhancedUI = localStorage.getItem('hoi5-enhanced-ui') !== '0'; }catch(e){}
 function liftHex(hex, amount){
   if (!amount || typeof hex!=='string' || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
   const n=parseInt(hex.slice(1),16), a=Math.max(0,Math.min(1,amount));
@@ -5988,6 +6011,7 @@ function liftHex(hex, amount){
    default zoom. Desert maps need less lift; ocean hexes get a separate treatment. */
 function terrColor(t){
   const base=(SCN.terrainColors && SCN.terrainColors[t]) || (TERRAIN[t]||{color:'#333'}).color;
+  if (!enhancedUI) return base;
   const water=t==='~'||t==='o'||t==='r';
   const theater=typeof theaterOf==='function' ? theaterOf(SCN.id) : 'east';
   const lift=water ? (theater==='pacific'?0.13:0.10) : (SCN.terrainColors?0.055:theater==='west'?0.14:0.12);
@@ -10408,6 +10432,7 @@ function fitCamera(){
    nearby opposition and nearby objectives, while broad naval deployments still
    naturally fall back to the full-map view. */
 function focusOpeningCamera(){
+  if (!enhancedUI){ fitCamera(); return; }
   if (!G || !G.units || !G.units.length){ fitCamera(); return; }
   killGlides();
   const side=G.mode==='hotseat' ? G.phase : (G.playerSide||G.phase);
@@ -11827,6 +11852,7 @@ window.addEventListener('mouseup', ()=>{ mmDragging = false; });
    readable; scenarios may add named landmarks (beaches, drop zones, sectors)
    without teaching the renderer any scenario-specific rules. */
 function drawOperationalMarkers(now){
+  if (!enhancedUI) return;
   const z=Math.max(0.55,Math.min(1.15,cam.z)), inv=1/z;
   ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
   const seedSeen=new Set();
@@ -12606,6 +12632,31 @@ function draw(){
     ctx.restore();
   }
 
+  // Enhanced attack-plan preview: connect every participating formation to the
+  // hovered defender. This is advisory only; the combat engine is untouched.
+  if (enhancedUI && hover){
+    const target=unitAt(hover[0],hover[1]);
+    if (target && target.side===enemyOf(G.phase) && isSpotted(target,viewerSide())){
+      const attackers=combinedAttackers(target);
+      if (attackers.length){
+        const [tx,ty]=hexCenter(target.x,target.y);
+        ctx.save();
+        hexPath(tx,ty,S*.82);ctx.strokeStyle='rgba(239,104,83,.9)';ctx.lineWidth=2.5;ctx.stroke();
+        for (const a of attackers){
+          const [ax,ay]=hexCenter(a.x,a.y), ang=Math.atan2(ty-ay,tx-ax);
+          const sx=ax+Math.cos(ang)*S*.72, sy=ay+Math.sin(ang)*S*.72;
+          const ex=tx-Math.cos(ang)*S*.86, ey=ty-Math.sin(ang)*S*.86;
+          ctx.strokeStyle=attackers.length>1?'rgba(105,197,201,.94)':'rgba(239,104,83,.94)';
+          ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+          ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(ex,ey);
+          ctx.lineTo(ex-9*Math.cos(ang-.48),ey-9*Math.sin(ang-.48));
+          ctx.lineTo(ex-9*Math.cos(ang+.48),ey-9*Math.sin(ang+.48));ctx.closePath();ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+
   // route preview (drawn over the counters so it stays legible): hovering a
   // reachable hex traces the exact march and prices it in movement points
   if (su && reach && hover && !su.moved && reach.has(keyOf(hover[0],hover[1]))){
@@ -12634,6 +12685,16 @@ function draw(){
       ctx.lineTo(ex - 7*Math.cos(ang+0.55), ey - 7*Math.sin(ang+0.55));
       ctx.closePath(); ctx.fill();
       ctx.shadowBlur = 0;
+      // Per-hex prices explain why a route bends around difficult ground. The
+      // existing destination tag still shows the accumulated total.
+      if (enhancedUI){
+        ctx.font='700 10px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+        for(let i=1;i<path.length;i++){
+          const [px0,py0]=path[i], [hx,hy]=hexCenter(px0,py0), step=moveCost(su,px0,py0);
+          ctx.beginPath();ctx.arc(hx+S*.42,hy-S*.36,7,0,Math.PI*2);ctx.fillStyle='#10202aee';ctx.fill();
+          ctx.strokeStyle='#79c8ed';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#cceeff';ctx.fillText('+'+step,hx+S*.42,hy-S*.36+.5);
+        }
+      }
       // MP price tag above the destination hex
       const cost = reach.get(keyOf(hover[0],hover[1]));
       if (cost != null){
@@ -12647,6 +12708,15 @@ function draw(){
         ctx.strokeRect(ex - tw/2 - 6, ey - S - 24, tw + 12, 17);
         ctx.fillStyle = '#ffd98a';
         ctx.fillText(label, ex, ey - S - 11);
+        if (enhancedUI){
+          const stopped=neighbors(hover[0],hover[1]).some(([nx,ny])=>{ const e=unitAt(nx,ny);return e&&e.side===enemyOf(su.side)&&isSpotted(e,su.side); });
+          if(stopped){
+            const z='ZOC · movement stops', zw=(ctx.measureText&&ctx.measureText(z).width)||92;
+            ctx.fillStyle='#351a17ee';ctx.fillRect(ex-zw/2-6,ey+S+7,zw+12,17);
+            ctx.strokeStyle='#e06a5f';ctx.strokeRect(ex-zw/2-6,ey+S+7,zw+12,17);
+            ctx.fillStyle='#ffc0b6';ctx.fillText(z,ex,ey+S+20);
+          }
+        }
       }
       ctx.restore();
     }
@@ -13201,8 +13271,8 @@ function drawTroopSprite(ctx, sym, bx, bw, bh, pale){
 }
 
 function drawUnit(u, cx, cy, wx){
-  const w = S*1.46, h = S*1.04, k = KINDS[u.kind];
-  const far = cam.z < 0.46;   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
+  const w = S*(enhancedUI?1.46:1.34), h = S*(enhancedUI?1.04:.96), k = KINDS[u.kind];
+  const far = cam.z < (enhancedUI?0.46:0.5);   // strategic zoom: simplified counter (block + symbol + bar) — no sub-pixel text/pips
   ctx.save(); ctx.translate(cx,cy);
   // 3D view: the counter stands off the board like a miniature — a cast shadow
   // on the ground, then the whole piece lifts, with a dark extruded side-wall
@@ -13251,10 +13321,12 @@ function drawUnit(u, cx, cy, wx){
   }
   // high-contrast side rail: counters stay identifiable even when two factions
   // use similarly dark historical colours or the map is viewed at a distance.
-  ctx.fillStyle = u.side==='G' ? 'rgba(173,211,234,.88)' : 'rgba(238,148,132,.88)';
-  ctx.fillRect(-w/2+1.7,-h/2+4,3.2,h-8);
-  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : u.strained ? '#ffb020' : 'rgba(235,230,208,.72)';
-  ctx.lineWidth = (sel===u.id) ? 2.8 : u.oos ? 2.2 : u.strained ? 2 : 1.35; ctx.stroke();
+  if (enhancedUI){
+    ctx.fillStyle = u.side==='G' ? 'rgba(173,211,234,.88)' : 'rgba(238,148,132,.88)';
+    ctx.fillRect(-w/2+1.7,-h/2+4,3.2,h-8);
+  }
+  ctx.strokeStyle = (sel===u.id) ? '#ffd98a' : u.oos ? '#ff5340' : u.strained ? '#ffb020' : enhancedUI ? 'rgba(235,230,208,.72)' : '#000c';
+  ctx.lineWidth = (sel===u.id) ? (enhancedUI?2.8:2.5) : u.oos ? (enhancedUI?2.2:2) : u.strained ? (enhancedUI?2:1.8) : (enhancedUI?1.35:1.2); ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.1;
   ctx.beginPath(); ctx.moveTo(-w/2+4,-h/2+1.3); ctx.lineTo(w/2-4,-h/2+1.3); ctx.stroke();
   ctx.strokeStyle = 'rgba(0,0,0,0.30)';
@@ -13844,6 +13916,7 @@ window.addEventListener('keydown', e=>{
   if (openModal){
     if (e.key==='Escape'){
       if (openModal.id==='pause-modal') closePause();
+      else if (openModal.id==='turn-check-modal') $('btn-turn-check-back').click();
       // every dismissible info/reference modal closes on Esc (not the gated flow modals:
       // event / briefing / gear / decision / dyn / pass, which need a real choice)
       else if (['keys-modal','roster-modal','settings-modal','doc-modal','obj-modal','help-modal','clock-modal','replay-modal'].includes(openModal.id)) show(openModal.id, false);
@@ -14749,6 +14822,25 @@ $('ui-scale').oninput = ()=>{
 };
 applyUiScale();
 
+/* One-switch comparison for the experimental QoL package. It deliberately wraps
+   presentation only: rules, AI, saves and scenario data are unchanged. */
+function setEnhancedUI(on){
+  enhancedUI = !!on;
+  try{ localStorage.setItem('hoi5-enhanced-ui', enhancedUI?'1':'0'); }catch(e){}
+  try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}
+  syncEnhancedUI();
+  if (typeof requestRender==='function') requestRender();
+}
+function syncEnhancedUI(){
+  const b=$('btn-enhanced-ui'); if(!b)return;
+  b.textContent='Enhanced: '+(enhancedUI?'ON':'OFF');
+  b.classList.toggle('sel',enhancedUI);
+  b.style.borderColor=enhancedUI?'var(--amber)':'';
+  b.style.color=enhancedUI?'var(--amber)':'';
+}
+$('btn-enhanced-ui').onclick=()=>{ setEnhancedUI(!enhancedUI); sClick(); };
+syncEnhancedUI();
+
 /* ---- graphics quality controls ---- */
 const GFX_DESC = {
   low:    'Flat terrain, no decorations or weather effects, 20fps. Best for older / work PCs.',
@@ -14783,6 +14875,7 @@ function syncGfxUI(){
   if (sp) sp.classList.toggle('sel', spriteMode);
   const tb = $('btn-tilt');
   if (tb){ tb.textContent = 'Tilt: ' + (tilt?'ON':'OFF'); tb.classList.toggle('sel', tilt); }
+  syncEnhancedUI();
 }
 for (const l of ['low','medium','high'])
   $('gfx-'+l).onclick = ()=>{ setGfx(l); syncGfxUI(); sClick(); };
@@ -15946,6 +16039,31 @@ $('pause-modal').addEventListener('click', e=>{ if (e.target === $('pause-modal'
 
 /* ---------------- end turn & AI driver ---------------- */
 let endPendingUntil = 0;
+function turnCheckJump(kind){
+  show('turn-check-modal',false);endPendingUntil=0;$('btn-endturn').textContent='End Turn ▶';
+  if(kind==='ready'){ selectNext();return; }
+  if(kind==='oos'||kind==='strained'){
+    const u=unitsOf(G.phase).find(t=>kind==='oos'?t.oos:(t.strained&&!t.oos));
+    if(u){selectUnit(u);centerOn(u.x,u.y);mmPing(u.x,u.y);}return;
+  }
+  if(kind==='air'){
+    $('hint').innerHTML='<b>Air groups are still ready.</b> Choose Strike, Patrol, Support or Recon in the Air Forces panel.';
+    const card=$('air-card');if(card){card.style.borderColor='var(--amber)';setTimeout(()=>card.style.borderColor='',1500);}return;
+  }
+}
+function openTurnChecklist(counts){
+  const rows=[];
+  const add=(kind,icon,title,copy,action)=>rows.push(`<div class="turn-check-item"><span class="tc-icon">${icon}</span><div><b>${title}</b><small>${copy}</small></div><button data-tc="${kind}">${action}</button></div>`);
+  if(counts.ready)add('ready','⏭',`${counts.ready} formation${counts.ready===1?'':'s'} still ready`,'These units can still move, attack, hold or receive orders.','Review');
+  if(counts.oos)add('oos','⚠',`${counts.oos} formation${counts.oos===1?' is':'s are'} cut off`,'No route to a supply source; prolonged isolation causes attrition.','Locate');
+  if(counts.strained)add('strained','◔',`${counts.strained} formation${counts.strained===1?' has':'s have'} strained supply`,'They are operating at the edge of the network.','Locate');
+  if(counts.air)add('air','✈',`${counts.air} air group${counts.air===1?' is':'s are'} unused`,'Ready aircraft can strike, patrol, support or reconnoiter.','Assign');
+  $('turn-check-list').innerHTML=rows.join('');
+  $('turn-check-list').querySelectorAll('[data-tc]').forEach(b=>b.onclick=()=>{sClick();turnCheckJump(b.dataset.tc);});
+  show('turn-check-modal',true);
+}
+$('btn-turn-check-back').onclick=()=>{sClick();show('turn-check-modal',false);endPendingUntil=0;$('btn-endturn').textContent='End Turn ▶';};
+$('btn-turn-check-confirm').onclick=()=>{sClick();show('turn-check-modal',false);endPendingUntil=performance.now()+1000;$('btn-endturn').onclick();};
 $('btn-endturn').onclick = ()=>{
   if (!G || G.over || aiRunning) return;
   const human = G.mode==='hotseat' || G.phase===G.playerSide;
@@ -15956,13 +16074,17 @@ $('btn-endturn').onclick = ()=>{
   const ready = actionableUnits(G.phase).length;
   const oos = unitsOf(G.phase).filter(u=>u.oos).length;
   const strained = unitsOf(G.phase).filter(u=>u.strained && !u.oos).length;
-  if ((ready > 0 || oos > 0) && performance.now() > endPendingUntil){
+  const airReady = airOf(G.phase).filter(a=>a.mission==='ready'&&a.str>0).length;
+  const shouldWarn = enhancedUI ? (ready>0||oos>0||strained>0||airReady>0) : (ready>0||oos>0);
+  if (shouldWarn && performance.now() > endPendingUntil){
     endPendingUntil = performance.now() + 2500;
     const parts = [];
     if (ready > 0) parts.push(`${ready} still ready`);
     if (oos > 0) parts.push(`${oos} cut off`);
     if (strained > 0) parts.push(`${strained} supply-strained`);   // mentioned only when the safeguard already fires
+    if (enhancedUI && airReady > 0) parts.push(`${airReady} air ready`);
     $('btn-endturn').textContent = `⚠ ${parts.join(' · ')} — end anyway?`;
+    if (enhancedUI) openTurnChecklist({ready,oos,strained,air:airReady});
     setTimeout(()=>{ if (performance.now() >= endPendingUntil) $('btn-endturn').textContent = 'End Turn ▶'; }, 2600);
     return;
   }
