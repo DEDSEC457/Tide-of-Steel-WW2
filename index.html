@@ -80,6 +80,9 @@
   button{font-family:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
     border-radius:6px;padding:6px 14px;font-size:14px;cursor:pointer;}
   button:hover{border-color:var(--amber);color:var(--amber);}
+  button:focus-visible,.opt:focus-visible,.pick:focus-visible,.mode-card:focus-visible{
+    outline:2px solid #ffe09a;outline-offset:2px;box-shadow:0 0 0 4px #0009,0 0 18px #e8b34b44;}
+  button:active:not(:disabled){transform:translateY(1px);filter:brightness(1.08);}
   button:disabled{opacity:.4;cursor:default;}
   button.primary{background:#4a3b18;border-color:var(--amber);color:#ffd98a;font-weight:600;}
   button.primary:hover{background:#5d4a1d;}
@@ -178,6 +181,14 @@
     border:1px solid var(--line);border-radius:8px;cursor:pointer;box-shadow:0 2px 10px #0008;
     padding:3px;}
   #minimap:hover{border-color:var(--amber);}
+  #map-tools{position:absolute;left:8px;top:62px;z-index:20;display:flex;flex-direction:column;
+    gap:3px;padding:4px;border:1px solid #ffffff18;border-radius:9px;background:#0b0e09d9;
+    box-shadow:0 3px 14px #0009;backdrop-filter:blur(4px);}
+  #map-tools button{width:34px;height:32px;padding:0;font-size:17px;background:#1b2116e8;
+    border-color:#46503a;color:#d8d4c0;line-height:1;}
+  #map-tools button:hover{border-color:var(--amber);color:#ffe09a;background:#2a301c;}
+  body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 
   /* ---------- modals ---------- */
   .modal-back{position:absolute;inset:0;background:#000a;z-index:40;display:flex;
@@ -419,6 +430,11 @@
   <button id="coach-amphib-ok" class="primary">Got it ✓</button>
 </div>
 <canvas id="minimap" class="hidden" title="Click or drag to jump the camera · M hides the minimap"></canvas>
+<div id="map-tools" class="hidden" aria-label="Map zoom controls">
+  <button id="map-zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+  <button id="map-fit" title="Fit the whole battlefield (F)" aria-label="Fit battlefield">⌂</button>
+  <button id="map-zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button>
+</div>
 <div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
 <div id="turn-banner" class="hidden"><div id="tb-main"></div><div id="tb-sub"></div></div>
 
@@ -966,6 +982,9 @@
     <div class="setrow" style="margin-top:8px;"><span>🎥 Camera tilt <span style="opacity:.55;font-size:11px;">experimental</span></span>
       <button id="btn-tilt">Tilt: OFF</button></div>
     <div style="color:var(--dim);font-size:12px;margin-top:2px;">Pitches the whole board back like a table — best paired with the 3D board. A separate switch: if a click ever feels off, flip it back to flat.</div>
+    <div class="setrow" style="margin-top:12px;"><span>🍃 Motion &amp; battery</span>
+      <button id="btn-motion">Motion: FULL</button></div>
+    <div style="color:var(--dim);font-size:12px;margin-top:2px;">Calm mode removes decorative motion, camera glides and interface animation while preserving combat feedback. The map also sleeps whenever this tab is hidden.</div>
     <div style="border-top:1px solid var(--line);margin:16px 0 4px;"></div>
     <div class="setrow"><span>🔍 Interface size</span>
       <input type="range" id="ui-scale" min="90" max="125" step="5">
@@ -10374,21 +10393,28 @@ function applyGfx(){                                          // preset baseline
   GFX = Object.assign({level:lvl}, base);
   for (const t of GFX_TOGGLES) if (t.k in _gfxOv) GFX[t.k] = !!_gfxOv[t.k];
 }
-let REDUCED_MOTION = false;
+let REDUCED_MOTION = false, MOTION_PREF = 'auto';
 function loadGfx(){
   try{
     const l = localStorage.getItem('hoi5-gfx');
     if (l && GFX_PRESETS[l]) GFX.level = l;
-    else if (typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches){
-      // OS asks for less motion and the player hasn't chosen a preset — quiet the busiest
-      // animated effects (still fully playable, just calmer). Any manual toggle overrides this.
-      REDUCED_MOTION = true;
-      for (const k of ['grain','particles','tracers','clouds']) if (!(k in _gfxOv)) _gfxOv[k] = false;
-    }
+    const mp=localStorage.getItem('hoi5-motion');
+    if(mp==='calm'||mp==='full')MOTION_PREF=mp;
+    const osCalm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    REDUCED_MOTION=MOTION_PREF==='calm'||(MOTION_PREF==='auto'&&osCalm);
   }catch(e){}
   applyGfx();
+  if(document.body&&document.body.classList)document.body.classList.toggle('reduced-motion',REDUCED_MOTION);
 }
 loadGfx();
+function setReducedMotion(on){
+  REDUCED_MOTION=!!on;MOTION_PREF=REDUCED_MOTION?'calm':'full';
+  try{localStorage.setItem('hoi5-motion',MOTION_PREF);}catch(e){}
+  if(document.body&&document.body.classList)document.body.classList.toggle('reduced-motion',REDUCED_MOTION);
+  if(REDUCED_MOTION&&typeof killGlides==='function')killGlides();
+  if(typeof requestRender==='function')requestRender();
+  if(typeof syncGfxUI==='function')syncGfxUI();
+}
 // 3D battlefield view — a purely cosmetic render mode (raised block counters,
 // embossed terrain relief). It moves NO hex centres, so picking/input are
 // identical to 2D; a full toggle, off by default, switch any time.
@@ -13712,6 +13738,7 @@ function _sceneAnimating(){
   if (anims.length || moveAnim || shakeMag > 0 || mmPings.length) return 2;  // booms, floats, slides, shake, minimap pings
   if (slideAnims.size || terrFlips.length) return 2;                         // combat slides & territory pulses
   if (camGlide || zoomGlide || panVel || hitFlash.size || recoilMap.size) return 2;  // camera glides, flick momentum, damage flashes, recoil
+  if (REDUCED_MOTION) return 0;                                        // calm mode: action feedback only
   if (sel && reach) return 2;                                          // selection ants + reachable pulse
   // ambient: atmosphere that just has to keep breathing — ~30fps tier
   if (typeof TUT !== 'undefined' && TUT.on) return 1;                  // tutorial spotlight pulse
@@ -13727,12 +13754,18 @@ function _sceneAnimating(){
   if (G.missions && G.missions.some(m => m.side === (G.mode==='hotseat' ? G.phase : G.playerSide))) return 1;  // objective ring pulse
   return 0;
 }
+let _pageVisible = typeof document==='undefined' || !document.hidden;
+if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',()=>{
+  _pageVisible=!document.hidden;_animPrev=0;
+  if(_pageVisible)requestRender();
+});
 (function loop(ts){
   requestAnimationFrame(loop);
+  if(!_pageVisible)return;                                             // no canvas/GPU work in a background tab
   ts = ts || (typeof performance!=='undefined' && performance.now ? performance.now() : Date.now());
   const anim = _sceneAnimating();
   const elapsed = ts - _lastFrameTs;
-  if (!_needRender && !anim && elapsed < 120) return;                   // idle: ~8fps self-heal
+  if (!_needRender && !anim && elapsed < (REDUCED_MOTION?500:120)) return; // idle: calm ~2fps, otherwise ~8fps self-heal
   // the fps cap throttles continuous animation, but an input-driven redraw
   // (_needRender) should paint on the very next frame — never wait out the cap,
   // or clicks and hovers feel laggy on the medium/low presets.
@@ -13750,7 +13783,7 @@ let dragging=false, dragMoved=false, lastMx=0, lastMy=0, downX=0, downY=0;
 let panVel=null, _dragVx=0, _dragVy=0, _dragT=0;    // release momentum: the map glides to a stop
 canvas.addEventListener('mousedown', e=>{ if (e.button!==0) return; killGlides(); panVel=null; _dragVx=_dragVy=0; _dragT=performance.now(); dragging=true; dragMoved=false; lastMx=downX=e.clientX; lastMy=downY=e.clientY; canvas.style.cursor=''; canvas.classList.add('dragging'); requestRender(); });
 window.addEventListener('mouseup', ()=>{
-  if (dragging && dragMoved && Math.hypot(_dragVx,_dragVy) > 0.15 && performance.now()-_dragT < 90)
+  if (!REDUCED_MOTION && dragging && dragMoved && Math.hypot(_dragVx,_dragVy) > 0.15 && performance.now()-_dragT < 90)
     panVel = { vx:_dragVx, vy:_dragVy, t:performance.now() };   // flick: carry the pan through
   dragging=false; canvas.classList.remove('dragging'); requestRender();
 });
@@ -13806,7 +13839,8 @@ canvas.addEventListener('wheel', e=>{
   const [tx,ty] = untilt(e.clientX, e.clientY);
   const [wx,wy] = toWorld(tx,ty);
   camGlide = null;
-  zoomGlide = {target, sx:tx, sy:ty, wx, wy};
+  if(REDUCED_MOTION){cam.z=target;cam.x=wx-tx/target;cam.y=wy-ty/target;zoomGlide=null;}
+  else zoomGlide = {target, sx:tx, sy:ty, wx, wy};
   requestRender();
 }, {passive:false});
 
@@ -14017,9 +14051,13 @@ function zoomAt(cx, cy, f){            // eased zoom keeping the given screen po
   const target = Math.max(minZoom(), Math.min(2.2, cur*f));
   const [wx,wy] = toWorld(cx,cy);
   camGlide = null;
-  zoomGlide = {target, sx:cx, sy:cy, wx, wy};
+  if(REDUCED_MOTION){cam.z=target;cam.x=wx-cx/target;cam.y=wy-cy/target;zoomGlide=null;}
+  else zoomGlide = {target, sx:cx, sy:cy, wx, wy};
   requestRender();
 }
+$('map-zoom-in').onclick=()=>{zoomAt(innerWidth/2,innerHeight/2,1.18);sClick();};
+$('map-zoom-out').onclick=()=>{zoomAt(innerWidth/2,innerHeight/2,1/1.18);sClick();};
+$('map-fit').onclick=()=>{fitCamera();requestRender();sClick();};
 window.addEventListener('keydown', e=>{
   if (!G || G.over) return;
   // don't hijack typing or keys meant for an open dialog — but Esc still closes the pause menu
@@ -14109,7 +14147,7 @@ function actionableUnits(side){ return unitsOf(side).filter(isActionable); }
 function centerOn(x,y,instant){
   const [cx,cy] = hexCenter(x,y);
   const tx = cx - innerWidth/cam.z/2, ty = cy - innerHeight/cam.z/2;
-  if (instant){ killGlides(); cam.x = tx; cam.y = ty; }
+  if (instant||REDUCED_MOTION){ killGlides(); cam.x = tx; cam.y = ty; }
   else { zoomGlide = null; camGlide = {x0:cam.x, y0:cam.y, x1:tx, y1:ty, t0:performance.now(), dur:380}; }
   requestRender();
 }
@@ -14922,7 +14960,7 @@ let uiScale = 1;
 try{ const v = parseFloat(localStorage.getItem('hoi5-uiscale')); if (!isNaN(v) && v>=0.9 && v<=1.25) uiScale = v; }catch(e){}
 function applyUiScale(){
   try{
-    for (const id of ['topbar','side','hint','coach-amphib']){ const el=$(id); if (el && el.style) el.style.zoom = uiScale; }
+    for (const id of ['topbar','side','hint','coach-amphib','map-tools']){ const el=$(id); if (el && el.style) el.style.zoom = uiScale; }
     document.querySelectorAll('.modal').forEach(el=>{ el.style.zoom = uiScale; });
     const sv = $('ui-scale-val'); if (sv) sv.textContent = Math.round(uiScale*100)+'%';
   }catch(e){}
@@ -14987,6 +15025,8 @@ function syncGfxUI(){
   if (sp) sp.classList.toggle('sel', spriteMode);
   const tb = $('btn-tilt');
   if (tb){ tb.textContent = 'Tilt: ' + (tilt?'ON':'OFF'); tb.classList.toggle('sel', tilt); }
+  const mb=$('btn-motion');
+  if(mb){mb.textContent='Motion: '+(REDUCED_MOTION?'CALM':'FULL');mb.classList.toggle('sel',REDUCED_MOTION);}
   syncEnhancedUI();
 }
 for (const l of ['low','medium','high'])
@@ -14996,6 +15036,7 @@ $('sym-sprite').onclick = ()=>{ setSpriteMode(true);  sClick(); };
 $('view-2d').onclick = ()=>{ setView3d(false); sClick(); };
 $('view-3d').onclick = ()=>{ setView3d(true); sClick(); };
 $('btn-tilt').onclick = ()=>{ setTilt(!tilt); sClick(); };
+$('btn-motion').onclick = ()=>{ setReducedMotion(!REDUCED_MOTION); sClick(); };
 $('gfx-adv-toggle').onclick = ()=>{
   const adv = $('gfx-adv'), open = adv.classList.toggle('hidden');
   $('gfx-adv-toggle').textContent = open ? 'Advanced ▸' : 'Advanced ▾';
@@ -15858,6 +15899,7 @@ if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRende
    slot actually holds a saved campaign */
 function showModeSelect(){
   eventQueue.length = 0; show('event-modal', false);   // a stale battle event must not float over the menu
+  show('map-tools',false);
   show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false);
   if(typeof wwClose==='function') wwClose();
   // "continue where you left off" — one button to resume the last unfinished standalone battle
@@ -15982,6 +16024,7 @@ function quitToMenu(){
    tests can drive it; everything below is the browser-only presentation layer. */
 let rvResetPending = false;
 function rvOpen(){
+  show('map-tools',false);
   show('mode-select', false); show('realistic-menu', false); show('menu', false); show('waw-menu', false);
   try{ rvSetCamp(localStorage.getItem('hoi5-road-camp') || 'rv'); }catch(e){ rvSetCamp('rv'); }
   if (RV && RV.diff) rvDiff = RV.diff;
@@ -16830,7 +16873,7 @@ function startCampaign(loaded){
   if(document.body&&document.body.dataset) document.body.dataset.theater=th;
   $('game-title').textContent = ({east:'⚔ ',west:'🌍 ',pacific:'🌊 '}[th]||'⚙ ') + SCN.short;
   show('menu', false);
-  show('topbar', true); show('side', true); show('hint', true);
+  show('topbar', true); show('side', true); show('hint', true); show('map-tools',true);
   if (loaded) fitCamera(); else focusOpeningCamera();
   updateAll();
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
