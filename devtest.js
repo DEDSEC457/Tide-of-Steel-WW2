@@ -303,6 +303,31 @@ say('— pacific campaign —');
   check('the player is the Allies on both engine sides',
     E.rvStageSide('wal',0)==='S' && E.rvStageSide('wal',1)==='G' &&
     E.rvStageSide('wal',2)==='G' && E.rvStageSide('wal',3)==='S');
+  // COMMANDER CAMPAIGN: persistent headquarters + core army, built on the same arc engine
+  const cmd = E.RV_CAMPS.cmd;
+  check('the Commander Campaign has six real operations', !!cmd && cmd.commander && cmd.stages.length===6 && cmd.stages.every(s=>!!E.SCENARIOS[s.scn]));
+  check('Commander side overrides follow the Western Allied army',
+    E.rvStageSide('cmd',0)==='S' && E.rvStageSide('cmd',1)==='G' && E.rvStageSide('cmd',5)==='S');
+  E.rvSetCamp('cmd');
+  const cc = E.rvStart('normal');
+  check('a new Commander career opens headquarters resources', cc.version===2 && cc.hq.replacements===8 && cc.hq.command===3 && cc.hq.intel===2 && Array.isArray(cc.core));
+  cc.core.push({id:'c1',name:'Test Veterans',role:'inf',xp:18,kills:2,readiness:.4,battles:1,trait:'battle hardened',honours:[]});
+  check('operation plans can be selected without spending early', E.rvSetPrep('refit') && cc.hq.replacements===8 && cc.prep==='refit');
+  E.newGame('S','normal','ai','alamein');
+  E.rvApplyPrep('S'); E.rvApplyCore(0);
+  const carried = E.unitsOf('S').find(u=>u.coreId==='c1');
+  check('refit spends replacements and restores persistent readiness', cc.hq.replacements===5 && cc.core[0].readiness>.55);
+  check('a core cadre attaches to a compatible formation', !!carried && carried.xp>=14 && carried.kills===2);
+  const beforeCore=cc.core.length;
+  E.rvCaptureCore('S',0,4,800,true);
+  check('after-action capture expands the core roster', cc.core.length>=beforeCore && cc.core.length<=4 && cc.pendingReport && cc.pendingReport.name==='Lightfoot');
+  check('after-action rewards return to headquarters', cc.hq.command>=4 && cc.hq.intel>=3 && cc.hq.prestige>=8);
+  // Unlike classic Road to Victory, a Commander setback advances history.
+  cc.prep='balanced'; E.rvSetPrep('balanced');
+  const battle=E.newGame('S','normal','ai','alamein'); battle.campaign={mode:'rv',camp:'cmd',stage:0}; battle.result={vp:E.TOTAL_VP};
+  E.rvOnStageEnd();
+  const afterSetback=E.rvCurrent();
+  check('Commander setbacks advance instead of forcing a replay', afterSetback.stage===1 && afterSetback.cleared[0] && afterSetback.cleared[0].outcome==='setback');
   // Market Garden opens with the airborne carpet already down and supplied by air
   const Gm = E.newGame('G','normal','hotseat','marketgarden');
   check('the carpet starts with three air-bridge pockets', (Gm.airdrops||[]).length===3 && Gm.airdrops.every(a=>a.side==='G'&&a.turns>0));

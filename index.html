@@ -310,6 +310,12 @@
   .turn-check-item:last-child{border-bottom:0}.turn-check-item .tc-icon{font-size:18px;text-align:center;}
   .turn-check-item small{display:block;color:var(--dim);margin-top:2px;line-height:1.35;}
   .turn-check-item button{font-size:12px;padding:5px 8px;color:var(--cyan);}
+  .rv-hq{border:1px solid #59613d;border-radius:10px;background:#10150ddd;padding:12px;margin:10px 0;text-align:left;}
+  .rv-hq-bar{display:flex;gap:7px;flex-wrap:wrap;margin:7px 0 10px}.rv-hq-chip{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:#1a2116;color:var(--dim);font-size:12px}.rv-hq-chip b{color:var(--amber)}
+  .rv-hq-grid{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(320px,1.15fr);gap:10px}.rv-hq-panel{border:1px solid var(--line);border-radius:8px;background:#171c14;padding:10px;}
+  .rv-hq-title{color:var(--amber);font-size:11px;letter-spacing:1.5px;margin-bottom:7px}.rv-plan-row{display:flex;gap:6px;flex-wrap:wrap}.rv-plan{flex:1;min-width:135px;text-align:left;padding:7px 8px}.rv-plan.sel{border-color:var(--amber);color:#ffe4a8;background:#30371d}.rv-plan small{display:block;color:var(--dim);font-size:10.5px;line-height:1.3;margin-top:2px}
+  .rv-core-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:7px}.rv-core{border-left:3px solid var(--cyan);background:#1a2118;padding:7px 8px;border-radius:4px;font-size:12px}.rv-core.damaged{border-left-color:var(--redL)}.rv-core b{color:#eee4c8}.rv-readiness{height:4px;background:#30362a;margin-top:5px}.rv-readiness i{display:block;height:100%;background:var(--grn)}
+  @media(max-width:760px){.rv-hq-grid{grid-template-columns:1fr}.rv-plan{min-width:120px}}
 
   ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
 
@@ -443,8 +449,8 @@
         <div class="mc-icon">🎖</div>
         <div class="mc-text">
           <span class="mc-badge fresh">✦ NEW</span>
-          <h2>ROAD TO VICTORY</h2>
-          <p class="mc-desc">Two linked campaigns: the Axis war, Poland 1939 to the Ardennes — or the Great Patriotic War as the Soviets, Barbarossa to Kursk. Win to unlock the next; your doctrines, veterans and war chest carry forward. One continuous campaign.</p>
+          <h2>COMMANDER CAMPAIGNS</h2>
+          <p class="mc-desc">Lead one army through a connected war. Formations keep experience, losses, traits and battle honours; headquarters decisions shape the next operation. Classic Road to Victory arcs remain available.</p>
         </div>
         <button class="primary mc-btn">MARCH ▶</button>
       </div>
@@ -552,6 +558,15 @@
       <div id="rv-diff-desc" style="color:var(--dim);font-size:12px;margin:4px auto 0;max-width:560px;text-align:center;line-height:1.5;min-height:30px;"></div>
     </div>
     <div id="rv-stages" style="display:flex;gap:6px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin:14px 0;"></div>
+    <div id="rv-hq" class="rv-hq hidden">
+      <div class="rv-hq-title">FIELD HEADQUARTERS · PERSISTENT COMMAND</div>
+      <div id="rv-hq-res" class="rv-hq-bar"></div>
+      <div class="rv-hq-grid">
+        <div class="rv-hq-panel"><div class="rv-hq-title">AFTER-ACTION REPORT</div><div id="rv-report"></div></div>
+        <div class="rv-hq-panel"><div class="rv-hq-title">PLAN THE NEXT OPERATION</div><div id="rv-prep"></div></div>
+      </div>
+      <div class="rv-hq-panel" style="margin-top:10px;"><div class="rv-hq-title">CORE FORMATIONS</div><div id="rv-core" class="rv-core-grid"></div></div>
+    </div>
     <div id="rv-status" style="color:var(--dim);font-size:13px;min-height:18px;"></div>
     <div class="mrow" style="justify-content:center;margin-top:14px;">
       <button id="rv-back">← Back</button>
@@ -7544,7 +7559,20 @@ const WEST_STAGES = [
   { scn:'marketgarden', side:'G', name:'Market Garden', sub:'Holland · September 1944', goal:'Lay the airborne carpet and drive XXX Corps to the Rhine.' },
   { scn:'bulge',        side:'S', name:'The Ardennes',  sub:'Belgium · December 1944',  goal:'Hold the shoulders, relieve Bastogne, and throw back the last gamble.' },
 ];
+/* Commander Campaign vertical slice. It deliberately reuses completed operational
+   scenarios first; a Rhine finale can be added after the persistence loop is proven. */
+const COMMANDER_WEST_STAGES = [
+  { scn:'alamein',      side:'S', name:'Lightfoot',          sub:'Egypt · July 1942',        goal:'Save Egypt, preserve the Eighth Army, and take the initiative in the desert.' },
+  { scn:'italy',        side:'G', name:'Operation Husky',    sub:'Sicily & Italy · July 1943',goal:'Storm Sicily, secure the ports, and carry the veteran army onto the mainland.' },
+  { scn:'dday',         side:'G', name:'Operation Overlord', sub:'Normandy · June 1944',     goal:'Establish the lodgement, take the ports, and break the Atlantic Wall.' },
+  { scn:'normandy',     side:'G', name:'The Breakout',       sub:'France · June 1944',       goal:'Win the full operational campaign from the beaches to Paris.' },
+  { scn:'marketgarden', side:'G', name:'Market Garden',      sub:'Holland · September 1944', goal:'Preserve the airborne corps and force a road to the Rhine.' },
+  { scn:'bulge',        side:'S', name:'The Ardennes',       sub:'Belgium · December 1944',  goal:'Survive the winter blow, relieve Bastogne, and retain the road into Germany.' },
+];
 const RV_CAMPS = {
+  cmd: { title:'COMMANDER CAMPAIGN',       sub:'THE WESTERN ALLIES · 1942–1944 · ONE ARMY, SIX OPERATIONS',
+         blurb:'Command one persistent Allied army from the desert to the Ardennes. Core formations keep their experience, losses, honours and scars; between operations, spend replacements and choose the next headquarters plan. <b>Setbacks do not restart history</b> — the campaign continues with the consequences. ',
+         side:'G', flag:'🎖', key:'hoi5-commander-west-v1', stages:COMMANDER_WEST_STAGES, commander:true },
   rv:  { title:'ROAD TO VICTORY',        sub:'THE AXIS WAR · 1939–1944 · WIN EACH FRONT TO OPEN THE NEXT',
          blurb:'Fight the war as the Axis, one front at a time. Every victory carries your <b>doctrines</b>, a <b>veteran cadre</b> and a <b>war chest</b> into the next battle — and unlocks the campaign beyond it.',
          side:'G', flag:'⬛', key:'hoi5-roadtovictory-v1', stages:RV_STAGES },
@@ -7570,8 +7598,21 @@ let rvDiff = 'normal';
 function rvCamp(){ return RV_CAMPS[rvCampId] || RV_CAMPS.rv; }
 function rvStagesOf(campId){ return (RV_CAMPS[campId] || RV_CAMPS.rv).stages; }
 function rvSetCamp(id){ if (RV_CAMPS[id]){ rvCampId = id; rvLoadState(); } }
-function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(rvCamp().key)) || null; }catch(e){ RV = null; } }
-function rvSaveState(){ try{ if (RV) localStorage.setItem(rvCamp().key, JSON.stringify(RV)); else localStorage.removeItem(rvCamp().key); }catch(e){} }
+function rvEnsureState(){
+  if (!RV) return null;
+  RV.version = 2;
+  if (!Array.isArray(RV.cleared)) RV.cleared=[];
+  if (!RV.doc || typeof RV.doc!=='object') RV.doc={};
+  if (!Array.isArray(RV.core)) RV.core=[];
+  if (!Array.isArray(RV.reports)) RV.reports=[];
+  if (!RV.hq) RV.hq={replacements:8,command:3,intel:2,prestige:0};
+  for (const [k,v] of Object.entries({replacements:8,command:3,intel:2,prestige:0}))
+    if (!Number.isFinite(RV.hq[k])) RV.hq[k]=v;
+  if (!RV.prep) RV.prep='balanced';
+  return RV;
+}
+function rvLoadState(){ try{ RV = JSON.parse(localStorage.getItem(rvCamp().key)) || null; rvEnsureState(); }catch(e){ RV = null; } }
+function rvSaveState(){ try{ if (RV){rvEnsureState();localStorage.setItem(rvCamp().key, JSON.stringify(RV));}else localStorage.removeItem(rvCamp().key); }catch(e){} }
 /* stars measure the PLAYER's objective performance: the attacker wants the Axis
    score high, the Soviet defender wants it low */
 function rvStars(vp, side){
@@ -7580,12 +7621,76 @@ function rvStars(vp, side){
   return f>=0.85?5:f>=0.68?4:f>=0.5?3:f>=0.3?2:f>=0.14?1:0;
 }
 function rvWarChest(){ if (!RV) return 0; const s = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0); return Math.min(16, s*2); }
-function rvStart(diff){ RV = { diff:diff||rvDiff, stage:0, cleared:[], doc:{}, score:0 }; rvSaveState(); return RV; }
+function rvStart(diff){ RV = { version:2,diff:diff||rvDiff,stage:0,cleared:[],doc:{},score:0,core:[],reports:[],hq:{replacements:8,command:3,intel:2,prestige:0},prep:'balanced' }; rvSaveState(); return RV; }
 function rvApplyVeterans(stageIdx){
+  if (rvCamp().commander){ rvApplyCore(stageIdx); return; }
   const n = RV ? Math.min(6, RV.cleared.filter(Boolean).length*2) : 0;   // two blooded formations per front won
   if (!n) return;
   const cand = unitsOf(rvStageSide(rvCampId, stageIdx)).filter(u=>!KINDS[u.kind].hq && u.str>=4);
   for (let i=0;i<Math.min(n,cand.length);i++) gainXP(cand[(i*4+1)%cand.length], 12 + stageIdx*4);
+}
+function rvCoreRole(u){ return (u&&KINDS[u.kind]&&KINDS[u.kind].sym)||'inf'; }
+function rvSetPrep(key){
+  if (!RV || !rvCamp().commander || !['balanced','refit','air','intel'].includes(key)) return false;
+  const cost={refit:['replacements',3],air:['command',2],intel:['intel',1]}[key];
+  if (cost && RV.hq[cost[0]]<cost[1]) return false;
+  RV.prep=key;rvSaveState();return true;
+}
+function rvApplyCore(stageIdx){
+  if (!RV || !rvCamp().commander) return;
+  const side=rvStageSide(rvCampId,stageIdx), pool=unitsOf(side).filter(u=>!KINDS[u.kind].hq&&!KINDS[u.kind].lowProfile);
+  const used=new Set();
+  for (const c of RV.core){
+    let u=pool.find(x=>!used.has(x.id)&&rvCoreRole(x)===c.role);
+    if(!u)u=pool.find(x=>!used.has(x.id));if(!u)continue;used.add(u.id);
+    u.coreId=c.id;u.coreName=c.name;u.coreTrait=c.trait||null;
+    u.xp=Math.max(u.xp||0,Math.min(28,Math.round((c.xp||0)*.82)));
+    u.kills=c.kills||0;
+    const max=KINDS[u.kind].maxStr||u.str;
+    u.str=Math.max(2,Math.min(max,Math.round(max*Math.max(.25,Math.min(1,c.readiness??1)))));
+  }
+}
+function rvApplyPrep(side){
+  if (!RV || !rvCamp().commander) return;
+  const key=RV.prep||'balanced';
+  if(key==='refit'&&RV.hq.replacements>=3){
+    RV.hq.replacements-=3;for(const c of RV.core)c.readiness=Math.min(1,(c.readiness??1)+.18);
+  }else if(key==='air'&&RV.hq.command>=2){
+    RV.hq.command-=2;for(const a of airOf(side))a.str=Math.min(AIR_MAXSTR,a.str+1);
+  }else if(key==='intel'&&RV.hq.intel>=1){
+    RV.hq.intel-=1;const contacts=unitsOf(enemyOf(side)).filter(u=>!KINDS[u.kind].lowProfile).slice(0,3);
+    G.recon=(G.recon||[]).concat(contacts.map(u=>({side,x:u.x,y:u.y})));
+  }
+  RV.prep='balanced';rvSaveState();
+}
+function rvCoreTraitFor(u,scn){
+  if(['italy','dday','normandy'].includes(scn))return'amphibious veterans';
+  if(scn==='bulge')return'winter hardened';
+  if(['stalingrad','marketgarden'].includes(scn))return'urban veterans';
+  return rvCoreRole(u)==='arm'?'mobile warfare':'battle hardened';
+}
+function rvCaptureCore(side,stageIdx,stars,score,won){
+  if (!RV || !rvCamp().commander) return;
+  const survivors=unitsOf(side).filter(u=>!KINDS[u.kind].hq&&!KINDS[u.kind].lowProfile);
+  const byCore=new Map(survivors.filter(u=>u.coreId).map(u=>[u.coreId,u]));
+  for(const c of RV.core){
+    const u=byCore.get(c.id);
+    if(u){const max=KINDS[u.kind].maxStr||u.str;c.xp=u.xp||0;c.kills=u.kills||0;c.readiness=Math.max(.2,u.str/max);c.battles=(c.battles||0)+1;c.role=rvCoreRole(u);}
+    else{c.readiness=Math.min(c.readiness??1,.3);c.battles=(c.battles||0)+1;c.scar='rebuilt after catastrophic losses';}
+  }
+  const target=Math.min(6,4+stageIdx), ranked=survivors.filter(u=>!u.coreId).sort((a,b)=>unitLevel(b)-unitLevel(a)||(b.kills||0)-(a.kills||0)||b.str-a.str);
+  while(RV.core.length<target&&ranked.length){
+    const u=ranked.shift(), max=KINDS[u.kind].maxStr||u.str;
+    RV.core.push({id:'c'+(RV.core.length+1),name:u.name,role:rvCoreRole(u),xp:u.xp||0,kills:u.kills||0,readiness:u.str/max,battles:1,trait:rvCoreTraitFor(u,G.scenario),honours:[]});
+  }
+  if(stars>=4)for(const c of RV.core){const honours=c.honours||(c.honours=[]);if(!honours.includes(rvCamp().stages[stageIdx].name))honours.push(rvCamp().stages[stageIdx].name);}
+  const losses=G.stats&&G.stats[side]?G.stats[side].lost:0,enemyLosses=G.stats&&G.stats[enemyOf(side)]?G.stats[enemyOf(side)].lost:0;
+  RV.hq.replacements=Math.min(30,RV.hq.replacements+Math.max(1,stars+1));
+  if(won)RV.hq.command=Math.min(12,RV.hq.command+1);
+  if(stars>=4)RV.hq.intel=Math.min(8,RV.hq.intel+1);
+  RV.hq.prestige+=Math.round(score/100);
+  const report={stage:stageIdx,name:rvCamp().stages[stageIdx].name,stars,score,won,losses,enemyLosses,core:RV.core.length};
+  RV.reports.push(report);RV.reports=RV.reports.slice(-8);RV.pendingReport=report;
 }
 function rvOnStageEnd(){
   if (!G.campaign || G.campaign.mode!=='rv') return;
@@ -7596,9 +7701,11 @@ function rvOnStageEnd(){
   const stars = rvStars(vp, side), won = stars >= 3;
   const frac = TOTAL_VP ? (side==='S' ? (TOTAL_VP - vp)/TOTAL_VP : vp/TOTAL_VP) : 0;
   const score = Math.max(0, Math.round(frac*1000));
-  G.campaign.result = { won, stars, score };
-  if (won && i === RV.stage){                                           // clear the front, unlock the next
-    RV.cleared[i] = { stars, score };
+  const commander=!!rvCamp().commander, advanced=commander||won;
+  G.campaign.result = { won, advanced, stars, score };
+  if(commander)rvCaptureCore(side,i,stars,score,won);
+  if (advanced && i === RV.stage){                                      // Commander campaigns continue through setbacks
+    RV.cleared[i] = { stars, score, outcome:won?'victory':'setback' };
     RV.score += score;
     RV.doc = Object.assign({}, RV.doc, G.doc[side]);
     RV.stage = Math.min(rvCamp().stages.length, i+1);
@@ -10938,7 +11045,11 @@ onWinterDecision = function(){ if (!eventQueue.length && !maybeShowDecision()) m
 // defer to the pass screen; vs the AI, control is returning to us now, so show it
 onDecision = function(){ if (G.mode!=='hotseat' && !eventQueue.length) maybeShowDecision(); };
 function showNextEvent(){
-  if (!eventQueue.length){ show('event-modal', false); if (!maybeShowDecision()) maybeShowGear(); return; }
+  if (!eventQueue.length){
+    show('event-modal', false); if (!maybeShowDecision()) maybeShowGear();
+    if(typeof continueBriefingStart==='function')continueBriefingStart();
+    return;
+  }
   const e = eventQueue[0];
   const yr = (e.date && (e.date.match(/\b(19\d\d)\b/)||[])[1]) ||
              (START_DATE ? new Date(START_DATE).getUTCFullYear() : '');
@@ -14183,7 +14294,7 @@ function renderRoster(){
     const genTag = g ? ` <small style="color:var(--amber)">· ⭐ ${g.name}${tr?` <span title="${tr.name}: ${tr.desc}">${tr.icon}</span>`:''}</small>` : '';
     const kills = (u.kills||0) > 0 ? ` <small style="color:#e0a06a" title="${u.kills} enemy formations destroyed">☠${u.kills}</small>` : '';
     const row = document.createElement('div'); row.className = 'ros';
-    row.innerHTML = `<span class="ros-nm"><b>${u.name}</b> <small>· ${k.label}${u.entrench?' · '+'▮'.repeat(u.entrench):''}</small>${genTag}${kills}</span>`
+    row.innerHTML = `<span class="ros-nm"><b>${u.name}</b>${u.coreId?' <small style="color:var(--cyan)">· 🎖 core</small>':''} <small>· ${k.label}${u.entrench?' · '+'▮'.repeat(u.entrench):''}</small>${genTag}${kills}</span>`
       + `<span class="ros-tag ${st.cls}">${st.tag}</span>`
       + `<span class="ros-str ${scls}">${u.str}/${k.maxStr}</span>`;
     row.onclick = ()=>{ show('roster-modal', false); selectUnit(u); sClick(); centerOn(u.x,u.y); };
@@ -14264,6 +14375,7 @@ function updateUnitCard(){
   body.innerHTML = `
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
+    ${u.coreId ? `<div style="border-left:3px solid var(--cyan);background:#17251f;padding:5px 7px;margin:4px 0 6px;font-size:12px;color:#bfe8df;">🎖 <b>CORE FORMATION</b>${u.coreName&&u.coreName!==u.name?` · cadre of ${u.coreName}`:''}${u.coreTrait?`<br><span style="color:var(--dim)">${u.coreTrait}</span>`:''}</div>` : ''}
     ${u.embarked ? `<div style="color:#7fc4f0;font-size:12px;margin-bottom:4px;">⚓ <b>At sea in transports</b> — sail onto the shore to land the division (fragile until it does).</div>` : ''}
     ${g ? `<div style="color:var(--amber);margin-bottom:2px;">⭐ Gen. ${g.name} · ${genBonusText(g)}</div>
            ${g.trait && GEN_TRAITS[g.trait] ? `<div style="color:#ffe4a8;font-size:12px;margin-bottom:2px;" title="${GEN_TRAITS[g.trait].desc}">${GEN_TRAITS[g.trait].icon} <b>${GEN_TRAITS[g.trait].name}</b> — ${GEN_TRAITS[g.trait].desc}</div>` : ''}
@@ -15894,6 +16006,33 @@ function rvBattleSave(){
     return { stage:i, turn:d.G.turn };
   } catch(e){ return null; }
 }
+function rvRenderCommanderHQ(){
+  const box=$('rv-hq'), camp=rvCamp();
+  if(!box)return;
+  const active=!!(RV&&camp.commander);show('rv-hq',active);if(!active)return;
+  rvEnsureState();
+  $('rv-hq-res').innerHTML=`<span class="rv-hq-chip">👥 Replacements <b>${RV.hq.replacements}</b></span><span class="rv-hq-chip">★ Command <b>${RV.hq.command}</b></span><span class="rv-hq-chip">🔭 Intelligence <b>${RV.hq.intel}</b></span><span class="rv-hq-chip">🎖 Prestige <b>${RV.hq.prestige}</b></span>`;
+  const r=RV.pendingReport||(RV.reports.length?RV.reports[RV.reports.length-1]:null);
+  $('rv-report').innerHTML=r
+    ? `<div style="font-weight:700;color:${r.won?'var(--grn)':'var(--redL)'}">${r.won?'VICTORY':'FIGHTING SETBACK'} · ${r.name}</div><div style="margin:5px 0;color:#ffd34d">${'★'.repeat(r.stars)}<span style="opacity:.2">${'★'.repeat(5-r.stars)}</span></div><div class="statrow"><span>Enemy losses</span><span class="good">${r.enemyLosses} str</span></div><div class="statrow"><span>Our losses</span><span class="bad">${r.losses} str</span></div><div class="statrow"><span>Core formations retained</span><span>${r.core}</span></div>`
+    : '<div style="color:var(--dim);line-height:1.5">The army has not yet fought under your command. The first operation will establish the core roster.</div>';
+  const plans=[
+    ['balanced','Balanced plan','No cost','Enter battle with resources held in reserve.'],
+    ['refit','Refit the core','3 replacements','Restore 18% readiness to every core formation.'],
+    ['air','Air priority','2 command','Every friendly air group begins at +1 strength.'],
+    ['intel','Intelligence preparation','1 intelligence','Reveal three enemy formation areas at the opening.'],
+  ];
+  const can=k=>k==='balanced'||(k==='refit'?RV.hq.replacements>=3:k==='air'?RV.hq.command>=2:RV.hq.intel>=1);
+  $('rv-prep').innerHTML=RV.stage>=camp.stages.length
+    ? '<div style="color:var(--grn);line-height:1.5"><b>Campaign concluded.</b><br>All operations are complete; the final roster and record remain available here.</div>'
+    : `<div style="color:var(--dim);font-size:12px;margin-bottom:7px;">Choose one order for <b style="color:var(--ink)">${camp.stages[RV.stage].name}</b>; its cost is paid when the operation launches.</div><div class="rv-plan-row">`+plans.map(p=>`<button class="rv-plan ${RV.prep===p[0]?'sel':''}" data-plan="${p[0]}" ${can(p[0])?'':'disabled'}><b>${p[1]}</b><small>${p[2]} · ${p[3]}</small></button>`).join('')+'</div>';
+  $('rv-prep').querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>{if(rvSetPrep(b.dataset.plan)){sClick();rvRenderCommanderHQ();}});
+  const roleIcon={inf:'▭╳▭',arm:'▭●▭',para:'✈',mot:'▭➜▭',cav:'♞',art:'●'};
+  $('rv-core').innerHTML=RV.core.length?RV.core.map(c=>{
+    const rd=Math.round((c.readiness??1)*100), hon=(c.honours||[]).slice(-2).join(' · ');
+    return `<div class="rv-core ${rd<50?'damaged':''}"><b>${roleIcon[c.role]||'▭'} ${c.name}</b><div style="color:var(--dim);margin-top:3px;">${c.trait||'unblooded'} · ${c.battles||0} battle${c.battles===1?'':'s'} · ${c.kills||0} kills</div>${hon?`<div style="color:var(--amber);margin-top:3px;">🏅 ${hon}</div>`:''}${c.scar?`<div class="bad" style="margin-top:3px;">⚠ ${c.scar}</div>`:''}<div class="rv-readiness" title="Readiness ${rd}%"><i style="width:${rd}%;background:${rd<50?'var(--redL)':'var(--grn)'}"></i></div><div style="color:var(--dim);font-size:10px;margin-top:2px;">readiness ${rd}% · xp ${c.xp||0}</div></div>`;
+  }).join(''):'<div style="color:var(--dim);">Core formations will be selected from the survivors of your first operation.</div>';
+}
 function rvRender(){
   const camp = rvCamp(), STAGES = camp.stages;
   const tm = medalGet(rvCampId);
@@ -15929,10 +16068,10 @@ function rvRender(){
     const bg = open?'#37401f':state==='clear'?'#18220f':'#12160f';
     const bw = open?2.5:1.5;
     const glow = open ? 'box-shadow:0 0 22px rgba(232,179,75,0.45), inset 0 0 0 1px rgba(255,217,138,0.25);' : '';
-    const badge = state==='clear'?'<span style="color:var(--grn)">✓ CLEARED</span>'
-      : open?'<span style="color:#ffe4a8;font-weight:700;">▶ AVAILABLE</span>'
+    const badge = state==='clear'?(camp.commander&&rec&&rec.outcome==='setback'?'<span style="color:var(--redL)">↘ SETBACK</span>':'<span style="color:var(--grn)">✓ CLEARED</span>')
+      : open?`<span style="color:#ffe4a8;font-weight:700;">▶ ${camp.commander?'NEXT OPERATION':'AVAILABLE'}</span>`
       : '<span style="color:var(--dim)">🔒 LOCKED</span>';
-    const clickable = started && i<=RV.stage;
+    const clickable = started && (camp.commander?i===RV.stage:i<=RV.stage);
     const titleCol = open?'#fff3d6':'inherit';
     const goalCol = open?'#cdbb90':'var(--dim)';
     html += `<div class="rv-box" data-i="${i}" style="width:136px;border:${bw}px solid ${border};border-radius:10px;padding:9px 10px;background:${bg};text-align:left;${glow}${clickable?'cursor:pointer;':''}${(open||clickable)?'':'opacity:.45;'}">
@@ -15947,13 +16086,20 @@ function rvRender(){
   $('rv-stages').innerHTML = html;
   for (const b of $('rv-stages').querySelectorAll('.rv-box')){
     const i = +b.dataset.i;
-    if (started && i<=RV.stage) b.onclick = ()=>rvPlayStage(i);
+    if (started && (camp.commander?i===RV.stage:i<=RV.stage)) b.onclick = ()=>rvPlayStage(i);
   }
+  rvRenderCommanderHQ();
   if (started){
     const done = RV.cleared.filter(Boolean).length, totStars = RV.cleared.filter(Boolean).reduce((a,c)=>a+c.stars,0);
     const docs = Object.keys(RV.doc||{}).length;
-    if (RV.stage >= STAGES.length)
-      $('rv-status').innerHTML = `<b style="color:var(--grn)">🏆 The war is won — all ${STAGES.length} fronts cleared.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Replay any battle for a better result.`;
+    if (RV.stage >= STAGES.length){
+      const wins=RV.cleared.filter(c=>c&&c.outcome!=='setback').length;
+      $('rv-status').innerHTML = camp.commander
+        ? `<b style="color:var(--grn)">🎖 Campaign concluded — ${wins} victories in ${STAGES.length} operations.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Your headquarters record and surviving core army are preserved.`
+        : `<b style="color:var(--grn)">🏆 The war is won — all ${STAGES.length} fronts cleared.</b> &nbsp; Final score <b>${RV.score.toLocaleString()}</b> · ${totStars}★. Replay any battle for a better result.`;
+    }
+    else if(camp.commander)
+      $('rv-status').innerHTML = `Operation <b>${RV.stage+1}/${STAGES.length}</b> · core army <b>${RV.core.length||'forming'}</b> · campaign score <b>${RV.score.toLocaleString()}</b> · ${RV.diff}. Setbacks continue the war but reduce rewards and readiness.`;
     else
       $('rv-status').innerHTML = `Fronts won <b>${done}/${STAGES.length}</b> &nbsp;·&nbsp; <b>${totStars}★</b> earned &nbsp;·&nbsp; war chest <b>${rvWarChest()}⚙</b> &nbsp;·&nbsp; ${docs} doctrine${docs===1?'':'s'} carried &nbsp;·&nbsp; score <b>${RV.score.toLocaleString()}</b> &nbsp;·&nbsp; ${RV.diff}`;
   } else {
@@ -15978,9 +16124,11 @@ function rvPlayStage(i){
   const camp = rvCamp();
   const side = rvStageSide(rvCampId, i);     // the Pacific swaps the player's engine side per battle
   newGame(side, RV.diff, 'ai', camp.stages[i].scn, mVar);   // same always-on variants as every other mode
-  G.campaign = { mode:'rv', camp:rvCampId, stage:i };
+  const chosenPlan=RV.prep||'balanced';
+  G.campaign = { mode:'rv', camp:rvCampId, stage:i, plan:chosenPlan };
   G.doc[side] = Object.assign({}, RV.doc);                          // doctrines carry forward
   const chest = rvWarChest(); if (chest) G.pp[side] = Math.min(40, G.pp[side] + chest);
+  rvApplyPrep(side);
   rvApplyVeterans(i);
   refreshSupply();
   show('road-screen', false);
@@ -16299,7 +16447,13 @@ function showEnd(){
   if (camp && camp.result){
     const cs = rvStagesOf(camp.camp || 'rv');
     const i = camp.stage, next = cs[i+1];
-    if (camp.result.won){
+    const commander=!!(RV_CAMPS[camp.camp||'rv']&&RV_CAMPS[camp.camp||'rv'].commander);
+    if(commander){
+      $('btn-end-menu').textContent='Return to Headquarters ▶';
+      cn.innerHTML=camp.result.won
+        ? `<b style="color:var(--grn)">✓ ${cs[i].name} completed — ${camp.result.stars}★.</b> Your surviving core formations and headquarters rewards have been recorded.${next?` Next: <b>${next.name}</b> · ${next.sub}.`:' The campaign is complete.'}`
+        : `<b style="color:var(--redL)">↘ ${cs[i].name} ended in a fighting setback.</b> The war continues; damaged core formations, reduced rewards and the result now follow you to ${next?`<b>${next.name}</b>`:'the campaign reckoning'}.`;
+    } else if (camp.result.won){
       $('btn-end-menu').textContent = next ? 'To the next front ▶' : 'Return to the Road ▶';
       cn.innerHTML = next
         ? `<b style="color:var(--grn)">✓ ${cs[i].name} cleared — ${camp.result.stars}★.</b> The road opens to <b>${next.name}</b> · ${next.sub}.`
@@ -16648,7 +16802,16 @@ function showBriefing(){
     `<div class="brief-tier${/HISTORY/.test(t)?' hist':''}"><b>${v}+</b> — ${t}</div>`).join('');
   show('briefing-modal', true);
 }
-$('btn-briefing-close').onclick = ()=>{ show('briefing-modal', false); sClick(); };
+let briefingStartAI=false;
+function continueBriefingStart(){
+  if(briefingStartAI&&!G.over&&$('briefing-modal').classList.contains('hidden')&&!eventQueue.length){
+    briefingStartAI=false;if(G.mode==='ai'&&G.phase!==G.playerSide)runAIPhase();
+  }
+}
+$('btn-briefing-close').onclick = ()=>{
+  show('briefing-modal', false); sClick();
+  if(eventQueue.length)showNextEvent();else continueBriefingStart();
+};
 
 function startCampaign(loaded){
   undoSnap = null;
@@ -16673,9 +16836,14 @@ function startCampaign(loaded){
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
   // resuming a save exactly at the start of your turn: run any standing orders
   if (loaded && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide)){ runStandingOrders(G.phase); updateAll(); }
-  if (!loaded){ saveGame(); showBriefing(); }   // a fresh battle opens with its mission card
+  if (!loaded){
+    saveGame();showBriefing();show('event-modal',false); // mission first; opening history follows it
+    // Never let the opening AI turn play underneath the briefing. This matters in
+    // Commander operations where the player's engine side legitimately moves second.
+    if(!G.over&&G.mode==='ai'&&G.phase!==G.playerSide)briefingStartAI=true;
+  }
   // if the human plays the Soviets, the German AI opens the war
-  if (!G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
+  if (!briefingStartAI && !G.over && G.mode==='ai' && G.phase!==G.playerSide) runAIPhase();
   if (!G.over && G.mode==='hotseat') updateAll();
 }
 migrateSaves();                                        // fold legacy shared-slot saves into per-battle slots
@@ -16946,7 +17114,7 @@ if (typeof module !== 'undefined' && module.exports){
     fireDecisions, resolveDecision, pendingDecision, decisionsFor,
     unitLevel, vetMul, underHQ, previewGroup, gainXP, HQ_RANGE,
     DOCTRINES, hasDoc, canBuyDoc, buyDoctrine, aiBuyDoctrine, docIncome, docSupplyBonus,
-    rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvStageSide, RV_CAMPS, rvCurrent: ()=>RV,
+    rvStars, rvStart, rvOnStageEnd, rvSetCamp, rvStageSide, rvSetPrep, rvApplyCore, rvApplyPrep, rvCaptureCore, rvEnsureState, RV_CAMPS, rvCurrent: ()=>RV,
     medalAward, medalGet, medalsAll, MEDAL_RANK, MEDAL_ICON,
     theaterOf, MUSIC,
     SCENARIOS, loadScenario,
