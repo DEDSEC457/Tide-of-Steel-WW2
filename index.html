@@ -187,6 +187,7 @@
   #map-tools button{width:34px;height:32px;padding:0;font-size:17px;background:#1b2116e8;
     border-color:#46503a;color:#d8d4c0;line-height:1;}
   #map-tools button:hover{border-color:var(--amber);color:#ffe09a;background:#2a301c;}
+  #mobile-dock,#mobile-tools-sheet{display:none;}
   body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after{
     animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 
@@ -332,18 +333,10 @@
     button,.opt,.pick{min-height:44px;}
     #topbar{top:env(safe-area-inset-top);height:52px;gap:4px;padding:4px 5px;font-size:11px;
       background:linear-gradient(#181c13fa,#12150efa);}
-    #topbar .t-title,#wx-chip,#mission-chip,#topbar .spacer{display:none!important;}
+    #topbar .t-title,#mission-chip,#topbar .spacer{display:none!important;}
     #topbar .t-chip{padding:5px 6px;max-width:none!important;}
-    #topbar #date-chip{max-width:92px!important;}
-    #topbar #btn-next{padding:5px 7px;min-width:44px;}
-    #topbar #btn-next .bl,#topbar #btn-undo .bl{display:none;}
-    #topbar #btn-endturn{min-width:86px;padding:7px 8px;font-size:11px;margin-left:auto;}
-    #topbar .hud-map,#topbar .hud-command,#topbar .hud-system{position:fixed;bottom:calc(5px + env(safe-area-inset-bottom));
-      height:47px;padding:3px;z-index:29;background:#0b0e09f2;border-color:#4b553e;box-shadow:0 3px 18px #000c;}
-    #topbar .hud-map{left:5px}.hud-map button{width:42px;height:39px;padding:0;}
-    #topbar .hud-command{left:142px}.hud-command button{width:43px;height:39px;padding:0;}
-    #topbar .hud-system{right:5px}.hud-system button{width:43px;height:39px;padding:0;}
-    #btn-aispeed,#btn-help2,#btn-sound{display:none!important;}
+    #topbar #date-chip{max-width:105px!important;}#topbar #wx-chip{display:block!important;max-width:55px!important;}
+    #topbar .hud-cluster,#topbar #btn-next,#topbar #btn-undo,#topbar #btn-endturn{display:none!important;}
     #map-tools{top:calc(60px + env(safe-area-inset-top));left:5px;padding:3px;}
     #map-tools button{width:42px;height:42px;font-size:20px;}
     #side{top:auto;left:6px;right:6px;bottom:calc(57px + env(safe-area-inset-bottom));width:auto;
@@ -351,13 +344,26 @@
       box-shadow:0 -5px 24px #000b;}
     #mobile-panel-toggle{display:block;position:sticky;top:0;z-index:3;width:100%;min-height:40px;
       padding:7px;background:#222a1a;border-color:#596647;color:#e6d6aa;font-size:12px;letter-spacing:1px;}
-    #side.mobile-collapsed{max-height:48px;overflow:hidden;background:transparent;border-color:transparent;box-shadow:none;padding:3px;}
+    #side.mobile-collapsed{display:none!important;}
     #side.mobile-collapsed .card{display:none!important;}
     #side:not(.mobile-collapsed) ~ #minimap{display:none!important;}
     #side .card{padding:8px 10px;font-size:12px;}
     #unit-actions button,#air-body button{min-height:40px;padding:7px 10px;}
     #hint{display:none!important;}
     #minimap{left:6px;bottom:calc(59px + env(safe-area-inset-bottom));max-width:34vw;max-height:22vh;}
+    #mobile-dock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(92px,1.28fr);position:fixed;
+      left:5px;right:5px;bottom:calc(5px + env(safe-area-inset-bottom));height:52px;z-index:31;gap:3px;
+      padding:3px;background:#090c08f4;border:1px solid #4b553e;border-radius:10px;box-shadow:0 -4px 22px #000c;}
+    #mobile-dock button{min-width:0;height:44px;padding:3px 2px;font-size:10px;line-height:1.05;letter-spacing:.2px;}
+    #mobile-dock button span{display:block;font-size:17px;line-height:19px;margin-bottom:2px;}
+    #mobile-dock .mobile-end{background:#4a3b18;border-color:var(--amber);color:#ffe1a0;font-weight:800;}
+    #mobile-dock button.on{border-color:var(--amber);color:#ffe1a0;background:#30371d;}
+    #mobile-tools-sheet{position:fixed;left:7px;right:7px;bottom:calc(63px + env(safe-area-inset-bottom));z-index:32;
+      grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px;background:#10150df7;border:1px solid #66714e;
+      border-radius:12px;box-shadow:0 -8px 34px #000d;backdrop-filter:blur(8px);}
+    #mobile-tools-sheet:not(.hidden){display:grid;}
+    #mobile-tools-sheet button{min-height:46px;text-align:left;padding:8px 11px;font-size:12px;background:#1b2116;}
+    #mobile-tools-sheet button b{display:block;color:#eee4c8;font-size:12px;}#mobile-tools-sheet button small{color:var(--dim);font-size:10px;}
     #turn-banner{top:calc(59px + env(safe-area-inset-top));max-width:88vw;padding:7px 22px;overflow:hidden;text-overflow:ellipsis;}
     #tb-main{font-size:13px;letter-spacing:1.5px}#tb-sub{font-size:11px;}
     .modal-back{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
@@ -368,6 +374,9 @@
     .mode-card,.mc-hero{max-width:none;width:100%;padding:15px;}
     .mc-hero .mc-btn{width:100%;}.mc-hero .mc-icon{font-size:32px;}.mc-hero h2{font-size:18px;}
     #mode-select .modal{padding-top:58px;}#btn-settings-main,#btn-tutorial-main{top:10px;}
+    .opt-row{flex-wrap:wrap;}#theater-row,#scn-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+    #theater-row>span:first-child,#scn-row>span:first-child{grid-column:1/-1;text-align:left;padding:0!important;}
+    #theater-row .opt,#scn-row .opt{padding:7px 8px;font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center;}
     #rm-scn-row{flex-wrap:wrap;}#rm-scn-row .pick{max-width:none!important;min-width:46%;}
     .rv-hq-grid{grid-template-columns:1fr}.rv-plan{min-width:120px}.rv-core-grid{grid-template-columns:1fr;}
     #road-screen .modal{padding-left:10px;padding-right:10px;}#rv-stages{flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto;padding-bottom:7px;}
@@ -481,6 +490,23 @@
   <button id="map-zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
   <button id="map-fit" title="Fit the whole battlefield (F)" aria-label="Fit battlefield">⌂</button>
   <button id="map-zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button>
+</div>
+<div id="mobile-tools-sheet" class="hidden" aria-label="Battlefield tools">
+  <button data-proxy="btn-supply"><b>🚚 Supply map</b><small>Show your logistics network</small></button>
+  <button data-proxy="btn-threat"><b>⚠ Threat map</b><small>Show enemy attack range</small></button>
+  <button data-proxy="btn-objectives"><b>🎯 Objectives</b><small>Victory cities and score</small></button>
+  <button data-proxy="btn-doctrine"><b>🎖 Doctrines</b><small>Army-wide upgrades</small></button>
+  <button data-proxy="btn-undo"><b>↩ Undo move</b><small>Take back the last movement</small></button>
+  <button data-proxy="btn-sound"><b>⚙ Settings</b><small>Graphics, sound and motion</small></button>
+  <button data-proxy="btn-help2"><b>❓ How to play</b><small>Rules and controls</small></button>
+  <button data-proxy="btn-menu"><b>⏸ Pause menu</b><small>Save, restart or exit</small></button>
+</div>
+<div id="mobile-dock" class="hidden" aria-label="Mobile command bar">
+  <button id="mobile-tools"><span>🧰</span>TOOLS</button>
+  <button id="mobile-army"><span>📋</span>ARMY</button>
+  <button id="mobile-panel"><span>▤</span>DETAILS</button>
+  <button id="mobile-next"><span>⏭</span>NEXT</button>
+  <button id="mobile-end" class="mobile-end"><span>▶</span>END TURN</button>
 </div>
 <div id="ai-banner" class="hidden pulse">ENEMY TURN…</div>
 <div id="turn-banner" class="hidden"><div id="tb-main"></div><div id="tb-sub"></div></div>
@@ -10865,17 +10891,33 @@ function drawWaterGlint(now, vL, vT, vR, vB){
 
 const $ = id => document.getElementById(id);
 const show = (id,on) => $(id).classList.toggle('hidden', !on);
-let mobilePanelOpen=false;
+let mobilePanelOpen=false,mobileToolsOpen=false;
 function isPhoneLayout(){return typeof innerWidth!=='undefined'&&(innerWidth<=760||(innerWidth<=900&&innerHeight<=500));}
 function syncMobilePanel(){
   const side=$('side'),btn=$('mobile-panel-toggle'),phone=isPhoneLayout();if(!side||!btn)return;
   side.classList.toggle('mobile-collapsed',phone&&!mobilePanelOpen);
   btn.textContent=mobilePanelOpen?'BATTLE PANEL ▼':'BATTLE PANEL ▲';
   if(btn.setAttribute)btn.setAttribute('aria-expanded',mobilePanelOpen?'true':'false');
+  const pb=$('mobile-panel');if(pb)pb.classList.toggle('on',phone&&mobilePanelOpen);
 }
-function setMobilePanel(open){mobilePanelOpen=!!open;syncMobilePanel();}
+function setMobileTools(open){
+  mobileToolsOpen=!!open&&isPhoneLayout();show('mobile-tools-sheet',mobileToolsOpen);
+  const b=$('mobile-tools');if(b)b.classList.toggle('on',mobileToolsOpen);
+}
+function setMobilePanel(open){mobilePanelOpen=!!open;if(mobilePanelOpen)setMobileTools(false);syncMobilePanel();}
 $('mobile-panel-toggle').onclick=()=>{setMobilePanel(!mobilePanelOpen);sClick();};
-window.addEventListener('resize',syncMobilePanel);syncMobilePanel();
+$('mobile-tools').onclick=()=>{setMobileTools(!mobileToolsOpen);if(mobileToolsOpen)setMobilePanel(false);sClick();};
+$('mobile-army').onclick=()=>{setMobileTools(false);openRoster();};
+$('mobile-panel').onclick=()=>{setMobilePanel(!mobilePanelOpen);sClick();};
+$('mobile-next').onclick=()=>{setMobileTools(false);selectNext();};
+$('mobile-end').onclick=()=>{setMobileTools(false);$('btn-endturn').click();};
+for(const b of document.querySelectorAll('#mobile-tools-sheet [data-proxy]'))b.onclick=()=>{
+  const target=$(b.dataset.proxy);setMobileTools(false);if(target&&target.onclick)target.onclick();else if(target&&target.click)target.click();
+};
+window.addEventListener('resize',()=>{
+  const phone=isPhoneLayout(),playing=$('topbar')&&!$('topbar').classList.contains('hidden');
+  if(!phone){setMobileTools(false);mobilePanelOpen=false;}show('mobile-dock',phone&&playing);syncMobilePanel();
+});syncMobilePanel();
 
 /* ---------------- sound (tiny WebAudio synth) ---------------- */
 let AC = null;
@@ -14026,6 +14068,7 @@ canvas.style.touchAction = 'none';
 let _tc = null, _pinch = null;
 canvas.addEventListener('touchstart', e=>{
   e.preventDefault();
+  if(mobileToolsOpen)setMobileTools(false);
   if (e.touches.length === 1){
     const t = e.touches[0];
     killGlides(); panVel = null;
@@ -15964,7 +16007,7 @@ if(typeof window!=='undefined'){ window.wwStart=wwStart; window.wwRender=wwRende
    slot actually holds a saved campaign */
 function showModeSelect(){
   eventQueue.length = 0; show('event-modal', false);   // a stale battle event must not float over the menu
-  show('map-tools',false);
+  show('map-tools',false);show('mobile-dock',false);setMobileTools(false);
   show('mode-select', true); show('menu', false); show('realistic-menu', false); show('waw-menu', false); show('road-screen', false);
   if(typeof wwClose==='function') wwClose();
   // "continue where you left off" — one button to resume the last unfinished standalone battle
@@ -16089,7 +16132,7 @@ function quitToMenu(){
    tests can drive it; everything below is the browser-only presentation layer. */
 let rvResetPending = false;
 function rvOpen(){
-  show('map-tools',false);
+  show('map-tools',false);show('mobile-dock',false);setMobileTools(false);
   show('mode-select', false); show('realistic-menu', false); show('menu', false); show('waw-menu', false);
   try{ rvSetCamp(localStorage.getItem('hoi5-road-camp') || 'rv'); }catch(e){ rvSetCamp('rv'); }
   if (RV && RV.diff) rvDiff = RV.diff;
@@ -16939,6 +16982,7 @@ function startCampaign(loaded){
   $('game-title').textContent = ({east:'⚔ ',west:'🌍 ',pacific:'🌊 '}[th]||'⚙ ') + SCN.short;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true); show('map-tools',true);
+  show('mobile-dock',isPhoneLayout());setMobileTools(false);
   if(isPhoneLayout())setMobilePanel(false);else syncMobilePanel();
   if (loaded) fitCamera(); else focusOpeningCamera();
   updateAll();
