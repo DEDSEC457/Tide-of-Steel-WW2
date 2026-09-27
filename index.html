@@ -326,7 +326,53 @@
   .rv-hq-grid{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(320px,1.15fr);gap:10px}.rv-hq-panel{border:1px solid var(--line);border-radius:8px;background:#171c14;padding:10px;}
   .rv-hq-title{color:var(--amber);font-size:11px;letter-spacing:1.5px;margin-bottom:7px}.rv-plan-row{display:flex;gap:6px;flex-wrap:wrap}.rv-plan{flex:1;min-width:135px;text-align:left;padding:7px 8px}.rv-plan.sel{border-color:var(--amber);color:#ffe4a8;background:#30371d}.rv-plan small{display:block;color:var(--dim);font-size:10.5px;line-height:1.3;margin-top:2px}
   .rv-core-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:7px}.rv-core{border-left:3px solid var(--cyan);background:#1a2118;padding:7px 8px;border-radius:4px;font-size:12px}.rv-core.damaged{border-left-color:var(--redL)}.rv-core b{color:#eee4c8}.rv-readiness{height:4px;background:#30362a;margin-top:5px}.rv-readiness i{display:block;height:100%;background:var(--grn)}
-  @media(max-width:760px){.rv-hq-grid{grid-template-columns:1fr}.rv-plan{min-width:120px}}
+  #mobile-panel-toggle{display:none;}
+  @media(max-width:760px), (max-width:900px) and (max-height:500px){
+    html,body{overscroll-behavior:none;touch-action:none;}
+    button,.opt,.pick{min-height:44px;}
+    #topbar{top:env(safe-area-inset-top);height:52px;gap:4px;padding:4px 5px;font-size:11px;
+      background:linear-gradient(#181c13fa,#12150efa);}
+    #topbar .t-title,#wx-chip,#mission-chip,#topbar .spacer{display:none!important;}
+    #topbar .t-chip{padding:5px 6px;max-width:none!important;}
+    #topbar #date-chip{max-width:92px!important;}
+    #topbar #btn-next{padding:5px 7px;min-width:44px;}
+    #topbar #btn-next .bl,#topbar #btn-undo .bl{display:none;}
+    #topbar #btn-endturn{min-width:86px;padding:7px 8px;font-size:11px;margin-left:auto;}
+    #topbar .hud-map,#topbar .hud-command,#topbar .hud-system{position:fixed;bottom:calc(5px + env(safe-area-inset-bottom));
+      height:47px;padding:3px;z-index:29;background:#0b0e09f2;border-color:#4b553e;box-shadow:0 3px 18px #000c;}
+    #topbar .hud-map{left:5px}.hud-map button{width:42px;height:39px;padding:0;}
+    #topbar .hud-command{left:142px}.hud-command button{width:43px;height:39px;padding:0;}
+    #topbar .hud-system{right:5px}.hud-system button{width:43px;height:39px;padding:0;}
+    #btn-aispeed,#btn-help2,#btn-sound{display:none!important;}
+    #map-tools{top:calc(60px + env(safe-area-inset-top));left:5px;padding:3px;}
+    #map-tools button{width:42px;height:42px;font-size:20px;}
+    #side{top:auto;left:6px;right:6px;bottom:calc(57px + env(safe-area-inset-bottom));width:auto;
+      max-height:43vh;padding:4px;gap:5px;background:#0b0e09f2;border:1px solid #4b553e;border-radius:10px;
+      box-shadow:0 -5px 24px #000b;}
+    #mobile-panel-toggle{display:block;position:sticky;top:0;z-index:3;width:100%;min-height:40px;
+      padding:7px;background:#222a1a;border-color:#596647;color:#e6d6aa;font-size:12px;letter-spacing:1px;}
+    #side.mobile-collapsed{max-height:48px;overflow:hidden;background:transparent;border-color:transparent;box-shadow:none;padding:3px;}
+    #side.mobile-collapsed .card{display:none!important;}
+    #side:not(.mobile-collapsed) ~ #minimap{display:none!important;}
+    #side .card{padding:8px 10px;font-size:12px;}
+    #unit-actions button,#air-body button{min-height:40px;padding:7px 10px;}
+    #hint{display:none!important;}
+    #minimap{left:6px;bottom:calc(59px + env(safe-area-inset-bottom));max-width:34vw;max-height:22vh;}
+    #turn-banner{top:calc(59px + env(safe-area-inset-top));max-width:88vw;padding:7px 22px;overflow:hidden;text-overflow:ellipsis;}
+    #tb-main{font-size:13px;letter-spacing:1.5px}#tb-sub{font-size:11px;}
+    .modal-back{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+    .modal{width:96%;max-height:94%;padding:18px 15px;border-radius:10px;}
+    .modal h2{font-size:17px;letter-spacing:2px;}
+    .modal .mrow{padding-bottom:4px;}
+    .mode-row,.mc-hero .mc-inner,.pick-row{flex-direction:column;align-items:stretch;}
+    .mode-card,.mc-hero{max-width:none;width:100%;padding:15px;}
+    .mc-hero .mc-btn{width:100%;}.mc-hero .mc-icon{font-size:32px;}.mc-hero h2{font-size:18px;}
+    #mode-select .modal{padding-top:58px;}#btn-settings-main,#btn-tutorial-main{top:10px;}
+    #rm-scn-row{flex-wrap:wrap;}#rm-scn-row .pick{max-width:none!important;min-width:46%;}
+    .rv-hq-grid{grid-template-columns:1fr}.rv-plan{min-width:120px}.rv-core-grid{grid-template-columns:1fr;}
+    #road-screen .modal{padding-left:10px;padding-right:10px;}#rv-stages{flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto;padding-bottom:7px;}
+    .rv-box{flex:0 0 145px;}.setrow{gap:8px;}.setrow input[type=range]{width:120px;}
+  }
 
   ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:#333a28;border-radius:4px}
 
@@ -415,6 +461,7 @@
 </div>
 
 <div id="side" class="hidden">
+  <button id="mobile-panel-toggle" aria-expanded="false">BATTLE PANEL ▲</button>
   <div class="card" id="unit-card"><h3>UNIT</h3><div id="unit-body">Select one of your units.</div>
     <div id="unit-actions"></div></div>
   <div class="card" id="air-card"><h3>✈ AIR FORCES</h3><div id="air-body">—</div></div>
@@ -10554,7 +10601,7 @@ function fitCamera(){
   const mw = mapW(), mh = mapH();
   // the right-hand card column overlays the map — fit against the width it leaves clear
   // so the whole eastern edge is visible on first load instead of hiding under the panel
-  const panel = innerWidth > 720 ? 278 : 0, availW = innerWidth - panel;
+  const panel = (typeof isPhoneLayout==='function'&&isPhoneLayout()) ? 0 : (innerWidth > 720 ? 278 : 0), availW = innerWidth - panel;
   const z = Math.min(availW/mw, (innerHeight-60)/mh);
   cam.z = Math.max(minZoom(), Math.min(1.4, z));
   cam.x = (mw - availW/cam.z)/2;
@@ -10583,7 +10630,7 @@ function focusOpeningCamera(){
   const padX=2.6, padY=2.4;
   const [aX,aY]=hexCenter(Math.max(0,minX-padX),Math.max(0,minY-padY));
   const [bX,bY]=hexCenter(Math.min(COLS-1,maxX+padX),Math.min(ROWS-1,maxY+padY));
-  const panel=innerWidth>720?286:0, availW=innerWidth-panel, availH=innerHeight-94;
+  const panel=(typeof isPhoneLayout==='function'&&isPhoneLayout())?0:(innerWidth>720?286:0), availW=innerWidth-panel, availH=innerHeight-94;
   const bw=Math.max(HX*5,bX-aX+HX*2), bh=Math.max(VY*5,bY-aY+S*2);
   cam.z=Math.max(minZoom(),Math.min(1.12,availW/bw,availH/bh));
   cam.x=(aX+bX)/2-availW/(2*cam.z);
@@ -10818,6 +10865,17 @@ function drawWaterGlint(now, vL, vT, vR, vB){
 
 const $ = id => document.getElementById(id);
 const show = (id,on) => $(id).classList.toggle('hidden', !on);
+let mobilePanelOpen=false;
+function isPhoneLayout(){return typeof innerWidth!=='undefined'&&(innerWidth<=760||(innerWidth<=900&&innerHeight<=500));}
+function syncMobilePanel(){
+  const side=$('side'),btn=$('mobile-panel-toggle'),phone=isPhoneLayout();if(!side||!btn)return;
+  side.classList.toggle('mobile-collapsed',phone&&!mobilePanelOpen);
+  btn.textContent=mobilePanelOpen?'BATTLE PANEL ▼':'BATTLE PANEL ▲';
+  if(btn.setAttribute)btn.setAttribute('aria-expanded',mobilePanelOpen?'true':'false');
+}
+function setMobilePanel(open){mobilePanelOpen=!!open;syncMobilePanel();}
+$('mobile-panel-toggle').onclick=()=>{setMobilePanel(!mobilePanelOpen);sClick();};
+window.addEventListener('resize',syncMobilePanel);syncMobilePanel();
 
 /* ---------------- sound (tiny WebAudio synth) ---------------- */
 let AC = null;
@@ -13975,8 +14033,10 @@ canvas.addEventListener('touchstart', e=>{
     _pinch = null;
   } else if (e.touches.length >= 2){
     const a = e.touches[0], b = e.touches[1];
+    const mx=(a.clientX+b.clientX)/2,my=(a.clientY+b.clientY)/2;
+    const [sx,sy]=untilt(mx,my),[wx,wy]=toWorld(sx,sy);
     _tc = null; killGlides();
-    _pinch = { d0: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1, z0: cam.z };
+    _pinch = { d0: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1, z0: cam.z, wx, wy };
   }
 }, {passive:false});
 canvas.addEventListener('touchmove', e=>{
@@ -13985,9 +14045,9 @@ canvas.addEventListener('touchmove', e=>{
     const a = e.touches[0], b = e.touches[1];
     const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1;
     const mx = (a.clientX+b.clientX)/2, my = (a.clientY+b.clientY)/2;
-    const [wx,wy] = toWorld(mx,my);                       // pin the midpoint's world spot
+    const [sx,sy]=untilt(mx,my);                          // keep the original world point beneath the moving midpoint
     cam.z = Math.max(minZoom(), Math.min(2.2, _pinch.z0 * d/_pinch.d0));
-    cam.x = wx - mx/cam.z; cam.y = wy - my/cam.z;
+    cam.x = _pinch.wx - sx/cam.z; cam.y = _pinch.wy - sy/cam.z;
     requestRender();
     return;
   }
@@ -14003,10 +14063,13 @@ canvas.addEventListener('touchend', e=>{
   if (_pinch){ if (e.touches.length < 2) _pinch = null; return; }
   if (_tc && !_tc.moved && performance.now()-_tc.t0 < 600 && e.changedTouches.length){
     const t = e.changedTouches[0];
-    try { canvas.dispatchEvent(new MouseEvent('click', {clientX:t.clientX, clientY:t.clientY, bubbles:true})); } catch(_){}
+    const held=performance.now()-_tc.t0>=360;              // long-press = desktop Shift-click (build a combined assault)
+    if(held&&typeof navigator!=='undefined'&&navigator.vibrate)try{navigator.vibrate(18);}catch(_){}
+    try { canvas.dispatchEvent(new MouseEvent('click', {clientX:t.clientX, clientY:t.clientY, bubbles:true,shiftKey:held})); } catch(_){}
   }
   _tc = null;
 }, {passive:false});
+canvas.addEventListener('touchcancel',()=>{_tc=null;_pinch=null;}, {passive:true});
 // minimap: tap or drag flies the camera, same as the mouse
 mmCv.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); if (e.touches.length) mmFly(e.touches[0]); }, {passive:false});
 mmCv.addEventListener('touchmove',  e=>{ e.preventDefault(); if (e.touches.length) mmFly(e.touches[0]); }, {passive:false});
@@ -14112,6 +14175,7 @@ function selectUnit(u){
   if (sel !== u.id) selT = performance.now();      // fresh selection → play the pop ring
   sel = u.id;
   reach = (!u.moved) ? reachable(u) : new Map();
+  if(isPhoneLayout())setMobilePanel(true);
   updateUnitCard();
 }
 function deselect(){ sel=null; reach=null; selSet=[]; amphibTarget=null; paraTarget=null; updateUnitCard(); requestRender(); }
@@ -14374,7 +14438,7 @@ function updateUnitCard(){
   const u = sel && G.units.find(t=>t.id===sel);
   const isHuman = !aiRunning && !G.over && (G.mode==='hotseat' || G.phase===G.playerSide);
   if (!u){
-    let html = 'Select one of your units.<br><span style="color:var(--dim)">Shift-click to gang up · N next · R reinforce all · S supply · ? controls</span>';
+    let html = 'Select one of your units.<br><span style="color:var(--dim)">'+(isPhoneLayout()?'Tap to select · drag to pan · pinch to zoom · hold a unit to group':'Shift-click to gang up · N next · R reinforce all · S supply · ? controls')+'</span>';
     body.innerHTML = html;
     if (isHuman){
       const rn = unitsOf(G.phase).filter(x=>canReinforce(x)).length;
@@ -14413,6 +14477,7 @@ function updateUnitCard(){
   body.innerHTML = `
     <div class="${cls}"><span class="big">${flag(u.side)} ${u.name}</span></div>
     <div style="color:var(--dim);margin-bottom:4px;">${k.label}${k.winter?' · winter-hardened':''}</div>
+    ${selSet.includes(u.id)?`<div style="color:var(--amber);font-size:12px;margin-bottom:5px;">⚔ Combined assault group · ${selSet.length} formation${selSet.length===1?'':'s'}</div>`:''}
     ${u.coreId ? `<div style="border-left:3px solid var(--cyan);background:#17251f;padding:5px 7px;margin:4px 0 6px;font-size:12px;color:#bfe8df;">🎖 <b>CORE FORMATION</b>${u.coreName&&u.coreName!==u.name?` · cadre of ${u.coreName}`:''}${u.coreTrait?`<br><span style="color:var(--dim)">${u.coreTrait}</span>`:''}</div>` : ''}
     ${u.embarked ? `<div style="color:#7fc4f0;font-size:12px;margin-bottom:4px;">⚓ <b>At sea in transports</b> — sail onto the shore to land the division (fragile until it does).</div>` : ''}
     ${g ? `<div style="color:var(--amber);margin-bottom:2px;">⭐ Gen. ${g.name} · ${genBonusText(g)}</div>
@@ -16874,6 +16939,7 @@ function startCampaign(loaded){
   $('game-title').textContent = ({east:'⚔ ',west:'🌍 ',pacific:'🌊 '}[th]||'⚙ ') + SCN.short;
   show('menu', false);
   show('topbar', true); show('side', true); show('hint', true); show('map-tools',true);
+  if(isPhoneLayout())setMobilePanel(false);else syncMobilePanel();
   if (loaded) fitCamera(); else focusOpeningCamera();
   updateAll();
   if (!eventQueue.length && !maybeShowDecision() && G.winterGear === 'pending') maybeShowGear();   // saved mid-decision
