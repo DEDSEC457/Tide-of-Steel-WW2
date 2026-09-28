@@ -188,6 +188,16 @@
     border-color:#46503a;color:#d8d4c0;line-height:1;}
   #map-tools button:hover{border-color:var(--amber);color:#ffe09a;background:#2a301c;}
   #mobile-dock,#mobile-tools-sheet{display:none;}
+  /* Premium interface finish is deliberately tied to High graphics. */
+  body.gfx-ui-polish #topbar{background:linear-gradient(180deg,rgba(31,37,25,.97),rgba(13,17,11,.96));
+    border-bottom-color:#6f7953;box-shadow:0 8px 28px #000b,inset 0 1px rgba(255,255,255,.06);backdrop-filter:blur(9px);}
+  body.gfx-ui-polish #side .card{background:linear-gradient(145deg,rgba(30,36,25,.96),rgba(15,19,13,.97));
+    border-color:#4b553d;box-shadow:0 7px 22px #0007,inset 0 1px rgba(255,255,255,.045);}
+  body.gfx-ui-polish button{transition:filter .13s ease,transform .13s ease,border-color .13s ease,box-shadow .13s ease;}
+  body.gfx-ui-polish button:hover{filter:brightness(1.12);box-shadow:0 3px 12px #0007,inset 0 1px rgba(255,255,255,.08);}
+  body.gfx-ui-polish button:active{transform:translateY(1px);filter:brightness(.96);}
+  body.gfx-ui-polish .modal{background:linear-gradient(150deg,rgba(27,33,22,.985),rgba(10,13,9,.99));
+    box-shadow:0 22px 80px #000d,inset 0 1px rgba(255,255,255,.05);}
   body.reduced-motion *,body.reduced-motion *::before,body.reduced-motion *::after{
     animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 
@@ -10425,27 +10435,34 @@ let cam = {x:0, y:0, z:1};
 const GFX_PRESETS = {
   low:    { dpr:1,   fpsMs:50, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600,
             lighting:false, clouds:false, grain:false, softShadow:false,
-            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false },
+            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false,
+            counterDetail:false, terrainDetail:false, combatFx:false, atmosphere:false, uiPolish:false },
   medium: { dpr:1.5, fpsMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096,
             lighting:false, clouds:false, grain:false, softShadow:false,
-            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false },
+            bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false,
+            counterDetail:false, terrainDetail:false, combatFx:false, atmosphere:false, uiPolish:false },
   // "high" adds a cinematic pass: drifting cloud shadows, a directional sun
   // grade, soft blurred counter shadows, a faint film grain — and `cine`:
   // hex relief shading, living water & rivers, ember front lines, upgraded
   // explosions, lightning and near-snow parallax.
-  // fpsMs 6 uncaps the render loop to the display's native refresh: a clean 144fps
-  // on a 144Hz panel (frame interval ~6.9ms clears the 6ms gate every time), with a
-  // ~166fps ceiling so ultra-high-refresh screens don't run away. Motion is all
-  // time-based (performance.now), so the extra frames only smooth it — nothing speeds up.
-  high:   { dpr:2,   fpsMs:6,  decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
+  // High targets a steady 60fps. Retina rendering plus the premium passes already
+  // provide the visible quality; avoiding a 144fps redraw keeps input responsive
+  // and prevents laptops from spending their entire frame budget on film grain.
+  high:   { dpr:2,   fpsMs:16, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
             lighting:true,  clouds:true,  grain:true,  softShadow:true, cine:true,
-            bloom:true, glint:true, tracers:true, daynight:true, weatherSkin:true },
+            bloom:true, glint:true, tracers:true, daynight:true, weatherSkin:true,
+            counterDetail:true, terrainDetail:true, combatFx:true, atmosphere:true, uiPolish:true },
 };
 let GFX = Object.assign({ level:'medium' }, GFX_PRESETS.medium);
 // Per-effect overrides layered on top of the chosen preset — players can keep 144fps
 // while switching individual effects off to dial in performance on a mid-range PC.
 // Only these keys are individually toggleable; everything else follows the preset.
 const GFX_TOGGLES = [
+  {k:'counterDetail', label:'Premium counters', highOnly:true},
+  {k:'terrainDetail', label:'Terrain micro-detail', highOnly:true},
+  {k:'combatFx',     label:'Enhanced combat FX', highOnly:true},
+  {k:'atmosphere',   label:'Battlefield atmosphere', highOnly:true},
+  {k:'uiPolish',     label:'Premium interface', highOnly:true},
   {k:'cine',        label:'Cinematic terrain'},
   {k:'bloom',       label:'Emissive bloom'},
   {k:'glint',       label:'Water sun-glint'},
@@ -10465,6 +10482,10 @@ function applyGfx(){                                          // preset baseline
   const lvl = GFX.level;
   GFX = Object.assign({level:lvl}, base);
   for (const t of GFX_TOGGLES) if (t.k in _gfxOv) GFX[t.k] = !!_gfxOv[t.k];
+  if (document.body && document.body.classList){
+    document.body.classList.toggle('gfx-high', lvl==='high');
+    document.body.classList.toggle('gfx-ui-polish', lvl==='high' && !!GFX.uiPolish);
+  }
 }
 let REDUCED_MOTION = false, MOTION_PREF = 'auto';
 function loadGfx(){
@@ -10744,6 +10765,32 @@ function drawCloudShadows(now, vL, vT, vR, vB){
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.ellipse(cx,cy,c.r,c.r*c.sq,0.4,0,Math.PI*2); ctx.fill();
   }
+}
+/* High-only frontline air: faint drifting dust, smoke and ground haze. It stays
+   sparse and viewport-culled so the atmosphere reads without hiding counters. */
+function drawBattlefieldAtmosphere(now, wx, vL, vT, vR, vB){
+  if (GFX.level!=='high' || !GFX.atmosphere || !_frontSegs || !_frontSegs.length) return;
+  ctx.save();
+  const max=Math.min(34,_frontSegs.length);
+  for(let i=0;i<max;i++){
+    const s=_frontSegs[(i*7)%_frontSegs.length];
+    if(s.mx<vL||s.mx>vR||s.my<vT||s.my>vB)continue;
+    const phase=(now*.000035+i*.173)%1, drift=(phase-.5)*S*1.7;
+    const px=s.mx+drift+s.ex*.18, py=s.my-S*.15-Math.sin(phase*Math.PI)*S*.45;
+    const a=(wx==='mud'?.075:.052)*Math.sin(phase*Math.PI);
+    ctx.globalAlpha=Math.max(0,a);ctx.fillStyle=wx==='snow'?'#d9e2e6':'#8d8475';
+    ctx.beginPath();ctx.ellipse(px,py,8+phase*12,3.5+phase*5,.12,0,Math.PI*2);ctx.fill();
+  }
+  // Near-camera motes catch the light over clear and dusty battlefields.
+  if(wx==='clear' && cam.z>=.48){
+    ctx.fillStyle='#ecd7aa';
+    for(let i=0;i<22;i++){
+      const px=vL+((i*173+now*.008*(1+i%3))%(Math.max(1,vR-vL)));
+      const py=vT+((i*97+now*.004*(1+i%4))%(Math.max(1,vB-vT)));
+      ctx.globalAlpha=.06+(i%4)*.018;ctx.fillRect(px,py,1.1,1.1);
+    }
+  }
+  ctx.restore();
 }
 function grainTile(){                                      // a small noise tile, built once
   if (_grainTile || _grainTried) return _grainTile;
@@ -11631,6 +11678,34 @@ function snowyCol(t, base, depth){
   const a=h(base), b=h(s);
   return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(',')})`;
 }
+/* High-only terrain micro-detail. Stable coordinate hashing makes fields,
+   undergrowth and contour marks feel organic without changing between frames. */
+function drawTerrainMicro(c,t,x,y,wx,cx,cy){
+  if (GFX.level!=='high' || !GFX.terrainDetail) return;
+  const hs=(x*73856093 ^ y*19349663)>>>0;
+  c.save(); c.translate(cx,cy); c.lineCap='round';
+  if (t==='.' && wx!=='snow'){
+    c.strokeStyle=wx==='mud'?'rgba(35,25,14,.25)':'rgba(78,69,40,.27)';c.lineWidth=.75;
+    const tilt=(hs&1)?-.22:.22;
+    c.rotate(tilt);
+    for(let i=-2;i<=2;i++){const yy=i*4+(hs%3)-1;c.beginPath();c.moveTo(-18,yy);c.lineTo(18,yy);c.stroke();}
+  } else if(t==='f'){
+    c.fillStyle='rgba(12,24,13,.30)';
+    for(let i=0;i<7;i++){const px=((hs+i*37)%31)-15,py=((hs*3+i*23)%24)-10;c.beginPath();c.arc(px,py,1+(i%2)*.7,0,Math.PI*2);c.fill();}
+    c.strokeStyle='rgba(20,15,9,.38)';c.lineWidth=1.15;
+    for(let i=0;i<3;i++){const px=((hs+i*41)%25)-12;c.beginPath();c.moveTo(px,7);c.lineTo(px,-7-(i%2)*3);c.stroke();}
+  } else if(t==='h'){
+    c.strokeStyle='rgba(232,218,177,.16)';c.lineWidth=1;
+    for(let i=0;i<2;i++){c.beginPath();c.ellipse((hs%5)-2,2-i*5,18-i*4,8-i*2,(hs&1)?.16:-.16,Math.PI*.12,Math.PI*.88);c.stroke();}
+  } else if(t==='s'){
+    c.strokeStyle='rgba(184,202,163,.30)';c.lineWidth=.9;
+    for(let i=0;i<5;i++){const px=((hs+i*17)%31)-15,py=((hs+i*29)%19)-6;c.beginPath();c.moveTo(px,py+4);c.lineTo(px-1,py-2);c.moveTo(px,py+1);c.lineTo(px+3,py-2);c.stroke();}
+  } else if((t==='~'||t==='o') && (hs%3===0)){
+    c.fillStyle='rgba(205,234,242,.16)';
+    for(let i=0;i<4;i++)c.fillRect(-14+i*8+(hs%4),-6+(i%2)*11,2.2,.8);
+  }
+  c.restore();
+}
 function renderTerrCache(wx, depth){
   if (depth===undefined) depth = (wx==='snow') ? 1 : 0;
   const {cv,c} = _cacheCtx(_terrCacheCv); _terrCacheCv = cv;
@@ -11651,6 +11726,7 @@ function renderTerrCache(wx, depth){
       : (hv&1)?'rgba(255,255,255,0.030)':'rgba(0,0,0,'+(0.02+(hv%4)*0.012)+')';
     c.fill();
     c.strokeStyle='#00000033'; c.lineWidth=1; c.stroke();
+    drawTerrainMicro(c,t,x,y,wx,cx,cy);
     // 3D view: an embossed directional relief baked per tile — sunlit top-left,
     // shadowed bottom-right — scaled by the tile's "height" so hills and woods
     // read as raised ground. No cross-tile shadows: the hex centres never move,
@@ -12258,6 +12334,7 @@ function draw(){
       ctx.fill();
     }
     ctx.strokeStyle = '#00000033'; ctx.lineWidth = 1; ctx.stroke();
+    drawTerrainMicro(ctx,t,x,y,wx,cx,cy);
     // high: carved relief — the sun catches the NW edges of every land hex
     // (inverted for the sunken Qattara depression, which reads as a pit)
     if (GFX.cine && t!=='~' && t!=='o'){
@@ -12398,6 +12475,7 @@ function draw(){
   if (GFX.glint)  drawWaterGlint(now, vL, vT, vR, vB);     // high: sun sparkling on the sea
 
   drawScars();   // lingering scorched ground & drifting smoke at battle sites
+  drawBattlefieldAtmosphere(now, wx, vL, vT, vR, vB);
 
   // big territory swings (an absorbed pocket, a collapsed salient) pulse in the
   // new owner's colour for a moment, so encirclements visibly pay off
@@ -13163,7 +13241,20 @@ function draw(){
           ctx.fillRect(a.x+Math.cos(ang)*rr-0.8, a.y+Math.sin(ang)*rr*0.85-0.8, 1.6, 1.6);
         }
       }
-      if (GFX.level==='high' && a.big){                     // a kill lands with real weight
+      if (GFX.level==='high' && GFX.combatFx){              // dirt, fragments and a delayed secondary flash
+        const fp=Math.min(1,pr*1.15);
+        ctx.strokeStyle='rgba(79,62,43,.82)';ctx.lineWidth=1.35;ctx.globalAlpha=(1-fp)*.72;
+        for(let i=0;i<8;i++){
+          const ang=(a.seed*1.31+i*.79),dist=(8+(i%4)*5)*fp;
+          const sx=a.x+Math.cos(ang)*dist,sy=a.y+Math.sin(ang)*dist*.55-10*fp+15*fp*fp;
+          ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-Math.cos(ang)*3,sy-Math.sin(ang)*2);ctx.stroke();
+        }
+        if(a.big&&pr>.22&&pr<.52){
+          const q=(pr-.22)/.30,ox=Math.cos(a.seed)*S*.22,oy=Math.sin(a.seed)*S*.14;
+          ctx.globalAlpha=Math.sin(q*Math.PI)*.65;ctx.fillStyle='#ffd08a';ctx.beginPath();ctx.arc(a.x+ox,a.y+oy,3+q*5,0,Math.PI*2);ctx.fill();
+        }
+      }
+      if (GFX.level==='high' && GFX.combatFx && a.big){     // a kill lands with real weight
         const sp = Math.min(1, p*2.2);
         ctx.globalAlpha = (1-sp)*0.32;                       // ground shockwave: a low, wide dust ring
         ctx.strokeStyle = '#d8c9a8'; ctx.lineWidth = 2*(1-sp)+0.5;
@@ -13524,6 +13615,13 @@ function drawUnit(u, cx, cy, wx){
     ctx.fillStyle = 'rgba(18,14,10,0.88)';                 // the shadowed wall of the block
     roundRect(-w/2, -h/2, w, h+lift, 5); ctx.fill();
   }
+  // High: a restrained status light under the physical counter. Supply trouble
+  // reads immediately, while selected and ready formations retain distinct cues.
+  if (GFX.level==='high' && GFX.counterDetail && !far){
+    const alert=u.oos?'rgba(255,70,48,.72)':u.strained?'rgba(255,176,32,.56)':sel===u.id?'rgba(255,211,77,.55)':null;
+    if(alert){ctx.save();ctx.shadowColor=alert;ctx.shadowBlur=u.oos?15:11;ctx.strokeStyle=alert;ctx.lineWidth=2.2;
+      roundRect(-w/2-1,-h/2-1,w+2,h+2,6);ctx.stroke();ctx.restore();}
+  }
   // drop shadow, counter, bevel — high quality lifts the counter with a soft
   // blurred shadow; otherwise a cheap hard-offset shadow
   if (GFX.softShadow && cam.z >= 0.62){
@@ -13555,6 +13653,20 @@ function drawUnit(u, cx, cy, wx){
       ctx.save(); roundRect(-w/2,-h/2,w,h,5); ctx.clip();
       ctx.fillStyle = _glossGrad; ctx.fillRect(-w/2,-h/2,w,h*0.62); ctx.restore();
     }
+  }
+  // High: printed-card stock grain, an inset keyline and tiny corner fasteners.
+  // The pattern is stable per formation so it never shimmers while animating.
+  if (!far && GFX.level==='high' && GFX.counterDetail){
+    const seed=(u.id*1103515245)>>>0;
+    ctx.save();roundRect(-w/2,-h/2,w,h,5);ctx.clip();
+    for(let i=0;i<9;i++){
+      const px=-w/2+4+((seed+i*37)%(Math.max(1,w-8))),py=-h/2+3+(((seed>>>5)+i*23)%(Math.max(1,h-6)));
+      ctx.fillStyle=i&1?'rgba(255,255,255,.055)':'rgba(0,0,0,.07)';ctx.fillRect(px,py,1,1);
+    }
+    ctx.restore();
+    ctx.strokeStyle='rgba(245,237,208,.22)';ctx.lineWidth=.75;roundRect(-w/2+2.4,-h/2+2.4,w-4.8,h-4.8,3.2);ctx.stroke();
+    ctx.fillStyle='rgba(245,237,208,.38)';
+    for(const sx of [-1,1])for(const sy of [-1,1]){ctx.beginPath();ctx.arc(sx*(w/2-4.5),sy*(h/2-4.5),.85,0,Math.PI*2);ctx.fill();}
   }
   // high-contrast side rail: counters stay identifiable even when two factions
   // use similarly dark historical colours or the map is viewed at a distance.
@@ -15103,7 +15215,7 @@ syncEnhancedUI();
 const GFX_DESC = {
   low:    'Flat terrain, no decorations or weather effects, 20fps. Best for older / work PCs.',
   medium: 'Trees, contours, weather effects, 30fps, standard pixel density. A good balance.',
-  high:   'Cinematic: relief-shaded terrain, living water & rivers, an ember front line, cloud shadows & sunlight, richer explosions, storm lightning, film grain — up to 144fps, retina. For a strong gaming PC.',
+  high:   'Premium: richer counters, terrain micro-detail, heavier combat, frontline atmosphere and a polished HUD — plus cinematic light, weather and retina rendering at a smooth 60fps.',
 };
 let _gfxTogBuilt = false;
 function buildGfxToggles(){
@@ -15124,7 +15236,7 @@ function syncGfxUI(){
   for (const l of ['low','medium','high']) $('gfx-'+l).classList.toggle('sel', GFX.level===l);
   $('gfx-desc').textContent = GFX_DESC[GFX.level] || '';
   buildGfxToggles();
-  for (const t of GFX_TOGGLES){ const cb = $('gfxt-'+t.k); if (cb) cb.checked = !!GFX[t.k]; }
+  for (const t of GFX_TOGGLES){ const cb = $('gfxt-'+t.k); if (cb){ cb.checked = !!GFX[t.k]; cb.disabled = !!t.highOnly && GFX.level!=='high'; } }
   const v2 = $('view-2d'), v3 = $('view-3d');
   if (v2) v2.classList.toggle('sel', !view3d);
   if (v3) v3.classList.toggle('sel', view3d);
