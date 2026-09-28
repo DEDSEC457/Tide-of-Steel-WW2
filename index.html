@@ -6782,7 +6782,7 @@ function isEncircled(u){ return !!u && encircledIds(u.side).has(u.id); }
 // Territory-tint cache-invalidation flag. Declared here in the shared outer
 // scope (not inside the browser IIFE) so claimTerritory can actually flip it —
 // the draw layer's zoomed-out tint cache reads/clears it. Harmless in headless.
-let _tintDirty = true;
+let _tintDirty = true, _territoryVersion = 0;
 function seedTerritory(){ claimTerritory(); }   // legacy alias — BFS handles this now
 function terrOwner(x,y){
   if (!G || !G.terr) return null;
@@ -6791,6 +6791,7 @@ function terrOwner(x,y){
 }
 function claimTerritory(){
   _tintDirty = true;   // invalidate the zoomed-out tint cache (declared in outer scope, below)
+  _territoryVersion++; // cheap revision key for the minimap's ownership layer
   const n = COLS*ROWS;
   // UI hook: remember the old ownership so big swings (pockets absorbed) can pulse on the map.
   // Headless (hook null) skips the copy entirely — zero cost in the sims.
@@ -10433,11 +10434,11 @@ let cam = {x:0, y:0, z:1};
    high-DPI screens), frame-rate cap, per-hex terrain decorations & ground
    dressing, weather particles, and the big-map cache resolution. */
 const GFX_PRESETS = {
-  low:    { dpr:1,   fpsMs:50, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600,
+  low:    { dpr:1,   fpsMs:50, ambientMs:100, decor:false, dressing:false, variation:false, particles:false, cacheMax:2600,
             lighting:false, clouds:false, grain:false, softShadow:false,
             bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false,
             counterDetail:false, terrainDetail:false, combatFx:false, atmosphere:false, uiPolish:false },
-  medium: { dpr:1.5, fpsMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096,
+  medium: { dpr:1.5, fpsMs:33, ambientMs:50, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:4096,
             lighting:false, clouds:false, grain:false, softShadow:false,
             bloom:false, glint:false, tracers:false, daynight:false, weatherSkin:false,
             counterDetail:false, terrainDetail:false, combatFx:false, atmosphere:false, uiPolish:false },
@@ -10448,7 +10449,7 @@ const GFX_PRESETS = {
   // High targets a steady 60fps. Retina rendering plus the premium passes already
   // provide the visible quality; avoiding a 144fps redraw keeps input responsive
   // and prevents laptops from spending their entire frame budget on film grain.
-  high:   { dpr:2,   fpsMs:16, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
+  high:   { dpr:2,   fpsMs:16, ambientMs:33, decor:true,  dressing:true,  variation:true,  particles:true,  cacheMax:5200,
             lighting:true,  clouds:true,  grain:true,  softShadow:true, cine:true,
             bloom:true, glint:true, tracers:true, daynight:true, weatherSkin:true,
             counterDetail:true, terrainDetail:true, combatFx:true, atmosphere:true, uiPolish:true },
@@ -10599,6 +10600,7 @@ buildTilt();
 function _reGfx(){                                            // re-apply density + re-bake terrain
   if (typeof resize === 'function') resize();
   try{ _cacheKey=''; _terrCacheCv=null; _tintCacheCv=null; }catch(e){}
+  try{ if(typeof WW!=='undefined'&&WW.on){WW._mapDirty=true;WW.mapCanvas=null;wwResize();wwRequest();} }catch(e){}
   if (typeof requestRender === 'function') requestRender();
 }
 function setGfx(level){
@@ -10742,12 +10744,30 @@ let _seasonGrad = null, _seasonKey = '';
 let camGlide = null;   // {x0,y0,x1,y1,t0,dur}
 let zoomGlide = null;  // {target, sx,sy, wx,wy} — keep world point (wx,wy) under screen point (sx,sy)
 function killGlides(){ camGlide = null; zoomGlide = null; if (typeof panVel!=='undefined') panVel = null; }
-let _sunGrad = null, _sunW = 0, _clouds = null, _grainTile = null, _grainTried = false;
+let _sunGrad = null, _sunW = 0, _clouds = null, _cloudStamp = null;
+let _grainTile = null, _grainTried = false, _grainPattern = null, _grainStamp = -1;
+let _seasonTurnKey = '', _seasonMon = -1;
+
+// Rasterize one soft cloud once, then scale/blit it for every drifting shadow.
+// Creating several large radial gradients every frame was one of High mode's
+// biggest idle costs, especially on Retina phones and laptops.
+function cloudStamp(){
+  if (_cloudStamp) return _cloudStamp;
+  try{
+    const cv=document.createElement('canvas'); cv.width=cv.height=256;
+    const c=cv.getContext('2d'); if(!c||!c.createRadialGradient)return null;
+    const g=c.createRadialGradient(128,128,18,128,128,126);
+    if(!g||!g.addColorStop)return null;
+    g.addColorStop(0,'rgba(18,22,28,0.17)');g.addColorStop(.7,'rgba(18,22,28,0.09)');g.addColorStop(1,'rgba(18,22,28,0)');
+    c.fillStyle=g;c.fillRect(0,0,256,256);_cloudStamp=cv;
+  }catch(e){_cloudStamp=null;}
+  return _cloudStamp;
+}
 
 /* High-quality cinematic pass — all guarded so the headless fake-DOM (whose
    canvas methods return undefined) silently skips them. */
 function drawCloudShadows(now, vL, vT, vR, vB){
-  if (!ctx.createRadialGradient) return;                  // no gradients → skip (fake DOM)
+  const stamp=cloudStamp(); if(!stamp)return;
   if (!_clouds){                                          // seed a drifting overcast once
     _clouds = [];
     for (let i=0;i<6;i++) _clouds.push({
@@ -10759,11 +10779,8 @@ function drawCloudShadows(now, vL, vT, vR, vB){
     let cx = (c.x + now*0.001*c.sp) % span; if (cx<0) cx+=span; cx-=450;
     const cy = c.y + Math.sin(now*0.00018 + c.ph)*36;
     if (cx+c.r < vL || cx-c.r > vR || cy+c.r < vT || cy-c.r > vB) continue;   // off-screen
-    const g = ctx.createRadialGradient(cx,cy,c.r*0.15, cx,cy,c.r);
-    if (!g || !g.addColorStop) return;
-    g.addColorStop(0,'rgba(18,22,28,0.17)'); g.addColorStop(0.7,'rgba(18,22,28,0.09)'); g.addColorStop(1,'rgba(18,22,28,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(cx,cy,c.r,c.r*c.sq,0.4,0,Math.PI*2); ctx.fill();
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(.4);
+    ctx.drawImage(stamp,-c.r,-c.r*c.sq,c.r*2,c.r*c.sq*2);ctx.restore();
   }
 }
 /* High-only frontline air: faint drifting dust, smoke and ground haze. It stays
@@ -10821,7 +10838,9 @@ function drawPremiumOverlay(){                             // screen-space sun g
   // golden high summer, sepia autumn, cold-blue winter, fresh spring. Driven by the
   // same date maths as the HUD clock, applied as a gentle soft-light tint.
   if (GFX.daynight && ctx.createLinearGradient && typeof G!=='undefined' && G && typeof START_DATE!=='undefined'){
-    const mon = new Date(START_DATE + (G.turn-1)*((SCN.turnDays||7))*864e5).getUTCMonth();
+    const turnKey=(SCN.id||'?')+'|'+G.turn;
+    if(_seasonTurnKey!==turnKey){_seasonTurnKey=turnKey;_seasonMon=new Date(START_DATE+(G.turn-1)*((SCN.turnDays||7))*864e5).getUTCMonth();}
+    const mon = _seasonMon;
     const key = mon + 'x' + innerWidth + 'x' + innerHeight;
     if (_seasonKey !== key){
       // [top, bottom] soft-light tints per month (Jan..Dec)
@@ -10840,10 +10859,16 @@ function drawPremiumOverlay(){                             // screen-space sun g
   if (GFX.grain){
     const g = grainTile();
     if (g){
-      ctx.globalAlpha = 0.04; ctx.globalCompositeOperation='overlay';
-      const ox=(Math.random()*96)|0, oy=(Math.random()*96)|0;
-      for (let x=-ox; x<innerWidth; x+=96) for (let y=-oy; y<innerHeight; y+=96) ctx.drawImage(g,x,y);
-      ctx.globalAlpha = 1; ctx.globalCompositeOperation='source-over';
+      if(!_grainPattern&&ctx.createPattern)_grainPattern=ctx.createPattern(g,'repeat');
+      // Refresh the offset at film cadence, not every render. A single pattern
+      // fill replaces hundreds of individual drawImage calls on large displays.
+      const stamp=(performance.now()/83)|0;
+      if(stamp!==_grainStamp)_grainStamp=stamp;
+      if(_grainPattern){
+        const ox=(_grainStamp*37)%96,oy=(_grainStamp*53)%96;
+        ctx.save();ctx.globalAlpha=.04;ctx.globalCompositeOperation='overlay';
+        ctx.translate(-ox,-oy);ctx.fillStyle=_grainPattern;ctx.fillRect(ox,oy,innerWidth+96,innerHeight+96);ctx.restore();
+      }
     }
   }
 }
@@ -12070,7 +12095,7 @@ function drawSupplyArteries(net){
 let showMinimap = true;
 try { showMinimap = localStorage.getItem('barb-minimap') !== '0'; } catch(e){}
 const mmCv = $('minimap');
-let _mmBase = null, _mmKey = '', _mmAt = 0, _mmScale = 1;
+let _mmBase = null, _mmKey = '', _mmScale = 1, _mmCtx = null;
 
 function minimapVisible(){
   return !!G && showMinimap && !$('topbar').classList.contains('hidden');
@@ -12115,16 +12140,19 @@ function drawMinimap(now, wx){
   const d = Math.min((typeof DPR!=='undefined' && DPR) || 1, 2);   // crisp minimap on hi-DPI screens
   const bw = Math.round(w*d), bh = Math.round(h*d);
   if (mmCv.width !== bw || mmCv.height !== bh){ mmCv.width = bw; mmCv.height = bh; mmCv.style.width = w+'px'; mmCv.style.height = h+'px'; _mmKey = ''; }
-  const key = (SCN.id||'?') + '|' + wx + '|' + COLS + 'x' + ROWS;
-  if (_mmKey !== key || now - _mmAt > 350){ mmRebuild(wx, w, h, d); _mmKey = key; _mmAt = now; }
-  const mc = mmCv.getContext('2d');
+  // The minimap base only changes when the board state changes. The old timed
+  // rebuild walked every map hex every 350ms during any animation, even though
+  // units and the viewport are already painted as a cheap live overlay below.
+  const key = (SCN.id||'?')+'|'+wx+'|'+COLS+'x'+ROWS+'|t'+_territoryVersion;
+  if (_mmKey !== key){ mmRebuild(wx, w, h, d); _mmKey = key; }
+  const mc = _mmCtx || (_mmCtx=mmCv.getContext('2d'));
   if (!mc) return;
   if (mc.setTransform) mc.setTransform(d,0,0,d,0,0);
   if (_mmBase) mc.drawImage(_mmBase, 0, 0, w, h);
   const sc = _mmScale;
-  const mmSight = fowActive() ? sightFor(viewerSide()) : null;
+  const mmViewer=viewerSide(), mmSight = fowActive() ? sightFor(mmViewer) : null;
   for (const u of G.units){                               // live unit dots
-    if (mmSight && u.side!==viewerSide() && !mmSight.has(keyOf(u.x,u.y))) continue;
+    if (mmSight && u.side!==mmViewer && !mmSight.has(keyOf(u.x,u.y))) continue;
     const [cx,cy] = hexCenter(u.x,u.y);
     mc.fillStyle = (KINDS[u.kind] && KINDS[u.kind].color) || SIDES[u.side].color;
     mc.fillRect(cx*sc - 1.5, cy*sc - 1.5, 3, 3);
@@ -12246,7 +12274,7 @@ function draw(){
   const wx = weatherFor(G.turn);
   if (wx !== ambWx && typeof setAmbient==='function') setAmbient(wx);   // keep the weather bed in sync every frame it changes
   const snowNow = (wx==='mud') ? 0 : snowDepth(G.turn);                 // seasonal accumulation for the live draw
-  const now = performance.now();
+  const now = tnow;
   // camera shake: a short decaying rattle after a kill
   if (shakeMag > 0){
     const el = now - shakeT0;
@@ -13934,14 +13962,14 @@ function dropAnim(fromX, fromY, toX, toY, opts){
 /* render scheduler: cap to ~30fps and only repaint when something is actually
    moving or has changed. The old loop ran a full repaint 60×/second forever —
    murder on a weak machine, and on the 3×-scale map it re-drew ~19,000 hexes
-   every frame. Now idle frames are skipped (a slow heartbeat self-heals any
+   every frame. Now idle frames are skipped (a sparse heartbeat self-heals any
    missed update), animations run at a capped rate, and input forces a repaint. */
 let _needRender = true, _lastFrameTs = 0;
 function requestRender(){ _needRender = true; }
 /* what's moving on the stage? 2 = ACTION (combat, camera, slides — render at the
    preset's full fps), 1 = AMBIENT (idle atmosphere: clouds, grain, water shimmer,
    pulsing overlays — ~30fps is indistinguishable and cuts idle GPU/battery burn
-   several-fold on High), 0 = still (drop to the ~8fps self-heal). */
+   several-fold on High), 0 = still (drop to the sparse self-heal). */
 let _seaVisible = true;   // updated each frame by the water pass — landlocked views idle fully
 function _sceneAnimating(){
   if (typeof aiRunning !== 'undefined' && aiRunning) return 2;
@@ -13977,13 +14005,13 @@ if(typeof document!=='undefined'&&document.addEventListener)document.addEventLis
   ts = ts || (typeof performance!=='undefined' && performance.now ? performance.now() : Date.now());
   const anim = _sceneAnimating();
   const elapsed = ts - _lastFrameTs;
-  if (!_needRender && !anim && elapsed < (REDUCED_MOTION?500:120)) return; // idle: calm ~2fps, otherwise ~8fps self-heal
+  if (!_needRender && !anim && elapsed < (REDUCED_MOTION?1500:750)) return; // idle: a rare self-heal; input/state changes request immediate paint
   // the fps cap throttles continuous animation, but an input-driven redraw
   // (_needRender) should paint on the very next frame — never wait out the cap,
   // or clicks and hovers feel laggy on the medium/low presets.
   // Ambient-only scenes (tier 1: clouds, shimmer, pulses) run a ~30fps economy
   // tier — indistinguishable for slow atmosphere, big idle GPU/battery saving.
-  const cap = anim === 1 ? Math.max(GFX.fpsMs, 33) : GFX.fpsMs;
+  const cap = anim === 1 ? (GFX.ambientMs || Math.max(GFX.fpsMs,33)) : GFX.fpsMs;
   if (elapsed < cap && !_needRender) return;                            // frame-rate cap by quality
   _lastFrameTs = ts; _needRender = false;
   try{ if (G) draw(); }
@@ -15335,7 +15363,7 @@ function wwStart(key){ wwSetup(key, WW._pickDiff||'normal'); wwEnterGameUI(); ww
 function wwContinue(){ const s=wwLoadSave(); if(!s||!wwDeserialize(s)) return; wwEnterGameUI(); if(typeof startMusic==='function') startMusic(); }
 
 function wwWorldSize(){ return [WW_HX*(WW.cols+0.5)+WW_PAD*2, WW_VY*(WW.rows-1)+2*WW_S+WW_PAD*2]; }
-function wwResize(){ const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1,2);
+function wwResize(){ const cv=$('wwCanvas'); const dpr=Math.min(window.devicePixelRatio||1,(typeof GFX!=='undefined'&&GFX.dpr)||1.5);
   const cw=cv.clientWidth||window.innerWidth||1600, ch=cv.clientHeight||window.innerHeight||900;
   cv.width=Math.max(1,Math.floor(cw*dpr)); cv.height=Math.max(1,Math.floor(ch*dpr)); WW._dpr=dpr; }
 function wwFit(){ const cv=$('wwCanvas'); const [wW,wH]=wwWorldSize();
@@ -15477,8 +15505,11 @@ function wwBuildMapCache(){
   const W=WW, [wW,wH]=wwWorldSize(); WW._cacheW=wwWinterAt(WW.date);
   // supersample the cached base map so the camera can scale it up without going blurry
   // (the cache serves the zoomed-out range; crisp vector hexes take over up close).
-  // SS is capped so the offscreen canvas stays under mobile's ~16M-pixel limit.
-  const SS=Math.max(1, Math.min(1.5, Math.sqrt(14e6/(wW*wH)))); WW._mapSS=SS; WW._mapW=wW; WW._mapH=wH;
+  // Scale the one-time cache budget with the chosen graphics preset. Low keeps
+  // mobile memory pressure down; High retains the previous 14M-pixel ceiling.
+  const pxBudget=GFX.level==='high'?14e6:GFX.level==='medium'?9e6:5e6;
+  const ssCap=GFX.level==='high'?1.5:GFX.level==='medium'?1.25:1;
+  const SS=Math.max(1,Math.min(ssCap,Math.sqrt(pxBudget/(wW*wH)))); WW._mapSS=SS; WW._mapW=wW; WW._mapH=wH;
   const mc=document.createElement('canvas'); mc.width=Math.ceil(wW*SS); mc.height=Math.ceil(wH*SS);
   const g=mc.getContext('2d'); g.scale(SS,SS); g.fillStyle='#0c1622'; g.fillRect(0,0,wW,wH);
   for(let y=0;y<W.rows;y++) for(let x=0;x<W.cols;x++){ const t=W.terr[y][x], [cx,cy]=wwHexCenter(x,y);
@@ -15577,7 +15608,8 @@ function wwRender(){
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   // while zooming/panning, draw the cheap cached map when lots of hexes are on screen
   // (zoomed out / mid); when zoomed in only a handful are visible, so keep crisp detail.
-  const dA = (WW._interacting && cam.z < 1.3) ? 0 : wwSmooth(WW_DETAIL_LO, WW_DETAIL_HI, cam.z);
+  const detailBand=GFX.level==='high'?[WW_DETAIL_LO,WW_DETAIL_HI]:GFX.level==='medium'?[.82,1.02]:[1.15,1.4];
+  const dA = (WW._interacting && cam.z < 1.3) ? 0 : wwSmooth(detailBand[0],detailBand[1],cam.z);
   if(dA>=1){ wwDrawHexesDetailed(ctx); }
   else if(dA<=0){ ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); }
   else { ctx.drawImage(WW.mapCanvas,0,0,WW._mapW,WW._mapH); ctx.save(); ctx.globalAlpha=dA; wwDrawHexesDetailed(ctx); ctx.restore(); }

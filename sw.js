@@ -4,7 +4,7 @@
    cached copy when offline, so the game still plays with no connection.
    Bump CACHE_VERSION when you want every installed app to show the
    "Update ready — reload" banner (e.g. after changing icons/manifest). */
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE = 'tide-of-steel-' + CACHE_VERSION;
 const CORE = [
   './', './index.html', './manifest.webmanifest',
